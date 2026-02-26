@@ -1,0 +1,80 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React, { useState } from 'react';
+import { Screen } from './types';
+import { Landing, Login, OTPVerify } from './screens/AuthScreens';
+import { 
+  Registration, 
+  AppSubmitted, 
+  AppApproved, 
+  AgreementSubmit, 
+  BankSetup, 
+  OnboardingComplete 
+} from './screens/OnboardingScreens';
+import { Dashboard } from './screens/Dashboard';
+import { FinancialHub } from './screens/FinancialHub';
+import { Analytics } from './screens/Analytics';
+import { EditProfile, PreviewProfile } from './screens/ProfileScreens';
+import { 
+  EventListings, 
+  CreateEventDetails, 
+  CreateEventTickets, 
+  CreateEventReview, 
+  EventReviewStatus,
+  EventDetails
+} from './screens/EventScreens';
+import { Sidebar } from './components/Navigation';
+
+export default function App() {
+  const [currentScreen, setCurrentScreen] = useState<Screen>('LANDING');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const renderScreen = () => {
+    switch (currentScreen) {
+      // Auth
+      case 'LANDING': return <Landing onNavigate={setCurrentScreen} />;
+      case 'LOGIN': return <Login onNavigate={setCurrentScreen} />;
+      case 'OTP_VERIFY': return <OTPVerify onNavigate={setCurrentScreen} />;
+      
+      // Onboarding
+      case 'REGISTRATION': return <Registration onNavigate={setCurrentScreen} />;
+      case 'APP_SUBMITTED': return <AppSubmitted onNavigate={setCurrentScreen} />;
+      case 'APP_APPROVED': return <AppApproved onNavigate={setCurrentScreen} />;
+      case 'AGREEMENT_SUBMIT': return <AgreementSubmit onNavigate={setCurrentScreen} />;
+      case 'BANK_SETUP': return <BankSetup onNavigate={setCurrentScreen} />;
+      case 'ONBOARDING_COMPLETE': return <OnboardingComplete onNavigate={setCurrentScreen} />;
+      
+      // Dashboard & Core
+      case 'DASHBOARD': return <Dashboard onNavigate={setCurrentScreen} onOpenSidebar={() => setIsSidebarOpen(true)} />;
+      case 'FINANCIAL_HUB': return <FinancialHub onNavigate={setCurrentScreen} />;
+      case 'ANALYTICS': return <Analytics onNavigate={setCurrentScreen} />;
+      case 'EDIT_PROFILE': return <EditProfile onNavigate={setCurrentScreen} />;
+      case 'PREVIEW_PROFILE': return <PreviewProfile onNavigate={setCurrentScreen} />;
+      
+      // Events
+      case 'EVENT_LISTINGS': return <EventListings onNavigate={setCurrentScreen} />;
+      case 'CREATE_EVENT_DETAILS': return <CreateEventDetails onNavigate={setCurrentScreen} />;
+      case 'CREATE_EVENT_TICKETS': return <CreateEventTickets onNavigate={setCurrentScreen} />;
+      case 'CREATE_EVENT_REVIEW': return <CreateEventReview onNavigate={setCurrentScreen} />;
+      case 'EVENT_REVIEW_STATUS': return <EventReviewStatus onNavigate={setCurrentScreen} />;
+      case 'EVENT_DETAILS': return <EventDetails onNavigate={setCurrentScreen} />;
+      
+      default: return <Landing onNavigate={setCurrentScreen} />;
+    }
+  };
+
+  return (
+    <div className="font-sans text-tlb-dark">
+      {renderScreen()}
+      <Sidebar 
+        isOpen={isSidebarOpen} 
+        onClose={() => setIsSidebarOpen(false)} 
+        currentScreen={currentScreen}
+        onNavigate={setCurrentScreen}
+      />
+    </div>
+  );
+}

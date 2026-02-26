@@ -1,7 +1,8 @@
-export type Screen = 
+export type Screen =
   | 'LANDING'
   | 'LOGIN'
   | 'OTP_VERIFY'
+  | 'PARTNER_ACCESS'
   | 'REGISTRATION'
   | 'APP_SUBMITTED'
   | 'APP_APPROVED'

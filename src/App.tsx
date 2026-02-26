@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { Screen } from './types';
-import { Landing, Login, OTPVerify } from './screens/AuthScreens';
+import { Landing, Login, OTPVerify, PartnerAccess } from './screens/AuthScreens';
 import {
   Registration,
   AppSubmitted,
@@ -38,6 +38,7 @@ export default function App() {
       case 'LANDING': return <Landing onNavigate={setCurrentScreen} />;
       case 'LOGIN': return <Login onNavigate={setCurrentScreen} />;
       case 'OTP_VERIFY': return <OTPVerify onNavigate={setCurrentScreen} />;
+      case 'PARTNER_ACCESS': return <PartnerAccess onNavigate={setCurrentScreen} />;
 
       // Onboarding
       case 'REGISTRATION': return <Registration onNavigate={setCurrentScreen} />;

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  ArrowLeft,
+  Menu,
   Plus,
   Search,
   Filter,
@@ -21,12 +21,13 @@ import { Screen, EventData, TicketTier } from '../types';
 
 interface EventProps {
   onNavigate: (screen: Screen) => void;
+  onOpenSidebar: () => void;
 }
 
-export const EventListings: React.FC<EventProps> = ({ onNavigate }) => (
+export const EventListings: React.FC<EventProps> = ({ onNavigate, onOpenSidebar }) => (
   <div className="min-h-screen bg-gray-50 pb-24">
     <header className="bg-white p-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
-      <button onClick={() => onNavigate('DASHBOARD')} className="p-2 -ml-2"><ArrowLeft size={24} /></button>
+      <button onClick={onOpenSidebar} className="p-2 -ml-2"><Menu size={24} /></button>
       <h1 className="font-black text-lg">Event Listings</h1>
       <button onClick={() => onNavigate('CREATE_EVENT_DETAILS')} className="bg-tlb-yellow p-2 rounded-xl text-tlb-dark shadow-lg shadow-tlb-yellow/20">
         <Plus size={24} />
@@ -83,10 +84,10 @@ export const EventListings: React.FC<EventProps> = ({ onNavigate }) => (
   </div>
 );
 
-export const CreateEventDetails: React.FC<EventProps> = ({ onNavigate }) => (
+export const CreateEventDetails: React.FC<EventProps> = ({ onNavigate, onOpenSidebar }) => (
   <div className="min-h-screen bg-gray-50 pb-24">
     <header className="bg-white p-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
-      <button onClick={() => onNavigate('EVENT_LISTINGS')} className="p-2 -ml-2"><ArrowLeft size={24} /></button>
+      <button onClick={onOpenSidebar} className="p-2 -ml-2"><Menu size={24} /></button>
       <h1 className="font-black text-lg">Event Details</h1>
       <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">Step 1/3</span>
     </header>
@@ -144,10 +145,10 @@ export const CreateEventDetails: React.FC<EventProps> = ({ onNavigate }) => (
   </div>
 );
 
-export const CreateEventTickets: React.FC<EventProps> = ({ onNavigate }) => (
+export const CreateEventTickets: React.FC<EventProps> = ({ onNavigate, onOpenSidebar }) => (
   <div className="min-h-screen bg-gray-50 pb-24">
     <header className="bg-white p-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
-      <button onClick={() => onNavigate('CREATE_EVENT_DETAILS')} className="p-2 -ml-2"><ArrowLeft size={24} /></button>
+      <button onClick={onOpenSidebar} className="p-2 -ml-2"><Menu size={24} /></button>
       <h1 className="font-black text-lg">Ticket Setup</h1>
       <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">Step 2/3</span>
     </header>
@@ -200,10 +201,10 @@ export const CreateEventTickets: React.FC<EventProps> = ({ onNavigate }) => (
   </div>
 );
 
-export const CreateEventReview: React.FC<EventProps> = ({ onNavigate }) => (
+export const CreateEventReview: React.FC<EventProps> = ({ onNavigate, onOpenSidebar }) => (
   <div className="min-h-screen bg-gray-50 pb-24">
     <header className="bg-white p-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
-      <button onClick={() => onNavigate('CREATE_EVENT_TICKETS')} className="p-2 -ml-2"><ArrowLeft size={24} /></button>
+      <button onClick={onOpenSidebar} className="p-2 -ml-2"><Menu size={24} /></button>
       <h1 className="font-black text-lg">Review</h1>
       <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">Step 3/3</span>
     </header>
@@ -262,7 +263,7 @@ export const CreateEventReview: React.FC<EventProps> = ({ onNavigate }) => (
   </div>
 );
 
-export const EventReviewStatus: React.FC<EventProps> = ({ onNavigate }) => (
+export const EventReviewStatus: React.FC<EventProps> = ({ onNavigate, onOpenSidebar }) => (
   <div className="min-h-screen bg-tlb-dark flex flex-col items-center justify-center p-8 text-center">
     <div className="w-32 h-32 bg-tlb-yellow/10 rounded-full flex items-center justify-center mb-8 relative">
       <div className="absolute inset-0 border-4 border-tlb-yellow/20 rounded-full border-t-tlb-yellow animate-spin"></div>
@@ -279,10 +280,10 @@ export const EventReviewStatus: React.FC<EventProps> = ({ onNavigate }) => (
   </div>
 );
 
-export const EventDetails: React.FC<EventProps> = ({ onNavigate }) => (
+export const EventDetails: React.FC<EventProps> = ({ onNavigate, onOpenSidebar }) => (
   <div className="min-h-screen bg-gray-50 pb-24">
     <header className="bg-white p-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
-      <button onClick={() => onNavigate('EVENT_LISTINGS')} className="p-2 -ml-2"><ArrowLeft size={24} /></button>
+      <button onClick={onOpenSidebar} className="p-2 -ml-2"><Menu size={24} /></button>
       <h1 className="font-black text-lg">Event Details</h1>
       <button className="p-2 text-gray-400"><MoreHorizontal size={24} /></button>
     </header>

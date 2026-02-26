@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  ArrowLeft,
+  Menu,
   Bell,
   ArrowUpRight,
   Calendar,
@@ -10,12 +10,13 @@ import { Screen } from '../types';
 
 interface AnalyticsProps {
   onNavigate: (screen: Screen) => void;
+  onOpenSidebar: () => void;
 }
 
-export const Analytics: React.FC<AnalyticsProps> = ({ onNavigate }) => (
+export const Analytics: React.FC<AnalyticsProps> = ({ onNavigate, onOpenSidebar }) => (
   <div className="min-h-screen bg-gray-50 pb-24">
     <header className="bg-white p-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
-      <button onClick={() => onNavigate('DASHBOARD')} className="p-2 -ml-2"><ArrowLeft size={24} /></button>
+      <button onClick={onOpenSidebar} className="p-2 -ml-2"><Menu size={24} /></button>
       <h1 className="font-black text-lg">Analytics</h1>
       <button className="p-2 relative">
         <Bell size={24} />

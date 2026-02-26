@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  ArrowLeft,
+  Menu,
   UserCircle,
   Camera,
   Instagram,
@@ -19,12 +19,13 @@ import { Screen } from '../types';
 
 interface ProfileProps {
   onNavigate: (screen: Screen) => void;
+  onOpenSidebar: () => void;
 }
 
-export const EditProfile: React.FC<ProfileProps> = ({ onNavigate }) => (
+export const EditProfile: React.FC<ProfileProps> = ({ onNavigate, onOpenSidebar }) => (
   <div className="min-h-screen bg-gray-50 pb-24">
     <header className="bg-white p-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
-      <button onClick={() => onNavigate('DASHBOARD')} className="p-2 -ml-2"><ArrowLeft size={24} /></button>
+      <button onClick={onOpenSidebar} className="p-2 -ml-2"><Menu size={24} /></button>
       <h1 className="font-black text-lg">Edit Profile</h1>
       <button className="text-tlb-yellow font-black text-sm uppercase tracking-widest">Save</button>
     </header>
@@ -81,10 +82,10 @@ export const EditProfile: React.FC<ProfileProps> = ({ onNavigate }) => (
   </div>
 );
 
-export const PreviewProfile: React.FC<ProfileProps> = ({ onNavigate }) => (
+export const PreviewProfile: React.FC<ProfileProps> = ({ onNavigate, onOpenSidebar }) => (
   <div className="min-h-screen bg-[#FDFCF8] pb-24">
     <header className="p-6 flex items-center justify-between sticky top-0 z-30 bg-[#FDFCF8]/80 backdrop-blur-md">
-      <button onClick={() => onNavigate('DASHBOARD')} className="p-2 bg-white rounded-full shadow-sm"><ArrowLeft size={24} /></button>
+      <button onClick={onOpenSidebar} className="p-2 bg-white rounded-full shadow-sm"><Menu size={24} /></button>
       <h1 className="font-black text-lg">Preview</h1>
       <button className="p-2 bg-white rounded-full shadow-sm"><ArrowUpRight size={24} className="rotate-45" /></button>
     </header>

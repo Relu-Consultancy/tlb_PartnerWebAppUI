@@ -1,12 +1,12 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { 
-  CheckCircle2, 
-  Clock, 
-  FileText, 
-  Upload, 
-  Building2, 
-  ChevronRight, 
+import {
+  CheckCircle2,
+  Clock,
+  FileText,
+  Upload,
+  Building2,
+  ChevronRight,
   ArrowLeft,
   ArrowRight,
   LayoutGrid,
@@ -48,114 +48,116 @@ export const Registration: React.FC<OnboardingProps> = ({ onNavigate }) => (
       ))}
     </div>
 
-    <main className="flex-1 p-6 space-y-6 pb-24">
-      <section className="tlb-card space-y-6">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="bg-tlb-yellow/10 p-2 rounded-lg text-tlb-yellow"><Building2 size={20} /></div>
-          <h3 className="font-black text-xl">Business Details</h3>
-        </div>
-        <div className="space-y-4">
-          <div>
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Business / Brand Name</label>
-            <input className="tlb-input" defaultValue="The Grand Theater" />
+    <main className="flex-1 p-6 pb-24">
+      <div className="tlb-content space-y-6">
+        <section className="tlb-card space-y-6">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="bg-tlb-yellow/10 p-2 rounded-lg text-tlb-yellow"><Building2 size={20} /></div>
+            <h3 className="font-black text-xl">Business Details</h3>
           </div>
-          <div>
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Contact Person Name</label>
-            <input className="tlb-input" defaultValue="Sarah Bernhardt" />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Email ID</label>
-            <div className="relative">
-              <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input className="tlb-input pl-12" defaultValue="sarah@grandtheater.com" />
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Business / Brand Name</label>
+              <input className="tlb-input" defaultValue="The Grand Theater" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Contact Person Name</label>
+              <input className="tlb-input" defaultValue="Sarah Bernhardt" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Email ID</label>
+              <div className="relative">
+                <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input className="tlb-input pl-12" defaultValue="sarah@grandtheater.com" />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">City</label>
+              <select className="tlb-input appearance-none">
+                <option>New York</option>
+              </select>
             </div>
           </div>
-          <div>
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">City</label>
-            <select className="tlb-input appearance-none">
-              <option>New York</option>
-            </select>
-          </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="tlb-card space-y-6">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="bg-tlb-yellow/10 p-2 rounded-lg text-tlb-yellow"><Globe size={20} /></div>
-          <h3 className="font-black text-xl">Digital Presence</h3>
-        </div>
-        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest -mt-4">* At least one field required</p>
-        <div className="space-y-4">
-          <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-100">
-            <Instagram size={18} className="text-pink-500" />
-            <input className="bg-transparent flex-1 text-sm outline-none" placeholder="Instagram URL" defaultValue="https://instagram.com/thegrandtheater" />
+        <section className="tlb-card space-y-6">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="bg-tlb-yellow/10 p-2 rounded-lg text-tlb-yellow"><Globe size={20} /></div>
+            <h3 className="font-black text-xl">Digital Presence</h3>
           </div>
-          <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-100">
-            <Facebook size={18} className="text-blue-600" />
-            <input className="bg-transparent flex-1 text-sm outline-none" placeholder="https://facebook.com/..." />
+          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest -mt-4">* At least one field required</p>
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-100">
+              <Instagram size={18} className="text-pink-500" />
+              <input className="bg-transparent flex-1 text-sm outline-none" placeholder="Instagram URL" defaultValue="https://instagram.com/thegrandtheater" />
+            </div>
+            <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-100">
+              <Facebook size={18} className="text-blue-600" />
+              <input className="bg-transparent flex-1 text-sm outline-none" placeholder="https://facebook.com/..." />
+            </div>
+            <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-100">
+              <Globe size={18} className="text-tlb-dark" />
+              <input className="bg-transparent flex-1 text-sm outline-none" placeholder="https://www.yourbusiness.com" />
+            </div>
           </div>
-          <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-100">
-            <Globe size={18} className="text-tlb-dark" />
-            <input className="bg-transparent flex-1 text-sm outline-none" placeholder="https://www.yourbusiness.com" />
-          </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="tlb-card space-y-6">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="bg-tlb-yellow/10 p-2 rounded-lg text-tlb-yellow"><CheckCircle2 size={20} /></div>
-          <h3 className="font-black text-xl">Proof of Work</h3>
-        </div>
-        <div className="space-y-6">
-          <div>
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Experience</label>
-            <div className="flex gap-2">
-              <input className="tlb-input flex-1" placeholder="e.g. 5" />
-              <div className="flex bg-gray-100 rounded-xl p-1">
-                <button className="px-4 py-2 bg-white rounded-lg text-xs font-bold shadow-sm">Years</button>
-                <button className="px-4 py-2 text-xs font-bold text-gray-400">Months</button>
+        <section className="tlb-card space-y-6">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="bg-tlb-yellow/10 p-2 rounded-lg text-tlb-yellow"><CheckCircle2 size={20} /></div>
+            <h3 className="font-black text-xl">Proof of Work</h3>
+          </div>
+          <div className="space-y-6">
+            <div>
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Experience</label>
+              <div className="flex gap-2">
+                <input className="tlb-input flex-1" placeholder="e.g. 5" />
+                <div className="flex bg-gray-100 rounded-xl p-1">
+                  <button className="px-4 py-2 bg-white rounded-lg text-xs font-bold shadow-sm">Years</button>
+                  <button className="px-4 py-2 text-xs font-bold text-gray-400">Months</button>
+                </div>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Upload 3-5 Real Photos</label>
+              <div className="border-2 border-dashed border-gray-200 rounded-2xl p-8 flex flex-col items-center justify-center gap-2 bg-gray-50/50">
+                <div className="bg-tlb-yellow/10 p-3 rounded-xl text-tlb-yellow"><ImageIcon size={24} /></div>
+                <p className="text-sm font-medium"><span className="text-tlb-yellow font-bold">Click to upload</span> or drag and drop</p>
+                <p className="text-[10px] text-gray-400 font-bold uppercase">PNG, JPG up to 5MB each</p>
+              </div>
+            </div>
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block">Upload Short Video</label>
+                <span className="text-[10px] bg-gray-100 text-gray-400 px-2 py-0.5 rounded font-bold uppercase">Optional</span>
+              </div>
+              <div className="flex items-center gap-4 bg-gray-50 border border-gray-100 p-4 rounded-2xl">
+                <div className="bg-gray-200 p-3 rounded-xl text-gray-500"><Video size={20} /></div>
+                <div className="flex-1">
+                  <p className="text-sm font-bold">Select video file</p>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase">MP4, MOV up to 50MB</p>
+                </div>
+                <button className="text-tlb-yellow font-bold text-sm">Browse</button>
               </div>
             </div>
           </div>
-          <div>
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Upload 3-5 Real Photos</label>
-            <div className="border-2 border-dashed border-gray-200 rounded-2xl p-8 flex flex-col items-center justify-center gap-2 bg-gray-50/50">
-              <div className="bg-tlb-yellow/10 p-3 rounded-xl text-tlb-yellow"><ImageIcon size={24} /></div>
-              <p className="text-sm font-medium"><span className="text-tlb-yellow font-bold">Click to upload</span> or drag and drop</p>
-              <p className="text-[10px] text-gray-400 font-bold uppercase">PNG, JPG up to 5MB each</p>
-            </div>
-          </div>
-          <div>
-            <div className="flex justify-between items-center mb-2">
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block">Upload Short Video</label>
-              <span className="text-[10px] bg-gray-100 text-gray-400 px-2 py-0.5 rounded font-bold uppercase">Optional</span>
-            </div>
-            <div className="flex items-center gap-4 bg-gray-50 border border-gray-100 p-4 rounded-2xl">
-              <div className="bg-gray-200 p-3 rounded-xl text-gray-500"><Video size={20} /></div>
-              <div className="flex-1">
-                <p className="text-sm font-bold">Select video file</p>
-                <p className="text-[10px] text-gray-400 font-bold uppercase">MP4, MOV up to 50MB</p>
-              </div>
-              <button className="text-tlb-yellow font-bold text-sm">Browse</button>
-            </div>
-          </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="tlb-card">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="bg-tlb-yellow/10 p-2 rounded-lg text-tlb-yellow"><FileText size={20} /></div>
-          <h3 className="font-black text-xl">Safety Confirmation</h3>
-        </div>
-        <label className="flex gap-4 items-start bg-tlb-yellow/5 border border-tlb-yellow/20 p-4 rounded-2xl cursor-pointer">
-          <input type="checkbox" className="mt-1 w-5 h-5 rounded border-tlb-yellow text-tlb-yellow focus:ring-tlb-yellow" />
-          <span className="text-sm font-medium leading-relaxed">I confirm that the information provided is genuine.</span>
-        </label>
-      </section>
+        <section className="tlb-card">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="bg-tlb-yellow/10 p-2 rounded-lg text-tlb-yellow"><FileText size={20} /></div>
+            <h3 className="font-black text-xl">Safety Confirmation</h3>
+          </div>
+          <label className="flex gap-4 items-start bg-tlb-yellow/5 border border-tlb-yellow/20 p-4 rounded-2xl cursor-pointer">
+            <input type="checkbox" className="mt-1 w-5 h-5 rounded border-tlb-yellow text-tlb-yellow focus:ring-tlb-yellow" />
+            <span className="text-sm font-medium leading-relaxed">I confirm that the information provided is genuine.</span>
+          </label>
+        </section>
 
-      <button onClick={() => onNavigate('APP_SUBMITTED')} className="tlb-button w-full py-5 shadow-xl shadow-tlb-yellow/20">
-        Submit Application <CheckCircle2 size={20} />
-      </button>
+        <button onClick={() => onNavigate('APP_SUBMITTED')} className="tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20">
+          Submit Application <CheckCircle2 size={20} />
+        </button>
+      </div>
     </main>
   </div>
 );
@@ -191,11 +193,10 @@ export const AppSubmitted: React.FC<OnboardingProps> = ({ onNavigate }) => (
           { label: 'Final Decision', time: 'Estimated 48h', status: 'pending' }
         ].map((step, i) => (
           <div key={i} className="flex gap-6 items-start py-4 relative z-10">
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-sm ${
-              step.status === 'done' ? 'bg-tlb-yellow text-tlb-dark' : 
-              step.status === 'current' ? 'bg-white border-2 border-tlb-yellow text-tlb-yellow' : 
-              'bg-white border-2 border-gray-100 text-gray-200'
-            }`}>
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-sm ${step.status === 'done' ? 'bg-tlb-yellow text-tlb-dark' :
+                step.status === 'current' ? 'bg-white border-2 border-tlb-yellow text-tlb-yellow' :
+                  'bg-white border-2 border-gray-100 text-gray-200'
+              }`}>
               {step.status === 'done' ? <CheckCircle2 size={20} /> : step.status === 'current' ? <Clock size={20} /> : <CheckCircle2 size={20} />}
             </div>
             <div>
@@ -206,7 +207,7 @@ export const AppSubmitted: React.FC<OnboardingProps> = ({ onNavigate }) => (
         ))}
       </div>
 
-      <button onClick={() => onNavigate('APP_APPROVED')} className="tlb-button w-full py-5 shadow-xl shadow-tlb-yellow/20">
+      <button onClick={() => onNavigate('APP_APPROVED')} className="tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20">
         Back to Home
       </button>
 
@@ -259,7 +260,7 @@ export const AppApproved: React.FC<OnboardingProps> = ({ onNavigate }) => (
         ))}
       </div>
 
-      <button onClick={() => onNavigate('AGREEMENT_SUBMIT')} className="tlb-button w-full py-5 shadow-xl shadow-tlb-yellow/20">
+      <button onClick={() => onNavigate('AGREEMENT_SUBMIT')} className="tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20">
         Proceed to Submit Agreement <ChevronRight size={20} />
       </button>
 
@@ -313,7 +314,7 @@ export const AgreementSubmit: React.FC<OnboardingProps> = ({ onNavigate }) => (
         <button className="text-gray-300 hover:text-red-500"><X size={20} /></button>
       </div>
 
-      <button onClick={() => onNavigate('BANK_SETUP')} className="tlb-button w-full py-5 shadow-xl shadow-tlb-yellow/20">
+      <button onClick={() => onNavigate('BANK_SETUP')} className="tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20">
         Submit Document
       </button>
 
@@ -337,90 +338,92 @@ export const BankSetup: React.FC<OnboardingProps> = ({ onNavigate }) => (
       <div className="p-2 bg-gray-100 rounded-lg"><LayoutGrid size={20} className="text-gray-400" /></div>
     </header>
 
-    <main className="p-6 space-y-8">
-      <div>
-        <div className="flex items-center gap-2 text-[10px] font-black text-tlb-yellow uppercase tracking-widest mb-2">
-          <CheckCircle2 size={12} /> Secure Channel
+    <main className="p-6">
+      <div className="tlb-content space-y-8">
+        <div>
+          <div className="flex items-center gap-2 text-[10px] font-black text-tlb-yellow uppercase tracking-widest mb-2">
+            <CheckCircle2 size={12} /> Secure Channel
+          </div>
+          <h1 className="text-4xl font-black">Add Bank Account</h1>
+          <p className="text-gray-400 mt-2 font-medium">Funds are settled within 24 hours of performance.</p>
         </div>
-        <h1 className="text-4xl font-black">Add Bank Account</h1>
-        <p className="text-gray-400 mt-2 font-medium">Funds are settled within 24 hours of performance.</p>
+
+        <section className="tlb-card space-y-6">
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Account Holder Name</label>
+              <input className="tlb-input" defaultValue="Julian Alexander Reed" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Bank Account Number</label>
+              <input className="tlb-input" type="password" defaultValue="............" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">IFSC Code</label>
+              <div className="relative">
+                <input className="tlb-input border-tlb-yellow pr-12" defaultValue="TLBNK0001234" />
+                <CheckCircle2 size={20} className="absolute right-4 top-1/2 -translate-y-1/2 text-emerald-500" />
+              </div>
+              <p className="text-[10px] text-emerald-500 font-bold mt-2">Verified: Broadway Central Bank, New York Branch</p>
+            </div>
+          </div>
+
+          <div className="border-2 border-dashed border-gray-100 rounded-2xl p-8 flex flex-col items-center justify-center gap-4 bg-gray-50/50">
+            <div className="bg-gray-200 p-3 rounded-xl text-gray-400"><Upload size={24} /></div>
+            <div className="text-center">
+              <p className="font-bold">Verification Document</p>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Upload a cancelled cheque or bank statement (PDF/JPG)</p>
+            </div>
+            <button className="px-8 py-2 border border-tlb-yellow text-tlb-yellow rounded-xl font-bold text-sm">Select File</button>
+
+            <div className="w-full bg-white border border-gray-100 p-3 rounded-xl flex items-center gap-3">
+              <div className="bg-tlb-yellow/10 p-2 rounded-lg text-tlb-yellow"><ImageIcon size={18} /></div>
+              <div className="flex-1">
+                <p className="text-xs font-bold">bank_statement_2024.pdf</p>
+                <p className="text-[10px] text-gray-400 font-bold uppercase">1.2 MB • Ready</p>
+              </div>
+              <button className="text-gray-300"><X size={16} /></button>
+            </div>
+          </div>
+
+          <button onClick={() => onNavigate('ONBOARDING_COMPLETE')} className="tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20">
+            Link Payout Account
+          </button>
+
+          <p className="text-center text-[10px] text-gray-300 font-bold uppercase tracking-widest flex items-center justify-center gap-2">
+            <LayoutGrid size={12} /> AES-256 Bit Encrypted Storage
+          </p>
+        </section>
+
+        <section className="space-y-4">
+          <h3 className="font-black text-xl">Saved Accounts</h3>
+          <div className="tlb-card p-4 border-t-4 border-t-tlb-yellow">
+            <div className="flex justify-between items-start mb-4">
+              <div className="flex gap-4">
+                <div className="w-12 h-12 bg-tlb-yellow/10 rounded-xl flex items-center justify-center text-tlb-yellow">
+                  <Building2 size={24} />
+                </div>
+                <div>
+                  <h4 className="font-bold">Chase Manhattan</h4>
+                  <p className="text-xs text-gray-400 font-bold tracking-widest">•••• •••• 8821</p>
+                </div>
+              </div>
+              <span className="bg-tlb-yellow text-tlb-dark text-[10px] font-black px-2 py-1 rounded uppercase tracking-widest">Default</span>
+            </div>
+            <div className="flex justify-between items-center pt-4 border-t border-gray-50">
+              <div className="flex items-center gap-2 text-emerald-500 text-[10px] font-black uppercase tracking-widest">
+                <CheckCircle2 size={12} /> Verified
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Active</span>
+                <div className="w-10 h-5 bg-tlb-yellow rounded-full relative">
+                  <div className="absolute right-1 top-1 w-3 h-3 bg-white rounded-full"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
-
-      <section className="tlb-card space-y-6">
-        <div className="space-y-4">
-          <div>
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Account Holder Name</label>
-            <input className="tlb-input" defaultValue="Julian Alexander Reed" />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Bank Account Number</label>
-            <input className="tlb-input" type="password" defaultValue="............" />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">IFSC Code</label>
-            <div className="relative">
-              <input className="tlb-input border-tlb-yellow pr-12" defaultValue="TLBNK0001234" />
-              <CheckCircle2 size={20} className="absolute right-4 top-1/2 -translate-y-1/2 text-emerald-500" />
-            </div>
-            <p className="text-[10px] text-emerald-500 font-bold mt-2">Verified: Broadway Central Bank, New York Branch</p>
-          </div>
-        </div>
-
-        <div className="border-2 border-dashed border-gray-100 rounded-2xl p-8 flex flex-col items-center justify-center gap-4 bg-gray-50/50">
-          <div className="bg-gray-200 p-3 rounded-xl text-gray-400"><Upload size={24} /></div>
-          <div className="text-center">
-            <p className="font-bold">Verification Document</p>
-            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Upload a cancelled cheque or bank statement (PDF/JPG)</p>
-          </div>
-          <button className="px-8 py-2 border border-tlb-yellow text-tlb-yellow rounded-xl font-bold text-sm">Select File</button>
-          
-          <div className="w-full bg-white border border-gray-100 p-3 rounded-xl flex items-center gap-3">
-            <div className="bg-tlb-yellow/10 p-2 rounded-lg text-tlb-yellow"><ImageIcon size={18} /></div>
-            <div className="flex-1">
-              <p className="text-xs font-bold">bank_statement_2024.pdf</p>
-              <p className="text-[10px] text-gray-400 font-bold uppercase">1.2 MB • Ready</p>
-            </div>
-            <button className="text-gray-300"><X size={16} /></button>
-          </div>
-        </div>
-
-        <button onClick={() => onNavigate('ONBOARDING_COMPLETE')} className="tlb-button w-full py-5 shadow-xl shadow-tlb-yellow/20">
-          Link Payout Account
-        </button>
-        
-        <p className="text-center text-[10px] text-gray-300 font-bold uppercase tracking-widest flex items-center justify-center gap-2">
-          <LayoutGrid size={12} /> AES-256 Bit Encrypted Storage
-        </p>
-      </section>
-
-      <section className="space-y-4">
-        <h3 className="font-black text-xl">Saved Accounts</h3>
-        <div className="tlb-card p-4 border-t-4 border-t-tlb-yellow">
-          <div className="flex justify-between items-start mb-4">
-            <div className="flex gap-4">
-              <div className="w-12 h-12 bg-tlb-yellow/10 rounded-xl flex items-center justify-center text-tlb-yellow">
-                <Building2 size={24} />
-              </div>
-              <div>
-                <h4 className="font-bold">Chase Manhattan</h4>
-                <p className="text-xs text-gray-400 font-bold tracking-widest">•••• •••• 8821</p>
-              </div>
-            </div>
-            <span className="bg-tlb-yellow text-tlb-dark text-[10px] font-black px-2 py-1 rounded uppercase tracking-widest">Default</span>
-          </div>
-          <div className="flex justify-between items-center pt-4 border-t border-gray-50">
-            <div className="flex items-center gap-2 text-emerald-500 text-[10px] font-black uppercase tracking-widest">
-              <CheckCircle2 size={12} /> Verified
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Active</span>
-              <div className="w-10 h-5 bg-tlb-yellow rounded-full relative">
-                <div className="absolute right-1 top-1 w-3 h-3 bg-white rounded-full"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
     </main>
   </div>
 );
@@ -434,54 +437,56 @@ export const OnboardingComplete: React.FC<OnboardingProps> = ({ onNavigate }) =>
     </header>
 
     <main className="flex-1 p-6">
-      <div className="bg-tlb-dark rounded-[2.5rem] p-10 text-center text-white relative overflow-hidden mb-12">
-        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-tlb-yellow/20 to-transparent opacity-50"></div>
-        <div className="relative z-10 flex flex-col items-center">
-          <div className="bg-tlb-yellow text-tlb-dark px-4 py-2 rounded-full flex items-center gap-2 text-[10px] font-black uppercase tracking-widest mb-8 shadow-lg">
-            <CheckCircle2 size={14} /> Verified Partner
-          </div>
-          
-          <div className="w-32 h-32 rounded-full border-4 border-tlb-yellow p-1 mb-8 shadow-2xl shadow-tlb-yellow/20">
-            <div className="w-full h-full rounded-full overflow-hidden relative">
-              <img src="https://picsum.photos/seed/spotlight/200/200" alt="Spotlight" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+      <div className="tlb-content">
+        <div className="bg-tlb-dark rounded-[2.5rem] p-10 text-center text-white relative overflow-hidden mb-12">
+          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-tlb-yellow/20 to-transparent opacity-50"></div>
+          <div className="relative z-10 flex flex-col items-center">
+            <div className="bg-tlb-yellow text-tlb-dark px-4 py-2 rounded-full flex items-center gap-2 text-[10px] font-black uppercase tracking-widest mb-8 shadow-lg">
+              <CheckCircle2 size={14} /> Verified Partner
             </div>
-          </div>
 
-          <h1 className="text-4xl font-black mb-4 font-serif italic">Welcome to the Spotlight!</h1>
-          <p className="text-gray-400 leading-relaxed max-w-xs mx-auto">
-            Your journey with The Little Broadway officially begins now. Your profile is live and ready to reach your audience.
-          </p>
+            <div className="w-32 h-32 rounded-full border-4 border-tlb-yellow p-1 mb-8 shadow-2xl shadow-tlb-yellow/20">
+              <div className="w-full h-full rounded-full overflow-hidden relative">
+                <img src="https://picsum.photos/seed/spotlight/200/200" alt="Spotlight" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+              </div>
+            </div>
+
+            <h1 className="text-4xl font-black mb-4 font-serif italic">Welcome to the Spotlight!</h1>
+            <p className="text-gray-400 leading-relaxed max-w-xs mx-auto">
+              Your journey with The Little Broadway officially begins now. Your profile is live and ready to reach your audience.
+            </p>
+          </div>
         </div>
-      </div>
 
-      <h3 className="font-black text-xl mb-6">Next Steps</h3>
-      <div className="space-y-4">
-        {[
-          { icon: PlusCircle, title: 'Create Your First Event', desc: 'Launch your show to the TLB community', screen: 'CREATE_EVENT_DETAILS' },
-          { icon: UserCircle, title: 'Complete Your Profile', desc: 'Add photos and social media links', screen: 'EDIT_PROFILE' },
-          { icon: BarChart3, title: 'Explore Dashboard', desc: 'View performance and ticket sales', screen: 'DASHBOARD' }
-        ].map((item, i) => (
-          <button 
-            key={i} 
-            onClick={() => onNavigate(item.screen as Screen)}
-            className="w-full tlb-card p-4 flex items-center gap-4 text-left hover:border-tlb-yellow transition-colors group"
-          >
-            <div className="bg-tlb-yellow/10 p-3 rounded-xl text-tlb-yellow group-hover:bg-tlb-yellow group-hover:text-tlb-dark transition-colors">
-              <item.icon size={24} />
-            </div>
-            <div className="flex-1">
-              <h4 className="font-bold">{item.title}</h4>
-              <p className="text-xs text-gray-400 font-medium">{item.desc}</p>
-            </div>
-            <ChevronRight size={20} className="text-gray-300" />
-          </button>
-        ))}
-      </div>
+        <h3 className="font-black text-xl mb-6">Next Steps</h3>
+        <div className="space-y-4">
+          {[
+            { icon: PlusCircle, title: 'Create Your First Event', desc: 'Launch your show to the TLB community', screen: 'CREATE_EVENT_DETAILS' },
+            { icon: UserCircle, title: 'Complete Your Profile', desc: 'Add photos and social media links', screen: 'EDIT_PROFILE' },
+            { icon: BarChart3, title: 'Explore Dashboard', desc: 'View performance and ticket sales', screen: 'DASHBOARD' }
+          ].map((item, i) => (
+            <button
+              key={i}
+              onClick={() => onNavigate(item.screen as Screen)}
+              className="w-full tlb-card p-4 flex items-center gap-4 text-left hover:border-tlb-yellow transition-colors group"
+            >
+              <div className="bg-tlb-yellow/10 p-3 rounded-xl text-tlb-yellow group-hover:bg-tlb-yellow group-hover:text-tlb-dark transition-colors">
+                <item.icon size={24} />
+              </div>
+              <div className="flex-1">
+                <h4 className="font-bold">{item.title}</h4>
+                <p className="text-xs text-gray-400 font-medium">{item.desc}</p>
+              </div>
+              <ChevronRight size={20} className="text-gray-300" />
+            </button>
+          ))}
+        </div>
 
-      <button onClick={() => onNavigate('DASHBOARD')} className="tlb-button w-full py-5 mt-12 shadow-xl shadow-tlb-yellow/20">
-        Go to My Dashboard <ArrowRight size={20} />
-      </button>
+        <button onClick={() => onNavigate('DASHBOARD')} className="tlb-button w-full py-4 mt-12 shadow-lg shadow-tlb-yellow/20">
+          Go to My Dashboard <ArrowRight size={20} />
+        </button>
+      </div>
     </main>
   </div>
 );

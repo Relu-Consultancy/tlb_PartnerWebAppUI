@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  ArrowLeft,
+  Menu,
   TrendingUp,
   ReceiptIndianRupee,
   ArrowUpRight,
@@ -13,12 +13,13 @@ import { Screen } from '../types';
 
 interface FinancialHubProps {
   onNavigate: (screen: Screen) => void;
+  onOpenSidebar: () => void;
 }
 
-export const FinancialHub: React.FC<FinancialHubProps> = ({ onNavigate }) => (
+export const FinancialHub: React.FC<FinancialHubProps> = ({ onNavigate, onOpenSidebar }) => (
   <div className="min-h-screen bg-gray-50 pb-24">
     <header className="bg-white p-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
-      <button onClick={() => onNavigate('DASHBOARD')} className="p-2 -ml-2"><ArrowLeft size={24} /></button>
+      <button onClick={onOpenSidebar} className="p-2 -ml-2"><Menu size={24} /></button>
       <h1 className="font-black text-lg">Financial Hub</h1>
       <div className="w-10 h-10 rounded-full bg-tlb-yellow/10 flex items-center justify-center text-tlb-yellow">
         <CheckCircle2 size={24} />

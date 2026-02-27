@@ -15,7 +15,7 @@ import {
   OnboardingComplete
 } from './screens/OnboardingScreens';
 import { Dashboard } from './screens/Dashboard';
-import { FinancialHub } from './screens/FinancialHub';
+import { FinancialHub, BankSetupHub } from './screens/FinancialHub';
 import { Analytics } from './screens/Analytics';
 import { EditProfile, PreviewProfile } from './screens/ProfileScreens';
 import {
@@ -46,6 +46,7 @@ export default function App() {
       case 'APP_APPROVED': return <AppApproved onNavigate={setCurrentScreen} />;
       case 'AGREEMENT_SUBMIT': return <AgreementSubmit onNavigate={setCurrentScreen} />;
       case 'BANK_SETUP': return <BankSetup onNavigate={setCurrentScreen} />;
+      case 'BANK_SETUP_HUB': return <BankSetupHub onNavigate={setCurrentScreen} />;
       case 'ONBOARDING_COMPLETE': return <OnboardingComplete onNavigate={setCurrentScreen} />;
 
       // Dashboard & Core

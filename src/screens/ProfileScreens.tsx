@@ -23,7 +23,6 @@ interface ProfileProps {
   onNavigate: (screen: Screen) => void;
   onOpenSidebar: () => void;
 }
-
 export const EditProfile: React.FC<ProfileProps> = ({ onNavigate, onOpenSidebar }) => (
   <div className="min-h-screen bg-[#FDFCF8] pb-8">
     <header className="bg-white p-4 sm:p-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
@@ -123,10 +122,9 @@ export const EditProfile: React.FC<ProfileProps> = ({ onNavigate, onOpenSidebar 
         </section>
 
         {/* Save Profile Button */}
-        <button onClick={() => onNavigate('PREVIEW_PROFILE')} className="tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20">
+        <button onClick={() => onNavigate('DASHBOARD')} className="tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20">
           <Save size={20} /> Save Profile
         </button>
-
         <p className="text-center text-gray-300 text-[10px] font-bold tracking-widest uppercase">
           TLB Partner Dashboard V2.0
         </p>
@@ -141,7 +139,7 @@ export const PreviewProfile: React.FC<ProfileProps> = ({ onNavigate, onOpenSideb
   return (
     <div className="min-h-screen bg-[#FDFCF8] pb-8">
       <header className="p-4 sm:p-6 flex items-center justify-between sticky top-0 z-30 bg-[#FDFCF8]/80 backdrop-blur-md">
-        <button onClick={() => onNavigate('EDIT_PROFILE')} className="p-2"><ArrowLeft size={24} /></button>
+        <button onClick={onOpenSidebar} className="p-2 -ml-2"><Menu size={24} /></button>
         <h1 className="font-black text-lg">TLB Organizer</h1>
         <button className="p-2"><Share2 size={22} /></button>
       </header>

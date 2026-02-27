@@ -85,6 +85,7 @@ export const Registration: React.FC<OnboardingProps> = ({ onNavigate }) => (
             <div className="bg-tlb-yellow/10 p-2 rounded-lg text-tlb-yellow"><Globe size={20} /></div>
             <h3 className="font-black text-xl">Digital Presence</h3>
           </div>
+          <br></br>
           <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest -mt-4">* At least one field required</p>
           <div className="space-y-4">
             <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-100">
@@ -194,8 +195,8 @@ export const AppSubmitted: React.FC<OnboardingProps> = ({ onNavigate }) => (
         ].map((step, i) => (
           <div key={i} className="flex gap-6 items-start py-4 relative z-10">
             <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-sm ${step.status === 'done' ? 'bg-tlb-yellow text-tlb-dark' :
-                step.status === 'current' ? 'bg-white border-2 border-tlb-yellow text-tlb-yellow' :
-                  'bg-white border-2 border-gray-100 text-gray-200'
+              step.status === 'current' ? 'bg-white border-2 border-tlb-yellow text-tlb-yellow' :
+                'bg-white border-2 border-gray-100 text-gray-200'
               }`}>
               {step.status === 'done' ? <CheckCircle2 size={20} /> : step.status === 'current' ? <Clock size={20} /> : <CheckCircle2 size={20} />}
             </div>

@@ -29,190 +29,245 @@ interface EventProps {
   onOpenSidebar: () => void;
 }
 
-export const EventListings: React.FC<EventProps> = ({ onNavigate, onOpenSidebar }) => (
-  <div className="min-h-screen bg-[#FDFCF8] pb-12">
-    <header className="bg-white p-4 sm:p-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
-      <button onClick={onOpenSidebar} className="p-2 -ml-2"><Menu size={24} /></button>
-      <div className="flex flex-col">
-        <span className="text-[10px] font-bold text-tlb-yellow uppercase tracking-widest">Partner Portal</span>
-        <h1 className="font-black text-xl">My Listings</h1>
-      </div>
-      <button className="p-2 bg-white rounded-full shadow-sm relative">
-        <Bell size={24} />
-        <div className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border border-white"></div>
-      </button>
-    </header>
+export const EventListings: React.FC<EventProps> = ({ onNavigate, onOpenSidebar }) => {
+  const [showFilters, setShowFilters] = useState(false);
+  const [showCompleteSetupDialog, setShowCompleteSetupDialog] = useState(false);
 
-    <main className="px-4 sm:px-6 py-6 border-t border-gray-100 bg-[#F8F9FA]">
-      <div className="max-w-lg mx-auto space-y-6">
-        {/* Search & Filter */}
-        <div className="flex gap-3">
-          <div className="flex-1 bg-white border border-gray-100 rounded-2xl px-4 py-3 flex items-center gap-3 shadow-sm">
-            <Search size={18} className="text-gray-400" />
-            <input className="bg-transparent flex-1 text-sm outline-none" placeholder="Search your listings..." />
-          </div>
-          <button className="bg-tlb-yellow p-3 rounded-2xl text-tlb-dark shadow-sm"><Filter size={20} /></button>
+  return (
+    <div className="min-h-screen bg-[#FDFCF8] pb-12">
+      <header className="bg-white p-4 sm:p-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
+        <button onClick={onOpenSidebar} className="p-2 -ml-2"><Menu size={24} /></button>
+        <div className="flex flex-col">
+          <span className="text-[10px] font-bold text-tlb-yellow uppercase tracking-widest">Partner Portal</span>
+          <h1 className="font-black text-xl">My Listings</h1>
         </div>
-
-        {/* Filters */}
-        <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Advanced Filters</h3>
-            <button className="text-[10px] font-bold text-tlb-yellow uppercase tracking-widest">Clear All</button>
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <label className="text-xs text-tlb-dark mb-1.5 block">Date Range</label>
-              <div className="flex items-center gap-2">
-                <input type="text" placeholder="mm/dd/yyyy" className="tlb-input flex-1 bg-[#FDFCF8] border-gray-100 text-xs py-2" />
-                <span className="text-gray-300">-</span>
-                <input type="text" placeholder="mm/dd/yyyy" className="tlb-input flex-1 bg-[#FDFCF8] border-gray-100 text-xs py-2" />
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <div className="flex-1">
-                <label className="text-xs text-tlb-dark mb-1.5 block">Category</label>
-                <select className="tlb-input w-full bg-[#FDFCF8] border-gray-100 text-xs py-2 text-gray-500 appearance-none">
-                  <option>All Categories</option>
-                </select>
-              </div>
-              <div className="flex-1">
-                <label className="text-xs text-tlb-dark mb-1.5 block">Status</label>
-                <select className="tlb-input w-full bg-[#FDFCF8] border-gray-100 text-xs py-2 text-gray-500 appearance-none">
-                  <option>All Statuses</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide">
-          {['All', 'Active', 'Draft', 'Past'].map((tab, i) => (
-            <button key={tab} className={`px-5 py-2 rounded-full text-xs font-bold whitespace-nowrap ${i === 0 ? 'bg-tlb-yellow text-tlb-dark' : 'bg-white border border-gray-200 text-gray-500'}`}>
-              {tab}
-            </button>
-          ))}
-        </div>
-
-        {/* Create Listing Button */}
-        <button onClick={() => onNavigate('CREATE_EVENT_DETAILS')} className="tlb-button w-full py-4 text-sm shadow-sm flex items-center justify-center gap-2">
-          <Plus size={18} /> Create New Listing
+        <button className="p-2 bg-white rounded-full shadow-sm relative">
+          <Bell size={24} />
+          <div className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border border-white"></div>
         </button>
+      </header>
 
-        {/* Listings */}
-        <div className="space-y-6">
-          {/* Item 1 - Live */}
-          <div className="bg-white rounded-[2rem] overflow-hidden border border-gray-100 shadow-sm">
-            <div className="h-40 relative">
-              <img src="https://picsum.photos/seed/stage1/800/400" alt="Cover" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-              <span className="absolute top-4 right-4 bg-emerald-500 text-white text-[10px] font-black px-2 py-1 rounded">LIVE</span>
+      <main className="px-4 sm:px-6 py-6 border-t border-gray-100 bg-[#F8F9FA]">
+        <div className="max-w-lg mx-auto space-y-6">
+          {/* Search & Filter */}
+          <div className="flex gap-3">
+            <div className="flex-1 bg-white border border-gray-100 rounded-2xl px-4 py-3 flex items-center gap-3 shadow-sm">
+              <Search size={18} className="text-gray-400" />
+              <input className="bg-transparent flex-1 text-sm outline-none" placeholder="Search your listings..." />
             </div>
-            <div className="p-5">
-              <div className="flex justify-between items-start mb-1">
-                <span className="text-[10px] font-bold text-tlb-yellow uppercase tracking-widest">Theater Workshop</span>
-                <span className="text-[10px] text-gray-400">Dec 15, 2023</span>
-              </div>
-              <h4 className="font-black text-lg mb-4 text-tlb-dark">Holiday Broadway Intensive</h4>
-
-              <div className="flex gap-4 mb-5 border-t border-b border-gray-50 py-3 bg-[#FDFCF8] rounded-xl px-4">
-                <div className="flex-1 border-r border-gray-100">
-                  <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Bookings</p>
-                  <p className="font-black text-tlb-dark text-sm">45 / 50 <span className="text-[10px] text-gray-400 font-normal">(90%)</span></p>
-                </div>
-                <div className="flex-1">
-                  <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Revenue</p>
-                  <p className="font-black text-tlb-dark text-sm">$2,250</p>
-                </div>
-              </div>
-
-              <div className="flex justify-between items-center pt-2">
-                <div className="flex gap-2">
-                  <button className="p-2.5 bg-[#F8F9FA] rounded-xl text-tlb-dark border border-gray-100"><Edit2 size={16} /></button>
-                  <button className="p-2.5 bg-[#F8F9FA] rounded-xl text-tlb-dark border border-gray-100"><Copy size={16} /></button>
-                  <button className="p-2.5 bg-[#F8F9FA] rounded-xl text-tlb-dark border border-gray-100"><BarChart2 size={16} /></button>
-                </div>
-                <button onClick={() => onNavigate('EVENT_DETAILS')} className="text-xs font-black text-tlb-yellow uppercase tracking-widest pr-2">View Details</button>
-              </div>
-            </div>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`p-3 rounded-2xl shadow-sm transition-colors ${showFilters ? 'bg-tlb-dark text-tlb-yellow' : 'bg-tlb-yellow text-tlb-dark'}`}
+            >
+              <Filter size={20} />
+            </button>
           </div>
 
-          {/* Item 2 - Draft */}
-          <div className="bg-white rounded-[2rem] overflow-hidden border border-gray-100 shadow-sm opacity-80">
-            <div className="h-40 relative">
-              <img src="https://picsum.photos/seed/guitar/800/400" alt="Cover" className="w-full h-full object-cover grayscale" referrerPolicy="no-referrer" />
-              <div className="absolute inset-0 bg-white/40 mix-blend-overlay"></div>
-              <span className="absolute top-4 right-4 bg-slate-400 text-white text-[10px] font-black px-2 py-1 rounded">DRAFT</span>
-            </div>
-            <div className="p-5">
-              <div className="flex justify-between items-start mb-1">
-                <span className="text-[10px] font-bold text-tlb-yellow uppercase tracking-widest">Music Class</span>
-                <span className="text-[10px] text-gray-400">Jan 10, 2024</span>
-              </div>
-              <h4 className="font-black text-lg mb-4 text-tlb-dark">Beginner Piano for Toddlers</h4>
-
-              <div className="flex gap-4 mb-5 border-t border-b border-gray-50 py-3 bg-[#FDFCF8] rounded-xl px-4">
-                <div className="flex-1 border-r border-gray-100">
-                  <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Bookings</p>
-                  <p className="font-black text-tlb-dark text-sm">0 / 12</p>
-                </div>
-                <div className="flex-1">
-                  <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Status</p>
-                  <p className="text-gray-500 italic text-sm">Not Started</p>
-                </div>
+          {/* Filters */}
+          {showFilters && (
+            <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm animate-in slide-in-from-top-4 fade-in duration-200">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Advanced Filters</h3>
+                <button className="text-[10px] font-bold text-tlb-yellow uppercase tracking-widest">Clear All</button>
               </div>
 
-              <div className="flex justify-between items-center pt-2">
-                <div className="flex gap-2">
-                  <button className="p-2.5 bg-[#F8F9FA] rounded-xl text-tlb-dark border border-gray-100"><Edit2 size={16} /></button>
-                  <button className="p-2.5 bg-[#F8F9FA] rounded-xl text-tlb-dark border border-gray-100"><Copy size={16} /></button>
-                  <button className="p-2.5 bg-gray-50 rounded-xl text-gray-300 border border-gray-100" disabled><BarChart2 size={16} /></button>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs text-tlb-dark mb-1.5 block">Date Range</label>
+                  <div className="flex items-center gap-2">
+                    <input type="text" placeholder="mm/dd/yyyy" className="tlb-input flex-1 bg-[#FDFCF8] border-gray-100 text-xs py-2" />
+                    <span className="text-gray-300">-</span>
+                    <input type="text" placeholder="mm/dd/yyyy" className="tlb-input flex-1 bg-[#FDFCF8] border-gray-100 text-xs py-2" />
+                  </div>
                 </div>
-                <button className="text-xs font-black text-tlb-yellow uppercase tracking-widest pr-2">Complete Setup</button>
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <label className="text-xs text-tlb-dark mb-1.5 block">Category</label>
+                    <select className="tlb-input w-full bg-[#FDFCF8] border-gray-100 text-xs py-2 text-gray-500 appearance-none">
+                      <option>All Categories</option>
+                    </select>
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-xs text-tlb-dark mb-1.5 block">Status</label>
+                    <select className="tlb-input w-full bg-[#FDFCF8] border-gray-100 text-xs py-2 text-gray-500 appearance-none">
+                      <option>All Statuses</option>
+                    </select>
+                  </div>
+                </div>
               </div>
             </div>
+          )}
+
+          {/* Tabs */}
+          <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide">
+            {['All', 'Active', 'Draft', 'Past'].map((tab, i) => (
+              <button key={tab} className={`px-5 py-2 rounded-full text-xs font-bold whitespace-nowrap ${i === 0 ? 'bg-tlb-yellow text-tlb-dark' : 'bg-white border border-gray-200 text-gray-500'}`}>
+                {tab}
+              </button>
+            ))}
           </div>
 
-          {/* Item 3 - Sold Out */}
-          <div className="bg-white rounded-[2rem] overflow-hidden border border-gray-100 shadow-sm">
-            <div className="h-40 relative">
-              <img src="https://picsum.photos/seed/dance/800/400" alt="Cover" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-              <span className="absolute top-4 right-4 bg-red-500 text-white text-[10px] font-black px-2 py-1 rounded">SOLD OUT</span>
+          {/* Create Listing Button */}
+          <button onClick={() => onNavigate('CREATE_EVENT_DETAILS')} className="tlb-button w-full py-4 text-sm shadow-sm flex items-center justify-center gap-2">
+            <Plus size={18} /> Create New Listing
+          </button>
+
+          {/* Listings */}
+          <div className="space-y-6">
+            {/* Item 1 - Live */}
+            <div className="bg-white rounded-[2rem] overflow-hidden border border-gray-100 shadow-sm">
+              <div className="h-40 relative">
+                <img src="https://picsum.photos/seed/stage1/800/400" alt="Cover" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                <span className="absolute top-4 right-4 bg-emerald-500 text-white text-[10px] font-black px-2 py-1 rounded">LIVE</span>
+              </div>
+              <div className="p-5">
+                <div className="flex justify-between items-start mb-1">
+                  <span className="text-[10px] font-bold text-tlb-yellow uppercase tracking-widest">Theater Workshop</span>
+                  <span className="text-[10px] text-gray-400">Dec 15, 2023</span>
+                </div>
+                <h4 className="font-black text-lg mb-4 text-tlb-dark">Holiday Broadway Intensive</h4>
+
+                <div className="flex gap-4 mb-5 border-t border-b border-gray-50 py-3 bg-[#FDFCF8] rounded-xl px-4">
+                  <div className="flex-1 border-r border-gray-100">
+                    <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Bookings</p>
+                    <p className="font-black text-tlb-dark text-sm">45 / 50 <span className="text-[10px] text-gray-400 font-normal">(90%)</span></p>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Revenue</p>
+                    <p className="font-black text-tlb-dark text-sm">$2,250</p>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center pt-2">
+                  <div className="flex gap-2">
+                    <button className="p-2.5 bg-[#F8F9FA] rounded-xl text-tlb-dark border border-gray-100"><Edit2 size={16} /></button>
+                    <button className="p-2.5 bg-[#F8F9FA] rounded-xl text-tlb-dark border border-gray-100"><Copy size={16} /></button>
+                    <button className="p-2.5 bg-[#F8F9FA] rounded-xl text-tlb-dark border border-gray-100"><BarChart2 size={16} /></button>
+                  </div>
+                  <button onClick={() => onNavigate('EVENT_DETAILS')} className="text-xs font-black text-tlb-yellow uppercase tracking-widest pr-2">View Details</button>
+                </div>
+              </div>
             </div>
-            <div className="p-5">
-              <div className="flex justify-between items-start mb-1">
-                <span className="text-[10px] font-bold text-tlb-yellow uppercase tracking-widest">Dance Program</span>
-                <span className="text-[10px] text-gray-400">Every Tue/Thu</span>
-              </div>
-              <h4 className="font-black text-lg mb-4 text-tlb-dark">Advanced Tap Dance Techniques</h4>
 
-              <div className="flex gap-4 mb-5 border-t border-b border-gray-50 py-3 bg-[#FDFCF8] rounded-xl px-4">
-                <div className="flex-1 border-r border-gray-100">
-                  <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Bookings</p>
-                  <p className="font-black text-tlb-dark text-sm">20 / 20</p>
+            {/* Item 2 - Draft */}
+            <div className="bg-white rounded-[2rem] overflow-hidden border border-gray-100 shadow-sm opacity-80">
+              <div className="h-40 relative">
+                <img src="https://picsum.photos/seed/guitar/800/400" alt="Cover" className="w-full h-full object-cover grayscale" referrerPolicy="no-referrer" />
+                <div className="absolute inset-0 bg-white/40 mix-blend-overlay"></div>
+                <span className="absolute top-4 right-4 bg-slate-400 text-white text-[10px] font-black px-2 py-1 rounded">DRAFT</span>
+              </div>
+              <div className="p-5">
+                <div className="flex justify-between items-start mb-1">
+                  <span className="text-[10px] font-bold text-tlb-yellow uppercase tracking-widest">Music Class</span>
+                  <span className="text-[10px] text-gray-400">Jan 10, 2024</span>
                 </div>
-                <div className="flex-1">
-                  <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Waitlist</p>
-                  <p className="font-black text-tlb-dark text-sm">4</p>
+                <h4 className="font-black text-lg mb-4 text-tlb-dark">Beginner Piano for Toddlers</h4>
+
+                <div className="flex gap-4 mb-5 border-t border-b border-gray-50 py-3 bg-[#FDFCF8] rounded-xl px-4">
+                  <div className="flex-1 border-r border-gray-100">
+                    <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Bookings</p>
+                    <p className="font-black text-tlb-dark text-sm">0 / 12</p>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Status</p>
+                    <p className="text-gray-500 italic text-sm">Not Started</p>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center pt-2">
+                  <div className="flex gap-2">
+                    <button className="p-2.5 bg-[#F8F9FA] rounded-xl text-tlb-dark border border-gray-100"><Edit2 size={16} /></button>
+                    <button className="p-2.5 bg-[#F8F9FA] rounded-xl text-tlb-dark border border-gray-100"><Copy size={16} /></button>
+                    <button className="p-2.5 bg-gray-50 rounded-xl text-gray-300 border border-gray-100" disabled><BarChart2 size={16} /></button>
+                  </div>
+                  <button
+                    onClick={() => setShowCompleteSetupDialog(true)}
+                    className="text-xs font-black text-tlb-yellow uppercase tracking-widest pr-2"
+                  >
+                    Complete Setup
+                  </button>
                 </div>
               </div>
+            </div>
 
-              <div className="flex justify-between items-center pt-2">
-                <div className="flex gap-2">
-                  <button className="p-2.5 bg-[#F8F9FA] rounded-xl text-tlb-dark border border-gray-100"><Edit2 size={16} /></button>
-                  <button className="p-2.5 bg-[#F8F9FA] rounded-xl text-tlb-dark border border-gray-100"><Copy size={16} /></button>
-                  <button className="p-2.5 bg-[#F8F9FA] rounded-xl text-tlb-dark border border-gray-100"><BarChart2 size={16} /></button>
+            {/* Item 3 - Sold Out */}
+            <div className="bg-white rounded-[2rem] overflow-hidden border border-gray-100 shadow-sm">
+              <div className="h-40 relative">
+                <img src="https://picsum.photos/seed/dance/800/400" alt="Cover" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                <span className="absolute top-4 right-4 bg-red-500 text-white text-[10px] font-black px-2 py-1 rounded">SOLD OUT</span>
+              </div>
+              <div className="p-5">
+                <div className="flex justify-between items-start mb-1">
+                  <span className="text-[10px] font-bold text-tlb-yellow uppercase tracking-widest">Dance Program</span>
+                  <span className="text-[10px] text-gray-400">Every Tue/Thu</span>
                 </div>
-                <button onClick={() => onNavigate('EVENT_DETAILS')} className="text-xs font-black text-tlb-yellow uppercase tracking-widest pr-2">View Details</button>
+                <h4 className="font-black text-lg mb-4 text-tlb-dark">Advanced Tap Dance Techniques</h4>
+
+                <div className="flex gap-4 mb-5 border-t border-b border-gray-50 py-3 bg-[#FDFCF8] rounded-xl px-4">
+                  <div className="flex-1 border-r border-gray-100">
+                    <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Bookings</p>
+                    <p className="font-black text-tlb-dark text-sm">20 / 20</p>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Waitlist</p>
+                    <p className="font-black text-tlb-dark text-sm">4</p>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center pt-2">
+                  <div className="flex gap-2">
+                    <button className="p-2.5 bg-[#F8F9FA] rounded-xl text-tlb-dark border border-gray-100"><Edit2 size={16} /></button>
+                    <button className="p-2.5 bg-[#F8F9FA] rounded-xl text-tlb-dark border border-gray-100"><Copy size={16} /></button>
+                    <button className="p-2.5 bg-[#F8F9FA] rounded-xl text-tlb-dark border border-gray-100"><BarChart2 size={16} /></button>
+                  </div>
+                  <button onClick={() => onNavigate('EVENT_DETAILS')} className="text-xs font-black text-tlb-yellow uppercase tracking-widest pr-2">View Details</button>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    </main>
-  </div>
-);
+      </main>
+
+      {/* Complete Setup Dialog Overlay */}
+      {showCompleteSetupDialog && (
+        <div className="fixed inset-0 bg-tlb-dark/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-[2rem] w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="p-6 sm:p-8 space-y-6">
+              <div className="w-16 h-16 bg-tlb-yellow/10 rounded-full flex items-center justify-center mx-auto text-tlb-yellow">
+                <Edit2 size={24} />
+              </div>
+
+              <div className="text-center space-y-2">
+                <h3 className="font-black text-2xl text-tlb-dark">Complete Setup</h3>
+                <p className="text-sm text-gray-500 leading-relaxed">
+                  You have unsaved changes for <strong className="text-tlb-dark">Beginner Piano for Toddlers</strong>. Would you like to pick up where you left off?
+                </p>
+              </div>
+
+              <div className="space-y-3 pt-4">
+                <button
+                  onClick={() => {
+                    setShowCompleteSetupDialog(false);
+                    onNavigate('CREATE_EVENT_DETAILS');
+                  }}
+                  className="tlb-button w-full py-4 text-sm shadow-md"
+                >
+                  Continue Setup
+                </button>
+                <button
+                  onClick={() => setShowCompleteSetupDialog(false)}
+                  className="w-full py-4 text-gray-400 font-bold text-sm bg-white border border-gray-100 rounded-2xl hover:bg-gray-50 uppercase tracking-widest transition-colors shadow-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const CreateEventDetails: React.FC<EventProps> = ({ onNavigate, onOpenSidebar }) => (
   <div className="min-h-screen bg-[#FDFCF8] pb-24">
@@ -786,96 +841,205 @@ export const EventReviewStatus: React.FC<EventProps> = ({ onNavigate, onOpenSide
 
 export const EventDetails: React.FC<EventProps> = ({ onNavigate, onOpenSidebar }) => (
   <div className="min-h-screen bg-[#FDFCF8] pb-12">
-    <header className="bg-white p-4 sm:p-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
-      <div className="flex items-center gap-2 -ml-2">
-        <button onClick={() => onNavigate('EVENT_LISTINGS')} className="p-2"><ArrowLeft size={24} /></button>
-        <button onClick={onOpenSidebar} className="p-2"><Menu size={24} /></button>
+    <header className="p-4 sm:p-6 sticky top-0 z-30 bg-[#FDFCF8]">
+      <div className="max-w-3xl mx-auto flex items-start justify-between">
+        <div className="flex gap-4 items-start">
+          <button onClick={() => onNavigate('EVENT_LISTINGS')} className="p-2.5 rounded-full bg-white shadow-sm border border-gray-100 mt-1"><ArrowLeft size={20} className="text-gray-600" /></button>
+          <div className="space-y-1">
+            <span className="text-[10px] font-black text-tlb-yellow uppercase tracking-widest">Partner Portal</span>
+            <h1 className="font-black text-3xl text-tlb-dark leading-tight">Holiday Broadway<br />Intensive</h1>
+            <div className="flex items-center gap-4 text-xs font-bold text-gray-400 mt-2">
+              <div className="flex items-center gap-1.5"><Calendar size={14} /> Dec 15, 2023</div>
+              <div className="w-1 h-1 bg-gray-300 rounded-full"></div>
+              <div className="flex items-center gap-1.5"><MapPin size={14} /> Main Studio</div>
+            </div>
+          </div>
+        </div>
+
+        <button className="bg-tlb-yellow text-tlb-dark px-5 py-2.5 rounded-full font-black text-sm flex items-center gap-2 shadow-sm">
+          <span className="text-lg leading-none">↓</span> Export
+        </button>
       </div>
-      <h1 className="font-black text-lg text-tlb-dark">Event Details</h1>
-      <button className="p-2 text-gray-400"><MoreHorizontal size={24} /></button>
     </header>
 
-    <main className="px-4 sm:px-6 py-6 border-t border-gray-100 bg-[#F8F9FA]">
+    <main className="px-4 sm:px-6 py-6 pb-24">
       <div className="max-w-3xl mx-auto space-y-6">
 
-        {/* Main Card */}
-        <div className="bg-white rounded-[2rem] overflow-hidden border border-gray-100 shadow-sm">
-          <div className="h-56 relative">
-            <img src="https://picsum.photos/seed/hamilton/1200/600" alt="Hamilton" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
+        {/* Revenue Statistics */}
+        <div className="space-y-4">
+          <div className="flex justify-between items-center px-1">
+            <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">Revenue Statistics</h3>
+            <span className="text-[9px] font-black text-gray-400 bg-blue-50 px-2 py-0.5 rounded uppercase tracking-widest">Live</span>
           </div>
 
-          <div className="p-6 sm:p-8">
+          <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
+            {/* Stat 1 */}
+            <div className="bg-white rounded-[2rem] p-5 border border-gray-100 shadow-sm min-w-[140px] flex-1">
+              <p className="text-[10px] font-bold text-gray-400 mb-2">Gross Revenue</p>
+              <p className="text-xl font-black text-tlb-dark mb-1">$3,825</p>
+              <p className="text-[10px] font-black text-emerald-500">+12%</p>
+            </div>
+            {/* Stat 2 */}
+            <div className="bg-white rounded-[2rem] p-5 border border-tlb-yellow/30 shadow-sm min-w-[140px] flex-1">
+              <p className="text-[10px] font-bold text-gray-400 mb-2">Net Earnings</p>
+              <p className="text-xl font-black text-tlb-dark mb-1">$3,251</p>
+              <p className="text-[10px] text-gray-300 font-bold">After Com.</p>
+            </div>
+            {/* Stat 3 */}
+            <div className="bg-white rounded-[2rem] p-5 border border-gray-100 shadow-sm min-w-[140px] flex-1">
+              <p className="text-[10px] font-bold text-gray-400 mb-2">Sold Tickets</p>
+              <p className="text-xl font-black text-tlb-dark mb-3">45/50</p>
+              <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-full bg-tlb-yellow rounded-full w-[90%]"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Search and filter */}
+        <div className="flex gap-3 pt-2">
+          <div className="flex-1 bg-white border border-gray-100 rounded-[1.5rem] px-4 py-3.5 flex items-center gap-3 shadow-sm">
+            <Search size={18} className="text-gray-400" />
+            <input className="bg-transparent flex-1 text-sm outline-none text-gray-600" placeholder="Search participants..." />
+          </div>
+          <button className="bg-white p-3.5 rounded-[1.5rem] text-tlb-dark shadow-sm border border-gray-100 flex items-center justify-center min-w-[60px]">
+            <span className="text-xl rotate-90 leading-none pb-1">≡</span>
+          </button>
+        </div>
+
+        {/* Participant List */}
+        <div className="space-y-4">
+          {/* Participant 1 */}
+          <div className="bg-white rounded-[2rem] p-5 border border-gray-100 shadow-sm">
             <div className="flex justify-between items-start mb-6">
+              <div className="flex gap-3 items-center">
+                <div className="w-12 h-12 rounded-full bg-[#FFF9E6] text-tlb-yellow font-black text-lg flex items-center justify-center">SM</div>
+                <div>
+                  <h4 className="font-bold text-tlb-dark">Sarah Mitchell</h4>
+                  <p className="text-[10px] text-gray-400">Dec 01, 2023 • 10:45 AM</p>
+                </div>
+              </div>
+              <span className="text-[10px] font-black text-emerald-500 bg-emerald-50 px-3 py-1 rounded-full uppercase tracking-widest">Paid</span>
+            </div>
+
+            <div className="flex justify-between mb-6">
               <div>
-                <span className="inline-block bg-emerald-50 text-emerald-500 text-[10px] font-black px-2 py-0.5 rounded mb-2 uppercase tracking-widest">Live</span>
-                <h2 className="font-black text-2xl text-tlb-dark">Hamilton Workshop</h2>
+                <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest mb-1">TICKETS</p>
+                <p className="text-sm font-bold text-tlb-dark">2 × VIP Pass</p>
               </div>
               <div className="text-right">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-0.5">Earnings</span>
-                <span className="font-black text-xl text-emerald-500">$5,580</span>
+                <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest mb-1">AMOUNT</p>
+                <p className="text-sm font-bold text-tlb-dark">$240.00</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4 mb-8 text-center border-t border-b border-gray-50 py-4">
-              <div>
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Sold</span>
-                <span className="font-black text-lg text-tlb-dark">124</span>
+            <div className="flex justify-between items-center">
+              <div className="flex gap-4">
+                <button className="text-[10px] font-black text-tlb-yellow flex items-center gap-1.5"><span className="text-sm">📞</span> Call</button>
+                <button className="text-[10px] font-black text-tlb-yellow flex items-center gap-1.5"><span className="text-sm">✉️</span> Email</button>
               </div>
-              <div className="border-l border-gray-100">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Capacity</span>
-                <span className="font-black text-lg text-tlb-dark">150</span>
-              </div>
-              <div className="border-l border-gray-100">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Views</span>
-                <span className="font-black text-lg text-tlb-dark">1.2k</span>
-              </div>
-            </div>
-
-            <div className="space-y-4 pt-2">
-              <div className="flex items-center gap-3">
-                <div className="bg-[#F8F9FA] p-2.5 rounded-xl border border-gray-100 text-gray-400">
-                  <Calendar size={18} />
-                </div>
-                <span className="text-sm font-bold text-tlb-dark">Oct 28, 2023 • 10:00 AM</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="bg-[#F8F9FA] p-2.5 rounded-xl border border-gray-100 text-gray-400">
-                  <MapPin size={18} />
-                </div>
-                <span className="text-sm font-bold text-tlb-dark">The Broadway Studio, NYC</span>
-              </div>
+              <button className="text-gray-300"><MoreHorizontal size={18} /></button>
             </div>
           </div>
-        </div>
 
-        {/* Ticket Sales */}
-        <div className="space-y-4 pt-2">
-          <h3 className="font-black text-xl">Ticket Sales</h3>
-
-          <div className="bg-white rounded-[2rem] p-6 border border-gray-100 shadow-sm">
-            <div className="flex justify-between items-end mb-4">
-              <div>
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">General Admission</span>
-                <span className="font-black text-sm text-tlb-dark">124 / 150 sold</span>
+          {/* Participant 2 */}
+          <div className="bg-white rounded-[2rem] p-5 border border-gray-100 shadow-sm">
+            <div className="flex justify-between items-start mb-6">
+              <div className="flex gap-3 items-center">
+                <div className="w-12 h-12 rounded-full bg-[#F0F4F8] text-[#869AB8] font-black text-lg flex items-center justify-center">JC</div>
+                <div>
+                  <h4 className="font-bold text-tlb-dark">James Chen</h4>
+                  <p className="text-[10px] text-gray-400">Nov 28, 2023 • 02:15 PM</p>
+                </div>
               </div>
-              <span className="font-black text-base text-tlb-dark">$5,580</span>
+              <span className="text-[10px] font-black text-tlb-yellow bg-[#FFF9E6] px-3 py-1 rounded-full uppercase tracking-widest">Pending</span>
             </div>
 
-            <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
-              <div className="h-full bg-tlb-yellow rounded-full w-[82%]"></div>
+            <div className="flex justify-between mb-6">
+              <div>
+                <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest mb-1">TICKETS</p>
+                <p className="text-sm font-bold text-tlb-dark">1 × Standard</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest mb-1">AMOUNT</p>
+                <p className="text-sm font-bold text-tlb-dark">$85.00</p>
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center">
+              <div className="flex gap-4">
+                <button className="text-[10px] font-black text-tlb-yellow flex items-center gap-1.5"><span className="text-sm">📞</span> Call</button>
+                <button className="text-[10px] font-black text-tlb-yellow flex items-center gap-1.5"><span className="text-sm">✉️</span> Email</button>
+              </div>
+              <button className="text-gray-300"><MoreHorizontal size={18} /></button>
             </div>
           </div>
-        </div>
 
-        {/* Action Buttons */}
-        <div className="grid grid-cols-2 gap-4 pt-6">
-          <button className="w-full py-4 text-gray-400 font-bold text-sm bg-white border border-gray-100 rounded-2xl hover:bg-gray-50 uppercase tracking-widest transition-colors">
-            Edit Event
-          </button>
-          <button className="tlb-button w-full py-4 text-sm shadow-md flex items-center justify-center">
-            Pause Sales
-          </button>
+          {/* Participant 3 */}
+          <div className="bg-white rounded-[2rem] p-5 border border-gray-100 shadow-sm">
+            <div className="flex justify-between items-start mb-6">
+              <div className="flex gap-3 items-center">
+                <div className="w-12 h-12 rounded-full bg-[#FFF9E6] text-tlb-yellow font-black text-lg flex items-center justify-center">ET</div>
+                <div>
+                  <h4 className="font-bold text-tlb-dark">Emma Thompson</h4>
+                  <p className="text-[10px] text-gray-400">Nov 25, 2023 • 09:20 AM</p>
+                </div>
+              </div>
+              <span className="text-[10px] font-black text-red-500 bg-red-50 px-3 py-1 rounded-full uppercase tracking-widest">Failed</span>
+            </div>
+
+            <div className="flex justify-between mb-6">
+              <div>
+                <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest mb-1">TICKETS</p>
+                <p className="text-sm font-bold text-tlb-dark">4 × Early Bird</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest mb-1">AMOUNT</p>
+                <p className="text-sm font-bold text-tlb-dark">$260.00</p>
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center">
+              <div className="flex gap-4">
+                <button className="text-[10px] font-black text-tlb-yellow flex items-center gap-1.5"><span className="text-sm">📞</span> Call</button>
+                <button className="text-[10px] font-black text-tlb-yellow flex items-center gap-1.5"><span className="text-sm">✉️</span> Email</button>
+              </div>
+              <button className="text-gray-300"><MoreHorizontal size={18} /></button>
+            </div>
+          </div>
+
+          {/* Participant 4 */}
+          <div className="bg-white rounded-[2rem] p-5 border border-gray-100 shadow-sm">
+            <div className="flex justify-between items-start mb-6">
+              <div className="flex gap-3 items-center">
+                <div className="w-12 h-12 rounded-full bg-[#FFF9E6] text-tlb-yellow font-black text-lg flex items-center justify-center">MD</div>
+                <div>
+                  <h4 className="font-bold text-tlb-dark">Michael Davis</h4>
+                  <p className="text-[10px] text-gray-400">Nov 24, 2023 • 11:10 AM</p>
+                </div>
+              </div>
+              <span className="text-[10px] font-black text-emerald-500 bg-emerald-50 px-3 py-1 rounded-full uppercase tracking-widest">Paid</span>
+            </div>
+
+            <div className="flex justify-between mb-6">
+              <div>
+                <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest mb-1">TICKETS</p>
+                <p className="text-sm font-bold text-tlb-dark">1 × Standard</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest mb-1">AMOUNT</p>
+                <p className="text-sm font-bold text-tlb-dark">$85.00</p>
+              </div>
+            </div>
+
+            <div className="flex justify-between items-center">
+              <div className="flex gap-4">
+                <button className="text-[10px] font-black text-tlb-yellow flex items-center gap-1.5"><span className="text-sm">📞</span> Call</button>
+                <button className="text-[10px] font-black text-tlb-yellow flex items-center gap-1.5"><span className="text-sm">✉️</span> Email</button>
+              </div>
+              <button className="text-gray-300"><MoreHorizontal size={18} /></button>
+            </div>
+          </div>
         </div>
 
       </div>

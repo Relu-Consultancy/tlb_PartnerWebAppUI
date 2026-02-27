@@ -8,6 +8,7 @@ export type Screen =
   | 'APP_APPROVED'
   | 'AGREEMENT_SUBMIT'
   | 'BANK_SETUP'
+  | 'BANK_SETUP_HUB'
   | 'ONBOARDING_COMPLETE'
   | 'DASHBOARD'
   | 'FINANCIAL_HUB'

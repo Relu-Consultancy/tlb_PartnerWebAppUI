@@ -1,12 +1,12 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  LayoutDashboard, 
-  ReceiptIndianRupee, 
-  CalendarDays, 
-  BarChart3, 
-  UserCircle, 
-  Eye, 
+import {
+  LayoutDashboard,
+  ReceiptIndianRupee,
+  CalendarDays,
+  BarChart3,
+  UserCircle,
+  Eye,
   LogOut,
   X
 } from 'lucide-react';
@@ -70,11 +70,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen
                     onNavigate(item.id as Screen);
                     onClose();
                   }}
-                  className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-all ${
-                    currentScreen === item.id 
-                      ? 'bg-tlb-yellow/10 text-tlb-dark border-l-4 border-tlb-yellow' 
+                  className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-all ${currentScreen === item.id
+                      ? 'bg-tlb-yellow/10 text-tlb-dark border-l-4 border-tlb-yellow'
                       : 'text-gray-500 hover:bg-gray-50'
-                  }`}
+                    }`}
                 >
                   <div className={`p-2 rounded-xl ${currentScreen === item.id ? 'bg-tlb-yellow text-tlb-dark' : 'bg-gray-100 text-gray-400'}`}>
                     <item.icon size={20} />
@@ -88,7 +87,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen
             </nav>
 
             <div className="pt-6 border-t border-gray-100">
-              <button 
+              <button
                 onClick={() => onNavigate('LANDING')}
                 className="w-full flex items-center gap-4 p-4 text-gray-400 hover:text-red-500 transition-colors"
               >

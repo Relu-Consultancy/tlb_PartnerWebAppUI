@@ -19,6 +19,7 @@ export type Screen =
   | 'EVENT_REVIEW_STATUS'
   | 'EVENT_DETAILS'
   | 'ANALYTICS'
+  | 'ATTENDEES'
   | 'EDIT_PROFILE'
   | 'PREVIEW_PROFILE';
 

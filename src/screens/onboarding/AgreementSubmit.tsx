@@ -47,7 +47,7 @@ export const AgreementSubmit: React.FC<OnboardingProps> = ({ onNavigate }) => (
                 <button className="text-gray-300 hover:text-red-500"><X size={20} /></button>
             </div>
 
-            <button onClick={() => onNavigate('BANK_SETUP')} className="tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20">
+            <button onClick={() => onNavigate('DASHBOARD')} className="tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20">
                 Submit Document
             </button>
 

@@ -11,7 +11,7 @@ export const EditProfile: React.FC<ProfileProps> = ({ onNavigate, onOpenSidebar 
     <div className="min-h-screen bg-[#FDFCF8] pb-8">
         <header className="bg-white p-4 sm:p-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
             <button onClick={() => onNavigate('DASHBOARD')} className="p-2 -ml-2"><ArrowLeft size={24} /></button>
-            <h1 className="font-black text-lg">Edit Profile</h1>
+            <h1 className="font-black text-lg">Brand Profile Section</h1>
             <button className="text-tlb-yellow font-black text-sm uppercase tracking-widest">Save</button>
         </header>
 

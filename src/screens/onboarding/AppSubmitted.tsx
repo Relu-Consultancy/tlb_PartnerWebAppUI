@@ -51,8 +51,8 @@ export const AppSubmitted: React.FC<OnboardingProps> = ({ onNavigate }) => (
                 ))}
             </div>
 
-            <button onClick={() => onNavigate('APP_APPROVED')} className="tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20">
-                Back to Home
+            <button onClick={() => onNavigate('DASHBOARD')} className="tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20">
+                Dashboard
             </button>
 
             <button className="w-full mt-8 flex items-center justify-center gap-2 text-tlb-yellow font-bold text-sm">

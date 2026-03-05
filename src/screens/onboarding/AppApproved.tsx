@@ -51,7 +51,6 @@ export const AppApproved: React.FC<OnboardingProps> = ({ onNavigate }) => (
             <button onClick={() => onNavigate('AGREEMENT_SUBMIT')} className="tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20">
                 Proceed to Submit Agreement <ChevronRight size={20} />
             </button>
-
             <button className="w-full mt-8 flex items-center justify-center gap-2 text-gray-400 font-bold text-sm">
                 <LayoutGrid size={18} /> Back to Dashboard
             </button>

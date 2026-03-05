@@ -22,10 +22,10 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen, onNavigate }) => {
   const menuItems = [
     { id: 'DASHBOARD', label: 'Dashboard', icon: LayoutDashboard, sub: 'OVERVIEW' },
-    { id: 'FINANCIAL_HUB', label: 'Transactions & Management', icon: ReceiptIndianRupee, sub: 'FINANCES & SHOWS' },
+    { id: 'FINANCIAL_HUB', label: 'Payouts', icon: ReceiptIndianRupee, sub: 'FINANCES & SHOWS' },
     { id: 'EVENT_LISTINGS', label: 'My Events and Listings', icon: CalendarDays, sub: 'SCHEDULE & TIX' },
     { id: 'ANALYTICS', label: 'Analytics and Revenue', icon: BarChart3, sub: 'INSIGHTS & GROWTH' },
-    { id: 'EDIT_PROFILE', label: 'Edit Profile', icon: UserCircle, sub: 'BUSINESS DETAILS' },
+    { id: 'EDIT_PROFILE', label: 'Brand Profile Section', icon: UserCircle, sub: 'BUSINESS DETAILS' },
     { id: 'PREVIEW_PROFILE', label: 'Preview Profile', icon: Eye, sub: 'PUBLIC VIEW' },
   ];
 

@@ -13,6 +13,7 @@ import {
   AgreementSubmit, BankSetup, OnboardingComplete
 } from './screens/onboarding';
 import { Dashboard } from './screens/dashboard';
+import { Attendees } from './screens/attendees';
 import { FinancialHub, BankSetupHub } from './screens/financial';
 import { Analytics } from './screens/analytics';
 import { EditProfile, PreviewProfile } from './screens/profile';
@@ -55,6 +56,7 @@ const routes: Record<Screen, RouteConfig> = {
 
   // Dashboard & Core — has sidebar
   DASHBOARD: { component: Dashboard, hasSidebar: true },
+  ATTENDEES: { component: Attendees, hasSidebar: true },
   FINANCIAL_HUB: { component: FinancialHub, hasSidebar: true },
   ANALYTICS: { component: Analytics, hasSidebar: true },
   EDIT_PROFILE: { component: EditProfile, hasSidebar: true },

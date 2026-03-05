@@ -1,5 +1,5 @@
-import React from 'react';
-import { ArrowLeft, Search, Calendar, MapPin, MoreHorizontal } from 'lucide-react';
+import React, { useState } from 'react';
+import { ArrowLeft, Search, Calendar, MapPin, MoreHorizontal, Pencil, PauseCircle, Users, QrCode, Download } from 'lucide-react';
 import { Screen } from '../../types';
 
 interface EventProps {
@@ -7,7 +7,10 @@ interface EventProps {
     onOpenSidebar: () => void;
 }
 
-export const EventDetails: React.FC<EventProps> = ({ onNavigate, onOpenSidebar }) => (
+export const EventDetails: React.FC<EventProps> = ({ onNavigate, onOpenSidebar }) => {
+    const [salesPaused, setSalesPaused] = useState(false);
+
+    return (
     <div className="min-h-screen bg-[#FDFCF8] pb-12">
         <header className="p-4 sm:p-6 sticky top-0 z-30 bg-[#FDFCF8]">
             <div className="max-w-3xl mx-auto flex items-start justify-between">
@@ -24,7 +27,38 @@ export const EventDetails: React.FC<EventProps> = ({ onNavigate, onOpenSidebar }
                     </div>
                 </div>
                 <button className="bg-tlb-yellow text-tlb-dark px-5 py-2.5 rounded-full font-black text-sm flex items-center gap-2 shadow-sm">
-                    <span className="text-lg leading-none">↓</span> Export
+                    <Download size={16} /> Export
+                </button>
+            </div>
+
+            {/* Event Actions */}
+            <div className="max-w-3xl mx-auto mt-4 flex flex-wrap gap-2">
+                <button
+                    onClick={() => onNavigate('CREATE_EVENT_DETAILS')}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-white border border-gray-200 text-sm font-bold text-tlb-dark hover:bg-gray-50 transition-colors shadow-sm"
+                >
+                    <Pencil size={16} /> Edit
+                </button>
+                <button
+                    onClick={() => setSalesPaused(!salesPaused)}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-full border text-sm font-bold transition-colors shadow-sm ${salesPaused
+                        ? 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100'
+                        : 'bg-white border-gray-200 text-tlb-dark hover:bg-gray-50'
+                        }`}
+                >
+                    <PauseCircle size={16} /> {salesPaused ? 'Resume Sales' : 'Pause Sales'}
+                </button>
+                <button
+                    onClick={() => document.getElementById('participants-section')?.scrollIntoView({ behavior: 'smooth' })}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-white border border-gray-200 text-sm font-bold text-tlb-dark hover:bg-gray-50 transition-colors shadow-sm"
+                >
+                    <Users size={16} /> View Guest List
+                </button>
+                <button
+                    onClick={() => { /* TODO: open scan modal or navigate to scan screen */ }}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-tlb-yellow text-tlb-dark text-sm font-bold hover:bg-tlb-yellow/90 transition-colors shadow-sm"
+                >
+                    <QrCode size={16} /> Scan Tickets
                 </button>
             </div>
         </header>
@@ -58,7 +92,8 @@ export const EventDetails: React.FC<EventProps> = ({ onNavigate, onOpenSidebar }
                     </div>
                 </div>
 
-                {/* Search and filter */}
+                {/* Participants / Guest List */}
+                <div id="participants-section" className="space-y-4 scroll-mt-24">
                 <div className="flex gap-3 pt-2">
                     <div className="flex-1 bg-white border border-gray-100 rounded-[1.5rem] px-4 py-3.5 flex items-center gap-3 shadow-sm">
                         <Search size={18} className="text-gray-400" />
@@ -69,7 +104,6 @@ export const EventDetails: React.FC<EventProps> = ({ onNavigate, onOpenSidebar }
                     </button>
                 </div>
 
-                {/* Participant List */}
                 <div className="space-y-4">
                     {[
                         { initials: 'SM', name: 'Sarah Mitchell', date: 'Dec 01, 2023 • 10:45 AM', status: 'Paid', statusColor: 'text-emerald-500 bg-emerald-50', tickets: '2 × VIP Pass', amount: '$240.00', bgColor: 'bg-[#FFF9E6] text-tlb-yellow' },
@@ -108,7 +142,9 @@ export const EventDetails: React.FC<EventProps> = ({ onNavigate, onOpenSidebar }
                         </div>
                     ))}
                 </div>
+                </div>
             </div>
         </main>
     </div>
-);
+    );
+};

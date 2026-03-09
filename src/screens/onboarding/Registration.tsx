@@ -23,7 +23,7 @@ const Mail = ({ size, className }: { size: number, className?: string }) => <svg
 export const Registration: React.FC<OnboardingProps> = ({ onNavigate }) => (
     <div className="min-h-screen bg-gray-50 flex flex-col">
         <header className="bg-white p-6 flex items-center justify-between border-b border-gray-100">
-            <button onClick={() => onNavigate('OTP_VERIFY')}><ArrowLeft size={24} /></button>
+            <button type="button" onClick={() => onNavigate('LANDING')}><ArrowLeft size={24} /></button>
             <h2 className="font-black text-lg">Partner Registration</h2>
             <div className="w-6"></div>
         </header>

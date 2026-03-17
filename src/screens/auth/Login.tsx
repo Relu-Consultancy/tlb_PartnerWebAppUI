@@ -1,13 +1,11 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { ChevronRight, Smartphone, Mail, ArrowRight } from 'lucide-react';
+import { ChevronRight, Smartphone, Mail, ArrowRight, X } from 'lucide-react';
 import { Screen } from '../../types';
 
 interface AuthProps {
     onNavigate: (screen: Screen) => void;
 }
-
-const X = ({ size }: { size: number }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>;
 
 export const Login: React.FC<AuthProps> = ({ onNavigate }) => (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">

@@ -62,6 +62,17 @@ export const Registration: React.FC<OnboardingProps> = ({ onNavigate }) => (
                             <input className="tlb-input" defaultValue="Sarah Bernhardt" />
                         </div>
                         <div>
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Business Type</label>
+                            <div className="flex flex-wrap gap-2">
+                                {['Individual', 'Sole Proprietor', 'Partnership', 'Company', 'LLP'].map((type) => (
+                                    <label key={type} className="flex items-center gap-2 bg-gray-50 border border-gray-100 px-4 py-3 rounded-xl cursor-pointer hover:border-gray-200 transition-colors">
+                                        <input type="radio" name="businessType" value={type} defaultChecked={type === 'Company'} className="text-tlb-yellow focus:ring-tlb-yellow mt-0.5" />
+                                        <span className="text-sm font-bold text-gray-700">{type}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                        <div>
                             <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Email ID</label>
                             <div className="relative">
                                 <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -149,6 +160,11 @@ export const Registration: React.FC<OnboardingProps> = ({ onNavigate }) => (
                     <label className="flex gap-4 items-start bg-tlb-yellow/5 border border-tlb-yellow/20 p-4 rounded-2xl cursor-pointer">
                         <input type="checkbox" className="mt-1 w-5 h-5 rounded border-tlb-yellow text-tlb-yellow focus:ring-tlb-yellow" />
                         <span className="text-sm font-medium leading-relaxed">I confirm that the information provided is genuine.</span>
+                    </label>
+                    <br></br>
+                    <label className="flex gap-4 items-start bg-tlb-yellow/5 border border-tlb-yellow/20 p-4 rounded-2xl cursor-pointer">
+                        <input type="checkbox" className="mt-1 w-5 h-5 rounded border-tlb-yellow text-tlb-yellow focus:ring-tlb-yellow" />
+                        <span className="text-sm font-medium leading-relaxed">I confirm my offerings are safe and age-appropriate for children.</span>
                     </label>
                 </section>
 

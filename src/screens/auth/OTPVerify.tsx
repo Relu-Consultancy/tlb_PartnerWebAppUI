@@ -82,12 +82,13 @@ export const OTPVerify: React.FC<AuthProps> = ({ onNavigate }) => {
                     <button className="text-xs underline mt-2 opacity-50">Change Number?</button>
                 </p>
 
-                <button onClick={() => onNavigate('DASHBOARD')} className="tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20">
+                <button onClick={() => onNavigate('HOME')} className="tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20">
                     Verify Identity <ChevronRight size={20} />
                 </button>
 
-                <p className="mt-12 text-center text-gray-300 text-[10px] font-bold tracking-widest uppercase">
-                    The Little Broadway — Partner Portal V2.0
+                <p className="mt-8 text-center text-gray-300 text-[10px]">
+                    © 2026 The Little Broadway. All rights reserved.<br />
+                    The Little Broadway — Partner Portal V3.0
                 </p>
             </div>
         </div>

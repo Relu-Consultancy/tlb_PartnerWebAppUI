@@ -3,38 +3,56 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, Suspense, lazy } from 'react';
 import { Screen } from './types';
 
-// Screen imports — organized by module
-import { Landing, Login, OTPVerify, PartnerAccess } from './screens/auth';
-import {
-  Registration, AppSubmitted, AppApproved,
-  AgreementSubmit, BankSetup, OnboardingComplete
-} from './screens/onboarding';
-import { Dashboard } from './screens/dashboard';
-import { Attendees } from './screens/attendees';
-import { FinancialHub, BankSetupHub } from './screens/financial';
-import { Analytics } from './screens/analytics';
-import { EditProfile, PreviewProfile } from './screens/profile';
-import {
-  EventListings, CreateEventDetails, CreateEventTickets,
-  CreateEventReview, EventReviewStatus, EventDetails
-} from './screens/events';
+// Helper for lazy loading named exports
+const lazyImport = <T extends Record<string, any>>(
+  factory: () => Promise<T>,
+  name: keyof T
+) => lazy(() => factory().then((module) => ({ default: module[name] })));
+
+// Auth screens
+const Landing = lazyImport(() => import('./screens/auth'), 'Landing');
+const Login = lazyImport(() => import('./screens/auth'), 'Login');
+const OTPVerify = lazyImport(() => import('./screens/auth'), 'OTPVerify');
+const PartnerAccess = lazyImport(() => import('./screens/auth'), 'PartnerAccess');
+const PartnerAccessOTP = lazyImport(() => import('./screens/auth'), 'PartnerAccessOTP');
+const PartnerCategory = lazyImport(() => import('./screens/auth'), 'PartnerCategory');
+
+// Onboarding screens
+const Registration = lazyImport(() => import('./screens/onboarding'), 'Registration');
+const AppSubmitted = lazyImport(() => import('./screens/onboarding'), 'AppSubmitted');
+const AppApproved = lazyImport(() => import('./screens/onboarding'), 'AppApproved');
+const AgreementSubmit = lazyImport(() => import('./screens/onboarding'), 'AgreementSubmit');
+const IdentityVerification = lazyImport(() => import('./screens/onboarding'), 'IdentityVerification');
+const BankSetup = lazyImport(() => import('./screens/onboarding'), 'BankSetup');
+const OnboardingComplete = lazyImport(() => import('./screens/onboarding'), 'OnboardingComplete');
+
+// Core App screens
+const Home = lazyImport(() => import('./screens/dashboard'), 'Home');
+const BrandProfile = lazyImport(() => import('./screens/profile'), 'BrandProfile');
+const PreviewProfile = lazyImport(() => import('./screens/profile'), 'PreviewProfile');
+
+// Services screens
+const ServiceListings = lazyImport(() => import('./screens/services'), 'ServiceListings');
+const CreateListingIdentity = lazyImport(() => import('./screens/services'), 'CreateListingIdentity');
+const CreateListingBatch = lazyImport(() => import('./screens/services'), 'CreateListingBatch');
+const CreateListingMedia = lazyImport(() => import('./screens/services'), 'CreateListingMedia');
+const CreateListingPolicies = lazyImport(() => import('./screens/services'), 'CreateListingPolicies');
+const CreateListingPreview = lazyImport(() => import('./screens/services'), 'CreateListingPreview');
+
+// Enquiries & Packages
+const Enquiries = lazyImport(() => import('./screens/enquiries'), 'Enquiries');
+const Packages = lazyImport(() => import('./screens/packages'), 'Packages');
 
 import { Sidebar } from './components/Navigation';
 
 // ---------------------------------------------------------------------------
-// Route configuration map
-// Each screen maps to its component and whether it needs sidebar support.
+// Route configuration
 // ---------------------------------------------------------------------------
-type ScreenComponent = React.FC<{
-  onNavigate: (screen: Screen) => void;
-  onOpenSidebar?: () => void;
-}>;
-
 interface RouteConfig {
-  component: ScreenComponent;
+  component: React.LazyExoticComponent<any>;
   hasSidebar: boolean;
 }
 
@@ -44,31 +62,34 @@ const routes: Record<Screen, RouteConfig> = {
   LOGIN: { component: Login, hasSidebar: false },
   OTP_VERIFY: { component: OTPVerify, hasSidebar: false },
   PARTNER_ACCESS: { component: PartnerAccess, hasSidebar: false },
+  PARTNER_ACCESS_OTP: { component: PartnerAccessOTP, hasSidebar: false },
+  PARTNER_CATEGORY: { component: PartnerCategory, hasSidebar: false },
 
   // Onboarding — no sidebar
   REGISTRATION: { component: Registration, hasSidebar: false },
   APP_SUBMITTED: { component: AppSubmitted, hasSidebar: false },
   APP_APPROVED: { component: AppApproved, hasSidebar: false },
   AGREEMENT_SUBMIT: { component: AgreementSubmit, hasSidebar: false },
+  IDENTITY_VERIFICATION: { component: IdentityVerification, hasSidebar: false },
   BANK_SETUP: { component: BankSetup, hasSidebar: false },
-  BANK_SETUP_HUB: { component: BankSetupHub as ScreenComponent, hasSidebar: false },
   ONBOARDING_COMPLETE: { component: OnboardingComplete, hasSidebar: false },
 
-  // Dashboard & Core — has sidebar
-  DASHBOARD: { component: Dashboard, hasSidebar: true },
-  ATTENDEES: { component: Attendees, hasSidebar: true },
-  FINANCIAL_HUB: { component: FinancialHub, hasSidebar: true },
-  ANALYTICS: { component: Analytics, hasSidebar: true },
-  EDIT_PROFILE: { component: EditProfile, hasSidebar: true },
+  // Core App — has sidebar
+  HOME: { component: Home, hasSidebar: true },
+  BRAND_PROFILE: { component: BrandProfile, hasSidebar: true },
   PREVIEW_PROFILE: { component: PreviewProfile, hasSidebar: true },
 
-  // Events — has sidebar
-  EVENT_LISTINGS: { component: EventListings, hasSidebar: true },
-  CREATE_EVENT_DETAILS: { component: CreateEventDetails, hasSidebar: true },
-  CREATE_EVENT_TICKETS: { component: CreateEventTickets, hasSidebar: true },
-  CREATE_EVENT_REVIEW: { component: CreateEventReview, hasSidebar: true },
-  EVENT_REVIEW_STATUS: { component: EventReviewStatus, hasSidebar: true },
-  EVENT_DETAILS: { component: EventDetails, hasSidebar: true },
+  // Services — has sidebar
+  SERVICE_LISTINGS: { component: ServiceListings, hasSidebar: true },
+  CREATE_LISTING_IDENTITY: { component: CreateListingIdentity, hasSidebar: true },
+  CREATE_LISTING_BATCH: { component: CreateListingBatch, hasSidebar: true },
+  CREATE_LISTING_MEDIA: { component: CreateListingMedia, hasSidebar: true },
+  CREATE_LISTING_POLICIES: { component: CreateListingPolicies, hasSidebar: true },
+  CREATE_LISTING_PREVIEW: { component: CreateListingPreview, hasSidebar: true },
+
+  // Enquiries & Packages — has sidebar
+  ENQUIRIES: { component: Enquiries, hasSidebar: true },
+  PACKAGES: { component: Packages, hasSidebar: true },
 };
 
 // ---------------------------------------------------------------------------
@@ -83,10 +104,16 @@ export default function App() {
 
   return (
     <div className="font-sans text-tlb-dark">
-      <Component
-        onNavigate={setCurrentScreen}
-        {...(route.hasSidebar ? { onOpenSidebar: () => setIsSidebarOpen(true) } : {})}
-      />
+      <Suspense fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="w-12 h-12 border-4 border-gray-200 border-t-tlb-yellow rounded-full animate-spin"></div>
+        </div>
+      }>
+        <Component
+          onNavigate={setCurrentScreen}
+          {...(route.hasSidebar ? { onOpenSidebar: () => setIsSidebarOpen(true) } : {})}
+        />
+      </Suspense>
       <Sidebar
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}

@@ -1,14 +1,15 @@
-import React from 'react';
-import { FileText, Upload, ArrowLeft } from 'lucide-react';
+import React, { useState } from 'react';
+import { FileText, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { Screen } from '../../types';
 
 interface OnboardingProps {
     onNavigate: (screen: Screen) => void;
 }
 
-const X = ({ size }: { size: number }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>;
+export const AgreementSubmit: React.FC<OnboardingProps> = ({ onNavigate }) => {
+    const [accepted, setAccepted] = useState(false);
 
-export const AgreementSubmit: React.FC<OnboardingProps> = ({ onNavigate }) => (
+    return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center p-6">
         <header className="w-full flex items-center justify-between mb-8">
             <button onClick={() => onNavigate('APP_APPROVED')} className="p-2"><ArrowLeft size={24} /></button>
@@ -23,42 +24,59 @@ export const AgreementSubmit: React.FC<OnboardingProps> = ({ onNavigate }) => (
                 </div>
                 <h1 className="text-3xl font-black text-center">Agreement Submission</h1>
                 <p className="text-center text-gray-400 mt-4 leading-relaxed">
-                    Upload the signed agreement between TLB and the Partner to complete your verification process.
+                    Please read and accept the partner agreement to complete your verification process.
                 </p>
             </div>
 
-            <div className="border-2 border-dashed border-tlb-yellow/30 rounded-3xl p-10 flex flex-col items-center justify-center gap-4 bg-tlb-yellow/5 mb-6">
-                <div className="bg-tlb-yellow p-3 rounded-xl text-tlb-dark shadow-lg shadow-tlb-yellow/20">
-                    <Upload size={24} />
+            <div className="mb-6">
+                <div className="flex items-center gap-2 text-[10px] font-black text-tlb-yellow uppercase tracking-widest mb-2">
+                    <CheckCircle2 size={12} /> Section C
                 </div>
-                <div className="text-center">
-                    <p className="font-black text-lg">Upload Signed Agreement</p>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">PDF format only (Max 10MB)</p>
+                <h3 className="font-bold text-gray-700 mb-2">The Little Broadway Partner Agreement</h3>
+                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 h-48 overflow-y-auto text-xs text-gray-500 leading-relaxed space-y-3 custom-scrollbar">
+                    <p>
+                        <strong>1. Terms of Partnership:</strong> Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+                    </p>
+                    <p>
+                        <strong>2. Roles and Responsibilities:</strong> Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+                    </p>
+                    <p>
+                        <strong>3. Revenue Sharing:</strong> Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.
+                    </p>
+                    <p>
+                        <strong>4. Confidentiality:</strong> Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit.
+                    </p>
+                    <p>
+                        <strong>5. Termination:</strong> Ut enim ad minima veniam, quis nostrum exercitationem ullam corporis suscipit laboriosam, nisi ut aliquid ex ea commodi consequatur? Quis autem vel eum iure reprehenderit qui in ea voluptate velit esse quam nihil molestiae consequatur.
+                    </p>
                 </div>
-                <button className="mt-2 px-8 py-3 bg-white border border-gray-200 rounded-xl font-bold text-sm shadow-sm">Select File</button>
             </div>
 
-            <div className="bg-gray-50 border border-gray-100 p-4 rounded-2xl flex items-center gap-4 mb-8">
-                <div className="bg-red-50 p-3 rounded-xl text-red-500"><FileText size={24} /></div>
-                <div className="flex-1">
-                    <p className="text-sm font-bold truncate">partnership_agreement_2...</p>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase">2.4 MB</p>
-                </div>
-                <button className="text-gray-300 hover:text-red-500"><X size={20} /></button>
-            </div>
+            <label className="flex gap-4 items-start bg-tlb-yellow/5 border border-tlb-yellow/20 p-4 rounded-2xl cursor-pointer mb-8">
+                <input 
+                    type="checkbox" 
+                    checked={accepted}
+                    onChange={(e) => setAccepted(e.target.checked)}
+                    className="mt-1 w-5 h-5 rounded border-tlb-yellow text-tlb-yellow focus:ring-tlb-yellow" 
+                />
+                <span className="text-sm font-medium leading-relaxed">I have read and agree to The Little Broadway Partner Agreement</span>
+            </label>
 
-            <button onClick={() => onNavigate('DASHBOARD')} className="tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20">
-                Submit Document
+            <button 
+                disabled={!accepted}
+                onClick={() => {
+                    sessionStorage.setItem('kycCompleted', 'true');
+                    onNavigate('HOME');
+                }} 
+                className={`tlb-button w-full py-4 shadow-lg ${accepted ? 'shadow-tlb-yellow/20' : 'opacity-50 cursor-not-allowed'}`}
+            >
+                Submit Profile for Approval
             </button>
-
-            <div className="mt-6 flex items-center justify-center gap-2 text-gray-400 text-xs font-bold uppercase tracking-widest italic animate-pulse">
-                <div className="w-4 h-4 border-2 border-gray-200 border-t-tlb-yellow rounded-full animate-spin"></div>
-                Verification in progress
-            </div>
         </div>
 
         <p className="mt-12 text-center text-gray-400 font-medium">
             Need help? <button className="text-tlb-yellow font-bold underline">Contact TLB Support</button>
         </p>
     </div>
-);
+    );
+};

@@ -1,1 +1,0 @@
-export { Attendees } from './Attendees';

@@ -16,7 +16,7 @@ export const AppSubmitted: React.FC<OnboardingProps> = ({ onNavigate }) => (
 
         <div className="w-full max-w-md">
             <div className="rounded-[2.5rem] overflow-hidden mb-10 shadow-2xl relative">
-                <img src="https://picsum.photos/seed/theater-curtain/800/600" alt="Theater" className="w-full h-80 object-cover" referrerPolicy="no-referrer" />
+                <img loading="lazy" src="https://picsum.photos/seed/theater-curtain/800/600" alt="Theater" className="w-full h-80 object-cover" referrerPolicy="no-referrer" />
                 <div className="absolute inset-0 bg-black/20 flex items-end p-8">
                     <div className="bg-tlb-yellow text-tlb-dark px-4 py-2 rounded-full flex items-center gap-2 text-xs font-black uppercase tracking-widest shadow-lg">
                         <Clock size={14} /> Under Review
@@ -51,7 +51,7 @@ export const AppSubmitted: React.FC<OnboardingProps> = ({ onNavigate }) => (
                 ))}
             </div>
 
-            <button onClick={() => onNavigate('DASHBOARD')} className="tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20">
+            <button onClick={() => onNavigate('HOME')} className="tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20">
                 Dashboard
             </button>
 

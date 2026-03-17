@@ -17,7 +17,7 @@ export const Landing: React.FC<AuthProps> = ({ onNavigate }) => (
         </header>
 
         <main className="flex-1 px-4 sm:px-6 pb-12">
-            <div className="max-w-lg mx-auto md:max-w-3xl">
+            <div>
                 {/* Hero */}
                 <div className="mt-6 mb-10">
                     <span className="bg-tlb-yellow/20 text-tlb-yellow px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase">Partner Network</span>
@@ -32,7 +32,7 @@ export const Landing: React.FC<AuthProps> = ({ onNavigate }) => (
 
                 {/* Theater Image */}
                 <div className="rounded-2xl sm:rounded-3xl overflow-hidden mb-12 shadow-xl">
-                    <img src="https://picsum.photos/seed/theater/800/450" alt="Theater" className="w-full h-52 sm:h-64 object-cover" referrerPolicy="no-referrer" />
+                    <img loading="lazy" src="https://picsum.photos/seed/theater/800/450" alt="Theater" className="w-full h-70 sm:h-100 object-cover" referrerPolicy="no-referrer" />
                 </div>
 
                 {/* Empowering Broadway */}
@@ -76,11 +76,11 @@ export const Landing: React.FC<AuthProps> = ({ onNavigate }) => (
                                 </div>
                             </div>
                         ))}
-                    </div>
+                    </div>  
                 </section>
 
                 {/* CTA */}
-                <div className="bg-tlb-dark rounded-[2rem] sm:rounded-[2.5rem] p-8 sm:p-10 text-center text-white">
+                <div className="bg-tlb-dark rounded-[2rem] sm:rounded-[2.5rem] p-8 sm:p-30 text-center text-white">
                     <h2 className="text-2xl sm:text-3xl font-black mb-3">Ready for the Spotlight?</h2>
                     <p className="text-gray-400 mb-6 text-sm sm:text-base">Join the network that powers the next generation of Broadway excellence.</p>
                     <button onClick={() => onNavigate('PARTNER_ACCESS')} className="tlb-button w-full sm:w-auto py-3 sm:px-12 mx-auto">Apply Now</button>
@@ -89,7 +89,7 @@ export const Landing: React.FC<AuthProps> = ({ onNavigate }) => (
         </main>
 
         <footer className="px-4 sm:px-8 py-10 bg-gray-50 border-t border-gray-100">
-            <div className="max-w-lg mx-auto md:max-w-3xl">
+            <div>
                 <div className="flex items-center gap-2 mb-6">
                     <div className="w-6 h-6 bg-gray-300 rounded flex items-center justify-center text-white font-bold text-[8px]">TLB</div>
                     <span className="font-bold text-gray-400 text-sm">The Little Broadway</span>

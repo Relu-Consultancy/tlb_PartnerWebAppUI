@@ -1,12 +1,11 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  LayoutDashboard,
-  ReceiptIndianRupee,
-  CalendarDays,
-  BarChart3,
+  Home,
   UserCircle,
-  Eye,
+  CalendarDays,
+  Inbox,
+  Package,
   LogOut,
   X
 } from 'lucide-react';
@@ -21,12 +20,11 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen, onNavigate }) => {
   const menuItems = [
-    { id: 'DASHBOARD', label: 'Dashboard', icon: LayoutDashboard, sub: 'OVERVIEW' },
-    { id: 'FINANCIAL_HUB', label: 'Payouts', icon: ReceiptIndianRupee, sub: 'FINANCES & SHOWS' },
-    { id: 'EVENT_LISTINGS', label: 'My Events and Listings', icon: CalendarDays, sub: 'SCHEDULE & TIX' },
-    { id: 'ANALYTICS', label: 'Analytics and Revenue', icon: BarChart3, sub: 'INSIGHTS & GROWTH' },
-    { id: 'EDIT_PROFILE', label: 'Brand Profile Section', icon: UserCircle, sub: 'BUSINESS DETAILS' },
-    { id: 'PREVIEW_PROFILE', label: 'Preview Profile', icon: Eye, sub: 'PUBLIC VIEW' },
+    { id: 'HOME', label: 'Home', icon: Home, sub: 'STATS & ALERTS' },
+    { id: 'BRAND_PROFILE', label: 'Brand Profile', icon: UserCircle, sub: 'YOUR STOREFRONT' },
+    { id: 'SERVICE_LISTINGS', label: 'My Services', icon: CalendarDays, sub: 'CLASSES & BATCHES' },
+    { id: 'ENQUIRIES', label: 'Enquiries', icon: Inbox, sub: 'LEAD INBOX' },
+    { id: 'PACKAGES', label: 'Package', icon: Package, sub: 'CREDITS & BILLING' },
   ];
 
   return (
@@ -50,11 +48,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen
             <div className="flex justify-between items-center mb-8">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-tlb-yellow">
-                  <img src="https://picsum.photos/seed/partner/100/100" alt="Profile" referrerPolicy="no-referrer" />
+                  <img loading="lazy" src="https://picsum.photos/seed/partner/100/100" alt="Profile" referrerPolicy="no-referrer" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-lg leading-tight">The Little Broadway</h3>
-                  <span className="text-[10px] font-bold text-tlb-yellow tracking-widest uppercase">Premium Partner</span>
+                  <h3 className="font-bold text-lg leading-tight">TLB Partner</h3>
+                  <span className="text-[10px] font-bold text-tlb-yellow tracking-widest uppercase">Verified Partner</span>
                 </div>
               </div>
               <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
@@ -94,7 +92,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen
                 <LogOut size={20} />
                 <span className="font-bold text-sm uppercase tracking-widest">Sign Out</span>
               </button>
-              <p className="text-[10px] text-gray-300 mt-4 text-center">TLB Broadway Partner v2.4.0</p>
+              <p className="text-[10px] text-gray-300 mt-4 text-center">TLB Partner Portal v3.0.0</p>
             </div>
           </motion.div>
         </>

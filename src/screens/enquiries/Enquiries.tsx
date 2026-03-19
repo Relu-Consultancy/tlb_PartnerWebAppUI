@@ -77,68 +77,88 @@ export const Enquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                     <button className="bg-white border border-gray-100 p-3 rounded-2xl text-gray-400 shadow-sm"><Filter size={18} /></button>
                 </div>
 
-                {/* Table / Card list */}
-                <div className="space-y-3">
-                    {sorted.map((lead) => (
-                        <div
-                            key={lead.id}
-                            onClick={() => setSelectedLead(lead)}
-                            className={`bg-white rounded-2xl border p-4 cursor-pointer transition-all hover:shadow-md ${lead.status === 'New' ? 'border-blue-200 bg-blue-50/30' : 'border-gray-100'}`}
-                        >
-                            <div className="flex items-start justify-between">
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <h3 className="font-bold text-sm">{lead.studentName}</h3>
-                                        {lead.status === 'New' && (
-                                            <span className="bg-blue-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase">New</span>
-                                        )}
-                                    </div>
-                                    <p className="text-[11px] text-gray-400 mt-0.5">{lead.batch} • {lead.age}</p>
-                                </div>
-                                <p className="text-[10px] text-gray-400 font-bold">{lead.dateTime}</p>
-                            </div>
-
-                            {/* Contact Row */}
-                            <div className="mt-3 flex items-center gap-2">
-                                {!lead.isUnlocked ? (
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); unlockLead(lead.id); }}
-                                        className="bg-tlb-yellow/10 text-tlb-yellow px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-xs font-bold hover:bg-tlb-yellow/20 transition-colors"
+                {/* Enquiries Table */}
+                <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="bg-gray-50/50 border-b border-gray-100">
+                                    <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest">Student Name</th>
+                                    <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest">Batch Interested In</th>
+                                    <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest text-center">Student Age</th>
+                                    <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest">Date/Time</th>
+                                    <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest">Contact Information</th>
+                                    <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                                {sorted.map((lead) => (
+                                    <tr 
+                                        key={lead.id} 
+                                        onClick={() => setSelectedLead(lead)}
+                                        className={`hover:bg-gray-50/50 transition-colors cursor-pointer ${lead.status === 'New' ? 'bg-blue-50/20' : ''}`}
                                     >
-                                        <Lock size={12} /> Unlock Mobile
-                                    </button>
-                                ) : (
-                                    <>
-                                        <span className="text-sm font-bold text-gray-700">{lead.contact}</span>
-                                        <button className="bg-emerald-50 text-emerald-600 p-1.5 rounded-lg hover:bg-emerald-100 transition-colors">
-                                            <Phone size={14} />
-                                        </button>
-                                        <button className="bg-green-50 text-green-600 p-1.5 rounded-lg hover:bg-green-100 transition-colors">
-                                            <MessageCircle size={14} />
-                                        </button>
-                                    </>
-                                )}
-
-                                {/* Status dropdown */}
-                                <select
-                                    value={lead.status}
-                                    onClick={(e) => e.stopPropagation()}
-                                    onChange={(e) => updateStatus(lead.id, e.target.value as EnquiryStatus)}
-                                    className={`ml-auto text-xs font-bold rounded-lg px-2 py-1.5 border cursor-pointer ${
-                                        lead.status === 'New' ? 'bg-blue-50 text-blue-600 border-blue-200' :
-                                        lead.status === 'Contacted' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
-                                        lead.status === 'Converted' ? 'bg-purple-50 text-purple-600 border-purple-200' :
-                                        'bg-gray-50 text-gray-500 border-gray-200'
-                                    }`}
-                                >
-                                    <option value="New">New</option>
-                                    <option value="Contacted">Contacted</option>
-                                    <option value="Converted">Converted</option>
-                                    <option value="Lost">Lost</option>
-                                </select>
-                            </div>
-                        </div>
-                    ))}
+                                        <td className="px-6 py-5">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-bold text-sm text-gray-900">{lead.studentName}</span>
+                                                {lead.status === 'New' && (
+                                                    <span className="bg-blue-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded uppercase">New</span>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-5">
+                                            <span className="text-sm text-gray-600 font-medium">{lead.batch}</span>
+                                        </td>
+                                        <td className="px-6 py-5 text-center">
+                                            <span className="text-sm text-gray-500">{lead.age}</span>
+                                        </td>
+                                        <td className="px-6 py-5">
+                                            <span className="text-[11px] font-bold text-gray-400">{lead.dateTime}</span>
+                                        </td>
+                                        <td className="px-6 py-5" onClick={(e) => e.stopPropagation()}>
+                                            {!lead.isUnlocked ? (
+                                                <button
+                                                    onClick={() => unlockLead(lead.id)}
+                                                    className="bg-tlb-yellow/10 text-tlb-yellow px-4 py-2 rounded-xl flex items-center justify-center gap-2 text-xs font-black border border-tlb-yellow/20 hover:bg-tlb-yellow/20 transition-all"
+                                                >
+                                                    <Lock size={14} /> Unlock Mobile
+                                                </button>
+                                            ) : (
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-sm font-black text-gray-700 whitespace-nowrap">{lead.contact}</span>
+                                                    <div className="flex gap-1">
+                                                        <button title="Call" className="bg-emerald-50 text-emerald-600 p-2 rounded-lg hover:bg-emerald-100 transition-colors shadow-sm border border-emerald-100">
+                                                            <Phone size={14} />
+                                                        </button>
+                                                        <button title="WhatsApp" className="bg-green-50 text-green-600 p-2 rounded-lg hover:bg-green-100 transition-colors shadow-sm border border-green-100">
+                                                            <MessageCircle size={14} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-5" onClick={(e) => e.stopPropagation()}>
+                                            <select
+                                                value={lead.status}
+                                                onChange={(e) => updateStatus(lead.id, e.target.value as EnquiryStatus)}
+                                                className={`text-xs font-bold rounded-xl px-3 py-2 border outline-none cursor-pointer transition-all shadow-sm ${
+                                                    lead.status === 'New' ? 'bg-blue-500 text-white border-blue-600' :
+                                                    lead.status === 'Contacted' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
+                                                    lead.status === 'Converted' ? 'bg-purple-100 text-purple-700 border-purple-200' :
+                                                    'bg-gray-100 text-gray-600 border-gray-200'
+                                                }`}
+                                            >
+                                                <option value="New">New</option>
+                                                <option value="Contacted">Contacted</option>
+                                                <option value="Converted">Converted</option>
+                                                <option value="Lost">Lost</option>
+                                            </select>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </main>

@@ -7,7 +7,9 @@ import {
   Inbox,
   Package,
   LogOut,
-  X
+  X,
+  Users,
+  DollarSign
 } from 'lucide-react';
 import { Screen } from '../types';
 
@@ -22,8 +24,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen
   const menuItems = [
     { id: 'HOME', label: 'Home', icon: Home, sub: 'STATS & ALERTS' },
     { id: 'BRAND_PROFILE', label: 'Brand Profile', icon: UserCircle, sub: 'YOUR STOREFRONT' },
-    { id: 'SERVICE_LISTINGS', label: 'My Services', icon: CalendarDays, sub: 'CLASSES & BATCHES' },
+    { id: 'SERVICE_LISTINGS', label: 'My Listings', icon: CalendarDays, sub: 'CLASSES & BATCHES' },
+    { id: 'ATTENDEES', label: 'Attendees', icon: Users, sub: 'MANAGE GUESTS' },
     { id: 'ENQUIRIES', label: 'Enquiries', icon: Inbox, sub: 'LEAD INBOX' },
+    { id: 'FINANCIAL_HUB', label: 'Pay-outs & Finance', icon: DollarSign, sub: 'EARNINGS & TAX' },
     { id: 'PACKAGES', label: 'Package', icon: Package, sub: 'CREDITS & BILLING' },
   ];
 
@@ -69,8 +73,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen
                     onClose();
                   }}
                   className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-all ${currentScreen === item.id
-                      ? 'bg-tlb-yellow/10 text-tlb-dark border-l-4 border-tlb-yellow'
-                      : 'text-gray-500 hover:bg-gray-50'
+                    ? 'bg-tlb-yellow/10 text-tlb-dark border-l-4 border-tlb-yellow'
+                    : 'text-gray-500 hover:bg-gray-50'
                     }`}
                 >
                   <div className={`p-2 rounded-xl ${currentScreen === item.id ? 'bg-tlb-yellow text-tlb-dark' : 'bg-gray-100 text-gray-400'}`}>

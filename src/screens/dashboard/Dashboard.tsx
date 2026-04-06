@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Menu, Bell, ChevronRight, UserCircle, CheckCircle2,
   Inbox, Eye, BarChart3, CreditCard, Plus
@@ -11,6 +11,26 @@ interface HomeProps {
 }
 
 export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
+  const [showNotifications, setShowNotifications] = useState(false);
+  const notificationRef = useRef<HTMLDivElement>(null);
+
+  // Close notifications on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+        setShowNotifications(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const notifications = [
+    { id: 1, title: 'New Enquiry', message: 'Sana Mehta sent a new enquiry for Yoga Basics.', time: '2m ago', unread: true, icon: Inbox, color: 'text-blue-500', bg: 'bg-blue-50' },
+    { id: 2, title: 'Profile Reminder', message: 'Your profile is 85% complete. Add a video to reach 100%.', time: '1h ago', unread: true, icon: UserCircle, color: 'text-tlb-yellow', bg: 'bg-tlb-yellow/10' },
+    { id: 3, title: 'Low Credits', message: 'You have only 4 credits left. Recharge to keep leads flowing.', time: '3h ago', unread: false, icon: CreditCard, color: 'text-amber-500', bg: 'bg-amber-50' },
+  ];
+
   const metrics = [
     { label: 'New Enquiries', value: '14', icon: Inbox, color: 'text-blue-500', bg: 'bg-blue-50' },
     { label: 'Profile Views', value: '1,240', icon: Eye, color: 'text-purple-500', bg: 'bg-purple-50' },
@@ -25,10 +45,45 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
         <button onClick={onOpenSidebar} className="p-2 -ml-2"><Menu size={24} /></button>
         <h1 className="font-black text-lg">TLB Partner</h1>
         <div className="flex items-center gap-3">
-          <button className="relative p-2">
-            <Bell size={22} />
-            <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
-          </button>
+          <div className="relative" ref={notificationRef}>
+            <button 
+              onClick={() => setShowNotifications(!showNotifications)}
+              className={`relative p-2 rounded-xl transition-colors ${showNotifications ? 'bg-gray-100 text-tlb-dark' : 'hover:bg-gray-50 text-gray-600'}`}
+            >
+              <Bell size={22} />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
+            </button>
+
+            {/* Notification Popup */}
+            {showNotifications && (
+              <div className="absolute right-0 mt-3 w-80 sm:w-96 bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+                  <h3 className="font-black text-lg">Notifications</h3>
+                  <button className="text-[10px] font-black uppercase tracking-widest text-tlb-yellow hover:text-yellow-600">Mark all as read</button>
+                </div>
+                <div className="max-h-[400px] overflow-y-auto">
+                  {notifications.map((n) => (
+                    <div key={n.id} className={`p-4 flex gap-4 hover:bg-gray-50 transition-colors cursor-pointer border-b border-gray-50 last:border-0 ${n.unread ? 'bg-blue-50/20' : ''}`}>
+                      <div className={`w-10 h-10 ${n.bg} ${n.color} rounded-xl flex items-center justify-center shrink-0`}>
+                        <n.icon size={18} />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <h4 className="font-bold text-sm text-gray-900">{n.title}</h4>
+                          <span className="text-[10px] text-gray-400 font-medium">{n.time}</span>
+                        </div>
+                        <p className="text-xs text-gray-500 leading-relaxed">{n.message}</p>
+                      </div>
+                      {n.unread && <div className="w-2 h-2 bg-tlb-yellow rounded-full mt-2" />}
+                    </div>
+                  ))}
+                </div>
+                <button className="w-full p-4 text-center text-xs font-black uppercase tracking-widest text-gray-400 hover:text-tlb-dark hover:bg-gray-50 transition-colors border-t border-gray-100">
+                  View All Notifications
+                </button>
+              </div>
+            )}
+          </div>
           <button
             onClick={() => onNavigate('BRAND_PROFILE')}
             className="w-10 h-10 rounded-full bg-tlb-yellow/10 flex items-center justify-center text-tlb-yellow hover:bg-tlb-yellow/20 transition-colors"
@@ -40,6 +95,85 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
 
       <main className="p-6">
         <div className="tlb-content space-y-8">
+          {/* Onboarding Progress Tracker */}
+          {(() => {
+            const storedStep = sessionStorage.getItem('onboardingStep');
+            const currentStep = storedStep ? parseInt(storedStep, 10) : 3;
+
+            return currentStep < 5 ? (
+              <section className="bg-white border border-gray-100 rounded-3xl p-6 sm:p-8 shadow-sm">
+                <div className="flex items-center justify-between mb-8">
+                    <div>
+                        <h2 className="text-xl font-black">Onboarding Progress</h2>
+                        <p className="text-xs text-gray-500 mt-1">Complete these steps to activate your partner profile.</p>
+                    </div>
+                    <span className="bg-tlb-yellow/10 text-tlb-dark px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest hidden sm:block">Step {currentStep - 2} of 2 Remaining</span>
+                </div>
+                <div className="space-y-6">
+                    {/* Step 1 */}
+                    <div className="flex items-start gap-4">
+                        <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
+                            <CheckCircle2 size={18} />
+                        </div>
+                        <div>
+                            <p className="font-bold text-gray-900 opacity-50 line-through">Profile Submitted</p>
+                        </div>
+                    </div>
+
+                    {/* Step 2 */}
+                    <div className="flex items-start gap-4">
+                        <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
+                            <CheckCircle2 size={18} />
+                        </div>
+                        <div>
+                            <p className="font-bold text-gray-900 opacity-50 line-through">Admin Review</p>
+                            <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest mt-1">Approved</p>
+                        </div>
+                    </div>
+
+                    {/* Step 3 */}
+                    <div className="flex items-start gap-4">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${currentStep > 3 ? 'bg-emerald-100 text-emerald-600' : 'bg-tlb-yellow text-tlb-dark'}`}>
+                            {currentStep > 3 ? <CheckCircle2 size={18} /> : <span className="font-black text-sm">3</span>}
+                        </div>
+                        <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                                <p className={`font-bold ${currentStep > 3 ? 'text-gray-900 opacity-50 line-through' : 'text-gray-900'}`}>Document Upload & Agreement</p>
+                                {currentStep === 3 && <p className="text-xs text-gray-500 mt-1">Complete your KYC & sign the partner agreement.</p>}
+                            </div>
+                            {currentStep === 3 && (
+                                <button onClick={() => onNavigate('AGREEMENT_SUBMIT')} className="bg-tlb-dark text-tlb-yellow px-5 py-2.5 rounded-xl text-xs font-bold shadow-md hover:bg-black transition-colors whitespace-nowrap">
+                                    Start Step
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Step 4 */}
+                    <div className="flex items-start gap-4">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${currentStep > 4 ? 'bg-emerald-100 text-emerald-600' : currentStep === 4 ? 'bg-tlb-yellow text-tlb-dark' : 'bg-gray-100 text-gray-400'}`}>
+                            {currentStep > 4 ? <CheckCircle2 size={18} /> : <span className="font-black text-sm">4</span>}
+                        </div>
+                        <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div className={currentStep < 4 ? 'opacity-50' : ''}>
+                                <p className="font-bold text-gray-900">Bank Verification</p>
+                                {currentStep === 4 && <p className="text-xs text-gray-500 mt-1">Link your payouts bank account.</p>}
+                            </div>
+                            {currentStep === 4 && (
+                                <button onClick={() => onNavigate('IDENTITY_VERIFICATION')} className="bg-tlb-dark text-tlb-yellow px-5 py-2.5 rounded-xl text-xs font-bold shadow-md hover:bg-black transition-colors whitespace-nowrap">
+                                    Start Step
+                                </button>
+                            )}
+                            {currentStep < 4 && (
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:block">Locked</span>
+                            )}
+                        </div>
+                    </div>
+                </div>
+              </section>
+            ) : null;
+          })()}
+
           {/* Welcome Banner */}
           <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-tlb-dark to-gray-900 p-6 sm:p-8 text-white">
             <div className="absolute -right-6 -top-6 w-32 h-32 bg-tlb-yellow/10 rounded-full blur-2xl" />

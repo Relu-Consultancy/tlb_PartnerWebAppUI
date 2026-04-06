@@ -30,7 +30,11 @@ const BankSetup = lazyImport(() => import('./screens/onboarding'), 'BankSetup');
 const OnboardingComplete = lazyImport(() => import('./screens/onboarding'), 'OnboardingComplete');
 
 // Core App screens
-const Home = lazyImport(() => import('./screens/dashboard'), 'Home');
+const Dashboard = lazyImport(() => import('./screens/dashboard'), 'Home');
+const Attendees = lazy(() => import('./screens/attendees'));
+const Packages = lazy(() => import('./screens/packages'));
+const FinancialHub = lazy(() => import('./screens/financial'));
+const EditProfile = lazy(() => import('./screens/profile/EditProfile'));
 const BrandProfile = lazyImport(() => import('./screens/profile'), 'BrandProfile');
 const PreviewProfile = lazyImport(() => import('./screens/profile'), 'PreviewProfile');
 
@@ -44,7 +48,6 @@ const CreateListingPreview = lazyImport(() => import('./screens/services'), 'Cre
 
 // Enquiries & Packages
 const Enquiries = lazyImport(() => import('./screens/enquiries'), 'Enquiries');
-const Packages = lazyImport(() => import('./screens/packages'), 'Packages');
 
 import { Sidebar } from './components/Navigation';
 
@@ -75,7 +78,7 @@ const routes: Record<Screen, RouteConfig> = {
   ONBOARDING_COMPLETE: { component: OnboardingComplete, hasSidebar: false },
 
   // Core App — has sidebar
-  HOME: { component: Home, hasSidebar: true },
+  HOME: { component: Dashboard, hasSidebar: true },
   BRAND_PROFILE: { component: BrandProfile, hasSidebar: true },
   PREVIEW_PROFILE: { component: PreviewProfile, hasSidebar: true },
 
@@ -85,11 +88,13 @@ const routes: Record<Screen, RouteConfig> = {
   CREATE_LISTING_BATCH: { component: CreateListingBatch, hasSidebar: true },
   CREATE_LISTING_MEDIA: { component: CreateListingMedia, hasSidebar: true },
   CREATE_LISTING_POLICIES: { component: CreateListingPolicies, hasSidebar: true },
-  CREATE_LISTING_PREVIEW: { component: CreateListingPreview, hasSidebar: true },
+  CREATE_LISTING_PREVIEW: { component: CreateListingPreview, hasSidebar: false },
 
   // Enquiries & Packages — has sidebar
   ENQUIRIES: { component: Enquiries, hasSidebar: true },
+  ATTENDEES: { component: Attendees, hasSidebar: true },
   PACKAGES: { component: Packages, hasSidebar: true },
+  FINANCIAL_HUB: { component: FinancialHub, hasSidebar: true },
 };
 
 // ---------------------------------------------------------------------------

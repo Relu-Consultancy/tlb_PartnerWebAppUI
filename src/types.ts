@@ -24,7 +24,9 @@ export type Screen =
   | 'CREATE_LISTING_POLICIES'
   | 'CREATE_LISTING_PREVIEW'
   | 'ENQUIRIES'
-  | 'PACKAGES';
+  | 'PACKAGES'
+  | 'ATTENDEES'
+  | 'FINANCIAL_HUB';
 
 // ---------------------------------------------------------------------------
 // Partner

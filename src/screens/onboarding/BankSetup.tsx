@@ -18,7 +18,7 @@ const X = ({ size }: { size: number }) => <svg width={size} height={size} viewBo
 export const BankSetup: React.FC<OnboardingProps> = ({ onNavigate }) => (
     <div className="min-h-screen bg-gray-50 flex flex-col">
         <header className="bg-white p-6 flex items-center justify-between border-b border-gray-100">
-            <button onClick={() => onNavigate('AGREEMENT_SUBMIT')}><ArrowLeft size={24} /></button>
+            <button onClick={() => onNavigate('IDENTITY_VERIFICATION')}><ArrowLeft size={24} /></button>
             <h2 className="font-black text-lg">Payout Settings</h2>
             <div className="p-2 bg-gray-100 rounded-lg"><LayoutGrid size={20} className="text-gray-400" /></div>
         </header>
@@ -71,7 +71,10 @@ export const BankSetup: React.FC<OnboardingProps> = ({ onNavigate }) => (
                         </div>
                     </div>
 
-                    <button onClick={() => onNavigate('ONBOARDING_COMPLETE')} className="tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20">
+                    <button onClick={() => {
+                        sessionStorage.setItem('onboardingStep', '5');
+                        onNavigate('HOME');
+                    }} className="tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20">
                         Link Payout Account
                     </button>
 

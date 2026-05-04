@@ -5,13 +5,14 @@ import {
   UserCircle,
   CalendarDays,
   Inbox,
-  Package,
   LogOut,
   X,
   Users,
-  DollarSign
+  DollarSign,
+  Package
 } from 'lucide-react';
 import { Screen } from '../types';
+import { usePartner } from '../context/PartnerContext';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -21,15 +22,47 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen, onNavigate }) => {
+  const { allowedEntities } = usePartner();
+
+  // Enquiries visible only if partner has Classes or Programs
+  const hasClassOrProgram = allowedEntities.includes('Classes') || allowedEntities.includes('Programs');
+
+  // Build dynamic sidebar label for "My Listings"
+  const listingsLabel = (() => {
+    if (allowedEntities.length === 0) return 'My Listings';
+    if (allowedEntities.length === 1) {
+      const e = allowedEntities[0];
+      if (e === 'Classes') return 'My Services';
+      if (e === 'Events') return 'My Events';
+      if (e === 'Programs') return 'My Programs';
+      if (e === 'Venues') return 'My Venues';
+    }
+    return 'My Listings';
+  })();
+
+  const listingsSub = (() => {
+    if (allowedEntities.length === 0) return 'ALL LISTINGS';
+    if (allowedEntities.length === 1) {
+      const e = allowedEntities[0];
+      if (e === 'Classes') return 'CLASSES & BATCHES';
+      if (e === 'Events') return 'EVENTS & SHOWS';
+      if (e === 'Programs') return 'LONG-TERM PROGRAMS';
+      if (e === 'Venues') return 'YOUR SPACES';
+    }
+    return allowedEntities.slice(0, 2).join(' & ').toUpperCase();
+  })();
+
   const menuItems = [
-    { id: 'HOME', label: 'Home', icon: Home, sub: 'STATS & ALERTS' },
-    { id: 'BRAND_PROFILE', label: 'Brand Profile', icon: UserCircle, sub: 'YOUR STOREFRONT' },
-    { id: 'SERVICE_LISTINGS', label: 'My Listings', icon: CalendarDays, sub: 'CLASSES & BATCHES' },
-    { id: 'ATTENDEES', label: 'Attendees', icon: Users, sub: 'MANAGE GUESTS' },
-    { id: 'ENQUIRIES', label: 'Enquiries', icon: Inbox, sub: 'LEAD INBOX' },
-    { id: 'FINANCIAL_HUB', label: 'Pay-outs & Finance', icon: DollarSign, sub: 'EARNINGS & TAX' },
-    { id: 'PACKAGES', label: 'Package', icon: Package, sub: 'CREDITS & BILLING' },
+    { id: 'HOME', label: 'Home', icon: Home, sub: 'STATS & ALERTS', visible: true },
+    { id: 'BRAND_PROFILE', label: 'Brand Profile', icon: UserCircle, sub: 'YOUR STOREFRONT', visible: true },
+    { id: 'SERVICE_LISTINGS', label: listingsLabel, icon: CalendarDays, sub: listingsSub, visible: true },
+    { id: 'ATTENDEES', label: 'Attendees', icon: Users, sub: 'MANAGE GUESTS', visible: true },
+    { id: 'ENQUIRIES', label: 'Enquiries', icon: Inbox, sub: 'LEAD INBOX', visible: hasClassOrProgram },
+    { id: 'PACKAGES', label: 'Packages', icon: Package, sub: 'CREDITS & BILLING', visible: true },
+    { id: 'FINANCIAL_HUB', label: 'Pay-outs & Finance', icon: DollarSign, sub: 'EARNINGS & TAX', visible: true },
   ];
+
+  const visibleItems = menuItems.filter(item => item.visible);
 
   return (
     <AnimatePresence>
@@ -65,7 +98,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen
             </div>
 
             <nav className="flex-1 space-y-2">
-              {menuItems.map((item) => (
+              {visibleItems.map((item) => (
                 <button
                   key={item.id}
                   onClick={() => {

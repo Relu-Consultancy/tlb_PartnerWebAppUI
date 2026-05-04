@@ -1,71 +1,206 @@
 import React from 'react';
-import { Smartphone, Mail, ArrowRight, ArrowLeft } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Smartphone, Mail, ArrowRight, ChevronDown, X } from 'lucide-react';
 import { Screen } from '../../types';
 
 interface AuthProps {
     onNavigate: (screen: Screen) => void;
+    setAuthData: (data: { value: string; type: 'email' | 'phone' }) => void;
 }
 
-export const PartnerAccess: React.FC<AuthProps> = ({ onNavigate }) => {
+export const PartnerAccess: React.FC<AuthProps> = ({ onNavigate, setAuthData }) => {
+    const [phone, setPhone] = React.useState('');
+    const [email, setEmail] = React.useState('');
+    const [showEmailModal, setShowEmailModal] = React.useState(false);
+    const [countryCode, setCountryCode] = React.useState('+91');
+
+    const handleSendPhoneOtp = () => {
+        if (!phone || phone.length < 10) return;
+        setAuthData({ value: `${countryCode}${phone}`, type: 'phone' });
+        onNavigate('PARTNER_ACCESS_OTP');
+    };
+
+    const handleSendEmailOtp = () => {
+        if (!email || !email.includes('@')) return;
+        setAuthData({ value: email, type: 'email' });
+        onNavigate('PARTNER_ACCESS_OTP');
+    };
+
+    const isPhoneValid = phone.length >= 10;
+    const isEmailValid = email.includes('@') && email.includes('.');
+
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col">
-            <header className="bg-white p-4 sm:p-6 flex items-center gap-4 sticky top-0 z-30 border-b border-gray-100">
-                <button onClick={() => onNavigate('LANDING')} className="p-2 -ml-2"><ArrowLeft size={24} /></button>
-                <h1 className="font-black text-lg">Partner Access</h1>
-            </header>
-
-            <main className="flex-1 px-4 sm:px-6 py-6">
-                <div className="max-w-lg mx-auto space-y-6">
-                    {/* Theater Banner */}
-                    <div className="relative rounded-2xl overflow-hidden h-50 sm:h-70">
-                        <img loading="lazy" src="https://picsum.photos/seed/theater/800/450" alt="Theater" className="w-full h-full object-cover " referrerPolicy="no-referrer" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex flex-col justify-end p-5">
-                            <span className="text-[10px] font-bold text-tlb-yellow uppercase tracking-widest mb-1">Business Portal</span>
-                            <h2 className="text-white text-xl font-black">The Little Broadway</h2>
-                        </div>
-                    </div>
-
-                    {/* Welcome */}
-                    <div>
-                        <h2 className="text-2xl font-black">Welcome to TLB</h2>
-                        <p className="text-gray-400 text-sm mt-1">Enter your contact details in to start account creation process</p>
-                    </div>
-
-                    {/* Mobile Number */}
-                    <div>
-                        <label className="text-sm font-bold text-tlb-dark mb-2 block">Mobile Number</label>
-                        <div className="relative">
-                            <input type="tel" placeholder="Enter 10-digit number" className="tlb-input w-full pr-12" />
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2 bg-tlb-yellow/10 p-1.5 rounded-lg text-tlb-yellow">
-                                <Smartphone size={18} />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Divider */}
-                    <div className="flex items-center gap-3">
-                        <div className="flex-1 border-t border-gray-200"></div>
-                        <span className="text-[10px] font-bold text-gray-300 uppercase tracking-[0.2em]">Or login with email</span>
-                        <div className="flex-1 border-t border-gray-200"></div>
-                    </div>
-
-                    {/* Email */}
-                    <div>
-                        <label className="text-sm font-bold text-gray-400 mb-2 block">Email ID <span className="font-normal text-gray-300">(Optional)</span></label>
-                        <div className="relative">
-                            <input type="email" placeholder="partner@example.com" className="tlb-input w-full pr-12" />
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300">
-                                <Mail size={18} />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Continue Button */}
-                    <button onClick={() => onNavigate('PARTNER_ACCESS_OTP')} className="tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20 mt-8">
-                        Send OTP <ArrowRight size={20} />
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+            <div className="w-full max-w-md bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
+                {/* Close Button */}
+                <div className="p-5 flex justify-start">
+                    <button
+                        onClick={() => onNavigate('LANDING')}
+                        className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
+                    >
+                        <X size={20} className="text-gray-400" />
                     </button>
                 </div>
-            </main>
+
+                <div className="px-8 pb-10 pt-2">
+                    {/* Logo & Title */}
+                    <div className="text-center mb-8">
+                        <div className="w-16 h-16 bg-tlb-yellow rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-tlb-yellow/20">
+                            <Smartphone size={28} className="text-tlb-dark" />
+                        </div>
+                        <h1 className="text-2xl font-black">The Little Broadway</h1>
+                        <p className="text-sm text-tlb-yellow font-bold mt-1">Partner Portal Access</p>
+                    </div>
+
+                    {/* Phone Input */}
+                    <div className="space-y-4">
+                        <div className="flex gap-3">
+                            {/* Country Code */}
+                            <div>
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">Code</label>
+                                <div className="relative">
+                                    <select
+                                        value={countryCode}
+                                        onChange={(e) => setCountryCode(e.target.value)}
+                                        className="tlb-input appearance-none pr-8 w-20 cursor-pointer"
+                                    >
+                                        <option value="+91">+91</option>
+                                        <option value="+1">+1</option>
+                                        <option value="+44">+44</option>
+                                        <option value="+971">+971</option>
+                                    </select>
+                                    <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                                </div>
+                            </div>
+
+                            {/* Phone Number */}
+                            <div className="flex-1">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">Mobile Number</label>
+                                <div className="relative">
+                                    <input
+                                        type="tel"
+                                        maxLength={10}
+                                        placeholder="98765 43210"
+                                        className="tlb-input w-full pr-10"
+                                        value={phone}
+                                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+                                    />
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300">
+                                        <Smartphone size={16} />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Send OTP Button (Phone) */}
+                    <button
+                        onClick={handleSendPhoneOtp}
+                        disabled={!isPhoneValid}
+                        className={`tlb-button w-full py-4 mt-6 shadow-lg gap-2 ${!isPhoneValid ? 'opacity-50 cursor-not-allowed' : 'shadow-tlb-yellow/20'}`}
+                    >
+                        Send OTP <ArrowRight size={18} />
+                    </button>
+
+                    {/* Divider */}
+                    <div className="flex items-center gap-4 my-5">
+                        <div className="flex-1 h-px bg-gray-100" />
+                        <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">or</span>
+                        <div className="flex-1 h-px bg-gray-100" />
+                    </div>
+
+                    {/* Login with Email Button */}
+                    <button
+                        type="button"
+                        onClick={() => setShowEmailModal(true)}
+                        className="w-full flex items-center justify-center gap-2 py-4 border border-gray-100 rounded-2xl text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors"
+                    >
+                        <Mail size={18} /> Login with Email
+                    </button>
+
+                    {/* Join as Partner */}
+                    <p className="text-center text-sm text-gray-400 mt-6">
+                        New to TLB?{' '}
+                        <button
+                            onClick={() => onNavigate('PARTNER_CATEGORY')}
+                            className="text-tlb-yellow font-bold hover:underline"
+                        >
+                            Join as a Partner
+                        </button>
+                    </p>
+                </div>
+            </div>
+
+            {/* Email Login Modal */}
+            <AnimatePresence>
+                {showEmailModal && (
+                    <motion.div 
+                        key="email-modal-overlay"
+                        className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                    >
+                        {/* Backdrop */}
+                        <div 
+                            className="absolute inset-0 bg-black/40 backdrop-blur-sm" 
+                            onClick={() => setShowEmailModal(false)} 
+                        />
+                        
+                        {/* Modal Content */}
+                        <motion.div
+                            initial={{ scale: 0.95, y: 20 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.95, y: 20 }}
+                            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                            className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <div className="bg-gray-100 p-1.5 rounded-lg text-gray-500">
+                                        <Mail size={16} />
+                                    </div>
+                                    <h3 className="font-bold text-gray-800">Login with Email</h3>
+                                </div>
+                                <button
+                                    onClick={() => setShowEmailModal(false)}
+                                    className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
+                            
+                            <div className="p-6 space-y-6">
+                                <div>
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">Email Address</label>
+                                    <div className="relative">
+                                        <input
+                                            type="email"
+                                            placeholder="you@company.com"
+                                            className="tlb-input w-full pr-10"
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
+                                            autoFocus
+                                        />
+                                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300">
+                                            <Mail size={16} />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={handleSendEmailOtp}
+                                    disabled={!isEmailValid}
+                                    className={`tlb-button w-full py-4 shadow-lg gap-2 ${!isEmailValid ? 'opacity-50 cursor-not-allowed' : 'shadow-tlb-yellow/20'}`}
+                                >
+                                    Send OTP <ArrowRight size={18} />
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

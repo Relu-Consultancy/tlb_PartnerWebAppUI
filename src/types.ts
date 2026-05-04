@@ -1,5 +1,13 @@
+// ---------------------------------------------------------------------------
+// Entity Types (selected during onboarding)
+// ---------------------------------------------------------------------------
+export type EntityType = 'Events' | 'Classes' | 'Programs' | 'Venues';
+
+// ---------------------------------------------------------------------------
+// Screens
+// ---------------------------------------------------------------------------
 export type Screen =
-  // Auth & Onboarding (unchanged)
+  // Auth & Onboarding
   | 'LANDING'
   | 'LOGIN'
   | 'OTP_VERIFY'
@@ -18,11 +26,18 @@ export type Screen =
   | 'BRAND_PROFILE'
   | 'PREVIEW_PROFILE'
   | 'SERVICE_LISTINGS'
+  // Class creation flow (existing)
   | 'CREATE_LISTING_IDENTITY'
   | 'CREATE_LISTING_BATCH'
   | 'CREATE_LISTING_MEDIA'
   | 'CREATE_LISTING_POLICIES'
   | 'CREATE_LISTING_PREVIEW'
+  // Event creation flow (new)
+  | 'CREATE_EVENT_DETAILS'
+  | 'CREATE_EVENT_SCHEDULE'
+  | 'CREATE_EVENT_MEDIA'
+  | 'CREATE_EVENT_PREVIEW'
+  // Other
   | 'ENQUIRIES'
   | 'PACKAGES'
   | 'ATTENDEES'
@@ -48,7 +63,7 @@ export interface PartnerData {
 }
 
 // ---------------------------------------------------------------------------
-// Services & Batches
+// Services & Batches (Classes)
 // ---------------------------------------------------------------------------
 export interface BatchData {
   id: string;
@@ -78,6 +93,58 @@ export interface ServiceData {
   refundPolicy: string;
   faqs: { question: string; answer: string }[];
   status: 'Live' | 'Paused';
+}
+
+// ---------------------------------------------------------------------------
+// Event Listings (new)
+// ---------------------------------------------------------------------------
+export type EventFormat =
+  | 'Workshop'
+  | 'Camp'
+  | 'Masterclass'
+  | 'Competition'
+  | 'Tournament'
+  | 'Showcase'
+  | 'Bootcamp'
+  | 'Demo / Trial'
+  | 'Meetup'
+  | 'Webinar';
+
+export type EventMode = 'Online' | 'Offline' | 'Hybrid';
+export type AgeGroup = '0-3' | '3-5' | '6-8' | '9-12' | '13-16' | 'All Ages';
+export type PricingType = 'Free' | 'Paid';
+
+export interface TicketTier {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+  description: string;
+}
+
+export interface EventListingData {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  subCategory: string;
+  formats: EventFormat[];
+  ageGroups: AgeGroup[];
+  mode: EventMode;
+  location: string;
+  startDate: string;
+  endDate: string;
+  startTime: string;
+  endTime: string;
+  pricingType: PricingType;
+  tickets: TicketTier[];
+  seatsAvailable: number;
+  registrationDeadline: string;
+  gallery: string[];
+  coverImage: string;
+  videoLink: string;
+  status: 'Draft' | 'Live' | 'Paused' | 'Completed';
+  entityType: EntityType;
 }
 
 // ---------------------------------------------------------------------------

@@ -3,8 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, Suspense, lazy } from 'react';
-import { Screen } from './types';
+import React, { useState, Suspense, lazy, useCallback } from 'react';
+import { Screen, EntityType } from './types';
+import { PartnerProvider, usePartner } from './context/PartnerContext';
 
 // Helper for lazy loading named exports
 const lazyImport = <T extends Record<string, any>>(
@@ -38,13 +39,19 @@ const EditProfile = lazy(() => import('./screens/profile/EditProfile'));
 const BrandProfile = lazyImport(() => import('./screens/profile'), 'BrandProfile');
 const PreviewProfile = lazyImport(() => import('./screens/profile'), 'PreviewProfile');
 
-// Services screens
+// Services / Class creation screens
 const ServiceListings = lazyImport(() => import('./screens/services'), 'ServiceListings');
 const CreateListingIdentity = lazyImport(() => import('./screens/services'), 'CreateListingIdentity');
 const CreateListingBatch = lazyImport(() => import('./screens/services'), 'CreateListingBatch');
 const CreateListingMedia = lazyImport(() => import('./screens/services'), 'CreateListingMedia');
 const CreateListingPolicies = lazyImport(() => import('./screens/services'), 'CreateListingPolicies');
 const CreateListingPreview = lazyImport(() => import('./screens/services'), 'CreateListingPreview');
+
+// Event creation screens
+const CreateEventDetails = lazyImport(() => import('./screens/events'), 'CreateEventDetails');
+const CreateEventSchedule = lazyImport(() => import('./screens/events'), 'CreateEventSchedule');
+const CreateEventMedia = lazyImport(() => import('./screens/events'), 'CreateEventMedia');
+const CreateEventPreview = lazyImport(() => import('./screens/events'), 'CreateEventPreview');
 
 // Enquiries & Packages
 const Enquiries = lazyImport(() => import('./screens/enquiries'), 'Enquiries');
@@ -57,6 +64,8 @@ import { Sidebar } from './components/Navigation';
 interface RouteConfig {
   component: React.LazyExoticComponent<any>;
   hasSidebar: boolean;
+  /** Optional: restrict this screen to partners with specific entity types */
+  requiresEntities?: EntityType[];
 }
 
 const routes: Record<Screen, RouteConfig> = {
@@ -82,7 +91,7 @@ const routes: Record<Screen, RouteConfig> = {
   BRAND_PROFILE: { component: BrandProfile, hasSidebar: true },
   PREVIEW_PROFILE: { component: PreviewProfile, hasSidebar: true },
 
-  // Services — has sidebar
+  // Services / Listings — has sidebar
   SERVICE_LISTINGS: { component: ServiceListings, hasSidebar: true },
   CREATE_LISTING_IDENTITY: { component: CreateListingIdentity, hasSidebar: true },
   CREATE_LISTING_BATCH: { component: CreateListingBatch, hasSidebar: true },
@@ -90,19 +99,42 @@ const routes: Record<Screen, RouteConfig> = {
   CREATE_LISTING_POLICIES: { component: CreateListingPolicies, hasSidebar: true },
   CREATE_LISTING_PREVIEW: { component: CreateListingPreview, hasSidebar: false },
 
-  // Enquiries & Packages — has sidebar
-  ENQUIRIES: { component: Enquiries, hasSidebar: true },
+  // Event creation — has sidebar
+  CREATE_EVENT_DETAILS: { component: CreateEventDetails, hasSidebar: true },
+  CREATE_EVENT_SCHEDULE: { component: CreateEventSchedule, hasSidebar: true },
+  CREATE_EVENT_MEDIA: { component: CreateEventMedia, hasSidebar: true },
+  CREATE_EVENT_PREVIEW: { component: CreateEventPreview, hasSidebar: false },
+
+  // Enquiries — restricted to Classes/Programs partners
+  ENQUIRIES: { component: Enquiries, hasSidebar: true, requiresEntities: ['Classes', 'Programs'] },
+
+  // Other
   ATTENDEES: { component: Attendees, hasSidebar: true },
   PACKAGES: { component: Packages, hasSidebar: true },
   FINANCIAL_HUB: { component: FinancialHub, hasSidebar: true },
 };
 
 // ---------------------------------------------------------------------------
-// App
+// Inner App (consumes PartnerContext)
 // ---------------------------------------------------------------------------
-export default function App() {
+function AppInner() {
+  const { allowedEntities } = usePartner();
   const [currentScreen, setCurrentScreen] = useState<Screen>('LANDING');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [authData, setAuthData] = useState<{ value: string; type: 'email' | 'phone' } | null>(null);
+
+  // Route guard: redirect restricted screens to HOME
+  const guardedNavigate = useCallback((screen: Screen) => {
+    const targetRoute = routes[screen];
+    if (targetRoute?.requiresEntities) {
+      const hasAccess = targetRoute.requiresEntities.some(e => allowedEntities.includes(e));
+      if (!hasAccess) {
+        setCurrentScreen('HOME');
+        return;
+      }
+    }
+    setCurrentScreen(screen);
+  }, [allowedEntities]);
 
   const route = routes[currentScreen] ?? routes.LANDING;
   const Component = route.component;
@@ -115,7 +147,9 @@ export default function App() {
         </div>
       }>
         <Component
-          onNavigate={setCurrentScreen}
+          onNavigate={guardedNavigate}
+          authData={authData}
+          setAuthData={setAuthData}
           {...(route.hasSidebar ? { onOpenSidebar: () => setIsSidebarOpen(true) } : {})}
         />
       </Suspense>
@@ -123,8 +157,19 @@ export default function App() {
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
         currentScreen={currentScreen}
-        onNavigate={setCurrentScreen}
+        onNavigate={guardedNavigate}
       />
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// App (provides context)
+// ---------------------------------------------------------------------------
+export default function App() {
+  return (
+    <PartnerProvider>
+      <AppInner />
+    </PartnerProvider>
   );
 }

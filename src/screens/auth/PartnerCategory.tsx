@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
-import { ChevronRight, ArrowRight, CheckCircle2, BarChart3, Users, MapPin, ArrowLeft } from 'lucide-react';
-import { Screen } from '../../types';
+import { ChevronRight, ArrowRight, CheckCircle2, BarChart3, Users, MapPin, ArrowLeft, CalendarDays } from 'lucide-react';
+import { Screen, EntityType } from '../../types';
+import { usePartner } from '../../context/PartnerContext';
 
 interface AuthProps {
     onNavigate: (screen: Screen) => void;
 }
 
 export const PartnerCategory: React.FC<AuthProps> = ({ onNavigate }) => {
-    const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+    const { allowedEntities, setAllowedEntities } = usePartner();
+    const [selectedCategories, setSelectedCategories] = useState<EntityType[]>(allowedEntities.length > 0 ? allowedEntities : []);
 
-    const toggleCategory = (catName: string) => {
+    const toggleCategory = (catName: EntityType) => {
         setSelectedCategories(prev =>
             prev.includes(catName)
                 ? prev.filter(c => c !== catName)
@@ -17,12 +19,18 @@ export const PartnerCategory: React.FC<AuthProps> = ({ onNavigate }) => {
         );
     };
 
-    const categories = [
-        { name: 'Events', icon: CheckCircle2, desc: 'Theatrical shows & performances' },
-        { name: 'Classes', icon: BarChart3, desc: 'Workshops & masterclasses' },
-        { name: 'Programs', icon: Users, desc: 'Long-term theater programs' },
-        { name: 'Venues', icon: MapPin, desc: 'List your performance space' },
-        { name: 'Shops', icon: MapPin, desc: 'List your Goods' }
+    const handleContinue = () => {
+        if (selectedCategories.length > 0) {
+            setAllowedEntities(selectedCategories);
+            onNavigate('REGISTRATION');
+        }
+    };
+
+    const categories: { name: EntityType; icon: any; desc: string }[] = [
+        { name: 'Events', icon: CalendarDays, desc: 'Workshops, shows & experiences' },
+        { name: 'Classes', icon: BarChart3, desc: 'Recurring lessons & courses' },
+        { name: 'Programs', icon: Users, desc: 'Long-term structured programs' },
+        { name: 'Venues', icon: MapPin, desc: 'List your performance space' }
     ];
 
     return (
@@ -37,7 +45,7 @@ export const PartnerCategory: React.FC<AuthProps> = ({ onNavigate }) => {
                 <div className="text-center mb-10">
                     <h1 className="text-3xl font-black mb-3">What do you offer?</h1>
                     <p className="text-gray-500 leading-relaxed text-sm px-4">
-                        Select your primary business category to customize your portal experience.
+                        Select your business categories. You can change this later from your profile settings.
                     </p>
                 </div>
 
@@ -77,7 +85,7 @@ export const PartnerCategory: React.FC<AuthProps> = ({ onNavigate }) => {
 
                 <div className="pt-8 pb-4">
                     <button
-                        onClick={() => selectedCategories.length > 0 && onNavigate('REGISTRATION')}
+                        onClick={handleContinue}
                         disabled={selectedCategories.length === 0}
                         className={`w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${selectedCategories.length > 0
                             ? 'bg-tlb-yellow text-tlb-dark shadow-lg shadow-tlb-yellow/20 hover:brightness-105 active:scale-[0.98]'

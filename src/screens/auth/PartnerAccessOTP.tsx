@@ -4,6 +4,7 @@ import { Screen } from '../../types';
 
 interface AuthProps {
     onNavigate: (screen: Screen) => void;
+    authData: { value: string; type: 'email' | 'phone' } | null;
 }
 
 const OtpInputGroup = ({ icon: Icon, label, color }: { icon: any, label: string, color: string }) => {
@@ -75,7 +76,10 @@ const OtpInputGroup = ({ icon: Icon, label, color }: { icon: any, label: string,
     );
 };
 
-export const PartnerAccessOTP: React.FC<AuthProps> = ({ onNavigate }) => {
+export const PartnerAccessOTP: React.FC<AuthProps> = ({ onNavigate, authData }) => {
+    const isEmail = authData?.type === 'email';
+    const contactValue = authData?.value || 'your device';
+
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col items-center">
             <header className="w-full bg-white p-4 sm:p-6 flex items-center justify-between border-b border-gray-100">
@@ -84,29 +88,23 @@ export const PartnerAccessOTP: React.FC<AuthProps> = ({ onNavigate }) => {
                 <div className="w-10"></div>
             </header>
 
-            <main className="flex-1 w-full max-w-lg px-4 sm:px-6 py-8 flex flex-col">
+            <main className="flex-1 w-full max-w-lg px-4 sm:px-6 py-12 flex flex-col justify-center">
                 <div className="text-center mb-10">
                     <h1 className="text-3xl font-black mb-3">Authentication</h1>
                     <p className="text-gray-500 leading-relaxed text-sm px-4">
-                        Please enter the verification codes sent to your mobile number and email ID.
+                        Please enter the verification code sent to <span className="font-bold text-tlb-dark">{contactValue}</span>.
                     </p>
                 </div>
 
-                <div className="space-y-6 mb-12 flex-1">
+                <div className="mb-12">
                     <OtpInputGroup 
-                        icon={Smartphone} 
-                        label="Mobile Verification" 
+                        icon={isEmail ? Mail : Smartphone} 
+                        label={isEmail ? "Email Verification" : "Mobile Verification"} 
                         color="bg-tlb-yellow/10 text-tlb-yellow" 
-                    />
-                    
-                    <OtpInputGroup 
-                        icon={Mail} 
-                        label="Email Verification" 
-                        color="bg-gray-100 text-gray-500" 
                     />
                 </div>
 
-                <div className="pb-8">
+                <div className="mt-auto pb-8">
                     <button onClick={() => onNavigate('PARTNER_CATEGORY')} className="tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20">
                         Verify & Continue <ChevronRight size={20} />
                     </button>

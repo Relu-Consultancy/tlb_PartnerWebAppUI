@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Menu, Bell, ChevronRight, UserCircle, CheckCircle2,
-  Inbox, Eye, BarChart3, CreditCard, Plus
+  Inbox, Eye, BarChart3, CreditCard, Plus, CalendarDays, MapPin, Ticket
 } from 'lucide-react';
 import { Screen } from '../../types';
+import { usePartner } from '../../context/PartnerContext';
+import { EntityPickerSheet } from '../../components/EntityPickerSheet';
 
 interface HomeProps {
   onNavigate: (screen: Screen) => void;
@@ -11,8 +13,14 @@ interface HomeProps {
 }
 
 export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
+  const { allowedEntities } = usePartner();
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showEntityPicker, setShowEntityPicker] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
+
+  const hasClassOrProgram = allowedEntities.includes('Classes') || allowedEntities.includes('Programs');
+  const hasEvents = allowedEntities.includes('Events');
+  const hasVenues = allowedEntities.includes('Venues');
 
   // Close notifications on click outside
   useEffect(() => {
@@ -25,17 +33,69 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const handleAddListing = () => {
+    if (allowedEntities.length === 1) {
+      const entity = allowedEntities[0];
+      if (entity === 'Events') onNavigate('CREATE_EVENT_DETAILS');
+      else onNavigate('CREATE_LISTING_IDENTITY');
+    } else if (allowedEntities.length > 1) {
+      setShowEntityPicker(true);
+    } else {
+      onNavigate('CREATE_LISTING_IDENTITY');
+    }
+  };
+
+  // Dynamic CTA label
+  const ctaLabel = (() => {
+    if (allowedEntities.length === 0) return 'Add New Listing';
+    if (allowedEntities.length === 1) {
+      const e = allowedEntities[0];
+      if (e === 'Events') return 'Create Event';
+      if (e === 'Classes') return 'Add New Class';
+      if (e === 'Programs') return 'Add New Program';
+      if (e === 'Venues') return 'Add Venue';
+    }
+    return 'Add New Listing';
+  })();
+
+  // Dynamic metrics based on entity types
+  const metrics = (() => {
+    if (hasClassOrProgram) {
+      // Classes/Programs mode → enquiry-centric
+      return [
+        { label: 'New Enquiries', value: '14', icon: Inbox, color: 'text-blue-500', bg: 'bg-blue-50' },
+        { label: 'Active Batches', value: '8', icon: BarChart3, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+        { label: 'Profile Views', value: '1,240', icon: Eye, color: 'text-purple-500', bg: 'bg-purple-50' },
+        { label: 'Credit Balance', value: '22', icon: CreditCard, color: 'text-amber-500', bg: 'bg-amber-50' },
+      ];
+    } else {
+      // Events/Venues only mode → listing-centric
+      return [
+        { label: 'Total Listings', value: '5', icon: CalendarDays, color: 'text-blue-500', bg: 'bg-blue-50' },
+        { label: 'Upcoming Events', value: '3', icon: Ticket, color: 'text-purple-500', bg: 'bg-purple-50' },
+        { label: 'Profile Views', value: '1,240', icon: Eye, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+        { label: hasVenues ? 'Venue Bookings' : 'Registrations', value: '47', icon: hasVenues ? MapPin : BarChart3, color: 'text-amber-500', bg: 'bg-amber-50' },
+      ];
+    }
+  })();
+
+  // Filter notifications — hide enquiry-related ones if no access
   const notifications = [
-    { id: 1, title: 'New Enquiry', message: 'Sana Mehta sent a new enquiry for Yoga Basics.', time: '2m ago', unread: true, icon: Inbox, color: 'text-blue-500', bg: 'bg-blue-50' },
+    ...(hasClassOrProgram ? [
+      { id: 1, title: 'New Enquiry', message: 'Sana Mehta sent a new enquiry for Yoga Basics.', time: '2m ago', unread: true, icon: Inbox, color: 'text-blue-500', bg: 'bg-blue-50' },
+    ] : []),
     { id: 2, title: 'Profile Reminder', message: 'Your profile is 85% complete. Add a video to reach 100%.', time: '1h ago', unread: true, icon: UserCircle, color: 'text-tlb-yellow', bg: 'bg-tlb-yellow/10' },
-    { id: 3, title: 'Low Credits', message: 'You have only 4 credits left. Recharge to keep leads flowing.', time: '3h ago', unread: false, icon: CreditCard, color: 'text-amber-500', bg: 'bg-amber-50' },
+    ...(hasEvents ? [
+      { id: 4, title: 'Event Update', message: 'Your Summer Art Festival has 12 new registrations.', time: '30m ago', unread: true, icon: CalendarDays, color: 'text-purple-500', bg: 'bg-purple-50' },
+    ] : []),
   ];
 
-  const metrics = [
-    { label: 'New Enquiries', value: '14', icon: Inbox, color: 'text-blue-500', bg: 'bg-blue-50' },
-    { label: 'Profile Views', value: '1,240', icon: Eye, color: 'text-purple-500', bg: 'bg-purple-50' },
-    { label: 'Active Batches', value: '8', icon: BarChart3, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-    { label: 'Credit Balance', value: '22', icon: CreditCard, color: 'text-amber-500', bg: 'bg-amber-50' },
+  // Dynamic quick links — hide enquiries if not applicable
+  const quickLinks = [
+    { label: 'Brand Profile', screen: 'BRAND_PROFILE' as Screen, icon: UserCircle },
+    { label: 'My Listings', screen: 'SERVICE_LISTINGS' as Screen, icon: CalendarDays },
+    ...(hasClassOrProgram ? [{ label: 'Enquiries', screen: 'ENQUIRIES' as Screen, icon: Inbox }] : []),
+    { label: 'Finance', screen: 'FINANCIAL_HUB' as Screen, icon: CreditCard },
   ];
 
   return (
@@ -51,7 +111,9 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
               className={`relative p-2 rounded-xl transition-colors ${showNotifications ? 'bg-gray-100 text-tlb-dark' : 'hover:bg-gray-50 text-gray-600'}`}
             >
               <Bell size={22} />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
+              {notifications.some(n => n.unread) && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
+              )}
             </button>
 
             {/* Notification Popup */}
@@ -198,7 +260,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
             </div>
           </section>
 
-          {/* Metric Cards */}
+          {/* Metric Cards — Dynamic based on entity types */}
           <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {metrics.map((m) => (
               <div key={m.label} className="tlb-card p-5 flex flex-col gap-3">
@@ -213,58 +275,76 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
             ))}
           </section>
 
-          {/* Add New Class CTA */}
+          {/* Add New Listing CTA — Dynamic label */}
           <section>
             <button
-              onClick={() => onNavigate('CREATE_LISTING_IDENTITY')}
+              onClick={handleAddListing}
               className="tlb-button w-full py-5 shadow-lg shadow-tlb-yellow/20 text-base gap-3"
             >
-              <Plus size={22} /> Add New Class
+              <Plus size={22} /> {ctaLabel}
             </button>
           </section>
 
-          {/* Action Needed Alerts */}
+          {/* Action Needed Alerts — Conditional */}
           <section className="space-y-4">
             <div className="flex items-center gap-2">
               <div className="bg-tlb-yellow/10 p-2 rounded-lg text-tlb-yellow"><Bell size={18} /></div>
               <h3 className="font-black text-lg">Action Needed</h3>
             </div>
             <div className="space-y-3">
-              <div className="tlb-card p-4 flex gap-4 items-start bg-blue-50/50 border-blue-100">
-                <div className="bg-blue-100 p-2 rounded-xl text-blue-600 shrink-0"><Inbox size={16} /></div>
-                <div className="flex-1">
-                  <h4 className="font-bold text-sm">3 New Enquiries</h4>
-                  <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">
-                    You have new leads waiting. Respond quickly to convert them.
-                  </p>
+              {/* Enquiry alert — only if Classes/Programs */}
+              {hasClassOrProgram && (
+                <div className="tlb-card p-4 flex gap-4 items-start bg-blue-50/50 border-blue-100">
+                  <div className="bg-blue-100 p-2 rounded-xl text-blue-600 shrink-0"><Inbox size={16} /></div>
+                  <div className="flex-1">
+                    <h4 className="font-bold text-sm">3 New Enquiries</h4>
+                    <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">
+                      You have new leads waiting. Respond quickly to convert them.
+                    </p>
+                  </div>
+                  <button onClick={() => onNavigate('ENQUIRIES')} className="text-blue-600 shrink-0">
+                    <ChevronRight size={18} />
+                  </button>
                 </div>
-                <button onClick={() => onNavigate('ENQUIRIES')} className="text-blue-600 shrink-0">
-                  <ChevronRight size={18} />
-                </button>
-              </div>
-              <div className="tlb-card p-4 flex gap-4 items-start bg-amber-50/50 border-amber-100">
-                <div className="bg-amber-100 p-2 rounded-xl text-amber-600 shrink-0"><CreditCard size={16} /></div>
-                <div className="flex-1">
-                  <h4 className="font-bold text-sm">Credits Running Low</h4>
-                  <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">
-                    Only 4 credits remaining. Recharge now to keep unlocking leads.
-                  </p>
+              )}
+
+              {/* Event-specific alert */}
+              {hasEvents && (
+                <div className="tlb-card p-4 flex gap-4 items-start bg-purple-50/50 border-purple-100">
+                  <div className="bg-purple-100 p-2 rounded-xl text-purple-600 shrink-0"><CalendarDays size={16} /></div>
+                  <div className="flex-1">
+                    <h4 className="font-bold text-sm">Upcoming Event</h4>
+                    <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">
+                      Summer Art Festival starts in 3 days. 12 registrations so far.
+                    </p>
+                  </div>
+                  <button onClick={() => onNavigate('SERVICE_LISTINGS')} className="text-purple-600 shrink-0">
+                    <ChevronRight size={18} />
+                  </button>
                 </div>
-                <button onClick={() => onNavigate('PACKAGES')} className="text-amber-600 shrink-0">
-                  <ChevronRight size={18} />
-                </button>
-              </div>
+              )}
+
+              {/* Venue-specific alert */}
+              {hasVenues && (
+                <div className="tlb-card p-4 flex gap-4 items-start bg-amber-50/50 border-amber-100">
+                  <div className="bg-amber-100 p-2 rounded-xl text-amber-600 shrink-0"><MapPin size={16} /></div>
+                  <div className="flex-1">
+                    <h4 className="font-bold text-sm">2 New Booking Requests</h4>
+                    <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">
+                      You have pending venue booking requests to review.
+                    </p>
+                  </div>
+                  <button onClick={() => onNavigate('SERVICE_LISTINGS')} className="text-amber-600 shrink-0">
+                    <ChevronRight size={18} />
+                  </button>
+                </div>
+              )}
             </div>
           </section>
 
-          {/* Quick Links */}
+          {/* Quick Links — Conditional */}
           <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[
-              { label: 'Brand Profile', screen: 'BRAND_PROFILE' as Screen, icon: UserCircle },
-              { label: 'My Services', screen: 'SERVICE_LISTINGS' as Screen, icon: BarChart3 },
-              { label: 'Enquiries', screen: 'ENQUIRIES' as Screen, icon: Inbox },
-              { label: 'Packages', screen: 'PACKAGES' as Screen, icon: CreditCard },
-            ].map((link) => (
+            {quickLinks.map((link) => (
               <button
                 key={link.label}
                 onClick={() => onNavigate(link.screen)}
@@ -277,6 +357,14 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
           </section>
         </div>
       </main>
+
+      {/* Entity Picker Bottom Sheet */}
+      <EntityPickerSheet
+        isOpen={showEntityPicker}
+        onClose={() => setShowEntityPicker(false)}
+        allowedEntities={allowedEntities}
+        onNavigate={onNavigate}
+      />
     </div>
   );
 };

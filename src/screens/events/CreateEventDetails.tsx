@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowLeft, ArrowRight, MapPin, ChevronDown, Check } from 'lucide-react';
-import { Screen, EventFormat, AgeGroup, EventMode } from '../../types';
+import { Screen, EventFormat, EventMode } from '../../types';
+import { WizardLayout, WizardNavigation } from '../../components/ui';
 import { EVENT_CATEGORIES, EVENT_FORMATS, AGE_GROUPS, EVENT_MODES, getSubcategories } from '../../data/eventCategories';
 
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
@@ -25,28 +26,19 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
     const visibleCategories = showAllCategories ? EVENT_CATEGORIES : EVENT_CATEGORIES.slice(0, 6);
 
     return (
-        <div className="min-h-screen bg-gray-50 pb-8">
-            <header className="bg-white p-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
-                <button onClick={() => onNavigate('SERVICE_LISTINGS')} className="p-2 -ml-2"><ArrowLeft size={24} /></button>
-                <div className="text-center">
-                    <h1 className="font-black text-lg">New Event</h1>
-                    <p className="text-[10px] font-bold text-purple-500 uppercase tracking-widest">Step 1 of 4 — Details</p>
-                </div>
-                <div className="w-10" />
-            </header>
-
-            {/* Progress Bar */}
-            <div className="w-full h-1.5 bg-gray-100">
-                <div className="h-full bg-gradient-to-r from-purple-400 to-purple-600 w-[25%] transition-all duration-500 rounded-r-full" />
+        <WizardLayout
+            title="New Event"
+            stepText="Step 1 of 4"
+            subtitle="Details"
+            progressPercentage={25}
+            themeColor="purple"
+            onBack={() => onNavigate('SERVICE_LISTINGS')}
+        >
+            {/* Section Header */}
+            <div className="space-y-1">
+                <h2 className="text-2xl font-black">Event Details</h2>
+                <p className="text-sm text-gray-400">Define what your event is about.</p>
             </div>
-
-            <main className="p-6">
-                <div className="tlb-content space-y-8">
-                    {/* Section Header */}
-                    <div className="space-y-1">
-                        <h2 className="text-2xl font-black">Event Details</h2>
-                        <p className="text-sm text-gray-400">Define what your event is about.</p>
-                    </div>
 
                     {/* Event Title */}
                     <div>
@@ -220,15 +212,12 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
                         </div>
                     )}
 
-                    {/* Next Button */}
-                    <button
-                        onClick={() => onNavigate('CREATE_EVENT_SCHEDULE')}
-                        className="tlb-button w-full py-4 shadow-lg shadow-purple-200 text-base gap-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white hover:from-purple-600 hover:to-purple-700"
-                    >
-                        Next: Schedule & Pricing <ArrowRight size={20} />
-                    </button>
-                </div>
-            </main>
-        </div>
+            <WizardNavigation 
+                onNext={() => onNavigate('CREATE_EVENT_SCHEDULE')}
+                nextText="Next: Schedule & Pricing"
+                nextIcon={<ArrowRight size={20} />}
+                themeColor="purple"
+            />
+        </WizardLayout>
     );
 };

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowLeft, ArrowRight, Calendar, Clock, DollarSign, Users, Plus, Trash2, Tag } from 'lucide-react';
 import { Screen, PricingType } from '../../types';
+import { WizardLayout, WizardNavigation } from '../../components/ui';
 
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
 
@@ -31,26 +32,18 @@ export const CreateEventSchedule: React.FC<Props> = ({ onNavigate }) => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 pb-8">
-            <header className="bg-white p-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
-                <button onClick={() => onNavigate('CREATE_EVENT_DETAILS')} className="p-2 -ml-2"><ArrowLeft size={24} /></button>
-                <div className="text-center">
-                    <h1 className="font-black text-lg">New Event</h1>
-                    <p className="text-[10px] font-bold text-purple-500 uppercase tracking-widest">Step 2 of 4 — Schedule & Pricing</p>
-                </div>
-                <div className="w-10" />
-            </header>
-
-            <div className="w-full h-1.5 bg-gray-100">
-                <div className="h-full bg-gradient-to-r from-purple-400 to-purple-600 w-[50%] transition-all duration-500 rounded-r-full" />
+        <WizardLayout
+            title="New Event"
+            stepText="Step 2 of 4"
+            subtitle="Schedule & Pricing"
+            progressPercentage={50}
+            themeColor="purple"
+            onBack={() => onNavigate('CREATE_EVENT_DETAILS')}
+        >
+            <div className="space-y-1">
+                <h2 className="text-2xl font-black">Schedule & Pricing</h2>
+                <p className="text-sm text-gray-400">When does your event happen and how much does it cost?</p>
             </div>
-
-            <main className="p-6">
-                <div className="tlb-content space-y-8">
-                    <div className="space-y-1">
-                        <h2 className="text-2xl font-black">Schedule & Pricing</h2>
-                        <p className="text-sm text-gray-400">When does your event happen and how much does it cost?</p>
-                    </div>
 
                     {/* Date Range */}
                     <div>
@@ -197,20 +190,13 @@ export const CreateEventSchedule: React.FC<Props> = ({ onNavigate }) => {
                         <input type="date" className="tlb-input w-full" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
                     </div>
 
-                    {/* Navigation */}
-                    <div className="flex gap-3">
-                        <button onClick={() => onNavigate('CREATE_EVENT_DETAILS')} className="flex-1 py-4 border border-gray-200 rounded-2xl font-bold text-gray-500 text-sm">
-                            ← Back
-                        </button>
-                        <button
-                            onClick={() => onNavigate('CREATE_EVENT_MEDIA')}
-                            className="flex-1 tlb-button py-4 gap-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white hover:from-purple-600 hover:to-purple-700 shadow-lg shadow-purple-200"
-                        >
-                            Next: Media <ArrowRight size={18} />
-                        </button>
-                    </div>
-                </div>
-            </main>
-        </div>
+            <WizardNavigation 
+                onBack={() => onNavigate('CREATE_EVENT_DETAILS')}
+                onNext={() => onNavigate('CREATE_EVENT_MEDIA')}
+                nextText="Next: Media"
+                nextIcon={<ArrowRight size={18} />}
+                themeColor="purple"
+            />
+        </WizardLayout>
     );
 };

@@ -1,30 +1,23 @@
 import React from 'react';
 import { ArrowLeft, ArrowRight, Camera, Play, Star, Upload, Link2 } from 'lucide-react';
 import { Screen } from '../../types';
+import { WizardLayout, WizardNavigation } from '../../components/ui';
 
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
 
 export const CreateListingMedia: React.FC<Props> = ({ onNavigate }) => (
-    <div className="min-h-screen bg-gray-50 pb-8">
-        <header className="bg-white p-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
-            <button onClick={() => onNavigate('CREATE_LISTING_BATCH')} className="p-2 -ml-2"><ArrowLeft size={24} /></button>
-            <div className="text-center">
-                <h1 className="font-black text-lg">New Listing</h1>
-                <p className="text-[10px] font-bold text-tlb-yellow uppercase tracking-widest">Stage 3 of 5 — Visual Storefront</p>
-            </div>
-            <div className="w-10" />
-        </header>
-
-        <div className="w-full h-1.5 bg-gray-100">
-            <div className="h-full bg-tlb-yellow w-[60%] transition-all duration-500" />
+    <WizardLayout
+        title="New Listing"
+        stepText="Stage 3 of 5"
+        subtitle="Visual Storefront"
+        progressPercentage={60}
+        themeColor="yellow"
+        onBack={() => onNavigate('CREATE_LISTING_BATCH')}
+    >
+        <div className="space-y-1">
+            <h2 className="text-2xl font-black">Visual Storefront</h2>
+            <p className="text-sm text-gray-400">High-conversion media assets that showcase your class.</p>
         </div>
-
-        <main className="p-6">
-            <div className="tlb-content space-y-6">
-                <div className="space-y-1">
-                    <h2 className="text-2xl font-black">Visual Storefront</h2>
-                    <p className="text-sm text-gray-400">High-conversion media assets that showcase your class.</p>
-                </div>
 
                 {/* Gallery Upload */}
                 <div>
@@ -78,16 +71,12 @@ export const CreateListingMedia: React.FC<Props> = ({ onNavigate }) => (
                     </div>
                 </div>
 
-                {/* Navigation */}
-                <div className="flex gap-3">
-                    <button onClick={() => onNavigate('CREATE_LISTING_BATCH')} className="flex-1 py-4 border border-gray-200 rounded-2xl font-bold text-gray-500 text-sm">
-                        ← Back
-                    </button>
-                    <button onClick={() => onNavigate('CREATE_LISTING_POLICIES')} className="flex-1 tlb-button py-4 gap-2">
-                        Next: Policies <ArrowRight size={18} />
-                    </button>
-                </div>
-            </div>
-        </main>
-    </div>
+        <WizardNavigation 
+            onBack={() => onNavigate('CREATE_LISTING_BATCH')}
+            onNext={() => onNavigate('CREATE_LISTING_POLICIES')}
+            nextText="Next: Policies"
+            nextIcon={<ArrowRight size={18} />}
+            themeColor="yellow"
+        />
+    </WizardLayout>
 );

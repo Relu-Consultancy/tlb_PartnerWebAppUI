@@ -1,30 +1,23 @@
 import React from 'react';
 import { ArrowLeft, ArrowRight, Camera, Play, Star, Link2 } from 'lucide-react';
 import { Screen } from '../../types';
+import { WizardLayout, WizardNavigation } from '../../components/ui';
 
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
 
 export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => (
-    <div className="min-h-screen bg-gray-50 pb-8">
-        <header className="bg-white p-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
-            <button onClick={() => onNavigate('CREATE_EVENT_SCHEDULE')} className="p-2 -ml-2"><ArrowLeft size={24} /></button>
-            <div className="text-center">
-                <h1 className="font-black text-lg">New Event</h1>
-                <p className="text-[10px] font-bold text-purple-500 uppercase tracking-widest">Step 3 of 4 — Media</p>
-            </div>
-            <div className="w-10" />
-        </header>
-
-        <div className="w-full h-1.5 bg-gray-100">
-            <div className="h-full bg-gradient-to-r from-purple-400 to-purple-600 w-[75%] transition-all duration-500 rounded-r-full" />
+    <WizardLayout
+        title="New Event"
+        stepText="Step 3 of 4"
+        subtitle="Media"
+        progressPercentage={75}
+        themeColor="purple"
+        onBack={() => onNavigate('CREATE_EVENT_SCHEDULE')}
+    >
+        <div className="space-y-1">
+            <h2 className="text-2xl font-black">Event Visuals</h2>
+            <p className="text-sm text-gray-400">High-quality images drive more registrations. Make it count.</p>
         </div>
-
-        <main className="p-6">
-            <div className="tlb-content space-y-6">
-                <div className="space-y-1">
-                    <h2 className="text-2xl font-black">Event Visuals</h2>
-                    <p className="text-sm text-gray-400">High-quality images drive more registrations. Make it count.</p>
-                </div>
 
                 {/* Cover Image */}
                 <div>
@@ -76,19 +69,12 @@ export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => (
                     </div>
                 </div>
 
-                {/* Navigation */}
-                <div className="flex gap-3">
-                    <button onClick={() => onNavigate('CREATE_EVENT_SCHEDULE')} className="flex-1 py-4 border border-gray-200 rounded-2xl font-bold text-gray-500 text-sm">
-                        ← Back
-                    </button>
-                    <button
-                        onClick={() => onNavigate('CREATE_EVENT_PREVIEW')}
-                        className="flex-1 tlb-button py-4 gap-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white hover:from-purple-600 hover:to-purple-700 shadow-lg shadow-purple-200"
-                    >
-                        Preview & Publish <ArrowRight size={18} />
-                    </button>
-                </div>
-            </div>
-        </main>
-    </div>
+        <WizardNavigation 
+            onBack={() => onNavigate('CREATE_EVENT_SCHEDULE')}
+            onNext={() => onNavigate('CREATE_EVENT_PREVIEW')}
+            nextText="Preview & Publish"
+            nextIcon={<ArrowRight size={18} />}
+            themeColor="purple"
+        />
+    </WizardLayout>
 );

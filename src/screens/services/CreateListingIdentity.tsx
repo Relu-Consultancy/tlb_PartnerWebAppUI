@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowLeft, ArrowRight, MapPin, Tag, ChevronDown } from 'lucide-react';
 import { Screen } from '../../types';
+import { WizardLayout, WizardNavigation } from '../../components/ui';
 
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
 
@@ -30,27 +31,18 @@ export const CreateListingIdentity: React.FC<Props> = ({ onNavigate }) => {
     const toggleTag = (t: string) => setTags(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
 
     return (
-        <div className="min-h-screen bg-gray-50 pb-8">
-            <header className="bg-white p-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
-                <button onClick={() => onNavigate('SERVICE_LISTINGS')} className="p-2 -ml-2"><ArrowLeft size={24} /></button>
-                <div className="text-center">
-                    <h1 className="font-black text-lg">New Listing</h1>
-                    <p className="text-[10px] font-bold text-tlb-yellow uppercase tracking-widest">Stage 1 of 5 — Identity</p>
-                </div>
-                <div className="w-10" />
-            </header>
-
-            {/* Progress Bar */}
-            <div className="w-full h-1.5 bg-gray-100">
-                <div className="h-full bg-tlb-yellow w-[20%] transition-all duration-500" />
+        <WizardLayout
+            title="New Listing"
+            stepText="Stage 1 of 5"
+            subtitle="Identity"
+            progressPercentage={20}
+            themeColor="yellow"
+            onBack={() => onNavigate('SERVICE_LISTINGS')}
+        >
+            <div className="space-y-1">
+                <h2 className="text-2xl font-black">Identity & Story</h2>
+                <p className="text-sm text-gray-400">Capture the "What" and "Why" of your class.</p>
             </div>
-
-            <main className="p-6">
-                <div className="tlb-content space-y-6">
-                    <div className="space-y-1">
-                        <h2 className="text-2xl font-black">Identity & Story</h2>
-                        <p className="text-sm text-gray-400">Capture the "What" and "Why" of your class.</p>
-                    </div>
 
                     {/* Service Title */}
                     <div>
@@ -170,15 +162,12 @@ export const CreateListingIdentity: React.FC<Props> = ({ onNavigate }) => {
                         </div>
                     </div>
 
-                    {/* Next Button */}
-                    <button
-                        onClick={() => onNavigate('CREATE_LISTING_BATCH')}
-                        className="tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20 text-base gap-2"
-                    >
-                        Next: Batch & Schedule <ArrowRight size={20} />
-                    </button>
-                </div>
-            </main>
-        </div>
+            <WizardNavigation 
+                onNext={() => onNavigate('CREATE_LISTING_BATCH')}
+                nextText="Next: Batch & Schedule"
+                nextIcon={<ArrowRight size={20} />}
+                themeColor="yellow"
+            />
+        </WizardLayout>
     );
 };

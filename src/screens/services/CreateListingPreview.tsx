@@ -1,30 +1,23 @@
 import React from 'react';
 import { ArrowLeft, Edit3, Rocket, Clock, Users, MapPin, Star } from 'lucide-react';
 import { Screen } from '../../types';
+import { WizardLayout, WizardNavigation } from '../../components/ui';
 
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
 
 export const CreateListingPreview: React.FC<Props> = ({ onNavigate }) => (
-    <div className="min-h-screen bg-gray-50 pb-8">
-        <header className="bg-white p-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
-            <button onClick={() => onNavigate('CREATE_LISTING_POLICIES')} className="p-2 -ml-2"><ArrowLeft size={24} /></button>
-            <div className="text-center">
-                <h1 className="font-black text-lg">New Listing</h1>
-                <p className="text-[10px] font-bold text-tlb-yellow uppercase tracking-widest">Stage 5 of 5 — Preview & Publish</p>
-            </div>
-            <div className="w-10" />
-        </header>
-
-        <div className="w-full h-1.5 bg-gray-100">
-            <div className="h-full bg-tlb-yellow w-full transition-all duration-500" />
+    <WizardLayout
+        title="New Listing"
+        stepText="Stage 5 of 5"
+        subtitle="Preview & Publish"
+        progressPercentage={100}
+        themeColor="yellow"
+        onBack={() => onNavigate('CREATE_LISTING_POLICIES')}
+    >
+        <div className="text-center space-y-1">
+            <h2 className="text-2xl font-black">Preview Your Listing</h2>
+            <p className="text-sm text-gray-400">This is how parents will see your class. Review everything before publishing.</p>
         </div>
-
-        <main className="p-6">
-            <div className="tlb-content space-y-6">
-                <div className="text-center space-y-1">
-                    <h2 className="text-2xl font-black">Preview Your Listing</h2>
-                    <p className="text-sm text-gray-400">This is how parents will see your class. Review everything before publishing.</p>
-                </div>
 
                 {/* Mobile Mockup Frame */}
                 <div className="bg-white rounded-3xl border-2 border-gray-200 overflow-hidden shadow-xl max-w-md mx-auto">
@@ -123,14 +116,11 @@ export const CreateListingPreview: React.FC<Props> = ({ onNavigate }) => (
                     <p className="text-xs font-bold text-amber-700">✎ Tap any <Edit3 size={10} className="inline" /> icon above to jump back and edit that section</p>
                 </div>
 
-                {/* Publish Button */}
-                <button
-                    onClick={() => onNavigate('SERVICE_LISTINGS')}
-                    className="tlb-button w-full py-5 shadow-lg shadow-tlb-yellow/20 text-lg gap-3"
-                >
-                    <Rocket size={22} /> Publish Listing
-                </button>
-            </div>
-        </main>
-    </div>
+        <WizardNavigation 
+            onNext={() => onNavigate('SERVICE_LISTINGS')}
+            nextText="Publish Listing"
+            nextIcon={<Rocket size={22} />}
+            themeColor="yellow"
+        />
+    </WizardLayout>
 );

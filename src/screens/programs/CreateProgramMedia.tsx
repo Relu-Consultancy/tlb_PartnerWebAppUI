@@ -4,13 +4,13 @@ import { Screen } from '../../types';
 
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
 
-export const CreateListingMedia: React.FC<Props> = ({ onNavigate }) => (
+export const CreateProgramMedia: React.FC<Props> = ({ onNavigate }) => (
     <div className="min-h-screen bg-gray-50 pb-8">
         <header className="bg-white p-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
-            <button onClick={() => onNavigate('CREATE_LISTING_BATCH')} className="p-2 -ml-2"><ArrowLeft size={24} /></button>
+            <button onClick={() => onNavigate('CREATE_PROGRAM_BATCH')} className="p-2 -ml-2"><ArrowLeft size={24} /></button>
             <div className="text-center">
                 <h1 className="font-black text-lg">New Listing</h1>
-                <p className="text-[10px] font-bold text-tlb-yellow uppercase tracking-widest">Stage 3 of 5 — Visual Storefront</p>
+                <p className="text-[10px] font-bold text-tlb-yellow uppercase tracking-widest">Stage 3 of 5 â€” Visual Storefront</p>
             </div>
             <div className="w-10" />
         </header>
@@ -54,7 +54,7 @@ export const CreateListingMedia: React.FC<Props> = ({ onNavigate }) => (
                             </div>
                         ))}
                     </div>
-                    <p className="text-xs text-gray-300 mt-2">⭐ Tap a photo to set it as the <strong>Feature Image</strong> (main thumbnail)</p>
+                    <p className="text-xs text-gray-300 mt-2">â­ Tap a photo to set it as the <strong>Feature Image</strong> (main thumbnail)</p>
                 </div>
 
                 {/* Video Link */}
@@ -80,10 +80,10 @@ export const CreateListingMedia: React.FC<Props> = ({ onNavigate }) => (
 
                 {/* Navigation */}
                 <div className="flex gap-3">
-                    <button onClick={() => onNavigate('CREATE_LISTING_BATCH')} className="flex-1 py-4 border border-gray-200 rounded-2xl font-bold text-gray-500 text-sm">
-                        ← Back
+                    <button onClick={() => onNavigate('CREATE_PROGRAM_BATCH')} className="flex-1 py-4 border border-gray-200 rounded-2xl font-bold text-gray-500 text-sm">
+                        â† Back
                     </button>
-                    <button onClick={() => onNavigate('CREATE_LISTING_POLICIES')} className="flex-1 tlb-button py-4 gap-2">
+                    <button onClick={() => onNavigate('CREATE_PROGRAM_POLICIES')} className="flex-1 tlb-button py-4 gap-2">
                         Next: Policies <ArrowRight size={18} />
                     </button>
                 </div>

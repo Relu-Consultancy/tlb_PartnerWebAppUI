@@ -23,8 +23,6 @@ export const CreateEventSchedule: React.FC<Props> = ({ onNavigate }) => {
     ]);
     const [seatsAvailable, setSeatsAvailable] = useState('100');
     const [deadline, setDeadline] = useState('');
-    const [earlyBird, setEarlyBird] = useState(false);
-    const [earlyBirdDiscount, setEarlyBirdDiscount] = useState('');
 
     const addTicket = () => setTickets(prev => [...prev, { id: Date.now(), name: '', price: '', quantity: '', description: '' }]);
     const removeTicket = (id: number) => { if (tickets.length > 1) setTickets(prev => prev.filter(t => t.id !== id)); };
@@ -176,32 +174,6 @@ export const CreateEventSchedule: React.FC<Props> = ({ onNavigate }) => {
                                 <Plus size={18} /> Add Ticket Tier
                             </button>
 
-                            {/* Early Bird */}
-                            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-lg">🐦</span>
-                                        <p className="text-sm font-bold text-amber-800">Early Bird Discount</p>
-                                    </div>
-                                    <button
-                                        onClick={() => setEarlyBird(!earlyBird)}
-                                        className={`w-12 h-7 rounded-full transition-colors ${earlyBird ? 'bg-amber-400' : 'bg-gray-200'}`}
-                                    >
-                                        <div className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${earlyBird ? 'translate-x-6' : 'translate-x-1'}`} />
-                                    </button>
-                                </div>
-                                {earlyBird && (
-                                    <div className="mt-3">
-                                        <input
-                                            type="number"
-                                            className="tlb-input w-full"
-                                            placeholder="Discount percentage (e.g. 15)"
-                                            value={earlyBirdDiscount}
-                                            onChange={(e) => setEarlyBirdDiscount(e.target.value)}
-                                        />
-                                    </div>
-                                )}
-                            </div>
                         </div>
                     )}
 

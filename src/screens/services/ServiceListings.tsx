@@ -68,6 +68,8 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
             // Single entity — skip picker, go directly
             const entity = allowedEntities[0];
             if (entity === 'Events') onNavigate('CREATE_EVENT_DETAILS');
+            else if (entity === 'Venues') onNavigate('CREATE_VENUE_DETAILS');
+            else if (entity === 'Programs') onNavigate('CREATE_PROGRAM_IDENTITY');
             else onNavigate('CREATE_LISTING_IDENTITY');
         } else if (allowedEntities.length > 1) {
             setShowEntityPicker(true);
@@ -78,7 +80,10 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
     };
 
     const getEditScreen = (entityType: EntityType): Screen => {
-        return entityType === 'Events' ? 'CREATE_EVENT_DETAILS' : 'CREATE_LISTING_IDENTITY';
+        if (entityType === 'Events') return 'CREATE_EVENT_DETAILS';
+        if (entityType === 'Venues') return 'CREATE_VENUE_DETAILS';
+        if (entityType === 'Programs') return 'CREATE_PROGRAM_IDENTITY';
+        return 'CREATE_LISTING_IDENTITY';
     };
 
     // Filter by tab + search

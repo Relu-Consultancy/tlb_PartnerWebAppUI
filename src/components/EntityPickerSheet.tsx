@@ -30,14 +30,14 @@ const entityConfig: Record<EntityType, { icon: any; subtitle: string; color: str
         subtitle: 'Long-term structured programs',
         color: 'text-emerald-600',
         bg: 'bg-emerald-50',
-        screen: 'CREATE_LISTING_IDENTITY', // reuses class flow for now
+        screen: 'CREATE_PROGRAM_IDENTITY',
     },
     Venues: {
         icon: MapPin,
         subtitle: 'List your performance space',
         color: 'text-amber-600',
         bg: 'bg-amber-50',
-        screen: 'CREATE_LISTING_IDENTITY', // reuses class flow for now
+        screen: 'CREATE_VENUE_DETAILS',
     },
 };
 

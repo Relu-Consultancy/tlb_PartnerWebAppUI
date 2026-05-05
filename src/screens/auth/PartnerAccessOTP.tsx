@@ -92,7 +92,8 @@ export const PartnerAccessOTP: React.FC<AuthProps> = ({ onNavigate, authData }) 
                 <div className="text-center mb-10">
                     <h1 className="text-3xl font-black mb-3">Authentication</h1>
                     <p className="text-gray-500 leading-relaxed text-sm px-4">
-                        Please enter the verification code sent to <span className="font-bold text-tlb-dark">{contactValue}</span>.
+                        {isEmail ? 'OTP sent to email: ' : 'OTP sent to number given: '}
+                        <span className="font-bold text-tlb-dark">{contactValue}</span>
                     </p>
                 </div>
 

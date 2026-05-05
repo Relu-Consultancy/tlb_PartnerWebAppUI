@@ -53,6 +53,20 @@ const CreateEventSchedule = lazyImport(() => import('./screens/events'), 'Create
 const CreateEventMedia = lazyImport(() => import('./screens/events'), 'CreateEventMedia');
 const CreateEventPreview = lazyImport(() => import('./screens/events'), 'CreateEventPreview');
 
+// Programs creation screens
+const CreateProgramIdentity = lazyImport(() => import('./screens/programs'), 'CreateProgramIdentity');
+const CreateProgramBatch = lazyImport(() => import('./screens/programs'), 'CreateProgramBatch');
+const CreateProgramMedia = lazyImport(() => import('./screens/programs'), 'CreateProgramMedia');
+const CreateProgramPolicies = lazyImport(() => import('./screens/programs'), 'CreateProgramPolicies');
+const CreateProgramPreview = lazyImport(() => import('./screens/programs'), 'CreateProgramPreview');
+
+// Venue creation screens
+const CreateVenueDetails = lazyImport(() => import('./screens/venues'), 'CreateVenueDetails');
+const CreateVenueOccasions = lazyImport(() => import('./screens/venues'), 'CreateVenueOccasions');
+const CreateVenueAvailability = lazyImport(() => import('./screens/venues'), 'CreateVenueAvailability');
+const CreateVenuePackages = lazyImport(() => import('./screens/venues'), 'CreateVenuePackages');
+const CreateVenuePreview = lazyImport(() => import('./screens/venues'), 'CreateVenuePreview');
+
 // Enquiries & Packages
 const Enquiries = lazyImport(() => import('./screens/enquiries'), 'Enquiries');
 
@@ -104,6 +118,20 @@ const routes: Record<Screen, RouteConfig> = {
   CREATE_EVENT_SCHEDULE: { component: CreateEventSchedule, hasSidebar: true },
   CREATE_EVENT_MEDIA: { component: CreateEventMedia, hasSidebar: true },
   CREATE_EVENT_PREVIEW: { component: CreateEventPreview, hasSidebar: false },
+
+  // Venue creation — has sidebar
+  CREATE_VENUE_DETAILS: { component: CreateVenueDetails, hasSidebar: true },
+  CREATE_VENUE_OCCASIONS: { component: CreateVenueOccasions, hasSidebar: true },
+  CREATE_VENUE_AVAILABILITY: { component: CreateVenueAvailability, hasSidebar: true },
+  CREATE_VENUE_PACKAGES: { component: CreateVenuePackages, hasSidebar: true },
+  CREATE_VENUE_PREVIEW: { component: CreateVenuePreview, hasSidebar: false },
+
+  // Programs creation — has sidebar
+  CREATE_PROGRAM_IDENTITY: { component: CreateProgramIdentity, hasSidebar: true },
+  CREATE_PROGRAM_BATCH: { component: CreateProgramBatch, hasSidebar: true },
+  CREATE_PROGRAM_MEDIA: { component: CreateProgramMedia, hasSidebar: true },
+  CREATE_PROGRAM_POLICIES: { component: CreateProgramPolicies, hasSidebar: true },
+  CREATE_PROGRAM_PREVIEW: { component: CreateProgramPreview, hasSidebar: false },
 
   // Enquiries — restricted to Classes/Programs partners
   ENQUIRIES: { component: Enquiries, hasSidebar: true, requiresEntities: ['Classes', 'Programs'] },

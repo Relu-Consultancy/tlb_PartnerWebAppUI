@@ -37,6 +37,18 @@ export type Screen =
   | 'CREATE_EVENT_SCHEDULE'
   | 'CREATE_EVENT_MEDIA'
   | 'CREATE_EVENT_PREVIEW'
+  // Venue creation flow (new)
+  | 'CREATE_VENUE_DETAILS'
+  | 'CREATE_VENUE_OCCASIONS'
+  | 'CREATE_VENUE_AVAILABILITY'
+  | 'CREATE_VENUE_PACKAGES'
+  | 'CREATE_VENUE_PREVIEW'
+  // Programs flow
+  | 'CREATE_PROGRAM_IDENTITY'
+  | 'CREATE_PROGRAM_BATCH'
+  | 'CREATE_PROGRAM_MEDIA'
+  | 'CREATE_PROGRAM_POLICIES'
+  | 'CREATE_PROGRAM_PREVIEW'
   // Other
   | 'ENQUIRIES'
   | 'PACKAGES'
@@ -185,4 +197,33 @@ export interface BillingRecord {
   plan: string;
   amount: number;
   status: 'Paid' | 'Pending' | 'Failed';
+}
+
+// ---------------------------------------------------------------------------
+// Venues
+// ---------------------------------------------------------------------------
+export type VenueOccasion = 'Birthday' | 'Playdate' | 'Celebration' | 'Workshop' | 'Meetup' | 'Showcase';
+
+export interface VenuePackage {
+  id: string;
+  name: string; // e.g., 'Basic Party', 'Standard', 'Premium Party'
+  price: number;
+  description: string;
+}
+
+export interface VenueListingData {
+  id: string;
+  title: string;
+  description: string;
+  location: string;
+  gallery: string[];
+  occasions: VenueOccasion[];
+  minGuests: number;
+  maxGuests: number;
+  requiredAttendeeFields: string[];
+  availableDates: string[]; // e.g. ISO date strings
+  timeSlots: string[]; // e.g. ['Morning', 'Afternoon']
+  packages: VenuePackage[];
+  status: 'Draft' | 'Live' | 'Paused';
+  entityType: EntityType;
 }

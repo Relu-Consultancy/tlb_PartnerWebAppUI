@@ -52,13 +52,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen
     return allowedEntities.slice(0, 2).join(' & ').toUpperCase();
   })();
 
-  const menuItems = [
+    const menuItems = [
     { id: 'HOME', label: 'Home', icon: Home, sub: 'STATS & ALERTS', visible: true },
     { id: 'BRAND_PROFILE', label: 'Brand Profile', icon: UserCircle, sub: 'YOUR STOREFRONT', visible: true },
     { id: 'SERVICE_LISTINGS', label: listingsLabel, icon: CalendarDays, sub: listingsSub, visible: true },
     { id: 'ATTENDEES', label: 'Attendees', icon: Users, sub: 'MANAGE GUESTS', visible: true },
     { id: 'ENQUIRIES', label: 'Enquiries', icon: Inbox, sub: 'LEAD INBOX', visible: hasClassOrProgram },
-    { id: 'PACKAGES', label: 'Packages', icon: Package, sub: 'CREDITS & BILLING', visible: true },
+    { id: 'PACKAGES', label: 'Packages', icon: Package, sub: 'CREDITS & BILLING', visible: false },
     { id: 'FINANCIAL_HUB', label: 'Pay-outs & Finance', icon: DollarSign, sub: 'EARNINGS & TAX', visible: true },
   ];
 

@@ -11,13 +11,16 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
     const [selectedCategory, setSelectedCategory] = useState('');
     const [selectedSubCategory, setSelectedSubCategory] = useState('');
     const [selectedFormats, setSelectedFormats] = useState<EventFormat[]>([]);
-    const [selectedAgeGroups, setSelectedAgeGroups] = useState<AgeGroup[]>([]);
+    const [minAge, setMinAge] = useState('');
+    const [maxAge, setMaxAge] = useState('');
+    const [isAllAges, setIsAllAges] = useState(false);
     const [mode, setMode] = useState<EventMode>('Offline');
     const [location, setLocation] = useState('');
     const [showAllCategories, setShowAllCategories] = useState(false);
 
-    const toggleFormat = (f: EventFormat) => setSelectedFormats(prev => prev.includes(f) ? prev.filter(x => x !== f) : [...prev, f]);
-    const toggleAge = (a: AgeGroup) => setSelectedAgeGroups(prev => prev.includes(a) ? prev.filter(x => x !== a) : [...prev, a]);
+    const toggleFormat = (f: EventFormat) => {
+        setSelectedFormats(prev => prev.includes(f) ? [] : [f]);
+    };
 
     const visibleCategories = showAllCategories ? EVENT_CATEGORIES : EVENT_CATEGORIES.slice(0, 6);
 
@@ -141,22 +144,44 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
                         </div>
                     </div>
 
-                    {/* Age Group — Chip Presets */}
+                    {/* Age Group — Input Fields & All Ages Checkbox */}
                     <div>
                         <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">Age Group</label>
-                        <div className="flex flex-wrap gap-2">
-                            {AGE_GROUPS.map((a) => (
-                                <button
-                                    key={a}
-                                    onClick={() => toggleAge(a)}
-                                    className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${selectedAgeGroups.includes(a)
-                                        ? 'bg-tlb-yellow text-tlb-dark shadow-sm'
-                                        : 'bg-white border border-gray-200 text-gray-500 hover:border-tlb-yellow/30'
-                                    }`}
-                                >
-                                    {a === 'All Ages' ? '🌟 All Ages' : `${a} yrs`}
-                                </button>
-                            ))}
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                            <div className={`flex items-center gap-3 transition-opacity ${isAllAges ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+                                <div className="flex items-center bg-white border border-gray-200 rounded-xl overflow-hidden focus-within:border-purple-400 w-24">
+                                    <input 
+                                        type="number" 
+                                        placeholder="Min"
+                                        className="w-full p-3 outline-none text-sm font-bold text-gray-700 text-center" 
+                                        value={minAge} 
+                                        onChange={(e) => setMinAge(e.target.value)} 
+                                        disabled={isAllAges}
+                                    />
+                                </div>
+                                <span className="text-gray-400 font-bold text-sm">to</span>
+                                <div className="flex items-center bg-white border border-gray-200 rounded-xl overflow-hidden focus-within:border-purple-400 w-24">
+                                    <input 
+                                        type="number" 
+                                        placeholder="Max"
+                                        className="w-full p-3 outline-none text-sm font-bold text-gray-700 text-center" 
+                                        value={maxAge} 
+                                        onChange={(e) => setMaxAge(e.target.value)} 
+                                        disabled={isAllAges}
+                                    />
+                                </div>
+                                <span className="text-gray-400 font-bold text-sm">yrs</span>
+                            </div>
+                            
+                            <button
+                                onClick={() => setIsAllAges(!isAllAges)}
+                                className={`px-4 py-3 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${isAllAges
+                                    ? 'bg-tlb-yellow text-tlb-dark shadow-sm'
+                                    : 'bg-white border border-gray-200 text-gray-500 hover:border-tlb-yellow/50'
+                                }`}
+                            >
+                                🌟 All Ages
+                            </button>
                         </div>
                     </div>
 

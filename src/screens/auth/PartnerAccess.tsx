@@ -4,9 +4,20 @@ import { Screen } from '../../types';
 
 interface AuthProps {
     onNavigate: (screen: Screen) => void;
+    setAuthData?: (data: { value: string; type: 'email' | 'phone' }) => void;
 }
 
-export const PartnerAccess: React.FC<AuthProps> = ({ onNavigate }) => {
+export const PartnerAccess: React.FC<AuthProps> = ({ onNavigate, setAuthData }) => {
+    const [contact, setContact] = React.useState('');
+
+    const handleContinue = () => {
+        if (!contact) return;
+        const type = contact.includes('@') ? 'email' : 'phone';
+        if (setAuthData) {
+            setAuthData({ value: contact, type });
+        }
+        onNavigate('PARTNER_ACCESS_OTP');
+    };
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col">
             <header className="bg-white p-4 sm:p-6 flex items-center gap-4 sticky top-0 z-30 border-b border-gray-100">
@@ -31,37 +42,29 @@ export const PartnerAccess: React.FC<AuthProps> = ({ onNavigate }) => {
                         <p className="text-gray-400 text-sm mt-1">Enter your contact details in to start account creation process</p>
                     </div>
 
-                    {/* Mobile Number */}
+                    {/* Contact Input */}
                     <div>
-                        <label className="text-sm font-bold text-tlb-dark mb-2 block">Mobile Number</label>
+                        <label className="text-sm font-bold text-tlb-dark mb-2 block">Email or Mobile Number</label>
                         <div className="relative">
-                            <input type="tel" placeholder="Enter 10-digit number" className="tlb-input w-full pr-12" />
+                            <input 
+                                type="text" 
+                                placeholder="partner@example.com or 98765 43210" 
+                                className="tlb-input w-full pr-12" 
+                                value={contact}
+                                onChange={(e) => setContact(e.target.value)}
+                            />
                             <div className="absolute right-3 top-1/2 -translate-y-1/2 bg-tlb-yellow/10 p-1.5 rounded-lg text-tlb-yellow">
-                                <Smartphone size={18} />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Divider */}
-                    <div className="flex items-center gap-3">
-                        <div className="flex-1 border-t border-gray-200"></div>
-                        <span className="text-[10px] font-bold text-gray-300 uppercase tracking-[0.2em]">Or login with email</span>
-                        <div className="flex-1 border-t border-gray-200"></div>
-                    </div>
-
-                    {/* Email */}
-                    <div>
-                        <label className="text-sm font-bold text-gray-400 mb-2 block">Email ID <span className="font-normal text-gray-300">(Optional)</span></label>
-                        <div className="relative">
-                            <input type="email" placeholder="partner@example.com" className="tlb-input w-full pr-12" />
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300">
-                                <Mail size={18} />
+                                {contact.includes('@') ? <Mail size={18} /> : <Smartphone size={18} />}
                             </div>
                         </div>
                     </div>
 
                     {/* Continue Button */}
-                    <button onClick={() => onNavigate('PARTNER_ACCESS_OTP')} className="tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20 mt-8">
+                    <button 
+                        onClick={handleContinue} 
+                        disabled={!contact}
+                        className={`tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20 mt-8 ${!contact ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
                         Send OTP <ArrowRight size={20} />
                     </button>
                 </div>

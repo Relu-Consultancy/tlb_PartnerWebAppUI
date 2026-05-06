@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronRight, ArrowRight, CheckCircle2, BarChart3, Users, MapPin, ArrowLeft, CalendarDays } from 'lucide-react';
 import { Screen, EntityType } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
+import { getPartnerCategories, selectCategories } from '../../api/onboarding';
 
 interface AuthProps {
     onNavigate: (screen: Screen) => void;
@@ -10,7 +11,22 @@ interface AuthProps {
 export const PartnerCategory: React.FC<AuthProps> = ({ onNavigate }) => {
     const { allowedEntities, setAllowedEntities } = usePartner();
     const [selectedCategories, setSelectedCategories] = useState<EntityType[]>(allowedEntities.length > 0 ? allowedEntities : []);
+    const [loading, setLoading] = useState(false);
+    const [availableCategories, setAvailableCategories] = useState<string[]>([]);
 
+    useEffect(() => {
+        const fetchCategories = async () => {
+            try {
+                const res = await getPartnerCategories();
+                if (res.success) {
+                    setAvailableCategories(res.data.map((c: any) => c.name));
+                }
+            } catch (err) {
+                console.error('Failed to load categories', err);
+            }
+        };
+        fetchCategories();
+    }, []);
     const toggleCategory = (catName: EntityType) => {
         setSelectedCategories(prev =>
             prev.includes(catName)
@@ -19,10 +35,19 @@ export const PartnerCategory: React.FC<AuthProps> = ({ onNavigate }) => {
         );
     };
 
-    const handleContinue = () => {
+    const handleContinue = async () => {
         if (selectedCategories.length > 0) {
-            setAllowedEntities(selectedCategories);
-            onNavigate('REGISTRATION');
+            setLoading(true);
+            try {
+                await selectCategories(selectedCategories);
+                setAllowedEntities(selectedCategories);
+                onNavigate('REGISTRATION');
+            } catch (err) {
+                console.error('Failed to select categories', err);
+                alert('Failed to save categories. Please try again.');
+            } finally {
+                setLoading(false);
+            }
         }
     };
 
@@ -86,13 +111,13 @@ export const PartnerCategory: React.FC<AuthProps> = ({ onNavigate }) => {
                 <div className="pt-8 pb-4">
                     <button
                         onClick={handleContinue}
-                        disabled={selectedCategories.length === 0}
-                        className={`w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${selectedCategories.length > 0
+                        disabled={selectedCategories.length === 0 || loading}
+                        className={`w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${(selectedCategories.length > 0 && !loading)
                             ? 'bg-tlb-yellow text-tlb-dark shadow-lg shadow-tlb-yellow/20 hover:brightness-105 active:scale-[0.98]'
                             : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                             }`}
                     >
-                        Continue to Registration <ArrowRight size={20} />
+                        {loading ? 'Saving...' : 'Continue to Registration'} <ArrowRight size={20} />
                     </button>
                 </div>
             </main>

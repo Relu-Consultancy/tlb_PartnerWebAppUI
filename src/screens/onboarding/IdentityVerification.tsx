@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     CheckCircle2,
     ArrowLeft,
@@ -10,7 +10,21 @@ interface OnboardingProps {
     onNavigate: (screen: Screen) => void;
 }
 
-export const IdentityVerification: React.FC<OnboardingProps> = ({ onNavigate }) => (
+export const IdentityVerification: React.FC<OnboardingProps> = ({ onNavigate }) => {
+    const [pan, setPan] = useState(sessionStorage.getItem('pan_number') || '');
+    const [gst, setGst] = useState(sessionStorage.getItem('gst_number') || '');
+
+    const handleContinue = () => {
+        if (pan.length !== 10) {
+            alert('Please enter a valid 10-character PAN number.');
+            return;
+        }
+        sessionStorage.setItem('pan_number', pan);
+        sessionStorage.setItem('gst_number', gst);
+        onNavigate('BANK_SETUP');
+    };
+
+    return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
         <header className="bg-white p-6 flex items-center justify-between border-b border-gray-100">
             <button onClick={() => onNavigate('HOME')} className="p-2 -ml-2 text-gray-400 hover:text-tlb-dark transition-colors"><ArrowLeft size={24} /></button>
@@ -38,6 +52,8 @@ export const IdentityVerification: React.FC<OnboardingProps> = ({ onNavigate }) 
                                 className="tlb-input uppercase placeholder:normal-case font-medium tracking-wide"
                                 placeholder="e.g. ABCDE1234F"
                                 maxLength={10}
+                                value={pan}
+                                onChange={(e) => setPan(e.target.value.toUpperCase())}
                             />
                         </div>
                         <div>
@@ -46,13 +62,15 @@ export const IdentityVerification: React.FC<OnboardingProps> = ({ onNavigate }) 
                                 className="tlb-input uppercase placeholder:normal-case font-medium tracking-wide"
                                 placeholder="e.g. 22AAAAA0000A1Z5"
                                 maxLength={15}
+                                value={gst}
+                                onChange={(e) => setGst(e.target.value.toUpperCase())}
                             />
                         </div>
                     </div>
 
                     <div className="pt-2">
                         <button
-                            onClick={() => onNavigate('BANK_SETUP')}
+                            onClick={handleContinue}
                             className="tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20 flex items-center justify-center gap-2"
                         >
                             Continue to Bank Setup <ArrowLeft size={18} className="rotate-180" />
@@ -66,4 +84,5 @@ export const IdentityVerification: React.FC<OnboardingProps> = ({ onNavigate }) 
             </div>
         </main>
     </div>
-);
+    );
+};

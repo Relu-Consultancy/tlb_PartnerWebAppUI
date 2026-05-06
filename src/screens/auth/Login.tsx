@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ChevronRight, Smartphone, Mail, ArrowRight, X } from 'lucide-react';
 import { Screen } from '../../types';
 
+import { requestOtp } from '../../api/auth';
+
 interface AuthProps {
     onNavigate: (screen: Screen) => void;
     setAuthData?: (data: { value: string; type: 'email' | 'phone' }) => void;
@@ -11,16 +13,45 @@ interface AuthProps {
 export const Login: React.FC<AuthProps> = ({ onNavigate, setAuthData }) => {
     const [showEmailModal, setShowEmailModal] = useState(false);
     const [email, setEmail] = useState('');
+    const [phone, setPhone] = useState('');
+    const [loading, setLoading] = useState(false);
 
     const isEmailValid = email.includes('@') && email.includes('.');
+    const isPhoneValid = phone.length >= 10;
 
-    const handleEmailOtp = () => {
+    const handleEmailOtp = async () => {
         if (!isEmailValid) return;
-        if (setAuthData) {
-            setAuthData({ value: email, type: 'email' });
+        setLoading(true);
+        try {
+            await requestOtp(email, 'email');
+            if (setAuthData) {
+                setAuthData({ value: email, type: 'email' });
+            }
+            setShowEmailModal(false);
+            onNavigate('OTP_VERIFY');
+        } catch (error) {
+            console.error('Failed to request OTP', error);
+            alert('Failed to send OTP. Please try again.');
+        } finally {
+            setLoading(false);
         }
-        setShowEmailModal(false);
-        onNavigate('OTP_VERIFY');
+    };
+
+    const handlePhoneOtp = async () => {
+        if (!isPhoneValid) return;
+        setLoading(true);
+        try {
+            await requestOtp(`+91${phone}`, 'phone');
+            if (setAuthData) {
+                setAuthData({ value: `+91${phone}`, type: 'phone' });
+            }
+            onNavigate('OTP_VERIFY');
+        } catch (error) {
+            console.error('Failed to request OTP', error);
+            alert('Failed to send OTP. Please try again.');
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -51,12 +82,22 @@ export const Login: React.FC<AuthProps> = ({ onNavigate, setAuthData }) => {
                         </div>
                         <div className="flex-1">
                             <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Mobile Number</label>
-                            <input type="tel" placeholder="98765 43210" className="tlb-input" />
+                            <input 
+                                type="tel" 
+                                placeholder="98765 43210" 
+                                className="tlb-input"
+                                value={phone}
+                                onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                            />
                         </div>
                     </div>
 
-                    <button onClick={() => onNavigate('OTP_VERIFY')} className="tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20">
-                        Send OTP <ArrowRight size={20} />
+                    <button 
+                        onClick={handlePhoneOtp} 
+                        disabled={!isPhoneValid || loading}
+                        className={`tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20 ${(!isPhoneValid || loading) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                        {loading ? 'Sending...' : 'Send OTP'} <ArrowRight size={20} />
                     </button>
 
                     <div className="relative flex items-center justify-center py-4">
@@ -140,10 +181,10 @@ export const Login: React.FC<AuthProps> = ({ onNavigate, setAuthData }) => {
                                 <button
                                     type="button"
                                     onClick={handleEmailOtp}
-                                    disabled={!isEmailValid}
-                                    className={`tlb-button w-full py-4 shadow-lg gap-2 ${!isEmailValid ? 'opacity-50 cursor-not-allowed' : 'shadow-tlb-yellow/20'}`}
+                                    disabled={!isEmailValid || loading}
+                                    className={`tlb-button w-full py-4 shadow-lg gap-2 ${(!isEmailValid || loading) ? 'opacity-50 cursor-not-allowed' : 'shadow-tlb-yellow/20'}`}
                                 >
-                                    Send OTP <ArrowRight size={18} />
+                                    {loading ? 'Sending...' : 'Send OTP'} <ArrowRight size={18} />
                                 </button>
                             </div>
                         </motion.div>

@@ -69,6 +69,7 @@ const CreateVenuePreview = lazyImport(() => import('./screens/venues'), 'CreateV
 
 // Enquiries & Packages
 const Enquiries = lazyImport(() => import('./screens/enquiries'), 'Enquiries');
+const ProgramEnquiries = lazyImport(() => import('./screens/enquiries'), 'ProgramEnquiries');
 
 import { Sidebar } from './components/Navigation';
 
@@ -134,7 +135,8 @@ const routes: Record<Screen, RouteConfig> = {
   CREATE_PROGRAM_PREVIEW: { component: CreateProgramPreview, hasSidebar: false },
 
   // Enquiries — restricted to Classes/Programs partners
-  ENQUIRIES: { component: Enquiries, hasSidebar: true, requiresEntities: ['Classes', 'Programs'] },
+  ENQUIRIES: { component: Enquiries, hasSidebar: true, requiresEntities: ['Classes'] },
+  PROGRAM_ENQUIRIES: { component: ProgramEnquiries, hasSidebar: true, requiresEntities: ['Programs'] },
 
   // Other
   ATTENDEES: { component: Attendees, hasSidebar: true },

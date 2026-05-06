@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Smartphone, Mail, ArrowRight, ArrowLeft } from 'lucide-react';
 import { Screen } from '../../types';
+import { requestOtp } from '../../api/auth';
 
 interface AuthProps {
     onNavigate: (screen: Screen) => void;
@@ -8,15 +9,28 @@ interface AuthProps {
 }
 
 export const PartnerAccess: React.FC<AuthProps> = ({ onNavigate, setAuthData }) => {
-    const [contact, setContact] = React.useState('');
+    const [contact, setContact] = useState('');
+    const [loading, setLoading] = useState(false);
 
-    const handleContinue = () => {
+    const handleContinue = async () => {
         if (!contact) return;
-        const type = contact.includes('@') ? 'email' : 'phone';
-        if (setAuthData) {
-            setAuthData({ value: contact, type });
+        const isEmail = contact.includes('@');
+        const type = isEmail ? 'email' : 'phone';
+        const identifier = isEmail ? contact : (contact.startsWith('+') ? contact : `+91${contact}`);
+        
+        setLoading(true);
+        try {
+            await requestOtp(identifier, type);
+            if (setAuthData) {
+                setAuthData({ value: identifier, type });
+            }
+            onNavigate('PARTNER_ACCESS_OTP');
+        } catch (error) {
+            console.error('Failed to request OTP', error);
+            alert('Failed to send OTP. Please try again.');
+        } finally {
+            setLoading(false);
         }
-        onNavigate('PARTNER_ACCESS_OTP');
     };
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -62,10 +76,10 @@ export const PartnerAccess: React.FC<AuthProps> = ({ onNavigate, setAuthData }) 
                     {/* Continue Button */}
                     <button 
                         onClick={handleContinue} 
-                        disabled={!contact}
-                        className={`tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20 mt-8 ${!contact ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        disabled={!contact || loading}
+                        className={`tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20 mt-8 ${(!contact || loading) ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
-                        Send OTP <ArrowRight size={20} />
+                        {loading ? 'Sending...' : 'Send OTP'} <ArrowRight size={20} />
                     </button>
                 </div>
             </main>

@@ -65,7 +65,7 @@ export const AgreementSubmit: React.FC<OnboardingProps> = ({ onNavigate }) => {
             <button 
                 disabled={!accepted}
                 onClick={() => {
-                    sessionStorage.setItem('onboardingStep', '4');
+                    sessionStorage.setItem('agreement_accepted', 'true');
                     onNavigate('HOME');
                 }} 
                 className={`tlb-button w-full py-4 shadow-lg ${accepted ? 'shadow-tlb-yellow/20' : 'opacity-50 cursor-not-allowed'}`}

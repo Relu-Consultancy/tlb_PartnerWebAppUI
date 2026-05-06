@@ -1,14 +1,23 @@
 import React, { useRef, useState } from 'react';
 import { ChevronRight, Smartphone, ArrowRight, Mail } from 'lucide-react';
 import { Screen } from '../../types';
+import { verifyOtp } from '../../api/auth';
+import { setAuthToken, setRefreshToken } from '../../api/client';
 
 interface AuthProps {
     onNavigate: (screen: Screen) => void;
     authData: { value: string; type: 'email' | 'phone' } | null;
 }
 
-const OtpInputGroup = ({ icon: Icon, label, color }: { icon: any, label: string, color: string }) => {
-    const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
+interface OtpInputGroupProps {
+    icon: any;
+    label: string;
+    color: string;
+    otp: string[];
+    setOtp: (otp: string[]) => void;
+}
+
+const OtpInputGroup = ({ icon: Icon, label, color, otp, setOtp }: OtpInputGroupProps) => {
     const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
     const handleChange = (index: number, value: string) => {
@@ -79,6 +88,33 @@ const OtpInputGroup = ({ icon: Icon, label, color }: { icon: any, label: string,
 export const PartnerAccessOTP: React.FC<AuthProps> = ({ onNavigate, authData }) => {
     const isEmail = authData?.type === 'email';
     const contactValue = authData?.value || 'your device';
+    const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
+    const [loading, setLoading] = useState(false);
+
+    const handleVerify = async () => {
+        const code = otp.join('');
+        if (code.length !== 6 || !authData) return;
+        setLoading(true);
+        try {
+            const res = await verifyOtp(authData.value, code, 'partner');
+            const data = res.data || res;
+            const access = data.access_token || data.access;
+            const refresh = data.refresh_token || data.refresh;
+            
+            if (access) {
+                setAuthToken(access);
+                if (refresh) setRefreshToken(refresh);
+                onNavigate('PARTNER_CATEGORY');
+            } else {
+                throw new Error('No access token received');
+            }
+        } catch (error) {
+            console.error('Failed to verify OTP', error);
+            alert('Invalid OTP. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col items-center">
@@ -102,12 +138,18 @@ export const PartnerAccessOTP: React.FC<AuthProps> = ({ onNavigate, authData }) 
                         icon={isEmail ? Mail : Smartphone} 
                         label={isEmail ? "Email Verification" : "Mobile Verification"} 
                         color="bg-tlb-yellow/10 text-tlb-yellow" 
+                        otp={otp}
+                        setOtp={setOtp}
                     />
                 </div>
 
                 <div className="mt-auto pb-8">
-                    <button onClick={() => onNavigate('PARTNER_CATEGORY')} className="tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20">
-                        Verify & Continue <ChevronRight size={20} />
+                    <button 
+                        onClick={handleVerify} 
+                        disabled={otp.join('').length !== 6 || loading || !authData}
+                        className={`tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20 ${(otp.join('').length !== 6 || loading || !authData) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                        {loading ? 'Verifying...' : 'Verify & Continue'} <ChevronRight size={20} />
                     </button>
                 </div>
             </main>

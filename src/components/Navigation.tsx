@@ -24,9 +24,6 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen, onNavigate }) => {
   const { allowedEntities } = usePartner();
 
-  // Enquiries visible only if partner has Classes or Programs
-  const hasClassOrProgram = allowedEntities.includes('Classes') || allowedEntities.includes('Programs');
-
   // Build dynamic sidebar label for "My Listings"
   const listingsLabel = (() => {
     if (allowedEntities.length === 0) return 'My Listings';
@@ -52,12 +49,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen
     return allowedEntities.slice(0, 2).join(' & ').toUpperCase();
   })();
 
+  const hasClasses = allowedEntities.includes('Classes');
+  const hasPrograms = allowedEntities.includes('Programs');
+
     const menuItems = [
     { id: 'HOME', label: 'Home', icon: Home, sub: 'STATS & ALERTS', visible: true },
     { id: 'BRAND_PROFILE', label: 'Brand Profile', icon: UserCircle, sub: 'YOUR STOREFRONT', visible: true },
     { id: 'SERVICE_LISTINGS', label: listingsLabel, icon: CalendarDays, sub: listingsSub, visible: true },
     { id: 'ATTENDEES', label: 'Attendees', icon: Users, sub: 'MANAGE GUESTS', visible: true },
-    { id: 'ENQUIRIES', label: 'Enquiries', icon: Inbox, sub: 'LEAD INBOX', visible: hasClassOrProgram },
+    { id: 'ENQUIRIES', label: 'Class Enquiry Management', icon: Inbox, sub: 'CLASS LEAD INBOX', visible: hasClasses },
+    { id: 'PROGRAM_ENQUIRIES', label: 'Program Enquiry Management', icon: Inbox, sub: 'PROGRAM CRM', visible: hasPrograms },
     { id: 'PACKAGES', label: 'Packages', icon: Package, sub: 'CREDITS & BILLING', visible: false },
     { id: 'FINANCIAL_HUB', label: 'Pay-outs & Finance', icon: DollarSign, sub: 'EARNINGS & TAX', visible: true },
   ];

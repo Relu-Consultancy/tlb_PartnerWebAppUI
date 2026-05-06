@@ -51,6 +51,7 @@ export type Screen =
   | 'CREATE_PROGRAM_PREVIEW'
   // Other
   | 'ENQUIRIES'
+  | 'PROGRAM_ENQUIRIES'
   | 'PACKAGES'
   | 'ATTENDEES'
   | 'FINANCIAL_HUB';

@@ -6,17 +6,17 @@ import { WizardLayout, WizardNavigation } from '../../components/ui';
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
 
 const categories: Record<string, string[]> = {
-    'Future Tech & AI': ['AI Basics', 'Machine Learning', 'Robotics', 'Coding', 'Cybersecurity'],
-    'Design & Innovation': ['UI/UX Design', 'Product Design', 'Graphic Design', 'Creative Thinking'],
-    'Leadership & Entrepreneurship': ['Business Strategy', 'Management', 'Financial Literacy', 'Startup Basics'],
-    'Media & Content Creation': ['Video Editing', 'Podcasting', 'Social Media Marketing', 'Photography'],
-    'Stage Arts & Performance': ['Theatre / Acting', 'Dance', 'Vocal Performance', 'Instrument Learning'],
-    'Active Sports & Training': ['Athletics', 'Martial Arts', 'Fitness Bootcamp', 'Yoga'],
-    'Academics & Competitive Prep': ['Olympiads', 'Board Exams', 'Entrance Prep', 'School Subjects'],
-    'Analytical Thinking': ['Vedic Maths', 'Chess', 'Problem Solving', 'Abacus'],
-    'Language & Communication': ['Spoken English', 'Creative Writing', 'Foreign Languages', 'Public Speaking'],
-    'Culinary & Hospitality': ['Cooking', 'Baking', 'Food Styling', 'Etiquette'],
-    'Grooming & Personality Development': ['Personal Branding', 'Confidence Building', 'Emotional Intelligence'],
+    'Future Tech & AI': ['Coding & Programming', 'Robotics & Automation', 'Artificial Intelligence (AI)', 'Game Development', 'App Development', 'Electronics & IoT'],
+    'Design & Innovation': ['Visual Arts (Drawing, Painting, Sculpting)', 'Craft & DIY Creations', 'Fashion & Textile Design', 'Graphic & Digital Design', 'Design Thinking & Innovation'],
+    'Leadership & Entrepreneurship': ['Entrepreneurship & Startups', 'Financial Literacy', 'Leadership & Confidence', 'Business & Marketing Basics', 'Problem Solving & Decision Making'],
+    'Media & Content Creation': ['Animation', 'Video Creation & Editing', 'Filmmaking', 'Content Creation (YouTube, Social Media)', 'Photography', 'Journalism & Mass Communication'],
+    'Stage Arts & Performance': ['Dance', 'Music (Vocal & Instrumental)', 'Theatre & Acting', 'Stage Performance'],
+    'Active Sports & Training': ['Sports Coaching', 'Fitness & Strength Training', 'Yoga & Mindfulness', 'Adventure & Outdoor Programs', 'Motorsports Training'],
+    'Academics & Competitive Prep': ['Subject-Focused Programs', 'Olympiad Preparation', 'Entrance Exam Preparation', 'Smart Study Skills'],
+    'Analytical Thinking': ['Abacus', 'Vedic Maths', 'Logical Reasoning', 'Problem Solving', 'Memory & Focus Development'],
+    'Language & Communication': ['Spoken English', 'Public Speaking', 'Debate & Communication Skills', 'Creative Writing', 'Foreign Languages', 'Indian Languages'],
+    'Culinary & Hospitality': ['Cooking & Baking', 'Culinary Arts', 'Chef Programs', 'Hospitality & Hotel Management', 'Food Presentation & Service Skills'],
+    'Grooming & Personality Development': ['Personal Grooming', 'Etiquette & Manners', 'Personality Development', 'Confidence Building', 'Personal Styling'],
 };
 
 const formats = ['Physical', 'Online', 'Hybrid', 'Trial'];

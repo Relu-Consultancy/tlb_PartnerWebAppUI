@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, Plus, Search, Filter, Users, Edit3, CalendarDays, BarChart3, MapPin, Layers, Loader2, Clock } from 'lucide-react';
+import { Menu, Plus, Search, Filter, Users, Edit3, CalendarDays, BarChart3, MapPin, Layers, Loader2, Clock, X, Check, SlidersHorizontal } from 'lucide-react';
 import { Screen, EntityType } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
 import { EntityPickerSheet } from '../../components/EntityPickerSheet';
@@ -54,6 +54,8 @@ const fmtStart = (iso?: string) => {
     } catch { return ''; }
 };
 
+type SortOption = 'newest' | 'oldest' | 'a-z' | 'z-a';
+
 export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
     const { allowedEntities } = usePartner();
     const [listings, setListings] = useState<Listing[]>([]);
@@ -62,6 +64,45 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
     const [searchQuery, setSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState<EntityType | 'All'>('All');
     const [showEntityPicker, setShowEntityPicker] = useState(false);
+
+    // Filter state
+    const [showFilter, setShowFilter] = useState(false);
+    const [filterStatuses, setFilterStatuses] = useState<ListingStatus[]>([]);
+    const [filterTypes, setFilterTypes] = useState<EntityType[]>([]);
+    const [sortBy, setSortBy] = useState<SortOption>('newest');
+
+    // Temp state (inside dialog before Apply)
+    const [tmpStatuses, setTmpStatuses] = useState<ListingStatus[]>([]);
+    const [tmpTypes, setTmpTypes] = useState<EntityType[]>([]);
+    const [tmpSort, setTmpSort] = useState<SortOption>('newest');
+
+    const openFilter = () => {
+        setTmpStatuses([...filterStatuses]);
+        setTmpTypes([...filterTypes]);
+        setTmpSort(sortBy);
+        setShowFilter(true);
+    };
+
+    const applyFilter = () => {
+        setFilterStatuses(tmpStatuses);
+        setFilterTypes(tmpTypes);
+        setSortBy(tmpSort);
+        setShowFilter(false);
+    };
+
+    const resetFilter = () => {
+        setTmpStatuses([]);
+        setTmpTypes([]);
+        setTmpSort('newest');
+    };
+
+    const toggleTmpStatus = (s: ListingStatus) =>
+        setTmpStatuses(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
+
+    const toggleTmpType = (t: EntityType) =>
+        setTmpTypes(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
+
+    const activeFilterCount = filterStatuses.length + filterTypes.length + (sortBy !== 'newest' ? 1 : 0);
 
     useEffect(() => {
         const fetchListings = async () => {
@@ -120,7 +161,15 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
 
     const filtered = listings
         .filter(s => activeTab === 'All' || s.entityType === activeTab)
-        .filter(s => s.title.toLowerCase().includes(searchQuery.toLowerCase()));
+        .filter(s => s.title.toLowerCase().includes(searchQuery.toLowerCase()))
+        .filter(s => filterStatuses.length === 0 || filterStatuses.includes(s.status))
+        .filter(s => filterTypes.length === 0 || filterTypes.includes(s.entityType))
+        .sort((a, b) => {
+            if (sortBy === 'a-z') return a.title.localeCompare(b.title);
+            if (sortBy === 'z-a') return b.title.localeCompare(a.title);
+            if (sortBy === 'oldest') return (a.startDateTime || a.id) < (b.startDateTime || b.id) ? -1 : 1;
+            return (a.startDateTime || a.id) > (b.startDateTime || b.id) ? -1 : 1; // newest
+        });
 
     const tabCounts = {
         All: listings.length,
@@ -169,8 +218,16 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                                 onChange={(e) => setSearchQuery(e.target.value)}
                             />
                         </div>
-                        <button className="bg-white border border-gray-100 p-3 rounded-2xl text-gray-400 shadow-sm hover:border-tlb-yellow/30 transition-colors">
+                        <button
+                            onClick={openFilter}
+                            className={`relative bg-white border p-3 rounded-2xl shadow-sm transition-colors ${activeFilterCount > 0 ? 'border-tlb-yellow text-tlb-dark' : 'border-gray-100 text-gray-400 hover:border-tlb-yellow/30'}`}
+                        >
                             <Filter size={18} />
+                            {activeFilterCount > 0 && (
+                                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-tlb-yellow rounded-full text-[9px] font-black text-tlb-dark flex items-center justify-center">
+                                    {activeFilterCount}
+                                </span>
+                            )}
                         </button>
                     </div>
 
@@ -232,12 +289,9 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                                         <div className="p-5">
                                             <div className="flex items-start justify-between gap-3">
                                                 <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                                    <div className="flex items-center gap-2 mb-1">
                                                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold ${badge.bg} ${badge.color}`}>
                                                             <BadgeIcon size={10} /> {listing.entityType}
-                                                        </span>
-                                                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${sb.bg} ${sb.color}`}>
-                                                            {sb.label}
                                                         </span>
                                                     </div>
                                                     <h3 className="font-bold text-lg truncate">{listing.title}</h3>
@@ -250,6 +304,14 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                                                         </p>
                                                     )}
                                                 </div>
+                                                <span className={`shrink-0 mt-0.5 px-3 py-1.5 rounded-xl text-[11px] font-black border ${sb.bg} ${sb.color} ${
+                                                    listing.status === 'published' ? 'border-emerald-200' :
+                                                    listing.status === 'pending'   ? 'border-amber-200' :
+                                                    listing.status === 'rejected'  ? 'border-red-200' :
+                                                    'border-gray-200'
+                                                }`}>
+                                                    {sb.label}
+                                                </span>
                                             </div>
                                         </div>
 
@@ -305,6 +367,104 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                 allowedEntities={allowedEntities}
                 onNavigate={onNavigate}
             />
+
+            {/* Filter Bottom Sheet */}
+            {showFilter && (
+                <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ backdropFilter: 'blur(4px)', backgroundColor: 'rgba(0,0,0,0.4)' }} onClick={() => setShowFilter(false)}>
+                    <div className="bg-white w-full max-w-lg rounded-t-3xl p-6 space-y-6" onClick={e => e.stopPropagation()}>
+
+                        {/* Header */}
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <SlidersHorizontal size={18} className="text-tlb-dark" />
+                                <h2 className="font-black text-lg">Filter Listings</h2>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button onClick={resetFilter} className="text-xs font-bold text-gray-400 hover:text-red-500 transition-colors">Reset</button>
+                                <button onClick={() => setShowFilter(false)} className="p-1.5 rounded-xl hover:bg-gray-100 text-gray-400 transition-colors">
+                                    <X size={18} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Status */}
+                        <div>
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Status</p>
+                            <div className="grid grid-cols-2 gap-2">
+                                {(Object.entries(statusBadge) as [ListingStatus, typeof statusBadge[ListingStatus]][]).map(([key, s]) => {
+                                    const active = tmpStatuses.includes(key);
+                                    return (
+                                        <button
+                                            key={key}
+                                            onClick={() => toggleTmpStatus(key)}
+                                            className={`flex items-center justify-between px-4 py-3 rounded-2xl border-2 text-sm font-bold transition-all ${active ? 'border-tlb-yellow bg-tlb-yellow/10 text-tlb-dark' : 'border-gray-100 bg-white text-gray-500 hover:border-gray-200'}`}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <span className={`w-2 h-2 rounded-full ${key === 'published' ? 'bg-emerald-500' : key === 'pending' ? 'bg-amber-500' : key === 'draft' ? 'bg-gray-400' : 'bg-red-500'}`} />
+                                                {s.label}
+                                            </div>
+                                            {active && <Check size={14} className="text-tlb-dark" />}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Type */}
+                        <div>
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Listing Type</p>
+                            <div className="grid grid-cols-2 gap-2">
+                                {(Object.entries(entityBadgeConfig) as [EntityType, typeof entityBadgeConfig[EntityType]][])
+                                    .filter(([type]) => allowedEntities.includes(type))
+                                    .map(([type, cfg]) => {
+                                        const active = tmpTypes.includes(type);
+                                        const Icon = cfg.icon;
+                                        return (
+                                            <button
+                                                key={type}
+                                                onClick={() => toggleTmpType(type)}
+                                                className={`flex items-center justify-between px-4 py-3 rounded-2xl border-2 text-sm font-bold transition-all ${active ? 'border-tlb-yellow bg-tlb-yellow/10 text-tlb-dark' : 'border-gray-100 bg-white text-gray-500 hover:border-gray-200'}`}
+                                            >
+                                                <div className={`flex items-center gap-2 ${active ? 'text-tlb-dark' : cfg.color}`}>
+                                                    <Icon size={15} />
+                                                    {type}
+                                                </div>
+                                                {active && <Check size={14} className="text-tlb-dark" />}
+                                            </button>
+                                        );
+                                    })}
+                            </div>
+                        </div>
+
+                        {/* Sort */}
+                        <div>
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Sort By</p>
+                            <div className="grid grid-cols-2 gap-2">
+                                {([
+                                    { value: 'newest', label: 'Newest First' },
+                                    { value: 'oldest', label: 'Oldest First' },
+                                    { value: 'a-z',    label: 'A → Z' },
+                                    { value: 'z-a',    label: 'Z → A' },
+                                ] as { value: SortOption; label: string }[]).map(opt => (
+                                    <button
+                                        key={opt.value}
+                                        onClick={() => setTmpSort(opt.value)}
+                                        className={`flex items-center justify-between px-4 py-3 rounded-2xl border-2 text-sm font-bold transition-all ${tmpSort === opt.value ? 'border-tlb-yellow bg-tlb-yellow/10 text-tlb-dark' : 'border-gray-100 bg-white text-gray-500 hover:border-gray-200'}`}
+                                    >
+                                        {opt.label}
+                                        {tmpSort === opt.value && <Check size={14} />}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Apply */}
+                        <button onClick={applyFilter} className="tlb-button w-full py-4 gap-2 shadow-lg shadow-tlb-yellow/20">
+                            Apply Filters
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

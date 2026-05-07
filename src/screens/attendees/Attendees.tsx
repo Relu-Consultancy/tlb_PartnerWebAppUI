@@ -1,27 +1,22 @@
 import React, { useState } from 'react';
-import { Menu, Search, Download, FileText, FileSpreadsheet, Clock, CheckSquare, Square } from 'lucide-react';
+import { Menu, Search, Download, FileText, FileSpreadsheet, Clock, CheckSquare, Square, Inbox } from 'lucide-react';
 import { Screen } from '../../types';
 
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
 
-const MOCK_ATTENDEES = [
-    { id: 1, name: 'Sana Mehta', phone: '9820067890', event: 'Yoga Basics', status: 'Paid', checkedIn: false, time: '11:00 AM' },
-    { id: 2, name: 'Aarav Sharma', phone: '9167012345', event: 'Pilates Core', status: 'Comp', checkedIn: true, time: '11:15 AM' },
-    { id: 3, name: 'Rohan Gupta', phone: '9004098765', event: 'Yoga Basics', status: 'Paid', checkedIn: false, time: '11:05 AM' },
-    { id: 4, name: 'Priya Singh', phone: '9988776655', event: 'Zumba Cardio', status: 'Cancelled', checkedIn: false, time: '-' },
-];
+interface Attendee { id: number; name: string; phone: string; event: string; status: string; checkedIn: boolean; time: string; }
 
 const Attendees: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
     const [activeTab, setActiveTab] = useState<'Upcoming' | 'Past'>('Upcoming');
     const [searchQuery, setSearchQuery] = useState('');
-    const [attendees, setAttendees] = useState(MOCK_ATTENDEES);
+    const [attendees, setAttendees] = useState<Attendee[]>([]);
 
     const toggleCheckIn = (id: number) => {
         setAttendees(prev => prev.map(a => a.id === id ? { ...a, checkedIn: !a.checkedIn } : a));
     };
 
-    const filtered = attendees.filter(a => 
-        a.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    const filtered = attendees.filter(a =>
+        a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         a.phone.includes(searchQuery)
     );
 
@@ -72,7 +67,16 @@ const Attendees: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-50">
-                                            {filtered.map(attendee => (
+                                            {filtered.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={5} className="px-6 py-16 text-center">
+                                                        <div className="flex flex-col items-center gap-2 text-gray-300">
+                                                            <Inbox size={32} />
+                                                            <p className="text-sm font-bold">No attendees yet</p>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ) : filtered.map(attendee => (
                                                 <tr key={attendee.id} className="hover:bg-gray-50/50 transition-colors">
                                                     <td className="px-6 py-4 font-bold text-sm text-gray-900">{attendee.name}</td>
                                                     <td className="px-6 py-4 text-sm text-gray-800 font-bold">{attendee.event}</td>
@@ -85,7 +89,7 @@ const Attendees: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                                         }`}>{attendee.status}</span>
                                                     </td>
                                                     <td className="px-6 py-4 text-center">
-                                                        <button 
+                                                        <button
                                                             onClick={() => toggleCheckIn(attendee.id)}
                                                             className={`p-1.5 rounded-lg transition-colors ${attendee.checkedIn ? 'text-emerald-500 hover:bg-emerald-50' : 'text-gray-300 hover:text-gray-500 hover:bg-gray-100'}`}
                                                         >

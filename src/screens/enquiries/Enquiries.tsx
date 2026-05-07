@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, Search, Filter, Lock, Phone, MessageCircle, X, AlertTriangle, StickyNote } from 'lucide-react';
+import { Menu, Search, Filter, Lock, Phone, MessageCircle, X, StickyNote, Inbox } from 'lucide-react';
 import { Screen, EnquiryStatus } from '../../types';
 
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
@@ -19,15 +19,8 @@ interface Lead {
     notes: string;
 }
 
-const initialLeads: Lead[] = [
-    { id: '1', studentName: 'Aarav Sharma', parentName: 'Mrs. Sharma', batch: 'Keyboard (Sat 10 AM)', age: '8 Years', dateTime: '12 Mar, 10 AM', contact: '9820012345', isUnlocked: false, status: 'New', message: 'Do you offer a trial class this Saturday?', area: 'Bandra West', notes: '' },
-    { id: '2', studentName: 'Sana Mehta', batch: 'Hatha Yoga (M-W-F)', age: 'Adult', dateTime: '11 Mar, 4 PM', contact: '9820067890', isUnlocked: true, status: 'New', area: 'Andheri East', notes: '' },
-    { id: '3', studentName: 'Rohan Gupta', batch: 'MMA (Evening)', age: '15 Years', dateTime: '10 Mar, 11 AM', contact: '9167012345', isUnlocked: true, status: 'Contacted', area: 'Juhu', notes: '' },
-    { id: '4', studentName: 'Priya Singh', parentName: 'Mr. Singh', batch: 'Kids Dance', age: '6 Years', dateTime: '09 Mar, 2 PM', contact: '9004098765', isUnlocked: true, status: 'Contacted', message: 'Is there a demo class available?', area: 'Powai', notes: '' },
-];
-
 export const Enquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
-    const [leads, setLeads] = useState<Lead[]>(initialLeads);
+    const [leads, setLeads] = useState<Lead[]>([]);
     const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
     const [search, setSearch] = useState('');
 
@@ -47,8 +40,6 @@ export const Enquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
         .filter(l => l.studentName.toLowerCase().includes(search.toLowerCase()))
         .sort((a, b) => (a.status === 'New' ? -1 : 1) - (b.status === 'New' ? -1 : 1));
 
-    const maskNumber = (num: string) => num.slice(0, 5) + 'XXXXX';
-
     return (
     <div className="min-h-screen bg-gray-50 pb-24">
         <header className="bg-white p-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
@@ -59,15 +50,6 @@ export const Enquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
 
         <main className="p-6">
             <div className="tlb-content space-y-6">
-                {/* Credits Banner */}
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3">
-                    <div className="bg-amber-100 p-2 rounded-xl text-amber-600 shrink-0"><AlertTriangle size={18} /></div>
-                    <div className="flex-1">
-                        <p className="text-sm font-bold text-amber-800">22 Credits Remaining</p>
-                        <p className="text-[11px] text-amber-600">Each unlock costs 1 credit. <button onClick={() => onNavigate('PACKAGES')} className="underline font-bold">Buy more</button></p>
-                    </div>
-                </div>
-
                 {/* Search */}
                 <div className="flex gap-3">
                     <div className="flex-1 bg-white border border-gray-100 rounded-2xl px-4 py-3 flex items-center gap-3 shadow-sm">
@@ -92,9 +74,18 @@ export const Enquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
-                                {sorted.map((lead) => (
-                                    <tr 
-                                        key={lead.id} 
+                                {sorted.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={6} className="px-6 py-16 text-center">
+                                            <div className="flex flex-col items-center gap-3 text-gray-300">
+                                                <Inbox size={36} />
+                                                <p className="text-sm font-bold">No enquiries yet</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ) : sorted.map((lead) => (
+                                    <tr
+                                        key={lead.id}
                                         onClick={() => setSelectedLead(lead)}
                                         className={`hover:bg-gray-50/50 transition-colors cursor-pointer ${lead.status === 'New' ? 'bg-blue-50/20' : ''}`}
                                     >

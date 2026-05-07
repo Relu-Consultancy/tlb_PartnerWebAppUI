@@ -1,7 +1,7 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { ChevronRight, Smartphone, ArrowRight } from 'lucide-react';
 import { Screen } from '../../types';
-import { verifyOtp } from '../../api/auth';
+import { verifyOtp, requestOtp } from '../../api/auth';
 import { setAuthToken, setRefreshToken } from '../../api/client';
 
 interface AuthProps {
@@ -12,7 +12,30 @@ interface AuthProps {
 export const OTPVerify: React.FC<AuthProps> = ({ onNavigate, authData }) => {
     const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
     const [loading, setLoading] = useState(false);
+    const [resending, setResending] = useState(false);
+    const [countdown, setCountdown] = useState(30);
     const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+    useEffect(() => {
+        if (countdown <= 0) return;
+        const timer = setTimeout(() => setCountdown(c => c - 1), 1000);
+        return () => clearTimeout(timer);
+    }, [countdown]);
+
+    const handleResend = async () => {
+        if (!authData) return;
+        setResending(true);
+        try {
+            await requestOtp(authData.value, authData.type === 'email' ? 'email' : 'phone');
+            setOtp(['', '', '', '', '', '']);
+            setCountdown(30);
+            inputRefs.current[0]?.focus();
+        } catch {
+            alert('Failed to resend OTP. Please try again.');
+        } finally {
+            setResending(false);
+        }
+    };
 
     const handleChange = (index: number, value: string) => {
         if (!/^\d*$/.test(value)) return;
@@ -81,7 +104,20 @@ export const OTPVerify: React.FC<AuthProps> = ({ onNavigate, authData }) => {
                 </div>
 
                 <p className="text-center text-gray-400 font-medium mb-12">
-                    Didn't receive the code? <span className="text-tlb-yellow font-bold">Resend in 00:45</span>
+                    Didn't receive the code?{' '}
+                    {countdown > 0 ? (
+                        <span className="text-tlb-yellow font-bold">
+                            Resend in 00:{String(countdown).padStart(2, '0')}
+                        </span>
+                    ) : (
+                        <button
+                            onClick={handleResend}
+                            disabled={resending}
+                            className="text-tlb-yellow font-bold underline disabled:opacity-50"
+                        >
+                            {resending ? 'Sending...' : 'Resend OTP'}
+                        </button>
+                    )}
                     <br />
                     <button onClick={() => onNavigate('LOGIN')} className="text-xs underline mt-2 opacity-50">Change Number/Email?</button>
                 </p>

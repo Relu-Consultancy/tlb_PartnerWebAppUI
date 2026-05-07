@@ -6,25 +6,20 @@ import {
 import { Screen } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
 import { EntityPickerSheet } from '../../components/EntityPickerSheet';
-import { getPartnerDashboard, getCurrentPartner } from '../../api/onboarding';
+import { getPartnerDashboard, getCurrentPartner, getBusinessProfile, getExtendedProfile, getPartnerMedia } from '../../api/onboarding';
 
 interface HomeProps {
   onNavigate: (screen: Screen) => void;
   onOpenSidebar: () => void;
 }
 
-// Status hierarchy for onboarding step mapping
-const STATUS_STEPS: Record<string, number> = {
-  'otp_verified': 1,
-  'category_selected': 1,
-  'profile_submitted': 2,
-  'under_review': 2,
-  'approved': 3,
-  'agreement_signed': 4,
-  'verification_submitted': 5,
-  'activated_limited': 5,
-  'activated_full': 5,
-};
+const ACTIVE_STATUSES = new Set([
+  'activated_limited', 'under_review', 'approved',
+]);
+
+const VERIFICATION_SUBMITTED_STATUSES = new Set([
+  'under_review', 'approved',
+]);
 
 export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
   const { allowedEntities, setAllowedEntities } = usePartner();
@@ -35,20 +30,25 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
   // API data
   const [partnerData, setPartnerData] = useState<any>(null);
   const [dashboardData, setDashboardData] = useState<any>(null);
+  const [profileData, setProfileData] = useState<any>(null);
+  const [extendedData, setExtendedData] = useState<any>(null);
+  const [mediaItems, setMediaItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [partnerRes, dashboardRes] = await Promise.allSettled([
+        const [partnerRes, dashboardRes, profileRes, extRes, mediaRes] = await Promise.allSettled([
           getCurrentPartner(),
           getPartnerDashboard(),
+          getBusinessProfile(),
+          getExtendedProfile(),
+          getPartnerMedia(),
         ]);
 
         if (partnerRes.status === 'fulfilled') {
           const pData = partnerRes.value.data || partnerRes.value;
           setPartnerData(pData);
-          // Sync categories from API to context
           if (pData.categories?.length > 0) {
             const cats = pData.categories.map((c: any) => c.name || c);
             setAllowedEntities(cats);
@@ -56,8 +56,20 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
         }
 
         if (dashboardRes.status === 'fulfilled') {
-          const dData = dashboardRes.value.data || dashboardRes.value;
-          setDashboardData(dData);
+          setDashboardData(dashboardRes.value.data || dashboardRes.value);
+        }
+
+        if (profileRes.status === 'fulfilled') {
+          setProfileData(profileRes.value.data || profileRes.value);
+        }
+
+        if (extRes.status === 'fulfilled') {
+          setExtendedData(extRes.value.data || extRes.value);
+        }
+
+        if (mediaRes.status === 'fulfilled') {
+          const m = mediaRes.value.data || mediaRes.value;
+          setMediaItems(Array.isArray(m) ? m : []);
         }
       } catch (err) {
         console.error('Dashboard fetch error', err);
@@ -72,13 +84,45 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
   const hasEvents = allowedEntities.includes('Events');
   const hasVenues = allowedEntities.includes('Venues');
 
-  // Derive onboarding step from partner status
-  const partnerStatus = partnerData?.status || partnerData?.partner_status || '';
-  const onboardingStep = STATUS_STEPS[partnerStatus] ?? 1;
-  const isOnboardingComplete = onboardingStep >= 5;
+  // Onboarding state — derived from API status
+  const partnerStatus = partnerData?.status || '';
+  const isActive = partnerData?.is_active === true || ACTIVE_STATUSES.has(partnerStatus);
+  const isVerified = partnerData?.is_verified === true || partnerStatus === 'approved';
+  const verificationSubmitted = VERIFICATION_SUBMITTED_STATUSES.has(partnerStatus);
 
-  // Profile completion from API or fallback
-  const profileCompletion = dashboardData?.profile_completion ?? partnerData?.profile_completion ?? 0;
+  // Redirect incomplete onboarding statuses
+  useEffect(() => {
+    if (!loading && partnerData) {
+      if (partnerStatus === 'otp_verified') {
+        onNavigate('PARTNER_CATEGORY');
+      } else if (partnerStatus === 'category_selected') {
+        onNavigate('REGISTRATION');
+      }
+    }
+  }, [loading, partnerData, partnerStatus]);
+
+  // Profile completion — mirrors the same 10-field formula used in EditProfile.tsx
+  const profileCompletion = (() => {
+    const galleryImages = mediaItems.filter((m: any) => m.media_type === 'image');
+    const fields = [
+      !!(extendedData?.cover_image),
+      !!(extendedData?.logo),
+      galleryImages.length > 0,
+      !!(profileData?.business_name || partnerData?.business_name),
+      !!(extendedData?.bio),
+      !!(extendedData?.contact_number),
+      !!(profileData?.instagram_url),
+      !!(profileData?.facebook_url),
+      !!(profileData?.website_url),
+      !!(extendedData?.address),
+    ];
+    const filled = fields.filter(Boolean).length;
+    // Fall back to API-provided value only if none of the profile data loaded
+    if (filled === 0 && !extendedData && !profileData) {
+      return dashboardData?.profile_completion ?? partnerData?.profile_completion ?? 0;
+    }
+    return Math.round((filled / fields.length) * 100);
+  })();
 
   // Business name
   const businessName = partnerData?.business_name || partnerData?.business_profile?.business_name || 'Partner';
@@ -159,7 +203,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white p-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
         <button onClick={onOpenSidebar} className="p-2 -ml-2"><Menu size={24} /></button>
@@ -221,78 +265,76 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
       <main className="p-6">
         <div className="tlb-content space-y-8">
           {/* Onboarding Progress Tracker — driven by partner status */}
-          {!isOnboardingComplete && (
+          {/* Onboarding Progress — shown only while isActive=true and isVerified=false */}
+          {isActive && !isVerified && (
             <section className="bg-white border border-gray-100 rounded-3xl p-6 sm:p-8 shadow-sm">
-              <div className="flex items-center justify-between mb-8">
-                  <div>
-                      <h2 className="text-xl font-black">Onboarding Progress</h2>
-                      <p className="text-xs text-gray-500 mt-1">Complete these steps to activate your partner profile.</p>
-                  </div>
-                  <span className="bg-tlb-yellow/10 text-tlb-dark px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest hidden sm:block">
-                    {partnerStatus.replace(/_/g, ' ')}
-                  </span>
+              <div className="mb-6">
+                <h2 className="text-xl font-black">Onboarding Progress</h2>
+                <p className="text-xs text-gray-500 mt-1">Complete all steps to fully activate your partner account.</p>
               </div>
-              <div className="space-y-6">
-                  {/* Step 1 — Profile */}
-                  <div className="flex items-start gap-4">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${onboardingStep >= 2 ? 'bg-emerald-100 text-emerald-600' : 'bg-tlb-yellow text-tlb-dark'}`}>
-                          {onboardingStep >= 2 ? <CheckCircle2 size={18} /> : <span className="font-black text-sm">1</span>}
-                      </div>
-                      <div>
-                          <p className={`font-bold ${onboardingStep >= 2 ? 'text-gray-900 opacity-50 line-through' : 'text-gray-900'}`}>Profile Submitted</p>
-                      </div>
-                  </div>
 
-                  {/* Step 2 — Review */}
-                  <div className="flex items-start gap-4">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${onboardingStep >= 3 ? 'bg-emerald-100 text-emerald-600' : onboardingStep === 2 ? 'bg-tlb-yellow text-tlb-dark' : 'bg-gray-100 text-gray-400'}`}>
-                          {onboardingStep >= 3 ? <CheckCircle2 size={18} /> : <span className="font-black text-sm">2</span>}
-                      </div>
-                      <div>
-                          <p className={`font-bold ${onboardingStep >= 3 ? 'text-gray-900 opacity-50 line-through' : 'text-gray-900'}`}>Admin Review</p>
-                          {onboardingStep >= 3 && <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest mt-1">Approved</p>}
-                          {onboardingStep === 2 && <p className="text-[10px] text-tlb-yellow font-bold uppercase tracking-widest mt-1">Under Review</p>}
-                      </div>
-                  </div>
+              {/* Connecting line */}
+              <div className="space-y-0 relative">
+                <div className="absolute left-4 top-5 bottom-5 w-0.5 bg-gray-100 z-0" />
 
-                  {/* Step 3 — Agreement */}
-                  <div className="flex items-start gap-4">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${onboardingStep >= 4 ? 'bg-emerald-100 text-emerald-600' : onboardingStep === 3 ? 'bg-tlb-yellow text-tlb-dark' : 'bg-gray-100 text-gray-400'}`}>
-                          {onboardingStep >= 4 ? <CheckCircle2 size={18} /> : <span className="font-black text-sm">3</span>}
-                      </div>
-                      <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                          <div>
-                              <p className={`font-bold ${onboardingStep >= 4 ? 'text-gray-900 opacity-50 line-through' : 'text-gray-900'}`}>Document Upload & Agreement</p>
-                              {onboardingStep === 3 && <p className="text-xs text-gray-500 mt-1">Complete your KYC & sign the partner agreement.</p>}
-                          </div>
-                          {onboardingStep === 3 && (
-                              <button onClick={() => onNavigate('AGREEMENT_SUBMIT')} className="bg-tlb-dark text-tlb-yellow px-5 py-2.5 rounded-xl text-xs font-bold shadow-md hover:bg-black transition-colors whitespace-nowrap">
-                                  Start Step
-                              </button>
-                          )}
-                      </div>
+                {/* Step 1 — Profile Created */}
+                <div className="flex items-start gap-4 relative z-10 pb-6">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-emerald-100 text-emerald-600">
+                    <CheckCircle2 size={18} />
                   </div>
+                  <div className="pt-0.5">
+                    <p className="font-bold text-gray-900 opacity-60 line-through">Profile Created</p>
+                    <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest mt-0.5">Completed</p>
+                  </div>
+                </div>
 
-                  {/* Step 4 — Bank */}
-                  <div className="flex items-start gap-4">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${onboardingStep >= 5 ? 'bg-emerald-100 text-emerald-600' : onboardingStep === 4 ? 'bg-tlb-yellow text-tlb-dark' : 'bg-gray-100 text-gray-400'}`}>
-                          {onboardingStep >= 5 ? <CheckCircle2 size={18} /> : <span className="font-black text-sm">4</span>}
-                      </div>
-                      <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                          <div className={onboardingStep < 4 ? 'opacity-50' : ''}>
-                              <p className="font-bold text-gray-900">Bank Verification</p>
-                              {onboardingStep === 4 && <p className="text-xs text-gray-500 mt-1">Link your payouts bank account.</p>}
-                          </div>
-                          {onboardingStep === 4 && (
-                              <button onClick={() => onNavigate('IDENTITY_VERIFICATION')} className="bg-tlb-dark text-tlb-yellow px-5 py-2.5 rounded-xl text-xs font-bold shadow-md hover:bg-black transition-colors whitespace-nowrap">
-                                  Start Step
-                              </button>
-                          )}
-                          {onboardingStep < 4 && (
-                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:block">Locked</span>
-                          )}
-                      </div>
+                {/* Step 2 — Verification Documents */}
+                <div className="flex items-start gap-4 relative z-10 pb-6">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                    verificationSubmitted ? 'bg-emerald-100 text-emerald-600' : 'bg-tlb-yellow text-tlb-dark'
+                  }`}>
+                    {verificationSubmitted ? <CheckCircle2 size={18} /> : <span className="font-black text-sm">2</span>}
                   </div>
+                  <div className="flex-1 flex flex-col sm:flex-row sm:items-start justify-between gap-3 pt-0.5">
+                    <div>
+                      <p className={`font-bold ${verificationSubmitted ? 'text-gray-900 opacity-60 line-through' : 'text-gray-900'}`}>
+                        Verification Documents
+                      </p>
+                      {!verificationSubmitted && (
+                        <p className="text-xs text-gray-500 mt-1">Submit PAN, bank details &amp; sign the partner agreement.</p>
+                      )}
+                      {verificationSubmitted && (
+                        <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest mt-0.5">Submitted</p>
+                      )}
+                    </div>
+                    {!verificationSubmitted && (
+                      <button
+                        onClick={() => onNavigate('AGREEMENT_SUBMIT')}
+                        className="bg-tlb-dark text-tlb-yellow px-5 py-2.5 rounded-xl text-xs font-bold shadow-md hover:bg-black transition-colors whitespace-nowrap self-start"
+                      >
+                        Start Verification
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Step 3 — Admin Review */}
+                <div className="flex items-start gap-4 relative z-10">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                    verificationSubmitted ? 'bg-tlb-yellow text-tlb-dark' : 'bg-gray-100 text-gray-300'
+                  }`}>
+                    <span className="font-black text-sm">3</span>
+                  </div>
+                  <div className={`pt-0.5 ${!verificationSubmitted ? 'opacity-40' : ''}`}>
+                    <p className="font-bold text-gray-900">Admin Review</p>
+                    {verificationSubmitted && (
+                      <p className="text-[10px] text-tlb-yellow font-bold uppercase tracking-widest mt-0.5">In Progress — typically 24–48 hrs</p>
+                    )}
+                    {!verificationSubmitted && (
+                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">Unlocks after Step 2</p>
+                    )}
+                  </div>
+                </div>
               </div>
             </section>
           )}
@@ -363,6 +405,39 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
           </section>
         </div>
       </main>
+
+      {/* Footer */}
+      <footer className="mt-10 bg-tlb-dark text-white px-6 py-8">
+        <div className="flex flex-col items-center gap-4">
+          <img src="/tlbAppIcon.png" alt="The Little Broadway" className="w-14 h-14 rounded-2xl" />
+          <p className="text-white font-black text-base tracking-tight">The Little Broadway</p>
+          <p className="text-gray-400 text-xs text-center leading-relaxed">
+            Your premier partner portal for Broadway events,<br />classes, and venue management.
+          </p>
+
+          <div className="w-full border-t border-white/10 my-2" />
+
+          <div className="w-full grid grid-cols-2 gap-4 text-xs text-gray-400">
+            <div>
+              <p className="text-[10px] font-black text-tlb-yellow uppercase tracking-widest mb-2">Contact</p>
+              <p>support@thelittlebroadway.in</p>
+              <p className="mt-1">+91 98765 43210</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-tlb-yellow uppercase tracking-widest mb-2">Platform</p>
+              <p>Events</p>
+              <p className="mt-1">Classes</p>
+              <p className="mt-1">Venues</p>
+            </div>
+          </div>
+
+          <div className="w-full border-t border-white/10 my-2" />
+
+          <p className="text-gray-500 text-[10px] text-center">
+            © 2026 The Little Broadway. All rights reserved.<br />Partner Portal V3.0
+          </p>
+        </div>
+      </footer>
 
       {/* Entity Picker Bottom Sheet */}
       <EntityPickerSheet

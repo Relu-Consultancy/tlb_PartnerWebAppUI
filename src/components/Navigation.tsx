@@ -124,7 +124,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen
 
             <div className="pt-6 border-t border-gray-100">
               <button
-                onClick={() => onNavigate('LANDING')}
+                onClick={() => { onClose(); onNavigate('LANDING'); }}
                 className="w-full flex items-center gap-4 p-4 text-gray-400 hover:text-red-500 transition-colors"
               >
                 <LogOut size={20} />

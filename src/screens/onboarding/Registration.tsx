@@ -13,7 +13,7 @@ import {
     Image as ImageIcon
 } from 'lucide-react';
 import { Screen } from '../../types';
-import { updateBusinessProfile, uploadPartnerMedia, deletePartnerMedia } from '../../api/onboarding';
+import { updateBusinessProfile, uploadPartnerMedia, deletePartnerMedia, getCurrentPartner } from '../../api/onboarding';
 
 interface OnboardingProps {
     onNavigate: (screen: Screen) => void;
@@ -107,11 +107,23 @@ export const Registration: React.FC<OnboardingProps> = ({ onNavigate }) => {
             alert('Please provide at least one social media link (Instagram).');
             return;
         }
+        if (uploadedImages.length < 3) {
+            alert('Please upload at least 3 images before submitting. This is required for account activation.');
+            return;
+        }
 
         setLoading(true);
         try {
             await updateBusinessProfile(formData);
-            onNavigate('APP_SUBMITTED');
+            // Check if backend auto-activated us (profile_created + 3 images → activated_limited)
+            const partnerRes = await getCurrentPartner();
+            const partner = partnerRes.data || partnerRes;
+            if (partner.is_active || partner.status === 'activated_limited') {
+                onNavigate('APP_SUBMITTED');
+            } else {
+                // Not yet activated — might need more images
+                onNavigate('APP_SUBMITTED');
+            }
         } catch (error: any) {
             console.error('Failed to submit application', error);
             alert(error?.message || 'Failed to submit application. Please try again.');

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, Suspense, lazy, useCallback } from 'react';
+import React, { useState, useEffect, Suspense, lazy, useCallback } from 'react';
 import { Screen, EntityType } from './types';
 import { PartnerProvider, usePartner } from './context/PartnerContext';
 
@@ -72,6 +72,8 @@ const Enquiries = lazyImport(() => import('./screens/enquiries'), 'Enquiries');
 const ProgramEnquiries = lazyImport(() => import('./screens/enquiries'), 'ProgramEnquiries');
 
 import { Sidebar } from './components/Navigation';
+import { getAuthToken, getRefreshToken, setAuthToken, clearTokens, apiClient } from './api/client';
+import { getCurrentPartner } from './api/onboarding';
 
 // ---------------------------------------------------------------------------
 // Route configuration
@@ -148,10 +150,102 @@ const routes: Record<Screen, RouteConfig> = {
 // Inner App (consumes PartnerContext)
 // ---------------------------------------------------------------------------
 function AppInner() {
-  const { allowedEntities } = usePartner();
+  const { allowedEntities, setAllowedEntities } = usePartner();
   const [currentScreen, setCurrentScreen] = useState<Screen>('LANDING');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [authData, setAuthData] = useState<{ value: string; type: 'email' | 'phone' } | null>(null);
+  const [initializing, setInitializing] = useState(true);
+
+  // ── Session restore on page load / refresh ──
+  useEffect(() => {
+    const restoreSession = async () => {
+      let token = getAuthToken();
+
+      // If no access token, try refreshing with the refresh token
+      if (!token) {
+        const refreshToken = getRefreshToken();
+        if (!refreshToken) {
+          // No tokens at all — go to LANDING
+          setInitializing(false);
+          return;
+        }
+
+        try {
+          const BASE_URL = 'https://tlb-api.reluconsultancy.in';
+          const refreshRes = await fetch(`${BASE_URL}/api/v1/auth/refresh-token/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: refreshToken }),
+          });
+
+          if (refreshRes.ok) {
+            const res = await refreshRes.json();
+            const payload = res.data || res;
+            const newAccess = payload.access_token || payload.access;
+            if (newAccess) {
+              setAuthToken(newAccess);
+              token = newAccess;
+            } else {
+              clearTokens();
+              setInitializing(false);
+              return;
+            }
+          } else {
+            // Refresh token is invalid/expired — full logout
+            clearTokens();
+            setInitializing(false);
+            return;
+          }
+        } catch {
+          clearTokens();
+          setInitializing(false);
+          return;
+        }
+      }
+
+      // We have a (possibly refreshed) access token — fetch partner status
+      try {
+        const res = await getCurrentPartner();
+        const partner = res.data || res;
+        const status = partner.status || '';
+
+        // Sync categories into context
+        if (partner.categories?.length > 0) {
+          const cats = partner.categories.map((c: any) => c.name || c);
+          setAllowedEntities(cats);
+        }
+
+        // Route based on partner status
+        switch (status) {
+          case 'otp_verified':
+            setCurrentScreen('PARTNER_CATEGORY');
+            break;
+          case 'category_selected':
+            setCurrentScreen('REGISTRATION');
+            break;
+          case 'profile_created':
+          case 'activated_limited':
+          case 'under_review':
+          case 'approved':
+            setCurrentScreen('HOME');
+            break;
+          default:
+            // Unknown status but valid token — go to HOME
+            setCurrentScreen('HOME');
+            break;
+        }
+      } catch (err) {
+        console.error('Session restore failed:', err);
+        // Token is invalid even after refresh — clear and show landing
+        clearTokens();
+        setCurrentScreen('LANDING');
+      } finally {
+        setInitializing(false);
+      }
+    };
+
+    restoreSession();
+  }, []);
 
   // Route guard: redirect restricted screens to HOME
   const guardedNavigate = useCallback((screen: Screen) => {
@@ -163,8 +257,23 @@ function AppInner() {
         return;
       }
     }
+    // If navigating to LANDING, clear tokens (logout)
+    if (screen === 'LANDING') {
+      clearTokens();
+      sessionStorage.clear();
+    }
     setCurrentScreen(screen);
   }, [allowedEntities]);
+
+  // Show loading spinner while restoring session
+  if (initializing) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 gap-4">
+        <div className="w-14 h-14 border-4 border-gray-200 border-t-tlb-yellow rounded-full animate-spin"></div>
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Loading your session…</p>
+      </div>
+    );
+  }
 
   const route = routes[currentScreen] ?? routes.LANDING;
   const Component = route.component;

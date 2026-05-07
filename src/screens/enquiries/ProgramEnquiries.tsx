@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, Search, Filter, Lock, Phone, MessageCircle, X, AlertTriangle, StickyNote } from 'lucide-react';
+import { Menu, Search, Filter, Lock, Phone, MessageCircle, X, StickyNote, Inbox } from 'lucide-react';
 import { Screen, EnquiryStatus } from '../../types';
 
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
@@ -20,16 +20,8 @@ interface ProgramLead {
     notes: string;
 }
 
-const initialLeads: ProgramLead[] = [
-    { id: '1', studentName: 'Aarav Sharma', parentName: 'Mrs. Sharma', program: 'Space Camp', format: 'Holiday', age: '8 Years', receivedOn: '10 mins ago', contact: '9820012345', isUnlocked: false, status: 'New', message: 'Do you provide transport for the Belapur camp?', area: 'Vashi', notes: '' },
-    { id: '2', studentName: 'Sana Mehta', parentName: 'Mr. Mehta', program: 'Guitar', format: 'Recorded', age: '12 Years', receivedOn: '2 hours ago', contact: '98200XXXXX', isUnlocked: false, status: 'New', area: 'Andheri East', notes: '' },
-    { id: '3', studentName: 'Rohan Gupta', parentName: 'Mrs. Gupta', program: 'Cricket', format: 'Weekend', age: '15 Years', receivedOn: 'Yesterday', contact: '91670XXXXX', isUnlocked: true, status: 'Contacted', area: 'Juhu', notes: '' },
-    { id: '4', studentName: 'Priya Singh', parentName: 'Mr. Singh', program: 'Robotics Lab', format: 'After School', age: '10 Years', receivedOn: '2 days ago', contact: '9004098765', isUnlocked: true, status: 'Contacted', message: 'Can we get a free demo first?', area: 'Powai', notes: '' },
-    { id: '5', studentName: 'Aisha Khan', parentName: 'Mrs. Khan', program: 'Painting', format: 'Holiday', age: '7 Years', receivedOn: '3 days ago', contact: '9876543210', isUnlocked: true, status: 'Converted', area: 'Bandra', notes: 'Enrolled in June batch' },
-];
-
 export const ProgramEnquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
-    const [leads, setLeads] = useState<ProgramLead[]>(initialLeads);
+    const [leads, setLeads] = useState<ProgramLead[]>([]);
     const [selectedLead, setSelectedLead] = useState<ProgramLead | null>(null);
     const [search, setSearch] = useState('');
 
@@ -63,15 +55,6 @@ export const ProgramEnquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar })
 
         <main className="p-6">
             <div className="tlb-content space-y-6">
-                {/* Credits Banner */}
-                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-3">
-                    <div className="bg-emerald-100 p-2 rounded-xl text-emerald-600 shrink-0"><AlertTriangle size={18} /></div>
-                    <div className="flex-1">
-                        <p className="text-sm font-bold text-emerald-800">18 Credits Remaining</p>
-                        <p className="text-[11px] text-emerald-600">Each unlock costs 1 credit. <button onClick={() => onNavigate('PACKAGES')} className="underline font-bold">Buy more</button></p>
-                    </div>
-                </div>
-
                 {/* Search */}
                 <div className="flex gap-3">
                     <div className="flex-1 bg-white border border-gray-100 rounded-2xl px-4 py-3 flex items-center gap-3 shadow-sm">
@@ -97,7 +80,16 @@ export const ProgramEnquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar })
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
-                                {sorted.map((lead) => (
+                                {sorted.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={7} className="px-6 py-16 text-center">
+                                            <div className="flex flex-col items-center gap-3 text-gray-300">
+                                                <Inbox size={36} />
+                                                <p className="text-sm font-bold">No enquiries yet</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ) : sorted.map((lead) => (
                                     <tr
                                         key={lead.id}
                                         onClick={() => setSelectedLead(lead)}

@@ -120,6 +120,18 @@ export const updateExtendedProfile = async (formData: FormData) => {
     return response.json();
 };
 
+export const activatePartner = async () => {
+    const response = await apiClient('/api/v1/partners/activate/', {
+        method: 'POST',
+        body: JSON.stringify({ is_active: true }),
+    });
+    if (!response.ok) {
+        const err = await response.json().catch(() => null);
+        throw new Error(err?.error?.message || err?.message || 'Failed to activate partner');
+    }
+    return response.json();
+};
+
 export const submitVerification = async (data: any) => {
     const response = await apiClient('/api/v1/partners/verification/', {
         method: 'POST',

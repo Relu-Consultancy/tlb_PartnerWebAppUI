@@ -18,10 +18,18 @@ interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar?: () => vo
 interface VenueCategory { id: number; name: string; slug: string; icon?: string; subcategories: { id: number; name: string; slug: string }[] }
 interface MediaItem { id: number; media_type: 'cover' | 'gallery' | 'video'; file_url: string }
 
+const API_BASE = 'https://tlb-api.reluconsultancy.in';
 const COVER_MAX = 5 * 1024 * 1024;
 const GALLERY_MAX = 5 * 1024 * 1024;
 const VIDEO_MAX = 100 * 1024 * 1024;
 const GALLERY_LIMIT = 10;
+
+// Resolve relative media URLs returned by the API
+const resolveUrl = (url: string) => {
+    if (!url) return '';
+    if (url.startsWith('http')) return url;
+    return `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
+};
 
 export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
     const [title, setTitle] = useState('');
@@ -85,14 +93,32 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
     const selectedCategory = categories.find(c => c.id === selectedCategoryId);
     const visibleCategories = showAllCategories ? categories : categories.slice(0, 6);
 
+    // Creates a draft if one doesn't exist yet, returns the id or null on failure
+    const ensureDraft = async (): Promise<string | null> => {
+        if (draftId) return draftId;
+        if (!title.trim()) { alert('Please enter a venue name before uploading media.'); return null; }
+        try {
+            const res = await createVenueDraft({ title: title.trim() });
+            const id: string = (res.data || res).id;
+            setCurrentVenueDraftId(id);
+            setDraftId(id);
+            return id;
+        } catch (err: any) {
+            alert(err?.message || 'Failed to create draft.');
+            return null;
+        }
+    };
+
     const handleCoverPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!draftId || !e.target.files?.[0]) return;
+        if (!e.target.files?.[0]) return;
         const file = e.target.files[0];
         if (file.size > COVER_MAX) { alert('Cover must be under 5 MB.'); e.target.value = ''; return; }
+        const id = await ensureDraft();
+        if (!id) { e.target.value = ''; return; }
         setBusyKind('cover');
         try {
-            if (cover) await deleteVenueListingMedia(draftId, cover.id);
-            const res = await uploadVenueListingMedia(draftId, file, 'cover');
+            if (cover) await deleteVenueListingMedia(id, cover.id);
+            const res = await uploadVenueListingMedia(id, file, 'cover');
             setCover(res.data || res);
         } catch (err: any) {
             alert(err?.message || 'Failed to upload cover.');
@@ -103,13 +129,15 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
     };
 
     const handleGalleryPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!draftId || !e.target.files?.length) return;
+        if (!e.target.files?.length) return;
+        const id = await ensureDraft();
+        if (!id) { e.target.value = ''; return; }
         setBusyKind('gallery');
         try {
             for (const file of Array.from(e.target.files) as File[]) {
                 if (gallery.length >= GALLERY_LIMIT) { alert(`Gallery limit (${GALLERY_LIMIT}) reached.`); break; }
                 if (file.size > GALLERY_MAX) { alert(`${file.name} is over 5 MB — skipped.`); continue; }
-                const res = await uploadVenueListingMedia(draftId, file, 'gallery');
+                const res = await uploadVenueListingMedia(id, file, 'gallery');
                 setGallery(prev => [...prev, res.data || res]);
             }
         } catch (err: any) {
@@ -121,13 +149,15 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
     };
 
     const handleVideoPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!draftId || !e.target.files?.[0]) return;
+        if (!e.target.files?.[0]) return;
         const file = e.target.files[0];
         if (file.size > VIDEO_MAX) { alert('Video must be under 100 MB.'); e.target.value = ''; return; }
+        const id = await ensureDraft();
+        if (!id) { e.target.value = ''; return; }
         setBusyKind('video');
         try {
-            if (video) await deleteVenueListingMedia(draftId, video.id);
-            const res = await uploadVenueListingMedia(draftId, file, 'video');
+            if (video) await deleteVenueListingMedia(id, video.id);
+            const res = await uploadVenueListingMedia(id, file, 'video');
             setVideo(res.data || res);
         } catch (err: any) {
             alert(err?.message || 'Failed to upload video.');
@@ -276,91 +306,83 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
                 />
             </div>
 
-            {/* Cover Image */}
+            {/* Cover Image — always visible, auto-creates draft on first upload */}
             <div>
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">
                     Cover Image <span className="text-red-400">*</span>
                 </label>
                 <input ref={coverInputRef} type="file" accept="image/jpeg,image/png" className="hidden" onChange={handleCoverPick} />
-                {draftId ? (
-                    cover ? (
-                        <div className="relative w-full sm:w-80 aspect-[16/9] rounded-2xl overflow-hidden border border-gray-200">
-                            <img src={cover.file_url} alt="Cover" className="w-full h-full object-cover" />
-                            <button onClick={handleDeleteCover} className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-lg shadow text-red-500 hover:bg-white" aria-label="Remove cover">
-                                <Trash2 size={14} />
-                            </button>
-                            <button onClick={() => coverInputRef.current?.click()} disabled={busyKind === 'cover'} className="absolute bottom-2 right-2 bg-white/90 px-3 py-1.5 rounded-lg shadow text-xs font-bold text-amber-600 hover:bg-white disabled:opacity-50">
-                                {busyKind === 'cover' ? 'Uploading…' : 'Change'}
-                            </button>
-                        </div>
-                    ) : (
-                        <button onClick={() => coverInputRef.current?.click()} disabled={busyKind === 'cover'} className="w-full sm:w-80 aspect-[16/9] bg-amber-50 rounded-2xl border-2 border-dashed border-amber-200 flex flex-col items-center justify-center text-amber-500 hover:bg-amber-100 transition-colors disabled:opacity-60">
-                            {busyKind === 'cover' ? <Loader2 size={28} className="animate-spin" /> : <Camera size={28} />}
-                            <span className="text-xs font-bold mt-2">{busyKind === 'cover' ? 'Uploading…' : 'Upload Cover'}</span>
-                            <span className="text-[10px] text-amber-400 mt-1">JPG/PNG · Max 5MB</span>
+                {cover ? (
+                    <div className="relative w-full sm:w-80 aspect-[16/9] rounded-2xl overflow-hidden border border-gray-200">
+                        <img src={resolveUrl(cover.file_url)} alt="Cover" className="w-full h-full object-cover" />
+                        <button onClick={handleDeleteCover} className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-lg shadow text-red-500 hover:bg-white" aria-label="Remove cover">
+                            <Trash2 size={14} />
                         </button>
-                    )
+                        <button onClick={() => coverInputRef.current?.click()} disabled={busyKind === 'cover'} className="absolute bottom-2 right-2 bg-white/90 px-3 py-1.5 rounded-lg shadow text-xs font-bold text-amber-600 hover:bg-white disabled:opacity-50">
+                            {busyKind === 'cover' ? 'Uploading…' : 'Change'}
+                        </button>
+                    </div>
                 ) : (
-                    <p className="text-xs text-gray-400 italic">Save venue details first to enable media upload.</p>
+                    <button onClick={() => coverInputRef.current?.click()} disabled={busyKind === 'cover'} className="w-full sm:w-80 aspect-[16/9] bg-amber-50 rounded-2xl border-2 border-dashed border-amber-200 flex flex-col items-center justify-center text-amber-500 hover:bg-amber-100 transition-colors disabled:opacity-60">
+                        {busyKind === 'cover' ? <Loader2 size={28} className="animate-spin" /> : <Camera size={28} />}
+                        <span className="text-xs font-bold mt-2">{busyKind === 'cover' ? 'Uploading…' : 'Upload Cover'}</span>
+                        <span className="text-[10px] text-amber-400 mt-1">JPG/PNG · Max 5MB</span>
+                    </button>
                 )}
             </div>
 
             {/* Gallery */}
-            {draftId && (
-                <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">
-                        Gallery Photos <span className="text-gray-300 font-normal normal-case ml-1">({gallery.length}/{GALLERY_LIMIT})</span>
-                    </label>
-                    <input ref={galleryInputRef} type="file" accept="image/jpeg,image/png" multiple className="hidden" onChange={handleGalleryPick} />
-                    <div className="flex flex-wrap gap-3">
-                        {gallery.map(g => (
-                            <div key={g.id} className="relative w-24 h-24 rounded-2xl overflow-hidden border border-gray-200 group">
-                                <img src={g.file_url} alt="Gallery" className="w-full h-full object-cover" />
-                                <button onClick={() => handleDeleteGallery(g.id)} className="absolute top-1 right-1 bg-white/90 p-1 rounded-md text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Remove image">
-                                    <Trash2 size={12} />
-                                </button>
-                            </div>
-                        ))}
-                        {gallery.length < GALLERY_LIMIT && (
-                            <button onClick={() => galleryInputRef.current?.click()} disabled={busyKind === 'gallery'} className="w-24 h-24 bg-amber-50 rounded-2xl border-2 border-dashed border-amber-200 flex flex-col items-center justify-center text-amber-500 hover:bg-amber-100 disabled:opacity-60">
-                                {busyKind === 'gallery' ? <Loader2 size={20} className="animate-spin" /> : <ImageIcon size={20} />}
-                                <span className="text-[10px] font-bold mt-1">{busyKind === 'gallery' ? 'Uploading…' : 'Add'}</span>
+            <div>
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">
+                    Gallery Photos <span className="text-gray-300 font-normal normal-case ml-1">({gallery.length}/{GALLERY_LIMIT})</span>
+                </label>
+                <input ref={galleryInputRef} type="file" accept="image/jpeg,image/png" multiple className="hidden" onChange={handleGalleryPick} />
+                <div className="flex flex-wrap gap-3">
+                    {gallery.map(g => (
+                        <div key={g.id} className="relative w-24 h-24 rounded-2xl overflow-hidden border border-gray-200 group">
+                            <img src={resolveUrl(g.file_url)} alt="Gallery" className="w-full h-full object-cover" />
+                            <button onClick={() => handleDeleteGallery(g.id)} className="absolute top-1 right-1 bg-white/90 p-1 rounded-md text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Remove image">
+                                <Trash2 size={12} />
                             </button>
-                        )}
-                    </div>
-                    <p className="text-[10px] text-gray-400 mt-2">JPG/PNG · Max 5MB each · Up to {GALLERY_LIMIT}</p>
-                </div>
-            )}
-
-            {/* Video */}
-            {draftId && (
-                <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">
-                        Promo Video <span className="text-gray-300 font-normal normal-case ml-1">(optional)</span>
-                    </label>
-                    <input ref={videoInputRef} type="file" accept="video/mp4,video/quicktime" className="hidden" onChange={handleVideoPick} />
-                    {video ? (
-                        <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 flex items-center gap-3">
-                            <div className="bg-amber-100 p-3 rounded-xl text-amber-500"><Play size={20} /></div>
-                            <div className="flex-1 min-w-0">
-                                <p className="text-sm font-bold truncate">Video uploaded</p>
-                                <a href={video.file_url} target="_blank" rel="noreferrer" className="text-[10px] text-amber-500 truncate block hover:underline">{video.file_url}</a>
-                            </div>
-                            <button onClick={handleDeleteVideo} className="text-red-500 p-2"><Trash2 size={16} /></button>
                         </div>
-                    ) : (
-                        <button onClick={() => videoInputRef.current?.click()} disabled={busyKind === 'video'} className="w-full bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200 p-4 flex items-center gap-4 hover:bg-gray-100 disabled:opacity-60">
-                            <div className="bg-gray-200 p-3 rounded-xl text-gray-500">
-                                {busyKind === 'video' ? <Loader2 size={20} className="animate-spin" /> : <Play size={20} />}
-                            </div>
-                            <div className="flex-1 text-left">
-                                <p className="text-sm font-bold">{busyKind === 'video' ? 'Uploading…' : 'Upload Video'}</p>
-                                <p className="text-[10px] text-gray-400">MP4 / MOV · Max 100MB</p>
-                            </div>
+                    ))}
+                    {gallery.length < GALLERY_LIMIT && (
+                        <button onClick={() => galleryInputRef.current?.click()} disabled={busyKind === 'gallery'} className="w-24 h-24 bg-amber-50 rounded-2xl border-2 border-dashed border-amber-200 flex flex-col items-center justify-center text-amber-500 hover:bg-amber-100 disabled:opacity-60">
+                            {busyKind === 'gallery' ? <Loader2 size={20} className="animate-spin" /> : <ImageIcon size={20} />}
+                            <span className="text-[10px] font-bold mt-1">{busyKind === 'gallery' ? 'Uploading…' : 'Add'}</span>
                         </button>
                     )}
                 </div>
-            )}
+                <p className="text-[10px] text-gray-400 mt-2">JPG/PNG · Max 5MB each · Up to {GALLERY_LIMIT}</p>
+            </div>
+
+            {/* Video */}
+            <div>
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">
+                    Promo Video <span className="text-gray-300 font-normal normal-case ml-1">(optional)</span>
+                </label>
+                <input ref={videoInputRef} type="file" accept="video/mp4,video/quicktime" className="hidden" onChange={handleVideoPick} />
+                {video ? (
+                    <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 flex items-center gap-3">
+                        <div className="bg-amber-100 p-3 rounded-xl text-amber-500"><Play size={20} /></div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold truncate">Video uploaded</p>
+                            <a href={resolveUrl(video.file_url)} target="_blank" rel="noreferrer" className="text-[10px] text-amber-500 truncate block hover:underline">{video.file_url}</a>
+                        </div>
+                        <button onClick={handleDeleteVideo} className="text-red-500 p-2"><Trash2 size={16} /></button>
+                    </div>
+                ) : (
+                    <button onClick={() => videoInputRef.current?.click()} disabled={busyKind === 'video'} className="w-full bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200 p-4 flex items-center gap-4 hover:bg-gray-100 disabled:opacity-60">
+                        <div className="bg-gray-200 p-3 rounded-xl text-gray-500">
+                            {busyKind === 'video' ? <Loader2 size={20} className="animate-spin" /> : <Play size={20} />}
+                        </div>
+                        <div className="flex-1 text-left">
+                            <p className="text-sm font-bold">{busyKind === 'video' ? 'Uploading…' : 'Upload Video'}</p>
+                            <p className="text-[10px] text-gray-400">MP4 / MOV · Max 100MB</p>
+                        </div>
+                    </button>
+                )}
+            </div>
 
             <WizardNavigation
                 onNext={handleNext}

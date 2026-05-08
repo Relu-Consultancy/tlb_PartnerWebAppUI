@@ -18,10 +18,17 @@ interface MediaItem {
     created_at?: string;
 }
 
+const API_BASE = 'https://tlb-api.reluconsultancy.in';
 const COVER_MAX = 5 * 1024 * 1024;
 const GALLERY_MAX = 5 * 1024 * 1024;
 const VIDEO_MAX = 100 * 1024 * 1024;
 const GALLERY_LIMIT = 10;
+
+const resolveUrl = (url: string) => {
+    if (!url) return '';
+    if (url.startsWith('http')) return url;
+    return `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
+};
 
 export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => {
     const [draftId, setDraftId] = useState<string | null>(null);
@@ -211,7 +218,7 @@ export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => {
                 <input ref={coverInputRef} type="file" accept="image/jpeg,image/png" className="hidden" onChange={handleCoverPick} />
                 {cover ? (
                     <div className="relative w-full sm:w-80 aspect-[16/9] rounded-2xl overflow-hidden border border-gray-200">
-                        <img src={cover.file_url} alt="Cover" className="w-full h-full object-cover" />
+                        <img src={resolveUrl(cover.file_url)} alt="Cover" className="w-full h-full object-cover" />
                         <button
                             onClick={handleDeleteCover}
                             className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-lg shadow text-red-500 hover:bg-white"
@@ -256,7 +263,7 @@ export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => {
                 <div className="flex flex-wrap gap-3">
                     {gallery.map((g) => (
                         <div key={g.id} className="relative w-24 h-24 rounded-2xl overflow-hidden border border-gray-200 group">
-                            <img src={g.file_url} alt="Gallery" className="w-full h-full object-cover" />
+                            <img src={resolveUrl(g.file_url)} alt="Gallery" className="w-full h-full object-cover" />
                             <button
                                 onClick={() => handleDeleteGallery(g.id)}
                                 className="absolute top-1 right-1 bg-white/90 p-1 rounded-md text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -293,7 +300,7 @@ export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => {
                         <div className="bg-purple-100 p-3 rounded-xl text-purple-500"><Play size={20} /></div>
                         <div className="flex-1 min-w-0">
                             <p className="text-sm font-bold truncate">Video uploaded</p>
-                            <a href={video.file_url} target="_blank" rel="noreferrer" className="text-[10px] text-purple-500 truncate block hover:underline">
+                            <a href={resolveUrl(video.file_url)} target="_blank" rel="noreferrer" className="text-[10px] text-purple-500 truncate block hover:underline">
                                 {video.file_url}
                             </a>
                         </div>

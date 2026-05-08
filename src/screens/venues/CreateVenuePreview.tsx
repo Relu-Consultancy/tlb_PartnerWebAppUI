@@ -125,6 +125,13 @@ const ResultModal: React.FC<ResultModalProps> = ({ variant, message, onClose }) 
     );
 };
 
+const API_BASE = 'https://tlb-api.reluconsultancy.in';
+const resolveUrl = (url: string) => {
+    if (!url) return '';
+    if (url.startsWith('http')) return url;
+    return `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
+};
+
 const fmtSlotDate = (iso: string) => {
     try { return new Date(iso + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' }); }
     catch { return iso; }
@@ -244,7 +251,7 @@ export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
                 {/* Cover */}
                 <div className="h-52 relative bg-gray-100">
                     {cover ? (
-                        <img src={cover.file_url} alt="Cover" className="w-full h-full object-cover" />
+                        <img src={resolveUrl(cover.file_url)} alt="Cover" className="w-full h-full object-cover" />
                     ) : (
                         <div className="w-full h-full flex flex-col items-center justify-center text-gray-300">
                             <CalendarDays size={32} />
@@ -388,7 +395,7 @@ export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
                         <div className="flex gap-2 overflow-x-auto pb-1">
                             {gallery.map(g => (
                                 <div key={g.id} className="w-20 h-20 shrink-0 rounded-xl overflow-hidden">
-                                    <img src={g.file_url} alt="" className="w-full h-full object-cover" />
+                                    <img src={resolveUrl(g.file_url)} alt="" className="w-full h-full object-cover" />
                                 </div>
                             ))}
                         </div>

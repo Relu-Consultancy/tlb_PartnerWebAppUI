@@ -201,6 +201,13 @@ const fmtDate = (iso?: string) => {
     }
 };
 
+const API_BASE = 'https://tlb-api.reluconsultancy.in';
+const resolveUrl = (url: string) => {
+    if (!url) return '';
+    if (url.startsWith('http')) return url;
+    return `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
+};
+
 const titleCase = (s?: string) => s ? s.charAt(0).toUpperCase() + s.slice(1) : '—';
 
 export const CreateEventPreview: React.FC<Props> = ({ onNavigate }) => {
@@ -337,7 +344,7 @@ export const CreateEventPreview: React.FC<Props> = ({ onNavigate }) => {
             <div className="bg-white rounded-3xl border-2 border-gray-200 overflow-hidden shadow-xl max-w-md mx-auto">
                 <div className="h-52 relative bg-gray-100">
                     {cover ? (
-                        <img src={cover.file_url} alt="Cover" className="w-full h-full object-cover" />
+                        <img src={resolveUrl(cover.file_url)} alt="Cover" className="w-full h-full object-cover" />
                     ) : (
                         <div className="w-full h-full flex flex-col items-center justify-center text-gray-300">
                             <CalendarDays size={32} />
@@ -466,7 +473,7 @@ export const CreateEventPreview: React.FC<Props> = ({ onNavigate }) => {
                             <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Gallery</p>
                             <div className="flex gap-2 overflow-x-auto pb-1">
                                 {gallery.map(g => (
-                                    <img key={g.id} src={g.file_url} alt="" className="w-20 h-20 rounded-xl object-cover shrink-0" />
+                                    <img key={g.id} src={resolveUrl(g.file_url)} alt="" className="w-20 h-20 rounded-xl object-cover shrink-0" />
                                 ))}
                             </div>
                         </div>

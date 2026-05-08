@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, ArrowRight, MapPin, Tag, ChevronDown } from 'lucide-react';
+import { ArrowRight, MapPin, Tag, ChevronDown } from 'lucide-react';
 import { Screen } from '../../types';
 import { WizardLayout, WizardNavigation } from '../../components/ui';
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, ArrowRight, Calendar as CalendarIcon, Clock, Plus, Trash2 } from 'lucide-react';
+import { ArrowRight, Calendar as CalendarIcon, Clock } from 'lucide-react';
 import { Screen } from '../../types';
 import { WizardLayout, WizardNavigation } from '../../components/ui';
 

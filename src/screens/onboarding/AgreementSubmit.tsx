@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { ArrowLeft, CheckCircle2, Building2, FileText, Shield, Loader2, X, AlertTriangle } from 'lucide-react';
 import { Screen } from '../../types';
 import { submitVerification } from '../../api/onboarding';

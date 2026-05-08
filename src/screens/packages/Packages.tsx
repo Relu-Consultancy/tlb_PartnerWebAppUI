@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, CreditCard, Check, Star, Clock, ChevronRight, AlertTriangle, Zap, Crown, Shield } from 'lucide-react';
+import { Menu, CreditCard, Check, AlertTriangle, Zap, Crown, Shield } from 'lucide-react';
 import { Screen, PackagePlan, BillingRecord } from '../../types';
 
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }

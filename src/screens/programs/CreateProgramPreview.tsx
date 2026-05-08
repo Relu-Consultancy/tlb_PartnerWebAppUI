@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, Edit3, Rocket, Clock, Users, MapPin, Star } from 'lucide-react';
+import { Edit3, Rocket, Clock, Users, MapPin } from 'lucide-react';
 import { Screen } from '../../types';
 import { WizardLayout, WizardNavigation } from '../../components/ui';
 

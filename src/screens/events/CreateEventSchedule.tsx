@@ -5,7 +5,6 @@ import { WizardLayout, WizardNavigation } from '../../components/ui';
 import {
     getListingDetail,
     updateListing,
-    getTickets,
     createTicket,
     updateTicket,
     deleteTicket,

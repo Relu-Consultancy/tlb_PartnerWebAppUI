@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, ArrowRight, Camera, Play, Star, Upload, Link2 } from 'lucide-react';
+import { ArrowRight, Camera, Play, Star, Link2 } from 'lucide-react';
 import { Screen } from '../../types';
 import { WizardLayout, WizardNavigation } from '../../components/ui';
 

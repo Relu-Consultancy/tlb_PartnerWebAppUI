@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
     CheckCircle2,
     Upload,
-    Building2,
     ArrowLeft,
     LayoutGrid,
     Image as ImageIcon
@@ -34,7 +33,7 @@ export const BankSetup: React.FC<OnboardingProps> = ({ onNavigate }) => {
             account_holder_name: accountName,
             account_number: accountNumber,
             ifsc_code: ifsc,
-            agreement_accepted: sessionStorage.getItem('agreement_accepted') === 'true'
+            agreement_accepted: true
         };
 
         setLoading(true);
@@ -134,34 +133,6 @@ export const BankSetup: React.FC<OnboardingProps> = ({ onNavigate }) => {
                     </p>
                 </section>
 
-                <section className="space-y-4">
-                    <h3 className="font-black text-xl">Saved Accounts</h3>
-                    <div className="tlb-card p-4 border-t-4 border-t-tlb-yellow">
-                        <div className="flex justify-between items-start mb-4">
-                            <div className="flex gap-4">
-                                <div className="w-12 h-12 bg-tlb-yellow/10 rounded-xl flex items-center justify-center text-tlb-yellow">
-                                    <Building2 size={24} />
-                                </div>
-                                <div>
-                                    <h4 className="font-bold">Chase Manhattan</h4>
-                                    <p className="text-xs text-gray-400 font-bold tracking-widest">•••• •••• 8821</p>
-                                </div>
-                            </div>
-                            <span className="bg-tlb-yellow text-tlb-dark text-[10px] font-black px-2 py-1 rounded uppercase tracking-widest">Default</span>
-                        </div>
-                        <div className="flex justify-between items-center pt-4 border-t border-gray-50">
-                            <div className="flex items-center gap-2 text-emerald-500 text-[10px] font-black uppercase tracking-widest">
-                                <CheckCircle2 size={12} /> Verified
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Active</span>
-                                <div className="w-10 h-5 bg-tlb-yellow rounded-full relative">
-                                    <div className="absolute right-1 top-1 w-3 h-3 bg-white rounded-full"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
             </div>
         </main>
     </div>

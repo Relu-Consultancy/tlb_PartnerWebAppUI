@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, ArrowRight, MapPin, Upload, Check, ChevronDown } from 'lucide-react';
+import { ArrowRight, MapPin, Upload, Check, ChevronDown } from 'lucide-react';
 import { Screen } from '../../types';
 import { VENUE_CATEGORIES, getVenueSubcategories } from '../../data/venueCategories';
 import { WizardLayout, WizardNavigation } from '../../components/ui';

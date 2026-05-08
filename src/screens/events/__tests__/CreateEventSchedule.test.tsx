@@ -5,7 +5,7 @@ import { http, HttpResponse } from 'msw';
 import { server } from '../../../test/msw/server';
 import { DRAFT_ID } from '../../../test/msw/handlers';
 import { CreateEventSchedule } from '../CreateEventSchedule';
-import { setCurrentDraftId, clearCurrentDraftId } from '../../../api/listings';
+import { setCurrentDraftId } from '../../../api/listings';
 
 const BASE = 'https://tlb-api.reluconsultancy.in';
 

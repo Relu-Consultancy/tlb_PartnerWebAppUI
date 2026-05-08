@@ -35,7 +35,6 @@ const Dashboard = lazyImport(() => import('./screens/dashboard'), 'Home');
 const Attendees = lazy(() => import('./screens/attendees'));
 const Packages = lazy(() => import('./screens/packages'));
 const FinancialHub = lazy(() => import('./screens/financial'));
-const EditProfile = lazy(() => import('./screens/profile/EditProfile'));
 const BrandProfile = lazyImport(() => import('./screens/profile'), 'BrandProfile');
 const PreviewProfile = lazyImport(() => import('./screens/profile'), 'PreviewProfile');
 
@@ -72,7 +71,7 @@ const Enquiries = lazyImport(() => import('./screens/enquiries'), 'Enquiries');
 const ProgramEnquiries = lazyImport(() => import('./screens/enquiries'), 'ProgramEnquiries');
 
 import { Sidebar } from './components/Navigation';
-import { getAuthToken, getRefreshToken, setAuthToken, clearTokens, apiClient } from './api/client';
+import { getAuthToken, getRefreshToken, setAuthToken, clearTokens } from './api/client';
 import { getCurrentPartner } from './api/onboarding';
 
 // ---------------------------------------------------------------------------

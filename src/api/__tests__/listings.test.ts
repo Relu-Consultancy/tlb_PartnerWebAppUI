@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/msw/server';
-import { DRAFT_ID, mockCategories, mockFormats, mockAgeGroups, mockDraft, mockListing } from '../../test/msw/handlers';
+import { DRAFT_ID, mockDraft } from '../../test/msw/handlers';
 import {
     ApiError,
     getEventMetaCategories,

@@ -2,10 +2,8 @@ import React, { useState } from 'react';
 import {
     CheckCircle2,
     FileText,
-    Upload,
     Building2,
     ArrowLeft,
-    LayoutGrid,
     Instagram,
     Facebook,
     Globe,

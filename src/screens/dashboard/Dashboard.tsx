@@ -199,7 +199,9 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
   const { allowedEntities, setAllowedEntities } = usePartner();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showEntityPicker, setShowEntityPicker] = useState(false);
+  const [showProfilePopup, setShowProfilePopup] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
+  const profilePopupRef = useRef<HTMLDivElement>(null);
 
   const [partnerData, setPartnerData] = useState<any>(null);
   const [dashboardData, setDashboardData] = useState<any>(null);
@@ -274,6 +276,15 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profilePopupRef.current && !profilePopupRef.current.contains(event.target as Node))
+        setShowProfilePopup(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const handleAddListing = () => {
     if (allowedEntities.length === 1) {
       const e = allowedEntities[0];
@@ -318,7 +329,6 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
   const monthlyEnquiries: number[] = d.monthly_enquiries || [0, 0, 0, 0, 0, 0];
   const monthlyRevenue: number[] = d.monthly_revenue || [0, 0, 0, 0, 0, 0];
   const monthlyTickets: number[] = d.monthly_tickets || [0, 0, 0, 0, 0, 0];
-  const monthlyBookings: number[] = d.monthly_bookings || [0, 0, 0, 0, 0, 0];
 
   const funnelNew = d.funnel_new ?? d.new_enquiries ?? 0;
   const funnelContacted = d.funnel_contacted ?? 0;
@@ -345,12 +355,10 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
       const enqSpark: number[] = d.weekly_enquiries || [0, 0, 0, 0, 0, 0, 0];
       const batchSpark: number[] = d.weekly_batches || [0, 0, 0, 0, 0, 0, 0];
       const viewsSpark: number[] = d.weekly_views || [0, 0, 0, 0, 0, 0, 0];
-      const creditSpark: number[] = d.weekly_credits || [0, 0, 0, 0, 0, 0, 0];
       return [
         { label: 'New Enquiries', value: d.new_enquiries?.toString() || '0', icon: Inbox, color: 'text-blue-500', bg: 'bg-blue-50', hex: '#3B82F6', sparkId: 'enq', spark: enqSpark },
         { label: 'Active Batches', value: d.active_batches?.toString() || '0', icon: BarChart3, color: 'text-emerald-500', bg: 'bg-emerald-50', hex: '#10B981', sparkId: 'bat', spark: batchSpark },
         { label: 'Profile Views', value: d.profile_views?.toString() || '0', icon: Eye, color: 'text-purple-500', bg: 'bg-purple-50', hex: '#8B5CF6', sparkId: 'vw', spark: viewsSpark },
-        { label: 'Credit Balance', value: d.credit_balance?.toString() || '0', icon: CreditCard, color: 'text-amber-500', bg: 'bg-amber-50', hex: '#F59E0B', sparkId: 'cr', spark: creditSpark },
       ];
     }
     if (hasEvents) {
@@ -380,7 +388,6 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
       { label: 'New Enquiries', value: d.new_enquiries?.toString() || '0', icon: Inbox, color: 'text-blue-500', bg: 'bg-blue-50', hex: '#3B82F6', sparkId: 'genq', spark: [0,0,0,0,0,0,0] as number[] },
       { label: 'Active Batches', value: d.active_batches?.toString() || '0', icon: BarChart3, color: 'text-emerald-500', bg: 'bg-emerald-50', hex: '#10B981', sparkId: 'gbat', spark: [0,0,0,0,0,0,0] as number[] },
       { label: 'Profile Views', value: d.profile_views?.toString() || '0', icon: Eye, color: 'text-purple-500', bg: 'bg-purple-50', hex: '#8B5CF6', sparkId: 'gvw', spark: [0,0,0,0,0,0,0] as number[] },
-      { label: 'Credit Balance', value: d.credit_balance?.toString() || '0', icon: CreditCard, color: 'text-amber-500', bg: 'bg-amber-50', hex: '#F59E0B', sparkId: 'gcr', spark: [0,0,0,0,0,0,0] as number[] },
     ];
   })();
 
@@ -457,12 +464,82 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
               </div>
             )}
           </div>
-          <button
-            onClick={() => onNavigate('BRAND_PROFILE')}
-            className="w-10 h-10 rounded-full bg-tlb-yellow/10 flex items-center justify-center text-tlb-yellow hover:bg-tlb-yellow/20 transition-colors"
-          >
-            <UserCircle size={24} />
-          </button>
+          <div className="relative" ref={profilePopupRef}>
+            <button
+              onClick={() => setShowProfilePopup(!showProfilePopup)}
+              className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${showProfilePopup ? 'bg-tlb-yellow/20 text-tlb-yellow' : 'bg-tlb-yellow/10 text-tlb-yellow hover:bg-tlb-yellow/20'}`}
+            >
+              <UserCircle size={24} />
+            </button>
+            {showProfilePopup && (
+              <div className="absolute right-0 mt-3 w-72 bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden z-50">
+                {/* Avatar + name */}
+                <div className="p-5 flex items-center gap-4 border-b border-gray-100">
+                  <div className="w-12 h-12 rounded-2xl bg-tlb-yellow/10 flex items-center justify-center text-tlb-yellow shrink-0">
+                    {extendedData?.logo
+                      ? <img src={extendedData.logo} alt="logo" className="w-12 h-12 rounded-2xl object-cover" />
+                      : <UserCircle size={28} />
+                    }
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-black text-sm text-gray-900 truncate">
+                      {profileData?.business_name || partnerData?.business_name || 'Your Business'}
+                    </p>
+                    <p className="text-xs text-gray-400 truncate">
+                      {partnerData?.email || partnerData?.phone || ''}
+                    </p>
+                  </div>
+                </div>
+                {/* Stats row */}
+                <div className="px-5 py-4 flex items-center justify-between border-b border-gray-100">
+                  <div className="text-center">
+                    <p className="text-base font-black text-gray-900">{profileCompletion}%</p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Profile</p>
+                  </div>
+                  <div className="w-px h-8 bg-gray-100" />
+                  <div className="text-center">
+                    <p className="text-base font-black text-gray-900">{allowedEntities.length}</p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Services</p>
+                  </div>
+                  <div className="w-px h-8 bg-gray-100" />
+                  <div className="text-center">
+                    <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide ${
+                      isVerified ? 'bg-emerald-50 text-emerald-600' :
+                      verificationSubmitted ? 'bg-blue-50 text-blue-500' :
+                      isActive ? 'bg-amber-50 text-amber-500' :
+                      'bg-gray-100 text-gray-500'
+                    }`}>
+                      {isVerified ? 'Verified' : verificationSubmitted ? 'In Review' : isActive ? 'Active' : 'Pending'}
+                    </span>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Status</p>
+                  </div>
+                </div>
+                {/* Categories */}
+                {allowedEntities.length > 0 && (
+                  <div className="px-5 py-3 flex flex-wrap gap-1.5 border-b border-gray-100">
+                    {allowedEntities.map(e => (
+                      <span key={e} className="text-[10px] font-black uppercase tracking-wide bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full">{e}</span>
+                    ))}
+                  </div>
+                )}
+                {/* Actions */}
+                <div className="p-3 flex flex-col gap-1">
+                  <button
+                    onClick={() => { setShowProfilePopup(false); onNavigate('BRAND_PROFILE'); }}
+                    className="w-full text-left px-4 py-2.5 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    Edit Profile
+                  </button>
+                  <button
+                    onClick={() => { setShowProfilePopup(false); onNavigate('PREVIEW_PROFILE'); }}
+                    className="w-full text-left px-4 py-2.5 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    Preview Profile
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
@@ -902,11 +979,10 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
                 Edit Profile <ArrowRight size={12} />
               </button>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               {[
                 { label: 'Profile Views', value: d.profile_views ?? 0, icon: Eye, color: 'text-purple-500', bg: 'bg-purple-50' },
                 { label: 'Completion', value: `${profileCompletion}%`, icon: Award, color: 'text-blue-500', bg: 'bg-blue-50' },
-                { label: 'Credits', value: d.credit_balance ?? 0, icon: CreditCard, color: 'text-amber-500', bg: 'bg-amber-50' },
               ].map(stat => (
                 <div key={stat.label} className="flex flex-col items-center text-center gap-2">
                   <div className={`w-10 h-10 ${stat.bg} rounded-xl flex items-center justify-center ${stat.color}`}>

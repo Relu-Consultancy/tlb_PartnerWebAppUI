@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { ChevronRight, ArrowRight, CheckCircle2, BarChart3, Users, MapPin, ArrowLeft, CalendarDays } from 'lucide-react';
+import React, { useState } from 'react';
+import { ArrowRight, CheckCircle2, BarChart3, Users, MapPin, ArrowLeft, CalendarDays } from 'lucide-react';
 import { Screen, EntityType } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
-import { getPartnerCategories, selectCategories } from '../../api/onboarding';
+import { selectCategories } from '../../api/onboarding';
 
 interface AuthProps {
     onNavigate: (screen: Screen) => void;
@@ -12,21 +12,6 @@ export const PartnerCategory: React.FC<AuthProps> = ({ onNavigate }) => {
     const { allowedEntities, setAllowedEntities } = usePartner();
     const [selectedCategories, setSelectedCategories] = useState<EntityType[]>(allowedEntities.length > 0 ? allowedEntities : []);
     const [loading, setLoading] = useState(false);
-    const [availableCategories, setAvailableCategories] = useState<string[]>([]);
-
-    useEffect(() => {
-        const fetchCategories = async () => {
-            try {
-                const res = await getPartnerCategories();
-                if (res.success) {
-                    setAvailableCategories(res.data.map((c: any) => c.name));
-                }
-            } catch (err) {
-                console.error('Failed to load categories', err);
-            }
-        };
-        fetchCategories();
-    }, []);
     const toggleCategory = (catName: EntityType) => {
         setSelectedCategories(prev =>
             prev.includes(catName)

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Eye, Plus, Trash2, HelpCircle, FileText } from 'lucide-react';
+import { Eye, Plus, Trash2, HelpCircle, FileText } from 'lucide-react';
 import { Screen } from '../../types';
 import { WizardLayout, WizardNavigation } from '../../components/ui';
 

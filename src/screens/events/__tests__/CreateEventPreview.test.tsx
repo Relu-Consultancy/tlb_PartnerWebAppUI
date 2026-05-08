@@ -33,7 +33,7 @@ describe('CreateEventPreview — loading and error states', () => {
 
     it('shows error message on API failure', async () => {
         setCurrentDraftId(DRAFT_ID);
-        server.use(http.get(`${BASE}/api/v1/partners/listings/${DRAFT_ID}/`, () =>
+        server.use(http.get(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/`, () =>
             HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Listing not found' } }, { status: 404 })));
         render(<CreateEventPreview {...props} />);
         await waitFor(() =>
@@ -104,7 +104,7 @@ describe('CreateEventPreview — submission readiness', () => {
 
     it('shows missing fields list when required fields absent', async () => {
         setCurrentDraftId(DRAFT_ID);
-        server.use(http.get(`${BASE}/api/v1/partners/listings/${DRAFT_ID}/`, () =>
+        server.use(http.get(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/`, () =>
             HttpResponse.json({
                 success: true,
                 data: { ...mockDraft, title: '', media: [] },
@@ -134,7 +134,7 @@ describe('CreateEventPreview — submit modals', () => {
 
     it('shows Profile Under Review modal when PARTNER_UNDER_REVIEW error code', async () => {
         setCurrentDraftId(DRAFT_ID);
-        server.use(http.post(`${BASE}/api/v1/partners/listings/${DRAFT_ID}/submit/`, () =>
+        server.use(http.post(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/submit/`, () =>
             HttpResponse.json({
                 error: { code: 'PARTNER_UNDER_REVIEW', message: 'Partner under review' },
             }, { status: 403 })));
@@ -150,7 +150,7 @@ describe('CreateEventPreview — submit modals', () => {
 
     it('does NOT show Profile Under Review for non-PARTNER_UNDER_REVIEW errors', async () => {
         setCurrentDraftId(DRAFT_ID);
-        server.use(http.post(`${BASE}/api/v1/partners/listings/${DRAFT_ID}/submit/`, () =>
+        server.use(http.post(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/submit/`, () =>
             HttpResponse.json({
                 error: { code: 'LISTING_INCOMPLETE', message: 'Listing is incomplete' },
             }, { status: 400 })));
@@ -166,7 +166,7 @@ describe('CreateEventPreview — submit modals', () => {
 
     it('shows error message in Submission Failed modal', async () => {
         setCurrentDraftId(DRAFT_ID);
-        server.use(http.post(`${BASE}/api/v1/partners/listings/${DRAFT_ID}/submit/`, () =>
+        server.use(http.post(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/submit/`, () =>
             HttpResponse.json({
                 error: { code: 'SERVER_ERROR', message: 'Internal server error' },
             }, { status: 500 })));
@@ -203,7 +203,7 @@ describe('CreateEventPreview — submit modals', () => {
 
     it('navigates to SERVICE_LISTINGS when Profile Under Review modal is closed', async () => {
         setCurrentDraftId(DRAFT_ID);
-        server.use(http.post(`${BASE}/api/v1/partners/listings/${DRAFT_ID}/submit/`, () =>
+        server.use(http.post(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/submit/`, () =>
             HttpResponse.json({
                 error: { code: 'PARTNER_UNDER_REVIEW', message: 'Partner under review' },
             }, { status: 403 })));

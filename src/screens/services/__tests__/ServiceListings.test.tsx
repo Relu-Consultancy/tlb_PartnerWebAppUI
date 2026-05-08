@@ -34,7 +34,7 @@ describe('ServiceListings — loading and error states', () => {
     });
 
     it('shows error message on API failure', async () => {
-        server.use(http.get(`${BASE}/api/v1/partners/listings/`, () =>
+        server.use(http.get(`${BASE}/api/v1/partners/listings/events/`, () =>
             HttpResponse.json({ error: { code: 'SERVER_ERROR', message: 'Listings unavailable' } }, { status: 500 })));
         renderWithPartner();
         await waitFor(() =>
@@ -66,7 +66,7 @@ describe('ServiceListings — listing display', () => {
     });
 
     it('shows empty state when no listings returned', async () => {
-        server.use(http.get(`${BASE}/api/v1/partners/listings/`, () =>
+        server.use(http.get(`${BASE}/api/v1/partners/listings/events/`, () =>
             HttpResponse.json({ success: true, data: [] })));
         renderWithPartner();
         await waitFor(() =>
@@ -99,7 +99,7 @@ describe('ServiceListings — tabs', () => {
     });
 
     it('filters to show only selected entity type', async () => {
-        server.use(http.get(`${BASE}/api/v1/partners/listings/`, () =>
+        server.use(http.get(`${BASE}/api/v1/partners/listings/events/`, () =>
             HttpResponse.json({
                 success: true,
                 data: [
@@ -130,7 +130,7 @@ describe('ServiceListings — search', () => {
     });
 
     it('filters listings by search query', async () => {
-        server.use(http.get(`${BASE}/api/v1/partners/listings/`, () =>
+        server.use(http.get(`${BASE}/api/v1/partners/listings/events/`, () =>
             HttpResponse.json({
                 success: true,
                 data: [
@@ -166,7 +166,7 @@ describe('ServiceListings — edit and create navigation', () => {
     });
 
     it('shows Locked button for pending listings (not editable)', async () => {
-        server.use(http.get(`${BASE}/api/v1/partners/listings/`, () =>
+        server.use(http.get(`${BASE}/api/v1/partners/listings/events/`, () =>
             HttpResponse.json({
                 success: true,
                 data: [{
@@ -185,7 +185,7 @@ describe('ServiceListings — edit and create navigation', () => {
     });
 
     it('shows Locked button for published listings', async () => {
-        server.use(http.get(`${BASE}/api/v1/partners/listings/`, () =>
+        server.use(http.get(`${BASE}/api/v1/partners/listings/events/`, () =>
             HttpResponse.json({
                 success: true,
                 data: [{

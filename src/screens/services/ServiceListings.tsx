@@ -3,7 +3,7 @@ import { Menu, Plus, Search, Filter, Users, Edit3, CalendarDays, BarChart3, MapP
 import { Screen, EntityType } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
 import { EntityPickerSheet } from '../../components/EntityPickerSheet';
-import { getListings, setCurrentDraftId, clearCurrentDraftId } from '../../api/listings';
+import { getEventListings, getVenueListings, setCurrentDraftId, clearCurrentDraftId } from '../../api/listings';
 
 interface Props {
     onNavigate: (screen: Screen) => void;
@@ -107,19 +107,36 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
     useEffect(() => {
         const fetchListings = async () => {
             try {
-                const res = await getListings();
-                const data = res.data || res;
-                const normalized: Listing[] = (Array.isArray(data) ? data : []).map((item: any) => ({
-                    id: String(item.id || ''),
-                    title: item.title || 'Untitled',
-                    category: item.category?.name || item.subcategory?.name || '',
-                    entityType: listingTypeToEntity(item.listing_type),
-                    listingType: item.listing_type || '',
-                    status: (item.status as ListingStatus) || 'draft',
-                    coverUrl: item.cover_url,
-                    startDateTime: item.start_datetime,
-                }));
-                setListings(normalized);
+                const fetches: Promise<any>[] = [];
+                if (allowedEntities.includes('Events')) fetches.push(getEventListings());
+                if (allowedEntities.includes('Venues')) fetches.push(getVenueListings());
+                const results = await Promise.allSettled(fetches);
+                const combined: any[] = [];
+                let firstError: string | null = null;
+                results.forEach(r => {
+                    if (r.status === 'fulfilled') {
+                        const data = r.value.data || r.value;
+                        if (Array.isArray(data)) combined.push(...data);
+                    } else if (!firstError) {
+                        firstError = (r.reason as any)?.message || 'Failed to load listings.';
+                    }
+                });
+                if (combined.length === 0 && firstError) {
+                    setError(firstError);
+                    setListings([]);
+                } else {
+                    const normalized: Listing[] = combined.map((item: any) => ({
+                        id: String(item.id || ''),
+                        title: item.title || 'Untitled',
+                        category: item.category?.name || item.subcategory?.name || '',
+                        entityType: listingTypeToEntity(item.listing_type),
+                        listingType: item.listing_type || '',
+                        status: (item.status as ListingStatus) || 'draft',
+                        coverUrl: item.cover_url,
+                        startDateTime: item.start_datetime,
+                    }));
+                    setListings(normalized);
+                }
             } catch (err: any) {
                 console.error('Failed to load listings', err);
                 setError(err?.message || 'Failed to load listings.');

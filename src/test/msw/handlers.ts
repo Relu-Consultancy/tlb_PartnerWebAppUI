@@ -74,7 +74,7 @@ export const mockListing = {
 // ─── Default handlers ─────────────────────────────────────────────────────────
 
 export const handlers = [
-    // Metadata
+    // Event metadata
     http.get(`${BASE}/api/v1/listings/metadata/categories/`, () =>
         HttpResponse.json({ success: true, data: mockCategories })),
 
@@ -84,42 +84,56 @@ export const handlers = [
     http.get(`${BASE}/api/v1/listings/metadata/age-groups/`, () =>
         HttpResponse.json({ success: true, data: mockAgeGroups })),
 
-    // Listings
-    http.get(`${BASE}/api/v1/partners/listings/`, () =>
-        HttpResponse.json({ success: true, data: [mockListing] })),
+    // Venue metadata
+    http.get(`${BASE}/api/v1/listings/venues/metadata/categories/`, () =>
+        HttpResponse.json({ success: true, data: [] })),
 
-    http.get(`${BASE}/api/v1/partners/listings/${DRAFT_ID}/`, () =>
-        HttpResponse.json({ success: true, data: mockDraft })),
-
-    http.post(`${BASE}/api/v1/partners/listings/create/`, () =>
-        HttpResponse.json({ success: true, data: mockDraft }, { status: 201 })),
-
-    http.put(`${BASE}/api/v1/partners/listings/${DRAFT_ID}/update/`, () =>
-        HttpResponse.json({ success: true, data: mockDraft })),
-
-    http.post(`${BASE}/api/v1/partners/listings/${DRAFT_ID}/submit/`, () =>
-        HttpResponse.json({ success: true, data: { ...mockDraft, status: 'pending' } })),
-
-    // Media
-    http.get(`${BASE}/api/v1/partners/listings/${DRAFT_ID}/media/`, () =>
-        HttpResponse.json({ success: true, data: mockDraft.media })),
-
-    http.post(`${BASE}/api/v1/partners/listings/${DRAFT_ID}/media/`, () =>
-        HttpResponse.json({ success: true, data: { id: 99, media_type: 'cover', file_url: 'https://example.com/new.jpg', created_at: '2026-05-07T12:00:00Z' } }, { status: 201 })),
-
-    http.delete(`${BASE}/api/v1/partners/listings/${DRAFT_ID}/media/:mediaId`, () =>
-        new HttpResponse(null, { status: 204 })),
-
-    // Tickets
-    http.get(`${BASE}/api/v1/partners/listings/${DRAFT_ID}/tickets/`, () =>
-        HttpResponse.json({ success: true, data: mockDraft.tickets })),
-
-    http.post(`${BASE}/api/v1/partners/listings/${DRAFT_ID}/tickets/`, () =>
-        HttpResponse.json({ success: true, data: { id: 10, name: 'General', price: 499, total_quantity: 50, available_quantity: 50, description: '', is_default: false, created_at: '2026-05-07T12:00:00Z' } }, { status: 201 })),
-
-    http.put(`${BASE}/api/v1/partners/listings/${DRAFT_ID}/tickets/:ticketId`, () =>
+    http.get(`${BASE}/api/v1/listings/venues/metadata/discovery-enums/`, () =>
         HttpResponse.json({ success: true, data: {} })),
 
-    http.delete(`${BASE}/api/v1/partners/listings/${DRAFT_ID}/tickets/:ticketId`, () =>
+    http.get(`${BASE}/api/v1/listings/venues/metadata/occasions/`, () =>
+        HttpResponse.json({ success: true, data: [] })),
+
+    // Event listings
+    http.get(`${BASE}/api/v1/partners/listings/events/`, () =>
+        HttpResponse.json({ success: true, data: [mockListing] })),
+
+    http.get(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/`, () =>
+        HttpResponse.json({ success: true, data: mockDraft })),
+
+    http.post(`${BASE}/api/v1/partners/listings/events/`, () =>
+        HttpResponse.json({ success: true, data: mockDraft }, { status: 201 })),
+
+    http.patch(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/`, () =>
+        HttpResponse.json({ success: true, data: mockDraft })),
+
+    http.post(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/submit/`, () =>
+        HttpResponse.json({ success: true, data: { ...mockDraft, status: 'pending' } })),
+
+    // Event media
+    http.get(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/media/`, () =>
+        HttpResponse.json({ success: true, data: mockDraft.media })),
+
+    http.post(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/media/`, () =>
+        HttpResponse.json({ success: true, data: { id: 99, media_type: 'cover', file_url: 'https://example.com/new.jpg', created_at: '2026-05-07T12:00:00Z' } }, { status: 201 })),
+
+    http.delete(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/media/:mediaId`, () =>
         new HttpResponse(null, { status: 204 })),
+
+    // Event tickets
+    http.get(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/tickets/`, () =>
+        HttpResponse.json({ success: true, data: mockDraft.tickets })),
+
+    http.post(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/tickets/`, () =>
+        HttpResponse.json({ success: true, data: { id: 10, name: 'General', price: 499, total_quantity: 50, available_quantity: 50, description: '', is_default: false, created_at: '2026-05-07T12:00:00Z' } }, { status: 201 })),
+
+    http.put(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/tickets/:ticketId`, () =>
+        HttpResponse.json({ success: true, data: {} })),
+
+    http.delete(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/tickets/:ticketId`, () =>
+        new HttpResponse(null, { status: 204 })),
+
+    // Venue listings
+    http.get(`${BASE}/api/v1/partners/listings/venues/`, () =>
+        HttpResponse.json({ success: true, data: [] })),
 ];

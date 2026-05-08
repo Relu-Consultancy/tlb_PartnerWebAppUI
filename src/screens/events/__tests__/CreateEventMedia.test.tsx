@@ -33,7 +33,7 @@ describe('CreateEventMedia — loading and error states', () => {
 
     it('shows error message on media API failure', async () => {
         setCurrentDraftId(DRAFT_ID);
-        server.use(http.get(`${BASE}/api/v1/partners/listings/${DRAFT_ID}/media/`, () =>
+        server.use(http.get(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/media/`, () =>
             HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Media not found' } }, { status: 404 })));
         render(<CreateEventMedia {...props} />);
         await waitFor(() =>
@@ -55,7 +55,7 @@ describe('CreateEventMedia — media display', () => {
 
     it('shows upload cover button when no cover exists', async () => {
         setCurrentDraftId(DRAFT_ID);
-        server.use(http.get(`${BASE}/api/v1/partners/listings/${DRAFT_ID}/media/`, () =>
+        server.use(http.get(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/media/`, () =>
             HttpResponse.json({ success: true, data: [] })));
         render(<CreateEventMedia {...props} />);
         await waitFor(() =>
@@ -65,7 +65,7 @@ describe('CreateEventMedia — media display', () => {
 
     it('shows cover required warning when no cover', async () => {
         setCurrentDraftId(DRAFT_ID);
-        server.use(http.get(`${BASE}/api/v1/partners/listings/${DRAFT_ID}/media/`, () =>
+        server.use(http.get(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/media/`, () =>
             HttpResponse.json({ success: true, data: [] })));
         render(<CreateEventMedia {...props} />);
         await waitFor(() =>
@@ -129,7 +129,7 @@ describe('CreateEventMedia — cover deletion', () => {
     it('shows alert when cover delete fails', async () => {
         setCurrentDraftId(DRAFT_ID);
         const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
-        server.use(http.delete(`${BASE}/api/v1/partners/listings/${DRAFT_ID}/media/:mediaId`, () =>
+        server.use(http.delete(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/media/:mediaId`, () =>
             HttpResponse.json({ error: { code: 'SERVER_ERROR', message: 'Delete failed' } }, { status: 500 })));
         const user = userEvent.setup();
         render(<CreateEventMedia {...props} />);

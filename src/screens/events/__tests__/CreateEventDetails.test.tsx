@@ -162,7 +162,7 @@ describe('CreateEventDetails — Next button', () => {
     it('updates existing draft instead of creating new one when draft id already set', async () => {
         listingsApi.setCurrentDraftId(DRAFT_ID);
         let createCalled = false;
-        server.use(http.post(`${BASE}/api/v1/partners/listings/create/`, () => {
+        server.use(http.post(`${BASE}/api/v1/partners/listings/events/`, () => {
             createCalled = true;
             return HttpResponse.json({ success: true, data: mockDraft }, { status: 201 });
         }));

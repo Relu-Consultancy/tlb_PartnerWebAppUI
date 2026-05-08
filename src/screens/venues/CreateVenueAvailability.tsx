@@ -1,110 +1,203 @@
-import React, { useState } from 'react';
-import { ArrowRight, Calendar as CalendarIcon, Clock } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowRight, Calendar as CalendarIcon, Clock, Plus, Trash2, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
 import { WizardLayout, WizardNavigation } from '../../components/ui';
+import {
+    getVenueAvailability,
+    createVenueAvailabilitySlot,
+    deleteVenueAvailabilitySlot,
+    getCurrentVenueDraftId,
+} from '../../api/listings';
 
-interface Props { onNavigate: (screen: Screen) => void; }
+interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar?: () => void; }
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+interface AvailabilitySlot { id: number; date: string; start_time: string; end_time: string; note?: string }
+
+const fmtSlotDate = (iso: string) => {
+    if (!iso) return '';
+    try {
+        return new Date(iso + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+    } catch { return iso; }
+};
 
 export const CreateVenueAvailability: React.FC<Props> = ({ onNavigate }) => {
-    const [selectedDates, setSelectedDates] = useState<number[]>([21, 23, 24, 25, 26, 27]); 
-    const [selectedTimeSlots, setSelectedTimeSlots] = useState<string[]>(['Morning', 'Afternoon', 'Evening']);
+    const [draftId, setDraftId] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
 
-    const toggleDate = (day: number) => {
-        setSelectedDates(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
-    };
+    const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
+    const [deleting, setDeleting] = useState<number | null>(null);
 
-    const toggleTimeSlot = (slot: string) => {
-        setSelectedTimeSlots(prev => prev.includes(slot) ? prev.filter(s => s !== slot) : [...prev, slot]);
-    };
+    const [showForm, setShowForm] = useState(false);
+    const [newDate, setNewDate] = useState('');
+    const [newStart, setNewStart] = useState('');
+    const [newEnd, setNewEnd] = useState('');
+    const [newNote, setNewNote] = useState('');
+    const [adding, setAdding] = useState(false);
 
-    const mockDates = Array.from({ length: 14 }, (_, i) => {
-        const d = new Date(2026, 1, 15 + i);
-        return {
-            date: d.getDate(),
-            dayStr: DAYS[d.getDay()],
-            monthStr: MONTHS[d.getMonth()]
+    useEffect(() => {
+        const id = getCurrentVenueDraftId();
+        if (!id) { setLoadError('No active draft. Start from "Venue Details".'); setLoading(false); return; }
+        setDraftId(id);
+
+        const load = async () => {
+            try {
+                const res = await getVenueAvailability(id);
+                setSlots(res.data || res || []);
+            } catch (err: any) {
+                setLoadError(err?.message || 'Failed to load availability.');
+            } finally {
+                setLoading(false);
+            }
         };
-    });
+        load();
+    }, []);
+
+    const handleAdd = async () => {
+        if (!draftId) return;
+        if (!newDate || !newStart || !newEnd) { alert('Please fill in date, start time, and end time.'); return; }
+        if (newEnd <= newStart) { alert('End time must be after start time.'); return; }
+        setAdding(true);
+        try {
+            const res = await createVenueAvailabilitySlot(draftId, {
+                date: newDate,
+                start_time: newStart,
+                end_time: newEnd,
+                ...(newNote.trim() && { note: newNote.trim() }),
+            });
+            setSlots(prev => [...prev, res.data || res]);
+            setNewDate(''); setNewStart(''); setNewEnd(''); setNewNote('');
+            setShowForm(false);
+        } catch (err: any) {
+            alert(err?.message || 'Failed to add slot.');
+        } finally {
+            setAdding(false);
+        }
+    };
+
+    const handleDelete = async (slotId: number) => {
+        if (!draftId) return;
+        setDeleting(slotId);
+        try {
+            await deleteVenueAvailabilitySlot(draftId, slotId);
+            setSlots(prev => prev.filter(s => s.id !== slotId));
+        } catch (err: any) {
+            alert(err?.message || 'Failed to delete slot.');
+        } finally {
+            setDeleting(null);
+        }
+    };
+
+    if (loading) {
+        return (
+            <WizardLayout title="Availability" stepText="Step 3 of 5" subtitle="Schedule" progressPercentage={60} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_OCCASIONS')}>
+                <div className="flex items-center justify-center gap-2 text-gray-400 text-xs font-bold py-12">
+                    <Loader2 size={16} className="animate-spin" /> Loading availability…
+                </div>
+            </WizardLayout>
+        );
+    }
+
+    if (loadError) {
+        return (
+            <WizardLayout title="Availability" stepText="Step 3 of 5" subtitle="Schedule" progressPercentage={60} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_OCCASIONS')}>
+                <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-xs font-bold text-red-600">{loadError}</div>
+            </WizardLayout>
+        );
+    }
 
     return (
-        <WizardLayout
-            title="Availability"
-            stepText="Step 3 of 5"
-            subtitle="Schedule"
-            progressPercentage={60}
-            themeColor="amber"
-            onBack={() => onNavigate('CREATE_VENUE_OCCASIONS')}
-        >
+        <WizardLayout title="Availability" stepText="Step 3 of 5" subtitle="Schedule" progressPercentage={60} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_OCCASIONS')}>
             <div className="space-y-1">
                 <h2 className="text-2xl font-black">Schedule & Availability</h2>
-                <p className="text-sm text-gray-400">When can users book your venue?</p>
+                <p className="text-sm text-gray-400">Add time slots when your venue can be booked.</p>
             </div>
 
-            {/* Available Dates */}
-            <div>
-                <div className="flex items-center justify-between mb-3">
+            {/* Slots List */}
+            {slots.length > 0 && (
+                <div className="space-y-3">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
-                        <CalendarIcon size={14} /> Available Dates
+                        <CalendarIcon size={14} /> Available Slots ({slots.length})
                     </label>
-                    <button className="text-xs font-bold text-amber-500 hover:text-amber-700">Select Range</button>
-                </div>
-                
-                {/* Horizontal Scrollable Calendar Strip */}
-                <div className="flex gap-3 overflow-x-auto pb-4 snap-x hide-scrollbar -mx-6 px-6">
-                    {mockDates.map((item, idx) => {
-                        const isSelected = selectedDates.includes(item.date);
-                        return (
+                    {slots.map(slot => (
+                        <div key={slot.id} className="bg-white border border-gray-100 rounded-2xl px-4 py-3 flex items-center justify-between shadow-sm">
+                            <div className="flex items-center gap-3">
+                                <div className="bg-amber-50 p-2 rounded-xl text-amber-500 shrink-0">
+                                    <CalendarIcon size={16} />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-bold text-gray-800">{fmtSlotDate(slot.date)}</p>
+                                    <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                                        <Clock size={10} /> {slot.start_time} – {slot.end_time}
+                                        {slot.note && <span className="ml-1 text-gray-300">· {slot.note}</span>}
+                                    </p>
+                                </div>
+                            </div>
                             <button
-                                key={idx}
-                                onClick={() => toggleDate(item.date)}
-                                className={`snap-center shrink-0 w-[4.5rem] py-3 rounded-2xl border-2 flex flex-col items-center justify-center transition-all ${
-                                    isSelected 
-                                        ? 'border-amber-400 bg-amber-400 text-white shadow-md' 
-                                        : 'border-gray-100 bg-white text-gray-400 hover:border-amber-200 hover:text-amber-500'
-                                }`}
+                                onClick={() => handleDelete(slot.id)}
+                                disabled={deleting === slot.id}
+                                className="text-gray-300 hover:text-red-500 p-2 disabled:opacity-50 transition-colors"
+                                aria-label="Delete slot"
                             >
-                                <span className={`text-[10px] font-bold uppercase tracking-widest mb-1 ${isSelected ? 'text-amber-900/60' : ''}`}>{item.dayStr}</span>
-                                <span className={`text-xl font-black leading-none ${isSelected ? 'text-white' : 'text-gray-700'}`}>{item.date}</span>
-                                <span className={`text-[10px] font-bold uppercase mt-1 ${isSelected ? 'text-amber-900/60' : ''}`}>{item.monthStr}</span>
+                                {deleting === slot.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                             </button>
-                        );
-                    })}
+                        </div>
+                    ))}
                 </div>
-                <p className="text-xs text-gray-400 mt-1">Tap dates to toggle availability.</p>
-            </div>
+            )}
 
-            {/* Time Slots */}
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                    <Clock size={14} /> Available Time Slots
-                </label>
-                <div className="grid grid-cols-3 gap-3">
-                    {['Morning', 'Afternoon', 'Evening'].map((slot) => {
-                        const isSelected = selectedTimeSlots.includes(slot);
-                        return (
-                            <button
-                                key={slot}
-                                onClick={() => toggleTimeSlot(slot)}
-                                className={`py-4 rounded-xl border-2 text-center transition-all ${
-                                    isSelected
-                                        ? 'border-amber-400 bg-amber-50 text-amber-600'
-                                        : 'border-gray-100 bg-white text-gray-400 hover:border-amber-200 hover:text-amber-500'
-                                }`}
-                            >
-                                <span className="text-sm font-bold block">{slot}</span>
-                                <span className="text-[10px] font-semibold opacity-60">
-                                    {slot === 'Morning' ? '8 AM - 12 PM' : slot === 'Afternoon' ? '12 PM - 4 PM' : '4 PM - 9 PM'}
-                                </span>
-                            </button>
-                        );
-                    })}
+            {slots.length === 0 && !showForm && (
+                <div className="bg-amber-50 border border-amber-100 rounded-2xl p-8 text-center">
+                    <CalendarIcon size={32} className="text-amber-300 mx-auto mb-2" />
+                    <p className="text-sm font-bold text-amber-700">No slots yet</p>
+                    <p className="text-xs text-amber-500 mt-1">Add available time slots for customers to book.</p>
                 </div>
-            </div>
+            )}
 
-            <WizardNavigation 
+            {/* Add Slot Form */}
+            {showForm ? (
+                <div className="bg-white border-2 border-amber-200 rounded-3xl p-5 space-y-4">
+                    <h3 className="font-black text-gray-800 text-sm flex items-center gap-2">
+                        <Plus size={16} className="text-amber-500" /> Add Availability Slot
+                    </h3>
+                    <div>
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">Date</label>
+                        <input type="date" className="tlb-input w-full" value={newDate} onChange={e => setNewDate(e.target.value)} />
+                    </div>
+                    <div className="flex gap-4">
+                        <div className="flex-1">
+                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">Start Time</label>
+                            <input type="time" className="tlb-input w-full" value={newStart} onChange={e => setNewStart(e.target.value)} />
+                        </div>
+                        <div className="flex-1">
+                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">End Time</label>
+                            <input type="time" className="tlb-input w-full" value={newEnd} onChange={e => setNewEnd(e.target.value)} />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">Note (optional)</label>
+                        <input className="tlb-input w-full" placeholder="e.g. Weekend special" value={newNote} onChange={e => setNewNote(e.target.value)} />
+                    </div>
+                    <div className="flex gap-3">
+                        <button onClick={() => { setShowForm(false); setNewDate(''); setNewStart(''); setNewEnd(''); setNewNote(''); }} className="flex-1 py-3 rounded-2xl border-2 border-gray-200 text-sm font-bold text-gray-500 hover:bg-gray-50">
+                            Cancel
+                        </button>
+                        <button onClick={handleAdd} disabled={adding} className="flex-1 py-3 rounded-2xl bg-amber-400 text-sm font-bold text-amber-900 hover:brightness-95 disabled:opacity-50 flex items-center justify-center gap-2">
+                            {adding ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+                            {adding ? 'Adding…' : 'Add Slot'}
+                        </button>
+                    </div>
+                </div>
+            ) : (
+                <button
+                    onClick={() => setShowForm(true)}
+                    className="w-full py-4 border-2 border-dashed border-gray-200 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold text-gray-500 hover:border-amber-400 hover:text-amber-500 hover:bg-amber-50 transition-colors"
+                >
+                    <Plus size={18} /> Add Availability Slot
+                </button>
+            )}
+
+            <WizardNavigation
                 onBack={() => onNavigate('CREATE_VENUE_OCCASIONS')}
                 onNext={() => onNavigate('CREATE_VENUE_PACKAGES')}
                 nextText="Next: Packages & Pricing"

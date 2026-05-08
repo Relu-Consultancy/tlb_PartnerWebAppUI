@@ -3,7 +3,7 @@ import { Menu, Plus, Search, Filter, Users, Edit3, CalendarDays, BarChart3, MapP
 import { Screen, EntityType } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
 import { EntityPickerSheet } from '../../components/EntityPickerSheet';
-import { getEventListings, getVenueListings, setCurrentDraftId, clearCurrentDraftId } from '../../api/listings';
+import { getEventListings, getVenueListings, setCurrentDraftId, clearCurrentDraftId, setCurrentVenueDraftId, clearCurrentVenueDraftId } from '../../api/listings';
 
 interface Props {
     onNavigate: (screen: Screen) => void;
@@ -149,8 +149,9 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
     }, []);
 
     const handleAddListing = () => {
-        // Starting fresh — clear any leftover draft id
+        // Starting fresh — clear any leftover draft ids
         clearCurrentDraftId();
+        clearCurrentVenueDraftId();
         if (allowedEntities.length === 1) {
             const entity = allowedEntities[0];
             if (entity === 'Events') onNavigate('CREATE_EVENT_DETAILS');
@@ -168,12 +169,14 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
         if (listing.entityType === 'Events') {
             setCurrentDraftId(listing.id);
             onNavigate('CREATE_EVENT_DETAILS');
-            return;
+        } else if (listing.entityType === 'Venues') {
+            setCurrentVenueDraftId(listing.id);
+            onNavigate('CREATE_VENUE_DETAILS');
+        } else if (listing.entityType === 'Programs') {
+            onNavigate('CREATE_PROGRAM_IDENTITY');
+        } else {
+            onNavigate('CREATE_LISTING_IDENTITY');
         }
-        // Other entity wizards aren't API-integrated yet — just navigate
-        if (listing.entityType === 'Venues') onNavigate('CREATE_VENUE_DETAILS');
-        else if (listing.entityType === 'Programs') onNavigate('CREATE_PROGRAM_IDENTITY');
-        else onNavigate('CREATE_LISTING_IDENTITY');
     };
 
     const filtered = listings

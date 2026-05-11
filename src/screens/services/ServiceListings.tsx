@@ -107,16 +107,26 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
     useEffect(() => {
         const fetchListings = async () => {
             try {
-                const fetches: Promise<any>[] = [];
-                if (allowedEntities.includes('Events')) fetches.push(getEventListings());
-                if (allowedEntities.includes('Venues')) fetches.push(getVenueListings());
+                type Tagged = { item: any; entityType: EntityType };
+                const fetches: Promise<Tagged[]>[] = [];
+                if (allowedEntities.includes('Events')) {
+                    fetches.push(getEventListings().then(res => {
+                        const data = res.data || res;
+                        return Array.isArray(data) ? data.map(item => ({ item, entityType: 'Events' as EntityType })) : [];
+                    }));
+                }
+                if (allowedEntities.includes('Venues')) {
+                    fetches.push(getVenueListings().then(res => {
+                        const data = res.data || res;
+                        return Array.isArray(data) ? data.map(item => ({ item, entityType: 'Venues' as EntityType })) : [];
+                    }));
+                }
                 const results = await Promise.allSettled(fetches);
-                const combined: any[] = [];
+                const combined: Tagged[] = [];
                 let firstError: string | null = null;
                 results.forEach(r => {
                     if (r.status === 'fulfilled') {
-                        const data = r.value.data || r.value;
-                        if (Array.isArray(data)) combined.push(...data);
+                        combined.push(...r.value);
                     } else if (!firstError) {
                         firstError = (r.reason as any)?.message || 'Failed to load listings.';
                     }
@@ -125,14 +135,14 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                     setError(firstError);
                     setListings([]);
                 } else {
-                    const normalized: Listing[] = combined.map((item: any) => ({
+                    const normalized: Listing[] = combined.map(({ item, entityType }) => ({
                         id: String(item.id || ''),
                         title: item.title || 'Untitled',
                         category: item.category?.name || item.subcategory?.name || '',
-                        entityType: listingTypeToEntity(item.listing_type),
+                        entityType,
                         listingType: item.listing_type || '',
                         status: (item.status as ListingStatus) || 'draft',
-                        coverUrl: item.cover_url,
+                        coverUrl: item.cover_url || item.cover,
                         startDateTime: item.start_datetime,
                     }));
                     setListings(normalized);
@@ -338,15 +348,15 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                                         <div className="border-t border-gray-100 px-5 py-3 flex justify-end">
                                             <button
                                                 onClick={() => handleEdit(listing)}
-                                                disabled={listing.status === 'pending' || listing.status === 'published'}
+                                                disabled={listing.status === 'published'}
                                                 className={`flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest ${
-                                                    listing.status === 'pending' || listing.status === 'published'
+                                                    listing.status === 'published'
                                                         ? 'text-gray-300 cursor-not-allowed'
                                                         : 'text-tlb-yellow hover:underline'
                                                 }`}
                                             >
                                                 <Edit3 size={14} />
-                                                {listing.status === 'pending' || listing.status === 'published' ? 'Locked' : 'Edit Listing'}
+                                                {listing.status === 'published' ? 'Locked' : 'Edit Listing'}
                                             </button>
                                         </div>
                                     </div>

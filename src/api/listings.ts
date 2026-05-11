@@ -18,19 +18,19 @@ const handleError = async (response: Response, fallback: string): Promise<never>
 // ─── Event Metadata (public) ───────────────────────────────────────────────
 
 export const getEventMetaCategories = async () => {
-    const response = await apiClient('/api/v1/listings/metadata/categories/');
+    const response = await apiClient('/api/v1/listings/events/metadata/categories/');
     if (!response.ok) await handleError(response, 'Failed to load categories');
     return response.json();
 };
 
 export const getEventMetaFormats = async () => {
-    const response = await apiClient('/api/v1/listings/metadata/formats/');
+    const response = await apiClient('/api/v1/listings/events/metadata/formats/');
     if (!response.ok) await handleError(response, 'Failed to load formats');
     return response.json();
 };
 
 export const getEventMetaAgeGroups = async () => {
-    const response = await apiClient('/api/v1/listings/metadata/age-groups/');
+    const response = await apiClient('/api/v1/listings/events/metadata/age-groups/');
     if (!response.ok) await handleError(response, 'Failed to load age groups');
     return response.json();
 };

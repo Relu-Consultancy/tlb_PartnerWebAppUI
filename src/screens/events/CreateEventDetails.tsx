@@ -17,7 +17,7 @@ interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => voi
 
 interface ApiCategory { id: number; name: string; slug: string; subcategories: { id: number; name: string; slug: string }[] }
 interface ApiFormat { value: string; label: string }
-interface StaticRange { min_age: number; max_age: number; label: string }
+interface StaticRange { min_age: number; max_age: number }
 interface AgeGroupsMeta {
     static_ranges: StaticRange[];
     custom_range: { enabled: boolean; min_allowed_age: number; max_allowed_age: number };
@@ -190,7 +190,7 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
             stepText="Step 1 of 4"
             subtitle="Details"
             progressPercentage={25}
-            themeColor="purple"
+            themeColor="blue"
             onBack={() => onNavigate('SERVICE_LISTINGS')}
         >
             {overlayLoading && (
@@ -245,12 +245,12 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
                                     key={cat.id}
                                     onClick={() => { setSelectedCategoryId(cat.id); setSelectedSubcategoryId(null); }}
                                     className={`relative p-4 rounded-2xl border-2 text-center transition-all ${selectedCategoryId === cat.id
-                                        ? 'border-purple-400 bg-purple-50'
+                                        ? 'border-blue-400 bg-blue-50'
                                         : 'border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm'
                                     }`}
                                 >
                                     {selectedCategoryId === cat.id && (
-                                        <div className="absolute top-2 right-2 w-5 h-5 bg-purple-500 rounded-full flex items-center justify-center">
+                                        <div className="absolute top-2 right-2 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
                                             <Check size={12} className="text-white" />
                                         </div>
                                     )}
@@ -273,8 +273,8 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
                                 onClick={() => setSelectedSubcategoryId(selectedSubcategoryId === s.id ? null : s.id)}
                                 className={`px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap shrink-0 transition-all ${
                                     selectedSubcategoryId === s.id
-                                        ? 'bg-purple-500 text-white shadow-sm'
-                                        : 'bg-white border border-gray-200 text-gray-500 hover:border-purple-300'
+                                        ? 'bg-blue-500 text-white shadow-sm'
+                                        : 'bg-white border border-gray-200 text-gray-500 hover:border-blue-300'
                                 }`}
                             >
                                 {s.name}
@@ -340,11 +340,11 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
                                         key={key}
                                         onClick={() => setStaticAgeKey(staticAgeKey === key ? '' : key)}
                                         className={`px-3.5 py-2 rounded-full text-xs font-bold transition-all ${staticAgeKey === key
-                                            ? 'bg-purple-500 text-white shadow-sm'
-                                            : 'bg-white border border-gray-200 text-gray-500 hover:border-purple-300'
+                                            ? 'bg-blue-500 text-white shadow-sm'
+                                            : 'bg-white border border-gray-200 text-gray-500 hover:border-blue-300'
                                         }`}
                                     >
-                                        {r.label}
+                                        {r.min_age}–{r.max_age} yrs
                                     </button>
                                 );
                             })}
@@ -388,12 +388,12 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
                             key={m.value}
                             onClick={() => setMode(m.value)}
                             className={`p-4 rounded-2xl border-2 text-center transition-all ${mode === m.value
-                                ? 'border-purple-400 bg-purple-50'
+                                ? 'border-blue-400 bg-blue-50'
                                 : 'border-gray-100 bg-white hover:border-gray-200'
                             }`}
                         >
                             <span className="text-lg">{m.icon}</span>
-                            <p className={`text-xs font-bold mt-1.5 ${mode === m.value ? 'text-purple-600' : 'text-gray-500'}`}>{m.label}</p>
+                            <p className={`text-xs font-bold mt-1.5 ${mode === m.value ? 'text-blue-600' : 'text-gray-500'}`}>{m.label}</p>
                         </button>
                     ))}
                 </div>
@@ -447,7 +447,7 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
                 onNext={saving ? () => {} : handleNext}
                 nextText={saving ? 'Saving…' : 'Next: Schedule & Pricing'}
                 nextIcon={saving ? <Loader2 size={20} className="animate-spin" /> : <ArrowRight size={20} />}
-                themeColor="purple"
+                themeColor="blue"
             />
         </WizardLayout>
     );

@@ -196,7 +196,7 @@ export const CreateEventSchedule: React.FC<Props> = ({ onNavigate }) => {
                 stepText="Step 2 of 4"
                 subtitle="Schedule & Pricing"
                 progressPercentage={50}
-                themeColor="purple"
+                themeColor="blue"
                 onBack={() => onNavigate('CREATE_EVENT_DETAILS')}
             >
                 <div className="flex items-center justify-center gap-2 text-gray-400 text-xs font-bold py-12">
@@ -213,7 +213,7 @@ export const CreateEventSchedule: React.FC<Props> = ({ onNavigate }) => {
                 stepText="Step 2 of 4"
                 subtitle="Schedule & Pricing"
                 progressPercentage={50}
-                themeColor="purple"
+                themeColor="blue"
                 onBack={() => onNavigate('CREATE_EVENT_DETAILS')}
             >
                 <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-xs font-bold text-red-600">
@@ -229,7 +229,7 @@ export const CreateEventSchedule: React.FC<Props> = ({ onNavigate }) => {
             stepText="Step 2 of 4"
             subtitle="Schedule & Pricing"
             progressPercentage={50}
-            themeColor="purple"
+            themeColor="blue"
             onBack={() => onNavigate('CREATE_EVENT_DETAILS')}
         >
             <div className="space-y-1">
@@ -278,12 +278,12 @@ export const CreateEventSchedule: React.FC<Props> = ({ onNavigate }) => {
                     <button
                         onClick={() => setPriceType('paid')}
                         className={`p-4 rounded-2xl border-2 text-center transition-all ${priceType === 'paid'
-                            ? 'border-purple-400 bg-purple-50'
+                            ? 'border-blue-400 bg-blue-50'
                             : 'border-gray-100 bg-white hover:border-gray-200'
                         }`}
                     >
                         <span className="text-lg">🎟️</span>
-                        <p className={`text-sm font-bold mt-1 ${priceType === 'paid' ? 'text-purple-600' : 'text-gray-500'}`}>Paid Event</p>
+                        <p className={`text-sm font-bold mt-1 ${priceType === 'paid' ? 'text-blue-600' : 'text-gray-500'}`}>Paid Event</p>
                     </button>
                 </div>
                 {priceType !== originalPriceType && (
@@ -323,7 +323,7 @@ export const CreateEventSchedule: React.FC<Props> = ({ onNavigate }) => {
                     {tickets.map((ticket, idx) => (
                         <div key={ticket.id ?? `new-${idx}`} className="bg-white rounded-2xl border border-gray-100 p-5 space-y-3">
                             <div className="flex items-center justify-between">
-                                <p className="text-[10px] font-black text-purple-500 uppercase tracking-widest">
+                                <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">
                                     Tier {idx + 1} {ticket.id === null && '(new)'}
                                 </p>
                                 <button
@@ -376,7 +376,7 @@ export const CreateEventSchedule: React.FC<Props> = ({ onNavigate }) => {
                     ))}
                     <button
                         onClick={addTicket}
-                        className="w-full py-3 border-2 border-dashed border-purple-200 rounded-2xl text-sm font-bold text-purple-400 flex items-center justify-center gap-2 hover:bg-purple-50 transition-colors"
+                        className="w-full py-3 border-2 border-dashed border-blue-200 rounded-2xl text-sm font-bold text-purple-400 flex items-center justify-center gap-2 hover:bg-blue-50 transition-colors"
                     >
                         <Plus size={18} /> Add Ticket Tier
                     </button>
@@ -398,7 +398,7 @@ export const CreateEventSchedule: React.FC<Props> = ({ onNavigate }) => {
                 onNext={saving ? () => {} : handleNext}
                 nextText={saving ? 'Saving…' : 'Next: Media'}
                 nextIcon={saving ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={18} />}
-                themeColor="purple"
+                themeColor="blue"
             />
         </WizardLayout>
     );

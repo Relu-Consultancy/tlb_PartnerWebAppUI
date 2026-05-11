@@ -4,8 +4,6 @@ import { Screen } from '../../types';
 import { WizardLayout, WizardNavigation } from '../../components/ui';
 import {
     getVenueListingDetail,
-    getVenuePackages,
-    getVenueAvailability,
     submitVenueListing,
     getCurrentVenueDraftId,
     clearCurrentVenueDraftId,
@@ -14,22 +12,33 @@ import {
 
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar?: () => void; }
 
+interface MediaItem { id: number; media_type: string; url: string }
+interface AvailabilitySlot { id: number; date: string; start_time: string; end_time: string; note?: string }
+interface VenuePackage { id: number; name: string; price: string | number; description?: string; duration_minutes?: number; max_guests?: number }
+interface OccasionItem { id: number; name: string; slug: string }
+
 interface VenueDetail {
     id: string;
     title: string;
     description?: string;
-    location?: string;
     status: string;
-    category?: { id: number; name: string };
-    subcategory?: { id: number; name: string };
-    occasions?: string[];
-    min_guests?: number;
-    max_guests?: number;
-    media?: { id: number; media_type: string; file_url: string }[];
+    category?: { id: number; name: string; slug: string };
+    subcategory?: { id: number; name: string; slug: string };
+    location_type?: string;
+    city?: string;
+    area?: string;
+    address?: string;
+    min_age?: number;
+    max_age?: number;
+    min_capacity?: number;
+    max_capacity?: number;
+    occasions?: OccasionItem[];
+    media?: MediaItem[];
+    availability?: AvailabilitySlot[];
+    packages?: VenuePackage[];
+    discovery?: { outing_types: string[]; activity_types: string[]; format_types: string[] };
+    required_attendee_fields?: string[];
 }
-
-interface VenuePackage { id: number; name: string; price: number; description?: string; duration_minutes?: number; max_guests?: number }
-interface AvailabilitySlot { id: number; date: string; start_time: string; end_time: string; note?: string }
 
 type ModalVariant = 'success' | 'under_review' | 'error';
 
@@ -84,7 +93,7 @@ const ResultModal: React.FC<ResultModalProps> = ({ variant, message, onClose }) 
                     </div>
                     <div className="px-6 py-5">
                         <p className="text-sm text-gray-500 leading-relaxed text-center">
-                            {message || 'Your partner profile is currently under review. You can prepare and save drafts, but cannot submit venues until the review is complete.'}
+                            {message || 'Your partner profile is currently under review. You can save drafts, but cannot submit venues until the review is complete.'}
                         </p>
                     </div>
                     <div className="px-6 pb-6">
@@ -140,8 +149,6 @@ const fmtSlotDate = (iso: string) => {
 export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
     const [draftId, setDraftId] = useState<string | null>(null);
     const [venue, setVenue] = useState<VenueDetail | null>(null);
-    const [packages, setPackages] = useState<VenuePackage[]>([]);
-    const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [submitting, setSubmitting] = useState(false);
@@ -154,22 +161,9 @@ export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
 
         const load = async () => {
             try {
-                const [detailRes, pkgsRes, slotsRes] = await Promise.allSettled([
-                    getVenueListingDetail(id),
-                    getVenuePackages(id),
-                    getVenueAvailability(id),
-                ]);
-                if (detailRes.status === 'fulfilled') {
-                    setVenue(detailRes.value.data || detailRes.value);
-                } else {
-                    throw detailRes.reason;
-                }
-                if (pkgsRes.status === 'fulfilled') {
-                    setPackages(pkgsRes.value.data || pkgsRes.value || []);
-                }
-                if (slotsRes.status === 'fulfilled') {
-                    setSlots(slotsRes.value.data || slotsRes.value || []);
-                }
+                // Venue detail includes media, availability, packages, discovery, occasions inline
+                const res = await getVenueListingDetail(id);
+                setVenue(res.data || res);
             } catch (err: any) {
                 setLoadError(err?.message || 'Failed to load venue.');
             } finally {
@@ -181,17 +175,21 @@ export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
 
     const cover = venue?.media?.find(m => m.media_type === 'cover');
     const gallery = venue?.media?.filter(m => m.media_type === 'gallery') || [];
+    const packages = venue?.packages || [];
+    const slots = venue?.availability || [];
 
+    // Readiness check — mirrors backend submit requirements
     const missing: string[] = [];
     if (venue) {
         if (!venue.title?.trim()) missing.push('Title');
         if (!venue.description?.trim()) missing.push('Description');
-        if (!venue.location?.trim()) missing.push('Location');
         if (!venue.category) missing.push('Category');
+        if (!venue.subcategory) missing.push('Subcategory');
+        if (!venue.city) missing.push('City');
+        if (!venue.address) missing.push('Address');
         if (!cover) missing.push('Cover image');
-        if (!venue.occasions || venue.occasions.length === 0) missing.push('At least one occasion');
-        if (packages.length === 0) missing.push('At least one package');
         if (slots.length === 0) missing.push('At least one availability slot');
+        if (packages.length === 0) missing.push('At least one package');
     }
     const canSubmit = !!venue && missing.length === 0 && venue.status === 'draft';
 
@@ -243,7 +241,7 @@ export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
         <WizardLayout title="Review Listing" stepText="Step 5 of 5" subtitle="Preview & Publish" progressPercentage={100} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_PACKAGES')}>
             <div className="text-center space-y-1">
                 <h2 className="text-2xl font-black">Preview Your Venue</h2>
-                <p className="text-sm text-gray-400">This is how customers will see your listing. Review everything before submitting.</p>
+                <p className="text-sm text-gray-400">Review everything before submitting.</p>
             </div>
 
             {/* Venue Card */}
@@ -251,7 +249,7 @@ export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
                 {/* Cover */}
                 <div className="h-52 relative bg-gray-100">
                     {cover ? (
-                        <img src={resolveUrl(cover.file_url)} alt="Cover" className="w-full h-full object-cover" />
+                        <img src={resolveUrl(cover.url)} alt="Cover" className="w-full h-full object-cover" />
                     ) : (
                         <div className="w-full h-full flex flex-col items-center justify-center text-gray-300">
                             <CalendarDays size={32} />
@@ -278,9 +276,10 @@ export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
                     <div className="flex items-start justify-between">
                         <div>
                             <h3 className="text-xl font-black text-gray-900">{venue.title || 'Untitled Venue'}</h3>
-                            {venue.location && (
+                            {(venue.city || venue.area) && (
                                 <p className="text-sm text-gray-500 flex items-center gap-1.5 mt-1 font-medium">
-                                    <MapPin size={14} className="text-amber-500" /> {venue.location}
+                                    <MapPin size={14} className="text-amber-500" />
+                                    {venue.city}{venue.area && `, ${venue.area}`}
                                 </p>
                             )}
                             {venue.category && (
@@ -298,8 +297,8 @@ export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
                     {venue.occasions && venue.occasions.length > 0 && (
                         <div className="flex items-center justify-between">
                             <div className="flex flex-wrap gap-1.5">
-                                {venue.occasions.slice(0, 4).map(tag => (
-                                    <span key={tag} className="bg-amber-50 text-amber-700 text-[10px] font-bold px-2.5 py-1 rounded-full">🎉 {tag}</span>
+                                {venue.occasions.slice(0, 4).map(occ => (
+                                    <span key={occ.id} className="bg-amber-50 text-amber-700 text-[10px] font-bold px-2.5 py-1 rounded-full">🎉 {occ.name}</span>
                                 ))}
                                 {venue.occasions.length > 4 && (
                                     <span className="bg-amber-50 text-amber-700 text-[10px] font-bold px-2.5 py-1 rounded-full">+{venue.occasions.length - 4} more</span>
@@ -318,9 +317,9 @@ export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
                             <div>
                                 <p className="text-[10px] font-bold text-amber-900/50 uppercase tracking-widest">Capacity</p>
                                 <p className="text-sm font-black text-amber-900">
-                                    {venue.min_guests != null && venue.max_guests != null
-                                        ? `${venue.min_guests} – ${venue.max_guests}`
-                                        : venue.max_guests != null ? `Up to ${venue.max_guests}` : '—'} Guests
+                                    {venue.min_capacity != null && venue.max_capacity != null
+                                        ? `${venue.min_capacity} – ${venue.max_capacity}`
+                                        : venue.max_capacity != null ? `Up to ${venue.max_capacity}` : '—'} Guests
                                 </p>
                             </div>
                         </div>
@@ -384,7 +383,9 @@ export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
                                             {pkg.description && <p className="text-[11px] text-gray-400 line-clamp-1">{pkg.description}</p>}
                                         </div>
                                     </div>
-                                    <span className="font-black text-amber-600 text-sm whitespace-nowrap">₹{pkg.price?.toLocaleString()}</span>
+                                    <span className="font-black text-amber-600 text-sm whitespace-nowrap">
+                                        ₹{Number(pkg.price).toLocaleString()}
+                                    </span>
                                 </div>
                             ))}
                         </div>
@@ -395,7 +396,7 @@ export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
                         <div className="flex gap-2 overflow-x-auto pb-1">
                             {gallery.map(g => (
                                 <div key={g.id} className="w-20 h-20 shrink-0 rounded-xl overflow-hidden">
-                                    <img src={resolveUrl(g.file_url)} alt="" className="w-full h-full object-cover" />
+                                    <img src={resolveUrl(g.url)} alt="" className="w-full h-full object-cover" />
                                 </div>
                             ))}
                         </div>

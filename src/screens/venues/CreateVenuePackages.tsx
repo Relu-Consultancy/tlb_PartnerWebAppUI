@@ -97,13 +97,15 @@ export const CreateVenuePackages: React.FC<Props> = ({ onNavigate }) => {
             for (const pkg of packages) {
                 if (!pkg.dirty) continue;
                 if (!pkg.name.trim()) { alert('Package name is required for all packages.'); setProceeding(false); return; }
-                const payload = {
+                const payload: Record<string, any> = {
                     name: pkg.name.trim(),
                     price: pkg.price ? Number(pkg.price) : 0,
                     description: pkg.description.trim(),
-                    duration_minutes: pkg.duration_minutes ? Number(pkg.duration_minutes) : 0,
-                    max_guests: pkg.max_guests ? Number(pkg.max_guests) : 0,
                 };
+                const durMins = Number(pkg.duration_minutes);
+                const maxG = Number(pkg.max_guests);
+                if (pkg.duration_minutes && durMins >= 1) payload.duration_minutes = durMins;
+                if (pkg.max_guests && maxG >= 1) payload.max_guests = maxG;
                 if (pkg.apiId) {
                     await updateVenuePackage(draftId, pkg.apiId, payload);
                 } else {

@@ -15,8 +15,18 @@ import {
 
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar?: () => void; }
 
-interface VenueCategory { id: number; name: string; slug: string; icon?: string; subcategories: { id: number; name: string; slug: string }[] }
-interface MediaItem { id: number; media_type: 'cover' | 'gallery' | 'video'; file_url: string }
+interface VenueCategory { id: number; name: string; slug: string; subcategories: { id: number; name: string; slug: string }[] }
+// Venue media uses `url` (not `file_url`)
+interface MediaItem { id: number; media_type: 'cover' | 'gallery' | 'video'; url: string }
+
+const LOCATION_TYPES = [
+    { value: 'indoor',     label: 'Indoor' },
+    { value: 'outdoor',    label: 'Outdoor' },
+    { value: 'mall',       label: 'Mall' },
+    { value: 'standalone', label: 'Standalone' },
+    { value: 'mixed',      label: 'Mixed (Indoor + Outdoor)' },
+    { value: 'resort',     label: 'Resort / Hotel' },
+] as const;
 
 const API_BASE = 'https://tlb-api.reluconsultancy.in';
 const COVER_MAX = 5 * 1024 * 1024;
@@ -24,7 +34,6 @@ const GALLERY_MAX = 5 * 1024 * 1024;
 const VIDEO_MAX = 100 * 1024 * 1024;
 const GALLERY_LIMIT = 10;
 
-// Resolve relative media URLs returned by the API
 const resolveUrl = (url: string) => {
     if (!url) return '';
     if (url.startsWith('http')) return url;
@@ -32,20 +41,37 @@ const resolveUrl = (url: string) => {
 };
 
 export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
+    // Core info
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
-    const [location, setLocation] = useState('');
     const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
     const [selectedSubcategoryId, setSelectedSubcategoryId] = useState<number | null>(null);
     const [showAllCategories, setShowAllCategories] = useState(false);
 
+    // Location
+    const [locationType, setLocationType] = useState('');
+    const [city, setCity] = useState('');
+    const [area, setArea] = useState('');
+    const [address, setAddress] = useState('');
+    const [latitude, setLatitude] = useState('');
+    const [longitude, setLongitude] = useState('');
+
+    // Age & capacity
+    const [minAge, setMinAge] = useState('');
+    const [maxAge, setMaxAge] = useState('');
+    const [minCapacity, setMinCapacity] = useState('');
+    const [maxCapacity, setMaxCapacity] = useState('');
+
+    // Metadata
     const [categories, setCategories] = useState<VenueCategory[]>([]);
     const [metaLoading, setMetaLoading] = useState(true);
     const [metaError, setMetaError] = useState<string | null>(null);
 
+    // Draft
     const [draftId, setDraftId] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
 
+    // Media
     const [busyKind, setBusyKind] = useState<'cover' | 'gallery' | 'video' | null>(null);
     const [cover, setCover] = useState<MediaItem | null>(null);
     const [gallery, setGallery] = useState<MediaItem[]>([]);
@@ -77,9 +103,18 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
                     const d = res.data || res;
                     setTitle(d.title || '');
                     setDescription(d.description || '');
-                    setLocation(d.location || '');
                     if (d.category?.id) setSelectedCategoryId(d.category.id);
                     if (d.subcategory?.id) setSelectedSubcategoryId(d.subcategory.id);
+                    setLocationType(d.location_type || '');
+                    setCity(d.city || '');
+                    setArea(d.area || '');
+                    setAddress(d.address || '');
+                    setLatitude(d.latitude != null ? String(d.latitude) : '');
+                    setLongitude(d.longitude != null ? String(d.longitude) : '');
+                    setMinAge(d.min_age != null ? String(d.min_age) : '');
+                    setMaxAge(d.max_age != null ? String(d.max_age) : '');
+                    setMinCapacity(d.min_capacity != null ? String(d.min_capacity) : '');
+                    setMaxCapacity(d.max_capacity != null ? String(d.max_capacity) : '');
                     const media: MediaItem[] = d.media || [];
                     setCover(media.find(m => m.media_type === 'cover') || null);
                     setGallery(media.filter(m => m.media_type === 'gallery'));
@@ -93,7 +128,6 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
     const selectedCategory = categories.find(c => c.id === selectedCategoryId);
     const visibleCategories = showAllCategories ? categories : categories.slice(0, 6);
 
-    // Creates a draft if one doesn't exist yet, returns the id or null on failure
     const ensureDraft = async (): Promise<string | null> => {
         if (draftId) return draftId;
         if (!title.trim()) { alert('Please enter a venue name before uploading media.'); return null; }
@@ -196,13 +230,25 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
                 setCurrentVenueDraftId(id!);
                 setDraftId(id);
             }
-            await updateVenueListing(id!, {
+
+            const payload: Record<string, any> = {
                 title: title.trim(),
                 description: description.trim(),
-                location: location.trim(),
-                ...(selectedCategoryId != null && { category_id: selectedCategoryId }),
-                ...(selectedSubcategoryId != null && { subcategory_id: selectedSubcategoryId }),
-            });
+            };
+            if (selectedCategoryId != null) payload.category_id = selectedCategoryId;
+            if (selectedSubcategoryId != null) payload.subcategory_id = selectedSubcategoryId;
+            if (locationType) payload.location_type = locationType;
+            if (city.trim()) payload.city = city.trim();
+            if (area.trim()) payload.area = area.trim();
+            if (address.trim()) payload.address = address.trim();
+            if (latitude.trim()) payload.latitude = latitude.trim();
+            if (longitude.trim()) payload.longitude = longitude.trim();
+            if (minAge !== '') payload.min_age = parseInt(minAge, 10);
+            if (maxAge !== '') payload.max_age = parseInt(maxAge, 10);
+            if (minCapacity !== '') payload.min_capacity = parseInt(minCapacity, 10);
+            if (maxCapacity !== '') payload.max_capacity = parseInt(maxCapacity, 10);
+
+            await updateVenueListing(id!, payload);
             onNavigate('CREATE_VENUE_OCCASIONS');
         } catch (err: any) {
             alert(err?.message || 'Failed to save venue details.');
@@ -233,21 +279,27 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
         <WizardLayout title="New Venue Listing" stepText="Step 1 of 5" subtitle="Details" progressPercentage={20} themeColor="amber" onBack={() => onNavigate('SERVICE_LISTINGS')}>
             <div className="space-y-1">
                 <h2 className="text-2xl font-black">Venue Details</h2>
-                <p className="text-sm text-gray-400">Tell us about your performance or event space.</p>
+                <p className="text-sm text-gray-400">Tell us about your space.</p>
             </div>
 
+            {/* Title */}
             <div>
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Venue Name</label>
-                <input className="tlb-input w-full" placeholder="e.g. Royal Kids Party Hall" value={title} onChange={e => setTitle(e.target.value)} />
+                <input className="tlb-input w-full" placeholder="e.g. The Wonder Zone" maxLength={200} value={title} onChange={e => setTitle(e.target.value)} />
             </div>
 
+            {/* Description */}
             <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">
-                    <MapPin size={12} className="inline mr-1" /> Location
-                </label>
-                <input className="tlb-input w-full" placeholder="e.g. Powai, Mumbai" value={location} onChange={e => setLocation(e.target.value)} />
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Description</label>
+                <textarea
+                    className="tlb-input w-full min-h-[120px] resize-y"
+                    placeholder="Describe the ambiance, facilities, and what makes it special..."
+                    value={description}
+                    onChange={e => setDescription(e.target.value)}
+                />
             </div>
 
+            {/* Category */}
             {categories.length > 0 && (
                 <div>
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">Category</label>
@@ -264,7 +316,6 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
                                         <Check size={12} className="text-white" />
                                     </div>
                                 )}
-                                {cat.icon && <span className="text-2xl">{cat.icon}</span>}
                                 <span className="text-xs font-bold text-gray-700 leading-tight">{cat.name}</span>
                             </button>
                         ))}
@@ -277,10 +328,11 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
                 </div>
             )}
 
+            {/* Subcategory */}
             {selectedCategory && selectedCategory.subcategories.length > 0 && (
                 <div>
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Sub-Category</label>
-                    <div className="relative group">
+                    <div className="relative">
                         <select
                             value={selectedSubcategoryId ?? ''}
                             onChange={e => setSelectedSubcategoryId(e.target.value ? Number(e.target.value) : null)}
@@ -296,17 +348,123 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
                 </div>
             )}
 
+            {/* Location Type */}
             <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Description</label>
-                <textarea
-                    className="tlb-input w-full min-h-[140px] resize-y"
-                    placeholder="Describe the ambiance, facilities, and why it's perfect for events..."
-                    value={description}
-                    onChange={e => setDescription(e.target.value)}
-                />
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Location Type <span className="text-gray-300 font-normal normal-case">(optional)</span></label>
+                <div className="flex flex-wrap gap-2">
+                    {LOCATION_TYPES.map(lt => (
+                        <button
+                            key={lt.value}
+                            onClick={() => setLocationType(locationType === lt.value ? '' : lt.value)}
+                            className={`px-3.5 py-2 rounded-full text-xs font-bold transition-all ${locationType === lt.value
+                                ? 'bg-amber-500 text-white shadow-sm'
+                                : 'bg-white border border-gray-200 text-gray-500 hover:border-amber-300'
+                            }`}
+                        >
+                            {lt.label}
+                        </button>
+                    ))}
+                </div>
             </div>
 
-            {/* Cover Image — always visible, auto-creates draft on first upload */}
+            {/* Location Fields */}
+            <div className="space-y-3">
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                    <MapPin size={12} /> Location
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                    <div>
+                        <input
+                            className="tlb-input w-full"
+                            placeholder="City *"
+                            maxLength={100}
+                            value={city}
+                            onChange={e => setCity(e.target.value)}
+                        />
+                    </div>
+                    <div>
+                        <input
+                            className="tlb-input w-full"
+                            placeholder="Area / Neighbourhood"
+                            maxLength={100}
+                            value={area}
+                            onChange={e => setArea(e.target.value)}
+                        />
+                    </div>
+                </div>
+                <textarea
+                    className="tlb-input w-full min-h-[80px] resize-y"
+                    placeholder="Full address (street, building, pincode) *"
+                    value={address}
+                    onChange={e => setAddress(e.target.value)}
+                />
+                <div className="grid grid-cols-2 gap-3">
+                    <input
+                        className="tlb-input w-full"
+                        placeholder="Latitude (optional)"
+                        value={latitude}
+                        onChange={e => setLatitude(e.target.value)}
+                    />
+                    <input
+                        className="tlb-input w-full"
+                        placeholder="Longitude (optional)"
+                        value={longitude}
+                        onChange={e => setLongitude(e.target.value)}
+                    />
+                </div>
+                <p className="text-[10px] text-gray-400">Coordinates enable geo-distance search for customers.</p>
+            </div>
+
+            {/* Age Range */}
+            <div>
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">Age Range <span className="text-gray-300 font-normal normal-case">(optional)</span></label>
+                <div className="flex items-center gap-3">
+                    <input
+                        type="number"
+                        min={0}
+                        placeholder="Min age"
+                        className="tlb-input w-full"
+                        value={minAge}
+                        onChange={e => setMinAge(e.target.value)}
+                    />
+                    <span className="text-gray-400 font-bold text-sm shrink-0">to</span>
+                    <input
+                        type="number"
+                        min={0}
+                        placeholder="Max age"
+                        className="tlb-input w-full"
+                        value={maxAge}
+                        onChange={e => setMaxAge(e.target.value)}
+                    />
+                    <span className="text-gray-400 font-bold text-sm shrink-0">yrs</span>
+                </div>
+            </div>
+
+            {/* Capacity */}
+            <div>
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">Guest Capacity <span className="text-gray-300 font-normal normal-case">(optional)</span></label>
+                <div className="flex items-center gap-3">
+                    <input
+                        type="number"
+                        min={1}
+                        placeholder="Min guests"
+                        className="tlb-input w-full"
+                        value={minCapacity}
+                        onChange={e => setMinCapacity(e.target.value)}
+                    />
+                    <span className="text-gray-400 font-bold text-sm shrink-0">–</span>
+                    <input
+                        type="number"
+                        min={1}
+                        placeholder="Max guests"
+                        className="tlb-input w-full"
+                        value={maxCapacity}
+                        onChange={e => setMaxCapacity(e.target.value)}
+                    />
+                </div>
+            </div>
+
+            {/* Cover Image */}
             <div>
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">
                     Cover Image <span className="text-red-400">*</span>
@@ -314,7 +472,7 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
                 <input ref={coverInputRef} type="file" accept="image/jpeg,image/png" className="hidden" onChange={handleCoverPick} />
                 {cover ? (
                     <div className="relative w-full sm:w-80 aspect-[16/9] rounded-2xl overflow-hidden border border-gray-200">
-                        <img src={resolveUrl(cover.file_url)} alt="Cover" className="w-full h-full object-cover" />
+                        <img src={resolveUrl(cover.url)} alt="Cover" className="w-full h-full object-cover" />
                         <button onClick={handleDeleteCover} className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-lg shadow text-red-500 hover:bg-white" aria-label="Remove cover">
                             <Trash2 size={14} />
                         </button>
@@ -340,7 +498,7 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
                 <div className="flex flex-wrap gap-3">
                     {gallery.map(g => (
                         <div key={g.id} className="relative w-24 h-24 rounded-2xl overflow-hidden border border-gray-200 group">
-                            <img src={resolveUrl(g.file_url)} alt="Gallery" className="w-full h-full object-cover" />
+                            <img src={resolveUrl(g.url)} alt="Gallery" className="w-full h-full object-cover" />
                             <button onClick={() => handleDeleteGallery(g.id)} className="absolute top-1 right-1 bg-white/90 p-1 rounded-md text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Remove image">
                                 <Trash2 size={12} />
                             </button>
@@ -367,7 +525,7 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
                         <div className="bg-amber-100 p-3 rounded-xl text-amber-500"><Play size={20} /></div>
                         <div className="flex-1 min-w-0">
                             <p className="text-sm font-bold truncate">Video uploaded</p>
-                            <a href={resolveUrl(video.file_url)} target="_blank" rel="noreferrer" className="text-[10px] text-amber-500 truncate block hover:underline">{video.file_url}</a>
+                            <a href={resolveUrl(video.url)} target="_blank" rel="noreferrer" className="text-[10px] text-amber-500 truncate block hover:underline">{video.url}</a>
                         </div>
                         <button onClick={handleDeleteVideo} className="text-red-500 p-2"><Trash2 size={16} /></button>
                     </div>
@@ -386,7 +544,7 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
 
             <WizardNavigation
                 onNext={handleNext}
-                nextText={saving ? 'Saving…' : 'Next: Occasions & Capacity'}
+                nextText={saving ? 'Saving…' : 'Next: Occasions & Discovery'}
                 nextIcon={saving ? <Loader2 size={20} className="animate-spin" /> : <ArrowRight size={20} />}
                 themeColor="amber"
             />

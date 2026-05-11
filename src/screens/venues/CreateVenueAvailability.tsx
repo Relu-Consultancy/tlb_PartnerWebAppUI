@@ -199,7 +199,10 @@ export const CreateVenueAvailability: React.FC<Props> = ({ onNavigate }) => {
 
             <WizardNavigation
                 onBack={() => onNavigate('CREATE_VENUE_OCCASIONS')}
-                onNext={() => onNavigate('CREATE_VENUE_PACKAGES')}
+                onNext={() => {
+                    if (slots.length === 0) { alert('Add at least one availability slot before continuing.'); return; }
+                    onNavigate('CREATE_VENUE_PACKAGES');
+                }}
                 nextText="Next: Packages & Pricing"
                 nextIcon={<ArrowRight size={20} />}
                 themeColor="amber"

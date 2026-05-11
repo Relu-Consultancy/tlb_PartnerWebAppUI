@@ -127,13 +127,13 @@ const ResultModal: React.FC<ResultModalProps> = ({ variant, message, onClose }) 
             <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-6"
                 style={{ backdropFilter: 'blur(6px)', backgroundColor: 'rgba(0,0,0,0.5)' }}>
                 <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden border-2 border-purple-400">
-                    <div className="bg-purple-50 px-6 pt-8 pb-6 flex flex-col items-center text-center gap-4">
+                    <div className="bg-blue-50 px-6 pt-8 pb-6 flex flex-col items-center text-center gap-4">
                         <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center border-4 border-purple-400 shadow-lg">
-                            <ShieldCheck size={36} className="text-purple-500" />
+                            <ShieldCheck size={36} className="text-blue-500" />
                         </div>
                         <div>
                             <h2 className="text-2xl font-black text-tlb-dark">Profile Under Review</h2>
-                            <p className="text-[10px] font-black text-purple-500 uppercase tracking-widest mt-1">
+                            <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mt-1">
                                 Draft Saved
                             </p>
                         </div>
@@ -299,7 +299,7 @@ export const CreateEventPreview: React.FC<Props> = ({ onNavigate }) => {
                 stepText="Step 4 of 4"
                 subtitle="Preview & Publish"
                 progressPercentage={100}
-                themeColor="purple"
+                themeColor="blue"
                 onBack={() => onNavigate('CREATE_EVENT_MEDIA')}
             >
                 <div className="flex items-center justify-center gap-2 text-gray-400 text-xs font-bold py-12">
@@ -316,7 +316,7 @@ export const CreateEventPreview: React.FC<Props> = ({ onNavigate }) => {
                 stepText="Step 4 of 4"
                 subtitle="Preview & Publish"
                 progressPercentage={100}
-                themeColor="purple"
+                themeColor="blue"
                 onBack={() => onNavigate('CREATE_EVENT_MEDIA')}
             >
                 <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-xs font-bold text-red-600">
@@ -332,7 +332,7 @@ export const CreateEventPreview: React.FC<Props> = ({ onNavigate }) => {
             stepText="Step 4 of 4"
             subtitle="Preview & Publish"
             progressPercentage={100}
-            themeColor="purple"
+            themeColor="blue"
             onBack={() => onNavigate('CREATE_EVENT_MEDIA')}
         >
             <div className="text-center space-y-1">
@@ -351,7 +351,7 @@ export const CreateEventPreview: React.FC<Props> = ({ onNavigate }) => {
                             <span className="text-xs font-bold mt-2">No cover image</span>
                         </div>
                     )}
-                    <div className="absolute top-3 left-3 bg-purple-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest flex items-center gap-1">
+                    <div className="absolute top-3 left-3 bg-blue-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest flex items-center gap-1">
                         <CalendarDays size={10} /> Event
                     </div>
                     <div className={`absolute top-3 right-3 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest ${
@@ -374,18 +374,18 @@ export const CreateEventPreview: React.FC<Props> = ({ onNavigate }) => {
                     <div className="flex items-start justify-between">
                         <div>
                             <h3 className="text-xl font-black">{event.title || 'Untitled Event'}</h3>
-                            <p className="text-[10px] font-bold text-purple-500 uppercase tracking-widest mt-0.5">
+                            <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mt-0.5">
                                 {event.category?.name || '—'} {event.subcategory && `› ${event.subcategory.name}`}
                             </p>
                         </div>
-                        <button onClick={() => onNavigate('CREATE_EVENT_DETAILS')} className="text-gray-400 hover:text-purple-500 p-1">
+                        <button onClick={() => onNavigate('CREATE_EVENT_DETAILS')} className="text-gray-400 hover:text-blue-500 p-1">
                             <Edit3 size={14} />
                         </button>
                     </div>
 
                     {event.format && (
                         <div className="flex flex-wrap gap-1.5">
-                            <span className="bg-purple-50 text-purple-600 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase">
+                            <span className="bg-blue-50 text-blue-600 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase">
                                 {event.format}
                             </span>
                         </div>
@@ -412,7 +412,7 @@ export const CreateEventPreview: React.FC<Props> = ({ onNavigate }) => {
                     {event.description && (
                         <div className="relative">
                             <p className="text-sm text-gray-600 leading-relaxed">{event.description}</p>
-                            <button onClick={() => onNavigate('CREATE_EVENT_DETAILS')} className="absolute -top-1 -right-1 text-gray-400 hover:text-purple-500 p-1">
+                            <button onClick={() => onNavigate('CREATE_EVENT_DETAILS')} className="absolute -top-1 -right-1 text-gray-400 hover:text-blue-500 p-1">
                                 <Edit3 size={12} />
                             </button>
                         </div>
@@ -429,13 +429,13 @@ export const CreateEventPreview: React.FC<Props> = ({ onNavigate }) => {
                     <div className="space-y-2">
                         <div className="flex items-center justify-between">
                             <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Schedule</p>
-                            <button onClick={() => onNavigate('CREATE_EVENT_SCHEDULE')} className="text-gray-400 hover:text-purple-500 p-1">
+                            <button onClick={() => onNavigate('CREATE_EVENT_SCHEDULE')} className="text-gray-400 hover:text-blue-500 p-1">
                                 <Edit3 size={12} />
                             </button>
                         </div>
                         <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <div className="bg-purple-100 p-1.5 rounded-lg text-purple-500"><Clock size={14} /></div>
+                                <div className="bg-blue-100 p-1.5 rounded-lg text-blue-500"><Clock size={14} /></div>
                                 <div>
                                     <p className="text-sm font-bold">{fmtDate(event.start_datetime)}</p>
                                     <p className="text-[11px] text-gray-400">to {fmtDate(event.end_datetime)}</p>
@@ -460,7 +460,7 @@ export const CreateEventPreview: React.FC<Props> = ({ onNavigate }) => {
                                             <p className="text-[11px] text-gray-400">{t.available_quantity}/{t.total_quantity} available</p>
                                         </div>
                                     </div>
-                                    <span className="text-sm font-black text-purple-600">
+                                    <span className="text-sm font-black text-blue-600">
                                         {t.price > 0 ? `₹${t.price}` : 'Free'}
                                     </span>
                                 </div>
@@ -511,7 +511,7 @@ export const CreateEventPreview: React.FC<Props> = ({ onNavigate }) => {
                 onNext={canSubmit && !submitting ? handleSubmit : () => {}}
                 nextText={submitting ? 'Submitting…' : event.status === 'draft' ? 'Submit for Review' : 'Done'}
                 nextIcon={submitting ? <Loader2 size={20} className="animate-spin" /> : <Rocket size={20} />}
-                themeColor="purple"
+                themeColor="blue"
             />
 
             {modal && (

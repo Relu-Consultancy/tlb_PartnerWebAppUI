@@ -169,7 +169,7 @@ export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => {
                 stepText="Step 3 of 4"
                 subtitle="Media"
                 progressPercentage={75}
-                themeColor="purple"
+                themeColor="blue"
                 onBack={() => onNavigate('CREATE_EVENT_SCHEDULE')}
             >
                 <div className="flex items-center justify-center gap-2 text-gray-400 text-xs font-bold py-12">
@@ -186,7 +186,7 @@ export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => {
                 stepText="Step 3 of 4"
                 subtitle="Media"
                 progressPercentage={75}
-                themeColor="purple"
+                themeColor="blue"
                 onBack={() => onNavigate('CREATE_EVENT_SCHEDULE')}
             >
                 <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-xs font-bold text-red-600">
@@ -202,7 +202,7 @@ export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => {
             stepText="Step 3 of 4"
             subtitle="Media"
             progressPercentage={75}
-            themeColor="purple"
+            themeColor="blue"
             onBack={() => onNavigate('CREATE_EVENT_SCHEDULE')}
         >
             <div className="space-y-1">
@@ -229,7 +229,7 @@ export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => {
                         <button
                             onClick={() => coverInputRef.current?.click()}
                             disabled={busyKind === 'cover'}
-                            className="absolute bottom-2 right-2 bg-white/90 px-3 py-1.5 rounded-lg shadow text-xs font-bold text-purple-600 hover:bg-white disabled:opacity-50"
+                            className="absolute bottom-2 right-2 bg-white/90 px-3 py-1.5 rounded-lg shadow text-xs font-bold text-blue-600 hover:bg-white disabled:opacity-50"
                         >
                             {busyKind === 'cover' ? 'Uploading…' : 'Change'}
                         </button>
@@ -238,11 +238,11 @@ export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => {
                     <button
                         onClick={() => coverInputRef.current?.click()}
                         disabled={busyKind === 'cover'}
-                        className="w-full sm:w-80 aspect-[16/9] bg-purple-50 rounded-2xl border-2 border-dashed border-purple-200 flex flex-col items-center justify-center text-purple-500 hover:bg-purple-100 transition-colors disabled:opacity-60"
+                        className="w-full sm:w-80 aspect-[16/9] bg-blue-50 rounded-2xl border-2 border-dashed border-blue-200 flex flex-col items-center justify-center text-blue-500 hover:bg-blue-100 transition-colors disabled:opacity-60"
                     >
                         {busyKind === 'cover' ? <Loader2 size={28} className="animate-spin" /> : <Camera size={28} />}
                         <span className="text-xs font-bold mt-2">{busyKind === 'cover' ? 'Uploading…' : 'Upload Cover'}</span>
-                        <span className="text-[10px] text-purple-400 mt-1">JPG/PNG · Max 5MB</span>
+                        <span className="text-[10px] text-blue-400 mt-1">JPG/PNG · Max 5MB</span>
                     </button>
                 )}
             </div>
@@ -277,7 +277,7 @@ export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => {
                         <button
                             onClick={() => galleryInputRef.current?.click()}
                             disabled={busyKind === 'gallery'}
-                            className="w-24 h-24 bg-purple-50 rounded-2xl border-2 border-dashed border-purple-200 flex flex-col items-center justify-center text-purple-500 hover:bg-purple-100 disabled:opacity-60"
+                            className="w-24 h-24 bg-blue-50 rounded-2xl border-2 border-dashed border-blue-200 flex flex-col items-center justify-center text-blue-500 hover:bg-blue-100 disabled:opacity-60"
                         >
                             {busyKind === 'gallery'
                                 ? <Loader2 size={20} className="animate-spin" />
@@ -297,10 +297,10 @@ export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => {
                 <input ref={videoInputRef} type="file" accept="video/mp4,video/quicktime" className="hidden" onChange={handleVideoPick} />
                 {video ? (
                     <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 flex items-center gap-3">
-                        <div className="bg-purple-100 p-3 rounded-xl text-purple-500"><Play size={20} /></div>
+                        <div className="bg-purple-100 p-3 rounded-xl text-blue-500"><Play size={20} /></div>
                         <div className="flex-1 min-w-0">
                             <p className="text-sm font-bold truncate">Video uploaded</p>
-                            <a href={resolveUrl(video.file_url)} target="_blank" rel="noreferrer" className="text-[10px] text-purple-500 truncate block hover:underline">
+                            <a href={resolveUrl(video.file_url)} target="_blank" rel="noreferrer" className="text-[10px] text-blue-500 truncate block hover:underline">
                                 {video.file_url}
                             </a>
                         </div>
@@ -334,7 +334,7 @@ export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => {
                 onNext={() => onNavigate('CREATE_EVENT_PREVIEW')}
                 nextText="Preview & Publish"
                 nextIcon={<ArrowRight size={18} />}
-                themeColor="purple"
+                themeColor="blue"
             />
         </WizardLayout>
     );

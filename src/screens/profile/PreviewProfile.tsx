@@ -198,7 +198,7 @@ export const PreviewProfile: React.FC<ProfileProps> = ({ onNavigate, onOpenSideb
                             <p className="text-sm text-gray-400">
                                 Your services will appear here once you create listings.
                             </p>
-                            <button onClick={() => onNavigate('CREATE_LISTING_IDENTITY')} className="mt-4 bg-tlb-yellow text-tlb-dark px-6 py-2 rounded-xl text-sm font-bold">
+                            <button onClick={() => onNavigate('CREATE_CLASS_IDENTITY')} className="mt-4 bg-tlb-yellow text-tlb-dark px-6 py-2 rounded-xl text-sm font-bold">
                                 Create Your First Listing
                             </button>
                         </div>

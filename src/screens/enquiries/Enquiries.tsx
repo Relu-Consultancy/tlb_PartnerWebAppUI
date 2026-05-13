@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { Menu, Search, Filter, Lock, Phone, MessageCircle, X, StickyNote, Inbox } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Menu, Search, Filter, Lock, Phone, MessageCircle, X, StickyNote, Inbox, Loader2 } from 'lucide-react';
 import { Screen, EnquiryStatus } from '../../types';
+import { getClassEnquiries, updateClassEnquiry, unlockClassEnquiry } from '../../api/listings';
 
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
 
 interface Lead {
-    id: string;
+    id: number;
     studentName: string;
     parentName?: string;
     batch: string;
@@ -23,17 +24,76 @@ export const Enquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
     const [leads, setLeads] = useState<Lead[]>([]);
     const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
     const [search, setSearch] = useState('');
+    const [isLoading, setIsLoading] = useState(true);
 
-    const unlockLead = (id: string) => {
-        setLeads(prev => prev.map(l => l.id === id ? { ...l, isUnlocked: true } : l));
+    useEffect(() => {
+        loadEnquiries();
+    }, []);
+
+    const loadEnquiries = async () => {
+        try {
+            setIsLoading(true);
+            const res = await getClassEnquiries();
+            // Map the API response fields to the UI interface format if necessary
+            // For now assuming the backend matches or we provide fallbacks
+            const formattedData = (res.data || []).map((item: any) => ({
+                id: item.id,
+                studentName: item.student_name || item.studentName || 'Unknown Student',
+                parentName: item.parent_name || item.parentName,
+                batch: item.batch_name || item.batch || 'General',
+                age: item.age || item.student_age || 'N/A',
+                dateTime: item.created_at ? new Date(item.created_at).toLocaleString() : (item.dateTime || ''),
+                contact: item.contact_number || item.contact || 'Hidden',
+                isUnlocked: !!item.is_unlocked || !!item.isUnlocked,
+                status: (item.status || 'New') as EnquiryStatus,
+                message: item.message,
+                area: item.area,
+                notes: item.internal_notes || item.notes || '',
+            }));
+            setLeads(formattedData);
+        } catch (e) {
+            console.error('Failed to load enquiries', e);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
-    const updateStatus = (id: string, status: EnquiryStatus) => {
-        setLeads(prev => prev.map(l => l.id === id ? { ...l, status } : l));
+    const unlockLead = async (id: number) => {
+        try {
+            await unlockClassEnquiry(id);
+            setLeads(prev => prev.map(l => l.id === id ? { ...l, isUnlocked: true } : l));
+            // Reload to get the actual contact info
+            loadEnquiries();
+        } catch (e) {
+            console.error('Failed to unlock lead', e);
+        }
     };
 
-    const updateNotes = (id: string, notes: string) => {
-        setLeads(prev => prev.map(l => l.id === id ? { ...l, notes } : l));
+    const updateStatus = async (id: number, status: EnquiryStatus) => {
+        try {
+            // Optimistic update
+            setLeads(prev => prev.map(l => l.id === id ? { ...l, status } : l));
+            await updateClassEnquiry(id, { status: status.toLowerCase() });
+            if (selectedLead && selectedLead.id === id) {
+                setSelectedLead({ ...selectedLead, status });
+            }
+        } catch (e) {
+            console.error('Failed to update status', e);
+            loadEnquiries(); // Revert on failure
+        }
+    };
+
+    const updateNotes = async (id: number, notes: string) => {
+        try {
+            setLeads(prev => prev.map(l => l.id === id ? { ...l, notes } : l));
+            await updateClassEnquiry(id, { internal_notes: notes });
+            if (selectedLead && selectedLead.id === id) {
+                setSelectedLead({ ...selectedLead, notes });
+            }
+        } catch (e) {
+            console.error('Failed to update notes', e);
+            loadEnquiries(); // Revert on failure
+        }
     };
 
     const sorted = [...leads]
@@ -74,7 +134,16 @@ export const Enquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
-                                {sorted.length === 0 ? (
+                                {isLoading ? (
+                                    <tr>
+                                        <td colSpan={6} className="px-6 py-16 text-center">
+                                            <div className="flex flex-col items-center justify-center text-gray-400">
+                                                <Loader2 size={32} className="animate-spin mb-3" />
+                                                <p className="text-sm font-bold">Loading enquiries...</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ) : sorted.length === 0 ? (
                                     <tr>
                                         <td colSpan={6} className="px-6 py-16 text-center">
                                             <div className="flex flex-col items-center gap-3 text-gray-300">

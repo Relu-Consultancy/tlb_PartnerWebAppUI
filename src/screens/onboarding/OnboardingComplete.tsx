@@ -44,7 +44,7 @@ export const OnboardingComplete: React.FC<OnboardingProps> = ({ onNavigate }) =>
                 <h3 className="font-black text-xl mb-6">Next Steps</h3>
                 <div className="space-y-4">
                     {[
-                        { icon: PlusCircle, title: 'Create Your First Listing', desc: 'Add a class to your storefront', screen: 'CREATE_LISTING_IDENTITY' },
+                        { icon: PlusCircle, title: 'Create Your First Listing', desc: 'Add a class to your storefront', screen: 'CREATE_CLASS_IDENTITY' },
                         { icon: UserCircle, title: 'Complete Your Profile', desc: 'Add photos and social media links', screen: 'BRAND_PROFILE' },
                         { icon: BarChart3, title: 'Explore Dashboard', desc: 'View performance and ticket sales', screen: 'HOME' }
                     ].map((item, i) => (

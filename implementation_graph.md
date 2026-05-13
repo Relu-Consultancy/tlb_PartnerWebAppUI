@@ -142,8 +142,11 @@ Request → 401 Unauthorized?
 | `createClassBatch` | POST | `/api/v1/partner/listings/classes/<id>/batches/` | Batch JSON | CreateClassBatch |
 | `updateClassBatch` | PUT | `/api/v1/partner/listings/classes/<id>/batches/<bid>/` | Batch JSON | CreateClassBatch |
 | `deleteClassBatch` | DELETE | `/api/v1/partner/listings/classes/<id>/batches/<bid>/` | — | CreateClassBatch |
+| `getClassMedia` | GET | `/api/v1/partner/listings/classes/<id>/media/` | — | CreateClassMedia |
 | `uploadClassMedia` | POST | `/api/v1/partner/listings/classes/<id>/media/` | FormData | CreateClassMedia |
 | `deleteClassMedia` | DELETE | `/api/v1/partner/listings/classes/<id>/media/<mid>/` | — | CreateClassMedia |
+
+> **Class batch payload:** `days` uses 3-letter abbreviations (`mon`, `tue`, `wed`, `thu`, `fri`, `sat`, `sun`); capacity field is `capacity` (not `total_seats`); no `start_date`/`end_date`/`fee` fields exist on this endpoint.
 
 **Enquiries (Classes):**
 
@@ -154,8 +157,37 @@ Request → 401 Unauthorized?
 | `updateClassEnquiry` | PUT | `/api/v1/partner/listings/classes/enquiries/<id>/` | `{ status, internal_notes }` | Enquiries |
 | `unlockClassEnquiry` | POST | `/api/v1/partner/listings/classes/enquiries/<id>/unlock/` | — | Enquiries |
 
+**Programs:**
+
+| Function | Method | Endpoint | Payload | Used By |
+|----------|--------|----------|---------|---------|
+| `getProgramListings` | GET | `/api/v1/partner/listings/programs/` | — | ServiceListings |
+| `getProgramListingDetail` | GET | `/api/v1/partner/listings/programs/<id>/` | — | Program wizard steps |
+| `createProgramDraft` | POST | `/api/v1/partner/listings/programs/` | `{ title, short_description?, description? }` | CreateProgramIdentity |
+| `updateProgramListing` | PATCH | `/api/v1/partner/listings/programs/<id>/` | Partial program fields | CreateProgramIdentity |
+| `deleteProgramListing` | DELETE | `/api/v1/partner/listings/programs/<id>/` | — | CreateProgramIdentity |
+| `submitProgramListing` | POST | `/api/v1/partner/listings/programs/<id>/submit/` | — | CreateProgramPreview |
+| `archiveProgramListing` | POST | `/api/v1/partner/listings/programs/<id>/archive/` | — | CreateProgramPreview |
+| `unarchiveProgramListing` | POST | `/api/v1/partner/listings/programs/<id>/unarchive/` | — | CreateProgramPreview |
+| `getProgramBatches` | GET | `/api/v1/partner/listings/programs/<id>/batches/` | — | CreateProgramBatch |
+| `createProgramBatch` | POST | `/api/v1/partner/listings/programs/<id>/batches/` | Batch JSON | CreateProgramBatch |
+| `updateProgramBatch` | PUT | `/api/v1/partner/listings/programs/<id>/batches/<bid>/` | Batch JSON | CreateProgramBatch |
+| `deleteProgramBatch` | DELETE | `/api/v1/partner/listings/programs/<id>/batches/<bid>/` | — | CreateProgramBatch |
+| `getProgramEnquiries` | GET | `/api/v1/partner/listings/programs/<id>/enquiries/` | — | ProgramEnquiries |
+| `updateProgramEnquiry` | PATCH | `/api/v1/partner/listings/programs/<id>/enquiries/<eid>/` | `{ status?, partner_note? }` | ProgramEnquiries |
+| `getProgramFaqs` | GET | `/api/v1/partner/listings/programs/<id>/faqs/` | — | CreateProgramBatch |
+| `createProgramFaq` | POST | `/api/v1/partner/listings/programs/<id>/faqs/` | `{ question, answer }` | CreateProgramBatch |
+| `updateProgramFaq` | PATCH | `/api/v1/partner/listings/programs/<id>/faqs/<fid>/` | `{ question?, answer? }` | CreateProgramBatch |
+| `deleteProgramFaq` | DELETE | `/api/v1/partner/listings/programs/<id>/faqs/<fid>/` | — | CreateProgramBatch |
+| `getProgramMedia` | GET | `/api/v1/partner/listings/programs/<id>/media/` | — | CreateProgramMedia |
+| `uploadProgramMedia` | POST | `/api/v1/partner/listings/programs/<id>/media/` | FormData | CreateProgramMedia |
+| `deleteProgramMedia` | DELETE | `/api/v1/partner/listings/programs/<id>/media/<mid>/` | — | CreateProgramMedia |
+
+> **Program enquiries are per-listing (not global):** `ProgramEnquiries.tsx` fetches all programs on mount, then loads `GET /api/v1/partner/listings/programs/<id>/enquiries/` for the selected program. A dropdown appears when more than one program exists.
+
 > **Venue media field:** `url` (not `file_url`) — response shape: `{ id, url, media_type }`  
-> **Venue detail response** includes all sub-resources inline: `media`, `availability`, `packages`, `discovery`, `occasions`, `required_attendee_fields` — Preview uses a single `getVenueListingDetail` call.
+> **Venue detail response** includes all sub-resources inline: `media`, `availability`, `packages`, `discovery`, `occasions`, `required_attendee_fields` — Preview uses a single `getVenueListingDetail` call.  
+> **Media field defensive handling:** `CreateClassMedia` and `CreateVenueDetails` resolve URLs via `getUrl(item) = resolveUrl(item.url || item.file_url || '')` to handle API field name variation across entity types.
 
 **Draft ID Helpers (sessionStorage):**
 
@@ -170,6 +202,9 @@ Request → 401 Unauthorized?
 | `getCurrentClassDraftId()` | `current_class_draft_id` | Read active class draft ID |
 | `setCurrentClassDraftId(id)` | `current_class_draft_id` | Save class draft ID after create |
 | `clearCurrentClassDraftId()` | `current_class_draft_id` | Clear on submit or cancel |
+| `getCurrentProgramDraftId()` | `current_program_draft_id` | Read active program draft ID |
+| `setCurrentProgramDraftId(id)` | `current_program_draft_id` | Save program draft ID after create |
+| `clearCurrentProgramDraftId()` | `current_program_draft_id` | Clear on submit or cancel |
 
 ### 2.4 Partner API (`src/api/onboarding.ts`)
 
@@ -242,6 +277,8 @@ Navigating to `LANDING` triggers `clearTokens()` + `sessionStorage.clear()`.
 | `pan_number` / `gst_number` | sessionStorage | IdentityVerification | BankSetup |
 | `current_event_draft_id` | sessionStorage | `setCurrentDraftId()` in Step 1 (or Edit action) | All 4 event wizard steps |
 | `current_venue_draft_id` | sessionStorage | `setCurrentVenueDraftId()` in Step 1 (or Edit action) | All 5 venue wizard steps |
+| `current_class_draft_id` | sessionStorage | `setCurrentClassDraftId()` in Step 1 (or Edit action) | All 5 class wizard steps |
+| `current_program_draft_id` | sessionStorage | `setCurrentProgramDraftId()` in Step 1 (or Edit action) | All 5 program wizard steps |
 
 > **Note:** `partner_is_active` and `verification_submitted` sessionStorage keys have been **removed**. The Dashboard derives all flags from the API `status` field.
 
@@ -393,11 +430,12 @@ All chart data reads from `dashboardData` API fields first, then falls back to z
 | `getEventListings()` | Fetches all event listings |
 | `getVenueListings()` | Fetches all venue listings |
 | `getClassListings()` | Fetches all class listings |
+| `getProgramListings()` | Fetches all program listings |
 
-Both calls run in parallel via `Promise.allSettled`. Items are tagged with `entityType` **at fetch time** (not derived from `listing_type`) — venues always get `'Venues'`, events always get `'Events'`, classes get `'Classes'`. Cover URL: events use `cover_url`, venues use `cover` — normalized as `item.cover_url || item.cover`.
+All four calls run in parallel via `Promise.allSettled`. Items are tagged with `entityType` **at fetch time** (not derived from `listing_type`) — venues always get `'Venues'`, events always get `'Events'`, classes get `'Classes'`, programs get `'Programs'`. Cover URL: events use `cover_url`, venues use `cover` — normalized as `item.cover_url || item.cover`.
 
-**Edit flow:** Clicking Edit on an Event sets `current_event_draft_id` + routes to `CREATE_EVENT_DETAILS`. Clicking Edit on a Venue sets `current_venue_draft_id` + routes to `CREATE_VENUE_DETAILS`. Edit on a Class sets `current_class_draft_id` + routes to `CREATE_CLASS_IDENTITY`. Edit is disabled **only** for `published` listings — `pending` (In Review), `draft`, and `rejected` are all editable.  
-**New listing:** `clearCurrentDraftId()`, `clearCurrentVenueDraftId()`, and `clearCurrentClassDraftId()` are called before navigating to any wizard start screen.
+**Edit flow:** Clicking Edit on an Event sets `current_event_draft_id` + routes to `CREATE_EVENT_DETAILS`. Clicking Edit on a Venue sets `current_venue_draft_id` + routes to `CREATE_VENUE_DETAILS`. Edit on a Class sets `current_class_draft_id` + routes to `CREATE_CLASS_IDENTITY`. Edit on a Program sets `current_program_draft_id` + routes to `CREATE_PROGRAM_IDENTITY`. Edit is disabled **only** for `published` listings — `pending` (In Review), `draft`, and `rejected` are all editable.  
+**New listing:** `clearCurrentDraftId()`, `clearCurrentVenueDraftId()`, `clearCurrentClassDraftId()`, and `clearCurrentProgramDraftId()` are called before navigating to any wizard start screen.
 
 **Listing card layout:** Status badge (`Draft` / `In Review` / `Live` / `Rejected`) rendered on the **right side** of each card header row, opposite the entity type badge. Status data is sourced from the `getListings()` API response `status` field.
 
@@ -435,18 +473,31 @@ Theme color: `amber`. All wizard screens use `themeColor="amber"`.
 | 4 | **CreateVenuePackages** | `getVenuePackages` (on mount); `createVenuePackage` or `updateVenuePackage` (dirty packages on Next); `deleteVenuePackage` (on Delete) | Package fields: `name` (required), `price`, `description`, `duration_minutes?`, `max_guests?`. Optional fields omitted from payload if blank or < 1. Dirty tracking: only changed packages are saved on Next. |
 | 5 | **CreateVenuePreview** | `getVenueListingDetail` (single call — returns all sub-resources inline) | Venue detail response includes `media`, `availability`, `packages`, `discovery`, `occasions`, `required_attendee_fields` — no extra fetches needed. Cover = `media.find(m => m.media_type === 'cover')`, gallery = `media.filter(m => m.media_type === 'gallery')`. Readiness check: `title`, `city`, `address`, `subcategory`. Submit → `clearCurrentVenueDraftId()` → navigate to `SERVICE_LISTINGS`. |
 
-### 6.9 Enquiries — `Enquiries.tsx` / `ProgramEnquiries.tsx`
+### 6.9 Class Creation Wizard (`src/screens/classes/`) — Steps 1–3 API-Integrated
 
-Both screens have **no mock data anymore**. `Enquiries` is fully API-integrated.
+Theme color: `yellow`. All wizard screens use `themeColor="yellow"`.
+
+| Step | Screen | API Calls | Key Behavior |
+|------|--------|-----------|--------------|
+| 1 | **CreateClassIdentity** | `getClassListingDetail` (on mount if draft exists); `createClassDraft` + `updateClassListing` (on Next) | Creates a real draft via `POST /classes/` on first Next click; stores ID via `setCurrentClassDraftId()`. Pre-fills from existing draft if `current_class_draft_id` is set. Tag selection is **single-select** (toggle — deselect by clicking again). Location shown only for Physical/Hybrid formats. |
+| 2 | **CreateClassBatch** | `getClassBatches` (on mount); `createClassBatch`, `updateClassBatch` (dirty batches on Next); `deleteClassBatch` (staged on delete, flushed on Next) | Day abbreviations: `mon/tue/wed/thu/fri/sat/sun`. Capacity field: `capacity`. No `start_date`/`end_date`/`fee`. Dirty-only saves on Next. |
+| 3 | **CreateClassMedia** | `getClassMedia` (on mount); `uploadClassMedia`, `deleteClassMedia` (immediate) | Cover (1, 5MB), gallery (up to 5, 5MB each), video (1, 100MB). Cover required warning shown if missing. Media URL resolved defensively: `item.url \|\| item.file_url`. |
+| 4 | **CreateClassPolicies** | — | Local state only — not yet API-integrated |
+| 5 | **CreateClassPreview** | — | Local state only — not yet API-integrated |
+
+### 6.10 Enquiries — `Enquiries.tsx` / `ProgramEnquiries.tsx`
+
+Both screens have **no mock data**. Both are fully API-integrated.
 
 | Field | Behaviour |
 |-------|-----------|
-| `leads` state | `Enquiries` populates from `/api/v1/partner/listings/classes/enquiries/` |
+| `leads` state (`Enquiries`) | Populates from `GET /api/v1/partner/listings/classes/enquiries/` |
+| `ProgramEnquiries` | Fetches all programs on mount; loads `GET .../programs/<id>/enquiries/` for selected program; dropdown when >1 program |
 | Empty state | Table body renders an Inbox icon + "No enquiries yet" across all columns |
 | Credits banner | Label reads "Credits Remaining" — no hardcoded number |
-| Unlock / Status / Notes | `Enquiries` hits `/unlock/` and `PUT` update endpoints |
+| Unlock / Status / Notes | `Enquiries` hits `/unlock/` and `PUT` update endpoints; `ProgramEnquiries` calls `updateProgramEnquiry(listingId, id, { status?, partner_note? })` |
 
-### 6.10 Financial Hub — `FinancialHub.tsx`
+### 6.11 Financial Hub — `FinancialHub.tsx`
 
 Partially API-integrated: bank account details are fetched from the partner profile.
 
@@ -466,13 +517,12 @@ Partially API-integrated: bank account details are fetched from the partner prof
 | Transaction History | Empty state ("No transactions yet") |
 | UPI ID | Modal UI only, no API |
 
-### 6.11 Screens NOT Yet API-Integrated
+### 6.12 Screens NOT Yet API-Integrated
 
 | Screen Group | Status | Notes |
 |-------------|--------|-------|
-| **Create Class** (5 steps) | Local state only | Awaiting class listing API endpoints |
-| **Create Program** (5 steps) | Local state only | Awaiting program listing API endpoints |
-| **Enquiries** / **ProgramEnquiries** | Empty state, no mock data | Awaiting enquiry API endpoints |
+| **Create Class** steps 4–5 (Policies, Preview) | Local state only | Steps 1–3 are integrated; submit endpoint not wired |
+| **Create Program** (5 steps) | Local state only | Programs API is in `listings.ts`; wizard screens not yet wired up |
 | **Attendees** | Empty state UI | No attendees API — mock data removed, starts with `[]` |
 | **Packages** | Placeholder UI | No packages API |
 | **FinancialHub** (transactions) | Empty state, no mock data | Bank details fetched; financial API pending |
@@ -570,8 +620,12 @@ classDiagram
 | HOME | ✅ | — | Dashboard | ✅ getCurrentPartner, getPartnerDashboard |
 | BRAND_PROFILE | ✅ | — | BrandProfile | ✅ Full profile CRUD |
 | PREVIEW_PROFILE | ✅ | — | PreviewProfile | ✅ Profile read |
-| SERVICE_LISTINGS | ✅ | — | ServiceListings | ✅ getEventListings + getVenueListings (tagged at fetch, parallel) |
-| CREATE_LISTING_* (5) | ✅/❌ | — | Class wizard | ❌ Local only |
+| SERVICE_LISTINGS | ✅ | — | ServiceListings | ✅ Parallel fetch: events + venues + classes + programs (tagged at fetch time) |
+| CREATE_CLASS_IDENTITY | ✅/❌ | Classes | CreateClassIdentity | ✅ createClassDraft + updateClassListing (theme: yellow) |
+| CREATE_CLASS_BATCH | ✅/❌ | Classes | CreateClassBatch | ✅ Batch CRUD — days=3-letter abbr, capacity field |
+| CREATE_CLASS_MEDIA | ✅/❌ | Classes | CreateClassMedia | ✅ Cover/gallery/video upload; getClassMedia on mount |
+| CREATE_CLASS_POLICIES | ✅/❌ | Classes | CreateClassPolicies | ❌ Local only |
+| CREATE_CLASS_PREVIEW | ✅/❌ | Classes | CreateClassPreview | ❌ Local only |
 | CREATE_EVENT_DETAILS | ✅/❌ | — | CreateEventDetails | ✅ Meta + draft create/update (theme: blue) |
 | CREATE_EVENT_SCHEDULE | ✅/❌ | — | CreateEventSchedule | ✅ Schedule + tickets CRUD (theme: blue) |
 | CREATE_EVENT_MEDIA | ✅/❌ | — | CreateEventMedia | ✅ Cover/gallery/video upload (theme: blue) |
@@ -581,9 +635,9 @@ classDiagram
 | CREATE_VENUE_AVAILABILITY | ✅/❌ | Venues | CreateVenueAvailability | ✅ Slot CRUD |
 | CREATE_VENUE_PACKAGES | ✅/❌ | Venues | CreateVenuePackages | ✅ Package CRUD |
 | CREATE_VENUE_PREVIEW | ✅/❌ | Venues | CreateVenuePreview | ✅ Single-call detail + submit |
-| CREATE_PROGRAM_* (5) | ✅/❌ | — | Program wizard | ❌ Local only |
-| ENQUIRIES | ✅ | Classes | Enquiries | ⏳ Empty state (no mock data) |
-| PROGRAM_ENQUIRIES | ✅ | Programs | ProgramEnquiries | ⏳ Empty state (no mock data) |
+| CREATE_PROGRAM_* (5) | ✅/❌ | Programs | Program wizard | ❌ Local only (API in listings.ts, wizard not wired) |
+| ENQUIRIES | ✅ | Classes | Enquiries | ✅ getClassEnquiries, unlock, status/notes PUT |
+| PROGRAM_ENQUIRIES | ✅ | Programs | ProgramEnquiries | ✅ getProgramListings → getProgramEnquiries per-listing, updateProgramEnquiry |
 | ATTENDEES | ✅ | — | Attendees | ❌ Placeholder |
 | PACKAGES | ✅ | — | Packages | ❌ Placeholder |
 | FINANCIAL_HUB | ✅ | — | FinancialHub | ⚡ Partial — bank details from `getCurrentPartner` |
@@ -611,6 +665,9 @@ classDiagram
 - **Venue Creation Wizard (5 steps)** — full lifecycle: draft create → location/capacity/media → occasions/discovery/attendee fields → availability slots → packages → preview + submit (theme: amber)
 - **Class Enquiries** — fully integrated with `getClassEnquiries`, `/unlock/`, and status/notes `PUT` endpoints.
 - **Classes listing endpoints** — All Class listing endpoints are now mapped and hitting the API correctly, using singular `/api/v1/partner/` base paths.
+- **Class Creation Wizard (steps 1–3)** — Identity screen now calls `createClassDraft` on first Next and stores draft ID; Batch screen uses real batch CRUD with correct day abbreviations and capacity field; Media screen fetches existing media on mount and uploads immediately.
+- **Programs API** — Full endpoint set added to `listings.ts`: listings CRUD, batches, enquiries (per-listing), FAQs, media, archive/unarchive, and draft ID helpers (`getCurrentProgramDraftId`, `setCurrentProgramDraftId`, `clearCurrentProgramDraftId`).
+- **ProgramEnquiries** — Fully integrated with per-listing pattern: loads all programs, shows dropdown for multi-program partners, fetches enquiries per selected program, supports status update and partner notes via `updateProgramEnquiry`.
 
 ### ⚡ Partially Integrated
 
@@ -618,10 +675,9 @@ classDiagram
 
 ### ⏳ UI Ready — Awaiting Backend Endpoints
 
-- **Enquiries** (`ENQUIRIES`) — full table + slide-out panel UI, starts empty; needs `GET /api/v1/partners/enquiries/`
-- **ProgramEnquiries** (`PROGRAM_ENQUIRIES`) — same pattern; needs `GET /api/v1/partners/program-enquiries/`
 - **FinancialHub** (transactions) — needs `GET /api/v1/partners/financial/transactions/`
-- Class/Program listing create/update/submit endpoints
+- **Class wizard steps 4–5** (Policies, Preview) — UI exists; submit flow not yet wired
+- **Program wizard** — All 5 steps are local state only; API is ready in `listings.ts`
 
 ### ⚠️ Needs Both UI and Backend
 
@@ -658,6 +714,12 @@ classDiagram
 - ❌ Edit button locked for `pending` + `published` → now only locked for `published`
 - ❌ Plural `partners` prefix in Listing API calls → fixed globally to singular `partner`
 - ❌ `ServiceListings` inside `services` directory managed Class creation flows → Moved class flows to `src/screens/classes/` and renamed files to `CreateClass*.tsx`
+- ❌ Dummy data in `CreateClassBatch` (hardcoded "Morning Batch") → replaced with real `getClassBatches` / `createClassBatch` / `updateClassBatch` / `deleteClassBatch`
+- ❌ Dummy data in `CreateClassMedia` (hardcoded picsum images) → replaced with real `getClassMedia` / `uploadClassMedia` / `deleteClassMedia`
+- ❌ `CreateClassIdentity` navigated to next step without any API call → now calls `createClassDraft` on first Next and `updateClassListing` on every Next, storing draft ID via `setCurrentClassDraftId()`
+- ❌ Class batch payload used wrong field names (`days_of_week` with full names, `total_seats`, extra `start_date`/`end_date`/`fee` fields) → corrected to `days` (3-letter abbr), `capacity`, no date/fee fields
+- ❌ `CreateClassMedia` and `CreateVenueDetails` broke when API returned `file_url` instead of `url` (or vice versa) → both now use `getUrl(item) = resolveUrl(item.url || item.file_url || '')` defensive helper
+- ❌ Class media API response parsed unsafely (assumed array) → now uses `Array.isArray(raw) ? raw : []`
 
 ---
 
@@ -717,4 +779,4 @@ npm run test:ui    # vitest --ui (browser UI)
 
 ---
 
-*Last updated: 2026-05-13 — Phase 9 (API path singularization `partner/`, Classes API endpoints, and Class Enquiry UI integration)*
+*Last updated: 2026-05-14 — Phase 10 (Programs API full endpoint set, Class wizard steps 1–3 API integration, ProgramEnquiries per-listing pattern, defensive media field handling)*

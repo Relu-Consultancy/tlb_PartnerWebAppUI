@@ -23,7 +23,7 @@ const entityConfig: Record<EntityType, { icon: any; subtitle: string; color: str
         subtitle: 'Recurring lessons & courses',
         color: 'text-blue-600',
         bg: 'bg-blue-50',
-        screen: 'CREATE_LISTING_IDENTITY',
+        screen: 'CREATE_CLASS_IDENTITY',
     },
     Programs: {
         icon: Users,

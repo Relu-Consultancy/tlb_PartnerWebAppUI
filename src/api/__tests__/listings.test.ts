@@ -120,7 +120,7 @@ describe('getEventListings', () => {
 
     it('accepts optional status filter', async () => {
         let capturedUrl = '';
-        server.use(http.get(`${BASE}/api/v1/partners/listings/events/`, ({ request }) => {
+        server.use(http.get(`${BASE}/api/v1/partner/listings/events/`, ({ request }) => {
             capturedUrl = request.url;
             return HttpResponse.json({ success: true, data: [] });
         }));
@@ -129,7 +129,7 @@ describe('getEventListings', () => {
     });
 
     it('throws ApiError on 401', async () => {
-        server.use(http.get(`${BASE}/api/v1/partners/listings/events/`, () =>
+        server.use(http.get(`${BASE}/api/v1/partner/listings/events/`, () =>
             HttpResponse.json({ error: { code: 'UNAUTHORIZED', message: 'Auth required' } }, { status: 401 })));
         await expect(getEventListings()).rejects.toBeInstanceOf(ApiError);
     });
@@ -147,7 +147,7 @@ describe('getListingDetail', () => {
     });
 
     it('throws ApiError with NOT_FOUND code on 404', async () => {
-        server.use(http.get(`${BASE}/api/v1/partners/listings/events/bad-id/`, () =>
+        server.use(http.get(`${BASE}/api/v1/partner/listings/events/bad-id/`, () =>
             HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Listing not found' } }, { status: 404 })));
         const err = await getListingDetail('bad-id').catch(e => e);
         expect(err).toBeInstanceOf(ApiError);
@@ -170,7 +170,7 @@ describe('createEventDraft', () => {
     });
 
     it('throws ApiError with INVALID_PARTNER_STATE on 403', async () => {
-        server.use(http.post(`${BASE}/api/v1/partners/listings/events/`, () =>
+        server.use(http.post(`${BASE}/api/v1/partner/listings/events/`, () =>
             HttpResponse.json({ error: { code: 'INVALID_PARTNER_STATE', message: 'Partner not activated' } }, { status: 403 })));
         const err = await createEventDraft({ title: 'Test' }).catch(e => e);
         expect(err).toBeInstanceOf(ApiError);
@@ -178,7 +178,7 @@ describe('createEventDraft', () => {
     });
 
     it('throws ApiError with EVENTS_CATEGORY_NOT_SELECTED on 403', async () => {
-        server.use(http.post(`${BASE}/api/v1/partners/listings/events/`, () =>
+        server.use(http.post(`${BASE}/api/v1/partner/listings/events/`, () =>
             HttpResponse.json({ error: { code: 'EVENTS_CATEGORY_NOT_SELECTED', message: 'Select Events category first' } }, { status: 403 })));
         const err = await createEventDraft({}).catch(e => e);
         expect(err.code).toBe('EVENTS_CATEGORY_NOT_SELECTED');
@@ -188,7 +188,7 @@ describe('createEventDraft', () => {
 describe('updateListing', () => {
     it('sends payload and returns updated draft', async () => {
         let captured: any = null;
-        server.use(http.patch(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/`, async ({ request }) => {
+        server.use(http.patch(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, async ({ request }) => {
             captured = await request.json();
             return HttpResponse.json({ success: true, data: { ...mockDraft, title: 'Updated' } });
         }));
@@ -199,7 +199,7 @@ describe('updateListing', () => {
     });
 
     it('throws ApiError with VALIDATION_ERROR on 400', async () => {
-        server.use(http.patch(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/`, () =>
+        server.use(http.patch(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, () =>
             HttpResponse.json({ error: { code: 'VALIDATION_ERROR', message: 'end_datetime must be after start_datetime' } }, { status: 400 })));
         const err = await updateListing(DRAFT_ID, { end_datetime: '2020-01-01T00:00:00Z' }).catch(e => e);
         expect(err).toBeInstanceOf(ApiError);
@@ -207,7 +207,7 @@ describe('updateListing', () => {
     });
 
     it('throws ApiError with LISTING_LOCKED on 400', async () => {
-        server.use(http.patch(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/`, () =>
+        server.use(http.patch(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, () =>
             HttpResponse.json({ error: { code: 'LISTING_LOCKED', message: 'Listing is pending' } }, { status: 400 })));
         const err = await updateListing(DRAFT_ID, { title: 'x' }).catch(e => e);
         expect(err.code).toBe('LISTING_LOCKED');
@@ -222,7 +222,7 @@ describe('submitListing', () => {
     });
 
     it('throws ApiError with PARTNER_UNDER_REVIEW on 403', async () => {
-        server.use(http.post(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/submit/`, () =>
+        server.use(http.post(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/submit/`, () =>
             HttpResponse.json({ error: { code: 'PARTNER_UNDER_REVIEW', message: 'Your profile is under review' } }, { status: 403 })));
         const err = await submitListing(DRAFT_ID).catch(e => e);
         expect(err).toBeInstanceOf(ApiError);
@@ -231,7 +231,7 @@ describe('submitListing', () => {
     });
 
     it('throws ApiError with INCOMPLETE_EVENT (NOT under_review) on 400', async () => {
-        server.use(http.post(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/submit/`, () =>
+        server.use(http.post(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/submit/`, () =>
             HttpResponse.json({ error: { code: 'INCOMPLETE_EVENT', message: 'Missing: cover image, category' } }, { status: 400 })));
         const err = await submitListing(DRAFT_ID).catch(e => e);
         expect(err).toBeInstanceOf(ApiError);
@@ -240,7 +240,7 @@ describe('submitListing', () => {
     });
 
     it('throws ApiError with LISTING_LOCKED when already pending', async () => {
-        server.use(http.post(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/submit/`, () =>
+        server.use(http.post(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/submit/`, () =>
             HttpResponse.json({ error: { code: 'LISTING_LOCKED', message: 'Already pending' } }, { status: 400 })));
         const err = await submitListing(DRAFT_ID).catch(e => e);
         expect(err.code).toBe('LISTING_LOCKED');
@@ -257,7 +257,7 @@ describe('uploadListingMedia', () => {
 
     it('uploads cover and returns media item', async () => {
         let capturedType = '';
-        server.use(http.post(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/media/`, async ({ request }) => {
+        server.use(http.post(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/media/`, async ({ request }) => {
             const form = await request.formData();
             capturedType = form.get('media_type') as string;
             return HttpResponse.json({ success: true, data: { id: 99, media_type: 'cover', file_url: 'https://example.com/c.jpg', created_at: '' } }, { status: 201 });
@@ -268,7 +268,7 @@ describe('uploadListingMedia', () => {
     });
 
     it('throws ApiError with COVER_ALREADY_EXISTS when cover exists', async () => {
-        server.use(http.post(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/media/`, () =>
+        server.use(http.post(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/media/`, () =>
             HttpResponse.json({ error: { code: 'COVER_ALREADY_EXISTS', message: 'Delete existing cover first' } }, { status: 400 })));
         const err = await uploadListingMedia(DRAFT_ID, makeFile(), 'cover').catch(e => e);
         expect(err).toBeInstanceOf(ApiError);
@@ -276,14 +276,14 @@ describe('uploadListingMedia', () => {
     });
 
     it('throws ApiError with GALLERY_LIMIT_EXCEEDED', async () => {
-        server.use(http.post(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/media/`, () =>
+        server.use(http.post(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/media/`, () =>
             HttpResponse.json({ error: { code: 'GALLERY_LIMIT_EXCEEDED', message: 'Max 10 gallery images' } }, { status: 400 })));
         const err = await uploadListingMedia(DRAFT_ID, makeFile(), 'gallery').catch(e => e);
         expect(err.code).toBe('GALLERY_LIMIT_EXCEEDED');
     });
 
     it('throws ApiError with INVALID_FILE_FORMAT', async () => {
-        server.use(http.post(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/media/`, () =>
+        server.use(http.post(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/media/`, () =>
             HttpResponse.json({ error: { code: 'INVALID_FILE_FORMAT', message: 'Only JPG/PNG allowed' } }, { status: 400 })));
         const err = await uploadListingMedia(DRAFT_ID, makeFile('doc.pdf', 'application/pdf'), 'gallery').catch(e => e);
         expect(err.code).toBe('INVALID_FILE_FORMAT');
@@ -297,14 +297,14 @@ describe('deleteListingMedia', () => {
     });
 
     it('returns empty object on 200 with no body', async () => {
-        server.use(http.delete(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/media/:mediaId`, () =>
+        server.use(http.delete(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/media/:mediaId`, () =>
             HttpResponse.json({})));
         const res = await deleteListingMedia(DRAFT_ID, 55);
         expect(res).toBeDefined();
     });
 
     it('throws ApiError on 404', async () => {
-        server.use(http.delete(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/media/:mediaId`, () =>
+        server.use(http.delete(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/media/:mediaId`, () =>
             HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Media not found' } }, { status: 404 })));
         const err = await deleteListingMedia(DRAFT_ID, 999).catch(e => e);
         expect(err.code).toBe('NOT_FOUND');
@@ -316,7 +316,7 @@ describe('deleteListingMedia', () => {
 describe('createTicket', () => {
     it('creates ticket and returns it', async () => {
         let captured: any = null;
-        server.use(http.post(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/tickets/`, async ({ request }) => {
+        server.use(http.post(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/tickets/`, async ({ request }) => {
             captured = await request.json();
             return HttpResponse.json({ success: true, data: { id: 10, name: 'General', price: 499, total_quantity: 50, available_quantity: 50, description: '', is_default: false, created_at: '' } }, { status: 201 });
         }));
@@ -327,14 +327,14 @@ describe('createTicket', () => {
     });
 
     it('throws ApiError with FREE_EVENT_NO_MANUAL_TICKETS on free event', async () => {
-        server.use(http.post(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/tickets/`, () =>
+        server.use(http.post(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/tickets/`, () =>
             HttpResponse.json({ error: { code: 'FREE_EVENT_NO_MANUAL_TICKETS', message: 'Cannot add tickets to a free event' } }, { status: 400 })));
         const err = await createTicket(DRAFT_ID, { name: 'X', price: 0, total_quantity: 10 }).catch(e => e);
         expect(err.code).toBe('FREE_EVENT_NO_MANUAL_TICKETS');
     });
 
     it('throws ApiError with LISTING_LOCKED', async () => {
-        server.use(http.post(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/tickets/`, () =>
+        server.use(http.post(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/tickets/`, () =>
             HttpResponse.json({ error: { code: 'LISTING_LOCKED', message: 'Listing is not editable' } }, { status: 400 })));
         const err = await createTicket(DRAFT_ID, { name: 'X', price: 100, total_quantity: 5 }).catch(e => e);
         expect(err.code).toBe('LISTING_LOCKED');
@@ -344,7 +344,7 @@ describe('createTicket', () => {
 describe('updateTicket', () => {
     it('sends partial update payload', async () => {
         let captured: any = null;
-        server.use(http.put(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/tickets/:ticketId`, async ({ request }) => {
+        server.use(http.put(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/tickets/:ticketId`, async ({ request }) => {
             captured = await request.json();
             return HttpResponse.json({ success: true, data: {} });
         }));
@@ -354,7 +354,7 @@ describe('updateTicket', () => {
     });
 
     it('throws ApiError with INVALID_TICKET_QUANTITY', async () => {
-        server.use(http.put(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/tickets/:ticketId`, () =>
+        server.use(http.put(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/tickets/:ticketId`, () =>
             HttpResponse.json({ error: { code: 'INVALID_TICKET_QUANTITY', message: 'available_quantity exceeds total' } }, { status: 400 })));
         const err = await updateTicket(DRAFT_ID, 1, { available_quantity: 999 }).catch(e => e);
         expect(err.code).toBe('INVALID_TICKET_QUANTITY');
@@ -368,7 +368,7 @@ describe('deleteTicket', () => {
     });
 
     it('throws ApiError with CANNOT_DELETE_LAST_TICKET', async () => {
-        server.use(http.delete(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/tickets/:ticketId`, () =>
+        server.use(http.delete(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/tickets/:ticketId`, () =>
             HttpResponse.json({ error: { code: 'CANNOT_DELETE_LAST_TICKET', message: 'Must keep at least 1 ticket' } }, { status: 400 })));
         const err = await deleteTicket(DRAFT_ID, 1).catch(e => e);
         expect(err.code).toBe('CANNOT_DELETE_LAST_TICKET');

@@ -1,7 +1,7 @@
 import { apiClient } from './client';
 
 export const getPartnerCategories = async () => {
-    const response = await apiClient('/api/v1/partners/categories/');
+    const response = await apiClient('/api/v1/partner/categories/');
     if (!response.ok) {
         const err = await response.json().catch(() => null);
         throw new Error(err?.error?.message || err?.message || 'Failed to load categories');
@@ -10,7 +10,7 @@ export const getPartnerCategories = async () => {
 };
 
 export const getPartnerMedia = async () => {
-    const response = await apiClient('/api/v1/partners/media/');
+    const response = await apiClient('/api/v1/partner/media/');
     if (!response.ok) {
         const err = await response.json().catch(() => null);
         throw new Error(err?.error?.message || err?.message || 'Failed to load media');
@@ -23,7 +23,7 @@ export const uploadPartnerMedia = async (file: File, media_type: 'image' | 'vide
     formData.append('file', file);
     formData.append('media_type', media_type);
     
-    const response = await apiClient('/api/v1/partners/media/', {
+    const response = await apiClient('/api/v1/partner/media/', {
         method: 'POST',
         body: formData,
     });
@@ -35,7 +35,7 @@ export const uploadPartnerMedia = async (file: File, media_type: 'image' | 'vide
 };
 
 export const deletePartnerMedia = async (media_id: number) => {
-    const response = await apiClient(`/api/v1/partners/media/${media_id}/`, {
+    const response = await apiClient(`/api/v1/partner/media/${media_id}/`, {
         method: 'DELETE',
     });
     if (!response.ok) {
@@ -46,7 +46,7 @@ export const deletePartnerMedia = async (media_id: number) => {
 };
 
 export const getBusinessProfile = async () => {
-    const response = await apiClient('/api/v1/partners/profile/');
+    const response = await apiClient('/api/v1/partner/profile/');
     if (!response.ok) {
         const err = await response.json().catch(() => null);
         throw new Error(err?.error?.message || err?.message || 'Failed to load profile');
@@ -55,7 +55,7 @@ export const getBusinessProfile = async () => {
 };
 
 export const updateBusinessProfile = async (data: any) => {
-    const response = await apiClient('/api/v1/partners/profile/', {
+    const response = await apiClient('/api/v1/partner/profile/', {
         method: 'POST',
         body: JSON.stringify(data),
     });
@@ -70,7 +70,7 @@ export const updateBusinessProfile = async (data: any) => {
 };
 
 export const selectCategories = async (categories: string[]) => {
-    const response = await apiClient('/api/v1/partners/select-categories/', {
+    const response = await apiClient('/api/v1/partner/select-categories/', {
         method: 'POST',
         body: JSON.stringify({ categories }),
     });
@@ -82,7 +82,7 @@ export const selectCategories = async (categories: string[]) => {
 };
 
 export const getPartnerDashboard = async () => {
-    const response = await apiClient('/api/v1/partners/dashboard/');
+    const response = await apiClient('/api/v1/partner/dashboard/');
     if (!response.ok) {
         const err = await response.json().catch(() => null);
         throw new Error(err?.error?.message || err?.message || 'Failed to load dashboard');
@@ -91,7 +91,7 @@ export const getPartnerDashboard = async () => {
 };
 
 export const getCurrentPartner = async () => {
-    const response = await apiClient('/api/v1/partners/me/');
+    const response = await apiClient('/api/v1/partner/me/');
     if (!response.ok) {
         const err = await response.json().catch(() => null);
         throw new Error(err?.error?.message || err?.message || 'Failed to load partner profile');
@@ -100,7 +100,7 @@ export const getCurrentPartner = async () => {
 };
 
 export const getExtendedProfile = async () => {
-    const response = await apiClient('/api/v1/partners/extended-profile/');
+    const response = await apiClient('/api/v1/partner/extended-profile/');
     if (!response.ok) {
         const err = await response.json().catch(() => null);
         throw new Error(err?.error?.message || err?.message || 'Failed to load extended profile');
@@ -109,7 +109,7 @@ export const getExtendedProfile = async () => {
 };
 
 export const updateExtendedProfile = async (formData: FormData) => {
-    const response = await apiClient('/api/v1/partners/extended-profile/', {
+    const response = await apiClient('/api/v1/partner/extended-profile/', {
         method: 'POST',
         body: formData,
     });
@@ -121,7 +121,7 @@ export const updateExtendedProfile = async (formData: FormData) => {
 };
 
 export const activatePartner = async () => {
-    const response = await apiClient('/api/v1/partners/activate/', {
+    const response = await apiClient('/api/v1/partner/activate/', {
         method: 'POST',
         body: JSON.stringify({ is_active: true }),
     });
@@ -133,7 +133,7 @@ export const activatePartner = async () => {
 };
 
 export const submitVerification = async (data: any) => {
-    const response = await apiClient('/api/v1/partners/verification/', {
+    const response = await apiClient('/api/v1/partner/verification/', {
         method: 'POST',
         body: JSON.stringify(data),
     });

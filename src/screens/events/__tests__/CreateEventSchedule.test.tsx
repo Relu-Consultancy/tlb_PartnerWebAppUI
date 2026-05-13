@@ -33,7 +33,7 @@ describe('CreateEventSchedule — loading and error states', () => {
 
     it('shows error message on API failure', async () => {
         setCurrentDraftId(DRAFT_ID);
-        server.use(http.get(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/`, () =>
+        server.use(http.get(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, () =>
             HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Listing not found' } }, { status: 404 })));
         render(<CreateEventSchedule {...props} />);
         await waitFor(() =>
@@ -152,7 +152,7 @@ describe('CreateEventSchedule — Next navigation', () => {
     it('calls updateListing and navigates to CREATE_EVENT_MEDIA', async () => {
         setCurrentDraftId(DRAFT_ID);
         let updateCalled = false;
-        server.use(http.patch(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/`, () => {
+        server.use(http.patch(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, () => {
             updateCalled = true;
             return HttpResponse.json({ success: true, data: {} });
         }));
@@ -167,7 +167,7 @@ describe('CreateEventSchedule — Next navigation', () => {
     it('shows error alert on API failure', async () => {
         setCurrentDraftId(DRAFT_ID);
         const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
-        server.use(http.patch(`${BASE}/api/v1/partners/listings/events/${DRAFT_ID}/`, () =>
+        server.use(http.patch(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, () =>
             HttpResponse.json({ error: { code: 'LISTING_LOCKED', message: 'Listing is locked' } }, { status: 400 })));
         const user = userEvent.setup();
         render(<CreateEventSchedule {...props} />);

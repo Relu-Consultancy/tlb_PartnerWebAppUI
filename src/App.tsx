@@ -40,11 +40,11 @@ const PreviewProfile = lazyImport(() => import('./screens/profile'), 'PreviewPro
 
 // Services / Class creation screens
 const ServiceListings = lazyImport(() => import('./screens/services'), 'ServiceListings');
-const CreateListingIdentity = lazyImport(() => import('./screens/services'), 'CreateListingIdentity');
-const CreateListingBatch = lazyImport(() => import('./screens/services'), 'CreateListingBatch');
-const CreateListingMedia = lazyImport(() => import('./screens/services'), 'CreateListingMedia');
-const CreateListingPolicies = lazyImport(() => import('./screens/services'), 'CreateListingPolicies');
-const CreateListingPreview = lazyImport(() => import('./screens/services'), 'CreateListingPreview');
+const CreateClassIdentity = lazyImport(() => import('./screens/classes'), 'CreateClassIdentity');
+const CreateClassBatch = lazyImport(() => import('./screens/classes'), 'CreateClassBatch');
+const CreateClassMedia = lazyImport(() => import('./screens/classes'), 'CreateClassMedia');
+const CreateClassPolicies = lazyImport(() => import('./screens/classes'), 'CreateClassPolicies');
+const CreateClassPreview = lazyImport(() => import('./screens/classes'), 'CreateClassPreview');
 
 // Event creation screens
 const CreateEventDetails = lazyImport(() => import('./screens/events'), 'CreateEventDetails');
@@ -109,11 +109,11 @@ const routes: Record<Screen, RouteConfig> = {
 
   // Services / Listings — has sidebar
   SERVICE_LISTINGS: { component: ServiceListings, hasSidebar: true },
-  CREATE_LISTING_IDENTITY: { component: CreateListingIdentity, hasSidebar: true },
-  CREATE_LISTING_BATCH: { component: CreateListingBatch, hasSidebar: true },
-  CREATE_LISTING_MEDIA: { component: CreateListingMedia, hasSidebar: true },
-  CREATE_LISTING_POLICIES: { component: CreateListingPolicies, hasSidebar: true },
-  CREATE_LISTING_PREVIEW: { component: CreateListingPreview, hasSidebar: false },
+  CREATE_CLASS_IDENTITY: { component: CreateClassIdentity, hasSidebar: true },
+  CREATE_CLASS_BATCH: { component: CreateClassBatch, hasSidebar: true },
+  CREATE_CLASS_MEDIA: { component: CreateClassMedia, hasSidebar: true },
+  CREATE_CLASS_POLICIES: { component: CreateClassPolicies, hasSidebar: true },
+  CREATE_CLASS_PREVIEW: { component: CreateClassPreview, hasSidebar: false },
 
   // Event creation — has sidebar
   CREATE_EVENT_DETAILS: { component: CreateEventDetails, hasSidebar: true },

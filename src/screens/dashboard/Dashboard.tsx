@@ -291,9 +291,9 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
       if (e === 'Events') onNavigate('CREATE_EVENT_DETAILS');
       else if (e === 'Venues') onNavigate('CREATE_VENUE_DETAILS');
       else if (e === 'Programs') onNavigate('CREATE_PROGRAM_IDENTITY');
-      else onNavigate('CREATE_LISTING_IDENTITY');
+      else onNavigate('CREATE_CLASS_IDENTITY');
     } else if (allowedEntities.length > 1) setShowEntityPicker(true);
-    else onNavigate('CREATE_LISTING_IDENTITY');
+    else onNavigate('CREATE_CLASS_IDENTITY');
   };
 
   const ctaLabel = (() => {

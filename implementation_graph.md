@@ -25,7 +25,8 @@ src/
 │   ├── onboarding/         # Registration, AppSubmitted, AppApproved, AgreementSubmit, IdentityVerification, BankSetup, OnboardingComplete
 │   ├── dashboard/          # Dashboard (Home)
 │   ├── profile/            # BrandProfile (EditProfile), PreviewProfile
-│   ├── services/           # ServiceListings, CreateListing* (5 steps)
+│   ├── services/           # ServiceListings (shared dashboard for all entities)
+│   ├── classes/            # CreateClass* (5 steps)
 │   ├── events/             # CreateEvent* (4 steps) + __tests__/
 │   ├── programs/           # CreateProgram* (5 steps)
 │   ├── venues/             # CreateVenue* (5 steps)
@@ -89,18 +90,18 @@ Request → 401 Unauthorized?
 | `getEventMetaCategories` | GET | `/api/v1/listings/events/metadata/categories/` | — | CreateEventDetails |
 | `getEventMetaFormats` | GET | `/api/v1/listings/events/metadata/formats/` | — | CreateEventDetails |
 | `getEventMetaAgeGroups` | GET | `/api/v1/listings/events/metadata/age-groups/` | — | CreateEventDetails |
-| `getEventListings` | GET | `/api/v1/partners/listings/events/` | — | ServiceListings |
-| `getListingDetail` | GET | `/api/v1/partners/listings/events/<id>/` | — | All event wizard steps, Preview |
-| `createEventDraft` | POST | `/api/v1/partners/listings/events/` | `{ title?, description? }` | CreateEventDetails (Step 1) |
-| `updateListing` | PATCH | `/api/v1/partners/listings/events/<id>/` | Partial event fields | Steps 1 & 2 |
-| `submitListing` | POST | `/api/v1/partners/listings/events/<id>/submit/` | — | CreateEventPreview (Step 4) |
-| `getListingMedia` | GET | `/api/v1/partners/listings/events/<id>/media/` | — | CreateEventMedia |
-| `uploadListingMedia` | POST | `/api/v1/partners/listings/events/<id>/media/` | FormData (file, media_type) | CreateEventMedia |
-| `deleteListingMedia` | DELETE | `/api/v1/partners/listings/events/<id>/media/<mid>/` | — | CreateEventMedia |
-| `getTickets` | GET | `/api/v1/partners/listings/events/<id>/tickets/` | — | CreateEventSchedule |
-| `createTicket` | POST | `/api/v1/partners/listings/events/<id>/tickets/` | `{ name, price, total_quantity, description? }` | CreateEventSchedule |
-| `updateTicket` | PUT | `/api/v1/partners/listings/events/<id>/tickets/<tid>/` | Partial ticket fields | CreateEventSchedule |
-| `deleteTicket` | DELETE | `/api/v1/partners/listings/events/<id>/tickets/<tid>/` | — | CreateEventSchedule |
+| `getEventListings` | GET | `/api/v1/partner/listings/events/` | — | ServiceListings |
+| `getListingDetail` | GET | `/api/v1/partner/listings/events/<id>/` | — | All event wizard steps, Preview |
+| `createEventDraft` | POST | `/api/v1/partner/listings/events/` | `{ title?, description? }` | CreateEventDetails (Step 1) |
+| `updateListing` | PATCH | `/api/v1/partner/listings/events/<id>/` | Partial event fields | Steps 1 & 2 |
+| `submitListing` | POST | `/api/v1/partner/listings/events/<id>/submit/` | — | CreateEventPreview (Step 4) |
+| `getListingMedia` | GET | `/api/v1/partner/listings/events/<id>/media/` | — | CreateEventMedia |
+| `uploadListingMedia` | POST | `/api/v1/partner/listings/events/<id>/media/` | FormData (file, media_type) | CreateEventMedia |
+| `deleteListingMedia` | DELETE | `/api/v1/partner/listings/events/<id>/media/<mid>/` | — | CreateEventMedia |
+| `getTickets` | GET | `/api/v1/partner/listings/events/<id>/tickets/` | — | CreateEventSchedule |
+| `createTicket` | POST | `/api/v1/partner/listings/events/<id>/tickets/` | `{ name, price, total_quantity, description? }` | CreateEventSchedule |
+| `updateTicket` | PUT | `/api/v1/partner/listings/events/<id>/tickets/<tid>/` | Partial ticket fields | CreateEventSchedule |
+| `deleteTicket` | DELETE | `/api/v1/partner/listings/events/<id>/tickets/<tid>/` | — | CreateEventSchedule |
 
 > **Event media field:** `file_url` (not `url`) — response shape: `{ id, file_url, media_type }`
 
@@ -108,24 +109,50 @@ Request → 401 Unauthorized?
 
 | Function | Method | Endpoint | Payload | Used By |
 |----------|--------|----------|---------|---------|
-| `getVenueListings` | GET | `/api/v1/partners/listings/venues/` | — | ServiceListings |
-| `getVenueListingDetail` | GET | `/api/v1/partners/listings/venues/<id>/` | — | All venue wizard steps, Preview |
-| `createVenueListing` | POST | `/api/v1/partners/listings/venues/` | `{ title }` | CreateVenueDetails (Step 1) |
-| `updateVenueListing` | PATCH | `/api/v1/partners/listings/venues/<id>/` | Partial venue fields | Steps 1 & 2 |
-| `uploadVenueMedia` | POST | `/api/v1/partners/listings/venues/<id>/media/` | FormData (file, media_type) | CreateVenueDetails |
-| `deleteVenueMedia` | DELETE | `/api/v1/partners/listings/venues/<id>/media/<mid>/` | — | CreateVenueDetails |
+| `getVenueListings` | GET | `/api/v1/partner/listings/venues/` | — | ServiceListings |
+| `getVenueListingDetail` | GET | `/api/v1/partner/listings/venues/<id>/` | — | All venue wizard steps, Preview |
+| `createVenueListing` | POST | `/api/v1/partner/listings/venues/` | `{ title }` | CreateVenueDetails (Step 1) |
+| `updateVenueListing` | PATCH | `/api/v1/partner/listings/venues/<id>/` | Partial venue fields | Steps 1 & 2 |
+| `uploadVenueMedia` | POST | `/api/v1/partner/listings/venues/<id>/media/` | FormData (file, media_type) | CreateVenueDetails |
+| `deleteVenueMedia` | DELETE | `/api/v1/partner/listings/venues/<id>/media/<mid>/` | — | CreateVenueDetails |
 | `getVenueMetaOccasions` | GET | `/api/v1/listings/venues/meta/occasions/` | — | CreateVenueOccasions |
 | `getVenueMetaDiscoveryEnums` | GET | `/api/v1/listings/venues/meta/discovery-enums/` | — | CreateVenueOccasions |
-| `updateVenueDiscovery` | PUT | `/api/v1/partners/listings/venues/<id>/discovery/` | `{ outing_types, activity_types, format_types }` | CreateVenueOccasions |
-| `getVenueAttendeeFields` | GET | `/api/v1/partners/listings/venues/<id>/attendee-fields/` | — | CreateVenueOccasions |
-| `updateVenueAttendeeFields` | PUT | `/api/v1/partners/listings/venues/<id>/attendee-fields/` | `string[]` (field keys) | CreateVenueOccasions |
-| `getVenueAvailability` | GET | `/api/v1/partners/listings/venues/<id>/availability/` | — | CreateVenueAvailability |
-| `createVenueAvailabilitySlot` | POST | `/api/v1/partners/listings/venues/<id>/availability/` | `{ date, start_time, end_time, note? }` | CreateVenueAvailability |
-| `deleteVenueAvailabilitySlot` | DELETE | `/api/v1/partners/listings/venues/<id>/availability/<sid>/` | — | CreateVenueAvailability |
-| `getVenuePackages` | GET | `/api/v1/partners/listings/venues/<id>/packages/` | — | CreateVenuePackages |
-| `createVenuePackage` | POST | `/api/v1/partners/listings/venues/<id>/packages/` | `{ name, price, description, duration_minutes?, max_guests? }` | CreateVenuePackages |
-| `updateVenuePackage` | PATCH | `/api/v1/partners/listings/venues/<id>/packages/<pid>/` | Partial package fields | CreateVenuePackages |
-| `deleteVenuePackage` | DELETE | `/api/v1/partners/listings/venues/<id>/packages/<pid>/` | — | CreateVenuePackages |
+| `updateVenueDiscovery` | PUT | `/api/v1/partner/listings/venues/<id>/discovery/` | `{ outing_types, activity_types, format_types }` | CreateVenueOccasions |
+| `getVenueAttendeeFields` | GET | `/api/v1/partner/listings/venues/<id>/attendee-fields/` | — | CreateVenueOccasions |
+| `updateVenueAttendeeFields` | PUT | `/api/v1/partner/listings/venues/<id>/attendee-fields/` | `string[]` (field keys) | CreateVenueOccasions |
+| `getVenueAvailability` | GET | `/api/v1/partner/listings/venues/<id>/availability/` | — | CreateVenueAvailability |
+| `createVenueAvailabilitySlot` | POST | `/api/v1/partner/listings/venues/<id>/availability/` | `{ date, start_time, end_time, note? }` | CreateVenueAvailability |
+| `deleteVenueAvailabilitySlot` | DELETE | `/api/v1/partner/listings/venues/<id>/availability/<sid>/` | — | CreateVenueAvailability |
+| `getVenuePackages` | GET | `/api/v1/partner/listings/venues/<id>/packages/` | — | CreateVenuePackages |
+| `createVenuePackage` | POST | `/api/v1/partner/listings/venues/<id>/packages/` | `{ name, price, description, duration_minutes?, max_guests? }` | CreateVenuePackages |
+| `updateVenuePackage` | PATCH | `/api/v1/partner/listings/venues/<id>/packages/<pid>/` | Partial package fields | CreateVenuePackages |
+| `deleteVenuePackage` | DELETE | `/api/v1/partner/listings/venues/<id>/packages/<pid>/` | — | CreateVenuePackages |
+
+**Classes:**
+
+| Function | Method | Endpoint | Payload | Used By |
+|----------|--------|----------|---------|---------|
+| `getClassListings` | GET | `/api/v1/partner/listings/classes/` | — | ServiceListings |
+| `getClassListingDetail` | GET | `/api/v1/partner/listings/classes/<id>/` | — | CreateClass details |
+| `createClassDraft` | POST | `/api/v1/partner/listings/classes/` | `{ title, short_description, description }` | CreateClassIdentity |
+| `updateClassListing` | PATCH | `/api/v1/partner/listings/classes/<id>/` | Partial class fields | CreateClassIdentity |
+| `setClassListingLive` | POST | `/api/v1/partner/listings/classes/<id>/live/` | — | Wizard submit |
+| `submitClassListing` | POST | `/api/v1/partner/listings/classes/<id>/submit/` | — | CreateClassPreview |
+| `getClassBatches` | GET | `/api/v1/partner/listings/classes/<id>/batches/` | — | CreateClassBatch |
+| `createClassBatch` | POST | `/api/v1/partner/listings/classes/<id>/batches/` | Batch JSON | CreateClassBatch |
+| `updateClassBatch` | PUT | `/api/v1/partner/listings/classes/<id>/batches/<bid>/` | Batch JSON | CreateClassBatch |
+| `deleteClassBatch` | DELETE | `/api/v1/partner/listings/classes/<id>/batches/<bid>/` | — | CreateClassBatch |
+| `uploadClassMedia` | POST | `/api/v1/partner/listings/classes/<id>/media/` | FormData | CreateClassMedia |
+| `deleteClassMedia` | DELETE | `/api/v1/partner/listings/classes/<id>/media/<mid>/` | — | CreateClassMedia |
+
+**Enquiries (Classes):**
+
+| Function | Method | Endpoint | Payload | Used By |
+|----------|--------|----------|---------|---------|
+| `getClassEnquiries` | GET | `/api/v1/partner/listings/classes/enquiries/` | — | Enquiries |
+| `getClassEnquiryDetail` | GET | `/api/v1/partner/listings/classes/enquiries/<id>/` | — | Enquiries |
+| `updateClassEnquiry` | PUT | `/api/v1/partner/listings/classes/enquiries/<id>/` | `{ status, internal_notes }` | Enquiries |
+| `unlockClassEnquiry` | POST | `/api/v1/partner/listings/classes/enquiries/<id>/unlock/` | — | Enquiries |
 
 > **Venue media field:** `url` (not `file_url`) — response shape: `{ id, url, media_type }`  
 > **Venue detail response** includes all sub-resources inline: `media`, `availability`, `packages`, `discovery`, `occasions`, `required_attendee_fields` — Preview uses a single `getVenueListingDetail` call.
@@ -140,6 +167,9 @@ Request → 401 Unauthorized?
 | `getCurrentVenueDraftId()` | `current_venue_draft_id` | Read active venue draft ID |
 | `setCurrentVenueDraftId(id)` | `current_venue_draft_id` | Save venue draft ID after create |
 | `clearCurrentVenueDraftId()` | `current_venue_draft_id` | Clear on submit or cancel |
+| `getCurrentClassDraftId()` | `current_class_draft_id` | Read active class draft ID |
+| `setCurrentClassDraftId(id)` | `current_class_draft_id` | Save class draft ID after create |
+| `clearCurrentClassDraftId()` | `current_class_draft_id` | Clear on submit or cancel |
 
 ### 2.4 Partner API (`src/api/onboarding.ts`)
 
@@ -362,11 +392,12 @@ All chart data reads from `dashboardData` API fields first, then falls back to z
 |----------|---------|
 | `getEventListings()` | Fetches all event listings |
 | `getVenueListings()` | Fetches all venue listings |
+| `getClassListings()` | Fetches all class listings |
 
-Both calls run in parallel via `Promise.allSettled`. Items are tagged with `entityType` **at fetch time** (not derived from `listing_type`) — venues always get `'Venues'`, events always get `'Events'`. Cover URL: events use `cover_url`, venues use `cover` — normalized as `item.cover_url || item.cover`.
+Both calls run in parallel via `Promise.allSettled`. Items are tagged with `entityType` **at fetch time** (not derived from `listing_type`) — venues always get `'Venues'`, events always get `'Events'`, classes get `'Classes'`. Cover URL: events use `cover_url`, venues use `cover` — normalized as `item.cover_url || item.cover`.
 
-**Edit flow:** Clicking Edit on an Event sets `current_event_draft_id` + routes to `CREATE_EVENT_DETAILS`. Clicking Edit on a Venue sets `current_venue_draft_id` + routes to `CREATE_VENUE_DETAILS`. Edit is disabled **only** for `published` listings — `pending` (In Review), `draft`, and `rejected` are all editable.  
-**New listing:** `clearCurrentDraftId()` + `clearCurrentVenueDraftId()` both called before navigating to any wizard start screen.
+**Edit flow:** Clicking Edit on an Event sets `current_event_draft_id` + routes to `CREATE_EVENT_DETAILS`. Clicking Edit on a Venue sets `current_venue_draft_id` + routes to `CREATE_VENUE_DETAILS`. Edit on a Class sets `current_class_draft_id` + routes to `CREATE_CLASS_IDENTITY`. Edit is disabled **only** for `published` listings — `pending` (In Review), `draft`, and `rejected` are all editable.  
+**New listing:** `clearCurrentDraftId()`, `clearCurrentVenueDraftId()`, and `clearCurrentClassDraftId()` are called before navigating to any wizard start screen.
 
 **Listing card layout:** Status badge (`Draft` / `In Review` / `Live` / `Rejected`) rendered on the **right side** of each card header row, opposite the entity type badge. Status data is sourced from the `getListings()` API response `status` field.
 
@@ -406,14 +437,14 @@ Theme color: `amber`. All wizard screens use `themeColor="amber"`.
 
 ### 6.9 Enquiries — `Enquiries.tsx` / `ProgramEnquiries.tsx`
 
-Both screens have **no API yet** but all hardcoded mock data has been removed.
+Both screens have **no mock data anymore**. `Enquiries` is fully API-integrated.
 
 | Field | Behaviour |
 |-------|-----------|
-| `leads` state | Starts as `[]` — populated from API when endpoint is available |
+| `leads` state | `Enquiries` populates from `/api/v1/partner/listings/classes/enquiries/` |
 | Empty state | Table body renders an Inbox icon + "No enquiries yet" across all columns |
 | Credits banner | Label reads "Credits Remaining" — no hardcoded number |
-| Unlock / Status / Notes | All local-state mutations remain; will delegate to API when wired |
+| Unlock / Status / Notes | `Enquiries` hits `/unlock/` and `PUT` update endpoints |
 
 ### 6.10 Financial Hub — `FinancialHub.tsx`
 
@@ -575,9 +606,11 @@ classDiagram
 - Dashboard (status, onboarding tracker, profile completion computed client-side from 10 fields)
 - Brand Profile view/edit mode
 - Public profile preview
-- **Service Listings** — parallel fetch (events + venues), entity type tagged at fetch time, edit locked only for `published`
+- **Service Listings** — parallel fetch (events + venues + classes), entity type tagged at fetch time, edit locked only for `published`
 - **Event Creation Wizard (4 steps)** — full lifecycle: draft create → field update → media upload → ticket CRUD → submit for review (theme: blue)
 - **Venue Creation Wizard (5 steps)** — full lifecycle: draft create → location/capacity/media → occasions/discovery/attendee fields → availability slots → packages → preview + submit (theme: amber)
+- **Class Enquiries** — fully integrated with `getClassEnquiries`, `/unlock/`, and status/notes `PUT` endpoints.
+- **Classes listing endpoints** — All Class listing endpoints are now mapped and hitting the API correctly, using singular `/api/v1/partner/` base paths.
 
 ### ⚡ Partially Integrated
 
@@ -623,6 +656,8 @@ classDiagram
 - ❌ Venue media used `file_url` field → corrected to `url`
 - ❌ `ServiceListings` derived entity type from `listing_type` (defaulted to Events) → tagged at fetch time per API source
 - ❌ Edit button locked for `pending` + `published` → now only locked for `published`
+- ❌ Plural `partners` prefix in Listing API calls → fixed globally to singular `partner`
+- ❌ `ServiceListings` inside `services` directory managed Class creation flows → Moved class flows to `src/screens/classes/` and renamed files to `CreateClass*.tsx`
 
 ---
 
@@ -682,4 +717,4 @@ npm run test:ui    # vitest --ui (browser UI)
 
 ---
 
-*Last updated: 2026-05-11 — Phase 8 (Event wizard blue theme + age group fix; Venue wizard full API integration — 5 steps; ServiceListings entity tagging + edit lock fix)*
+*Last updated: 2026-05-13 — Phase 9 (API path singularization `partner/`, Classes API endpoints, and Class Enquiry UI integration)*

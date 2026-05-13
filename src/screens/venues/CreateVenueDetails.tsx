@@ -16,8 +16,7 @@ import {
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar?: () => void; }
 
 interface VenueCategory { id: number; name: string; slug: string; subcategories: { id: number; name: string; slug: string }[] }
-// Venue media uses `url` (not `file_url`)
-interface MediaItem { id: number; media_type: 'cover' | 'gallery' | 'video'; url: string }
+interface MediaItem { id: number; media_type: 'cover' | 'gallery' | 'video'; url?: string; file_url?: string }
 
 const LOCATION_TYPES = [
     { value: 'indoor',     label: 'Indoor' },
@@ -34,11 +33,13 @@ const GALLERY_MAX = 5 * 1024 * 1024;
 const VIDEO_MAX = 100 * 1024 * 1024;
 const GALLERY_LIMIT = 10;
 
-const resolveUrl = (url: string) => {
+const resolveUrl = (url: string | undefined) => {
     if (!url) return '';
     if (url.startsWith('http')) return url;
     return `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
 };
+
+const getUrl = (item: MediaItem) => resolveUrl(item.url || item.file_url || '');
 
 export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
     // Core info
@@ -472,7 +473,7 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
                 <input ref={coverInputRef} type="file" accept="image/jpeg,image/png" className="hidden" onChange={handleCoverPick} />
                 {cover ? (
                     <div className="relative w-full sm:w-80 aspect-[16/9] rounded-2xl overflow-hidden border border-gray-200">
-                        <img src={resolveUrl(cover.url)} alt="Cover" className="w-full h-full object-cover" />
+                        <img src={getUrl(cover)} alt="Cover" className="w-full h-full object-cover" />
                         <button onClick={handleDeleteCover} className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-lg shadow text-red-500 hover:bg-white" aria-label="Remove cover">
                             <Trash2 size={14} />
                         </button>
@@ -498,7 +499,7 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
                 <div className="flex flex-wrap gap-3">
                     {gallery.map(g => (
                         <div key={g.id} className="relative w-24 h-24 rounded-2xl overflow-hidden border border-gray-200 group">
-                            <img src={resolveUrl(g.url)} alt="Gallery" className="w-full h-full object-cover" />
+                            <img src={getUrl(g)} alt="Gallery" className="w-full h-full object-cover" />
                             <button onClick={() => handleDeleteGallery(g.id)} className="absolute top-1 right-1 bg-white/90 p-1 rounded-md text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Remove image">
                                 <Trash2 size={12} />
                             </button>
@@ -525,7 +526,7 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
                         <div className="bg-amber-100 p-3 rounded-xl text-amber-500"><Play size={20} /></div>
                         <div className="flex-1 min-w-0">
                             <p className="text-sm font-bold truncate">Video uploaded</p>
-                            <a href={resolveUrl(video.url)} target="_blank" rel="noreferrer" className="text-[10px] text-amber-500 truncate block hover:underline">{video.url}</a>
+                            <a href={getUrl(video)} target="_blank" rel="noreferrer" className="text-[10px] text-amber-500 truncate block hover:underline">{video.url || video.file_url}</a>
                         </div>
                         <button onClick={handleDeleteVideo} className="text-red-500 p-2"><Trash2 size={16} /></button>
                     </div>

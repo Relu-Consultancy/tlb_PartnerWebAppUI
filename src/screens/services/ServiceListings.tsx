@@ -3,7 +3,7 @@ import { Menu, Plus, Search, Filter, Users, Edit3, CalendarDays, BarChart3, MapP
 import { Screen, EntityType } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
 import { EntityPickerSheet } from '../../components/EntityPickerSheet';
-import { getEventListings, getVenueListings, setCurrentDraftId, clearCurrentDraftId, setCurrentVenueDraftId, clearCurrentVenueDraftId } from '../../api/listings';
+import { getEventListings, getVenueListings, getClassListings, getProgramListings, setCurrentDraftId, clearCurrentDraftId, setCurrentVenueDraftId, clearCurrentVenueDraftId, setCurrentClassDraftId, clearCurrentClassDraftId, setCurrentProgramDraftId, clearCurrentProgramDraftId } from '../../api/listings';
 
 interface Props {
     onNavigate: (screen: Screen) => void;
@@ -121,6 +121,18 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                         return Array.isArray(data) ? data.map(item => ({ item, entityType: 'Venues' as EntityType })) : [];
                     }));
                 }
+                if (allowedEntities.includes('Classes')) {
+                    fetches.push(getClassListings().then(res => {
+                        const data = res.data || res;
+                        return Array.isArray(data) ? data.map(item => ({ item, entityType: 'Classes' as EntityType })) : [];
+                    }));
+                }
+                if (allowedEntities.includes('Programs')) {
+                    fetches.push(getProgramListings().then(res => {
+                        const data = res.data || res;
+                        return Array.isArray(data) ? data.map(item => ({ item, entityType: 'Programs' as EntityType })) : [];
+                    }));
+                }
                 const results = await Promise.allSettled(fetches);
                 const combined: Tagged[] = [];
                 let firstError: string | null = null;
@@ -162,16 +174,18 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
         // Starting fresh — clear any leftover draft ids
         clearCurrentDraftId();
         clearCurrentVenueDraftId();
+        clearCurrentClassDraftId();
+        clearCurrentProgramDraftId();
         if (allowedEntities.length === 1) {
             const entity = allowedEntities[0];
             if (entity === 'Events') onNavigate('CREATE_EVENT_DETAILS');
             else if (entity === 'Venues') onNavigate('CREATE_VENUE_DETAILS');
             else if (entity === 'Programs') onNavigate('CREATE_PROGRAM_IDENTITY');
-            else onNavigate('CREATE_LISTING_IDENTITY');
+            else onNavigate('CREATE_CLASS_IDENTITY');
         } else if (allowedEntities.length > 1) {
             setShowEntityPicker(true);
         } else {
-            onNavigate('CREATE_LISTING_IDENTITY');
+            onNavigate('CREATE_CLASS_IDENTITY');
         }
     };
 
@@ -182,10 +196,14 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
         } else if (listing.entityType === 'Venues') {
             setCurrentVenueDraftId(listing.id);
             onNavigate('CREATE_VENUE_DETAILS');
+        } else if (listing.entityType === 'Classes') {
+            setCurrentClassDraftId(listing.id);
+            onNavigate('CREATE_CLASS_IDENTITY');
         } else if (listing.entityType === 'Programs') {
+            setCurrentProgramDraftId(listing.id);
             onNavigate('CREATE_PROGRAM_IDENTITY');
         } else {
-            onNavigate('CREATE_LISTING_IDENTITY');
+            onNavigate('CREATE_CLASS_IDENTITY');
         }
     };
 

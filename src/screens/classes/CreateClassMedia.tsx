@@ -4,7 +4,7 @@ import { Screen } from '../../types';
 import { WizardLayout, WizardNavigation } from '../../components/ui';
 import {
     getCurrentClassDraftId,
-    getClassMedia,
+    getClassListingDetail,
     uploadClassMedia,
     deleteClassMedia,
 } from '../../api/listings';
@@ -22,7 +22,7 @@ const API_BASE = 'https://tlb-api.reluconsultancy.in';
 const COVER_MAX   = 5  * 1024 * 1024;
 const GALLERY_MAX = 5  * 1024 * 1024;
 const VIDEO_MAX   = 100 * 1024 * 1024;
-const GALLERY_LIMIT = 5;
+const GALLERY_LIMIT = 10;
 
 const resolveUrl = (url: string | undefined) => {
     if (!url) return '';
@@ -56,9 +56,11 @@ export const CreateClassMedia: React.FC<Props> = ({ onNavigate }) => {
         setDraftId(id);
         (async () => {
             try {
-                const res = await getClassMedia(id);
-                const raw = res.data || res;
-                const items: MediaItem[] = Array.isArray(raw) ? raw : [];
+                const res = await getClassListingDetail(id);
+                const d = res.data || res;
+                const srv = d.service || {};
+                const raw = Array.isArray(srv.media) ? srv.media : (Array.isArray(d.media) ? d.media : []);
+                const items: MediaItem[] = raw;
                 setCover(items.find(m => m.media_type === 'cover') || null);
                 setGallery(items.filter(m => m.media_type === 'gallery'));
                 setVideo(items.find(m => m.media_type === 'video') || null);

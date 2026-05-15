@@ -15,6 +15,20 @@ const handleError = async (response: Response, fallback: string): Promise<never>
     throw new ApiError(msg, code);
 };
 
+// ─── Class Metadata (public) ──────────────────────────────────────────────
+
+export const getClassMetaCategories = async () => {
+    const response = await apiClient('/api/v1/listings/classes/metadata/categories/');
+    if (!response.ok) await handleError(response, 'Failed to load class categories');
+    return response.json();
+};
+
+export const getClassMetaFormats = async () => {
+    const response = await apiClient('/api/v1/listings/classes/metadata/formats/');
+    if (!response.ok) await handleError(response, 'Failed to load class formats');
+    return response.json();
+};
+
 // ─── Event Metadata (public) ───────────────────────────────────────────────
 
 export const getEventMetaCategories = async () => {
@@ -519,19 +533,22 @@ export const deleteClassMedia = async (listingId: string, mediaId: number) => {
 
 // ─── Class Enquiries ───────────────────────────────────────────────────────
 
-export const getClassEnquiries = async () => {
-    const response = await apiClient('/api/v1/partner/listings/classes/enquiries/');
+export const getClassEnquiries = async (status?: string) => {
+    const url = status
+        ? `/api/v1/partner/listings/classes/enquiries/?status=${encodeURIComponent(status)}`
+        : '/api/v1/partner/listings/classes/enquiries/';
+    const response = await apiClient(url);
     if (!response.ok) await handleError(response, 'Failed to load class enquiries');
     return response.json();
 };
 
-export const getClassEnquiryDetail = async (enquiryId: number) => {
+export const getClassEnquiryDetail = async (enquiryId: string) => {
     const response = await apiClient(`/api/v1/partner/listings/classes/enquiries/${enquiryId}/`);
     if (!response.ok) await handleError(response, 'Failed to load class enquiry detail');
     return response.json();
 };
 
-export const updateClassEnquiry = async (enquiryId: number, data: Record<string, any>) => {
+export const updateClassEnquiry = async (enquiryId: string, data: Record<string, any>) => {
     const response = await apiClient(`/api/v1/partner/listings/classes/enquiries/${enquiryId}/`, {
         method: 'PUT',
         body: JSON.stringify(data),
@@ -540,11 +557,31 @@ export const updateClassEnquiry = async (enquiryId: number, data: Record<string,
     return response.json();
 };
 
-export const unlockClassEnquiry = async (enquiryId: number) => {
+export const unlockClassEnquiry = async (enquiryId: string) => {
     const response = await apiClient(`/api/v1/partner/listings/classes/enquiries/${enquiryId}/unlock/`, {
         method: 'POST',
     });
     if (!response.ok) await handleError(response, 'Failed to unlock class enquiry');
+    return response.json();
+};
+
+// ─── Program Metadata (public) ────────────────────────────────────────────
+
+export const getProgramMetaCategories = async () => {
+    const response = await apiClient('/api/v1/listings/programs/metadata/categories/');
+    if (!response.ok) await handleError(response, 'Failed to load program categories');
+    return response.json();
+};
+
+export const getProgramMetaFormats = async () => {
+    const response = await apiClient('/api/v1/listings/programs/metadata/formats/');
+    if (!response.ok) await handleError(response, 'Failed to load program formats');
+    return response.json();
+};
+
+export const getProgramMetaTags = async () => {
+    const response = await apiClient('/api/v1/listings/programs/metadata/tags/');
+    if (!response.ok) await handleError(response, 'Failed to load program tags');
     return response.json();
 };
 

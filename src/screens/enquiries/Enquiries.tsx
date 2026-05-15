@@ -6,7 +6,8 @@ import { getClassEnquiries, updateClassEnquiry, unlockClassEnquiry } from '../..
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
 
 interface Lead {
-    id: number;
+    id: string;
+    classTitle: string;
     studentName: string;
     parentName?: string;
     batch: string;
@@ -20,35 +21,57 @@ interface Lead {
     notes: string;
 }
 
+// ── API status values ↔ display labels ─────────────────────────────────────
+const STATUS_OPTIONS: { value: EnquiryStatus; label: string }[] = [
+    { value: 'new',           label: 'New' },
+    { value: 'contacted',     label: 'Contacted' },
+    { value: 'trial_booked',  label: 'Trial Booked' },
+    { value: 'closed',        label: 'Closed' },
+];
+
+const statusStyle = (s: EnquiryStatus) => {
+    switch (s) {
+        case 'new':          return 'bg-blue-500 text-white border-blue-600';
+        case 'contacted':    return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+        case 'trial_booked': return 'bg-purple-100 text-purple-700 border-purple-200';
+        case 'closed':       return 'bg-gray-100 text-gray-600 border-gray-200';
+        default:             return 'bg-gray-100 text-gray-600 border-gray-200';
+    }
+};
+
 export const Enquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
     const [leads, setLeads] = useState<Lead[]>([]);
     const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
     const [search, setSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState<EnquiryStatus | ''>('');
+    const [showFilter, setShowFilter] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         loadEnquiries();
-    }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [statusFilter]);
 
     const loadEnquiries = async () => {
         try {
             setIsLoading(true);
-            const res = await getClassEnquiries();
-            // Map the API response fields to the UI interface format if necessary
-            // For now assuming the backend matches or we provide fallbacks
-            const formattedData = (res.data || []).map((item: any) => ({
-                id: item.id,
-                studentName: item.student_name || item.studentName || 'Unknown Student',
-                parentName: item.parent_name || item.parentName,
-                batch: item.batch_name || item.batch || 'General',
-                age: item.age || item.student_age || 'N/A',
-                dateTime: item.created_at ? new Date(item.created_at).toLocaleString() : (item.dateTime || ''),
-                contact: item.contact_number || item.contact || 'Hidden',
-                isUnlocked: !!item.is_unlocked || !!item.isUnlocked,
-                status: (item.status || 'New') as EnquiryStatus,
-                message: item.message,
-                area: item.area,
-                notes: item.internal_notes || item.notes || '',
+            const res = await getClassEnquiries(statusFilter || undefined);
+            // API returns a flat array or { data: [...] }
+            const raw: any[] = Array.isArray(res) ? res : (res.data || []);
+            const formattedData: Lead[] = raw.map((item: any) => ({
+                id: String(item.id),
+                classTitle: item.class_title || '',
+                studentName: item.student_name || 'Unknown Student',
+                parentName: item.parent_name || undefined,
+                batch: item.batch_name || `Batch ${item.batch || ''}`.trim() || 'General',
+                age: item.student_age != null ? String(item.student_age) : 'N/A',
+                dateTime: item.created_at ? new Date(item.created_at).toLocaleString() : '',
+                contact: item.mobile || 'Hidden',
+                isUnlocked: !!item.is_contact_unlocked,
+                status: (item.status || 'new') as EnquiryStatus,
+                message: item.message || undefined,
+                area: item.area || undefined,
+                notes: item.internal_notes || '',
             }));
             setLeads(formattedData);
         } catch (e) {
@@ -58,22 +81,30 @@ export const Enquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
         }
     };
 
-    const unlockLead = async (id: number) => {
+    const unlockLead = async (id: string) => {
         try {
-            await unlockClassEnquiry(id);
-            setLeads(prev => prev.map(l => l.id === id ? { ...l, isUnlocked: true } : l));
-            // Reload to get the actual contact info
-            loadEnquiries();
-        } catch (e) {
+            const res = await unlockClassEnquiry(id);
+            // API returns the full updated enquiry with is_contact_unlocked: true and unmasked mobile
+            const item = res.data || res;
+            const updatedLead: Partial<Lead> = {
+                isUnlocked: !!item.is_contact_unlocked,
+                contact: item.mobile || 'Hidden',
+            };
+            setLeads(prev => prev.map(l => l.id === id ? { ...l, ...updatedLead } : l));
+            if (selectedLead && selectedLead.id === id) {
+                setSelectedLead({ ...selectedLead, ...updatedLead });
+            }
+        } catch (e: any) {
             console.error('Failed to unlock lead', e);
+            alert(e?.message || 'Failed to unlock contact. Please try again.');
         }
     };
 
-    const updateStatus = async (id: number, status: EnquiryStatus) => {
+    const updateStatus = async (id: string, status: EnquiryStatus) => {
         try {
             // Optimistic update
             setLeads(prev => prev.map(l => l.id === id ? { ...l, status } : l));
-            await updateClassEnquiry(id, { status: status.toLowerCase() });
+            await updateClassEnquiry(id, { status });
             if (selectedLead && selectedLead.id === id) {
                 setSelectedLead({ ...selectedLead, status });
             }
@@ -83,7 +114,7 @@ export const Enquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
         }
     };
 
-    const updateNotes = async (id: number, notes: string) => {
+    const updateNotes = async (id: string, notes: string) => {
         try {
             setLeads(prev => prev.map(l => l.id === id ? { ...l, notes } : l));
             await updateClassEnquiry(id, { internal_notes: notes });
@@ -96,9 +127,11 @@ export const Enquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
         }
     };
 
-    const sorted = [...leads]
-        .filter(l => l.studentName.toLowerCase().includes(search.toLowerCase()))
-        .sort((a, b) => (a.status === 'New' ? -1 : 1) - (b.status === 'New' ? -1 : 1));
+    // Client-side search on top of any API-side status filter
+    const filtered = leads.filter(l =>
+        l.studentName.toLowerCase().includes(search.toLowerCase()) ||
+        l.classTitle.toLowerCase().includes(search.toLowerCase())
+    );
 
     return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -110,13 +143,39 @@ export const Enquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
 
         <main className="p-6">
             <div className="tlb-content space-y-6">
-                {/* Search */}
+                {/* Search + Filter */}
                 <div className="flex gap-3">
                     <div className="flex-1 bg-white border border-gray-100 rounded-2xl px-4 py-3 flex items-center gap-3 shadow-sm">
                         <Search size={18} className="text-gray-400" />
-                        <input className="bg-transparent flex-1 text-sm outline-none" placeholder="Search enquiries..." value={search} onChange={(e) => setSearch(e.target.value)} />
+                        <input className="bg-transparent flex-1 text-sm outline-none" placeholder="Search by student or class name..." value={search} onChange={(e) => setSearch(e.target.value)} />
                     </div>
-                    <button className="bg-white border border-gray-100 p-3 rounded-2xl text-gray-400 shadow-sm"><Filter size={18} /></button>
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowFilter(!showFilter)}
+                            className={`bg-white border p-3 rounded-2xl shadow-sm transition-colors ${statusFilter ? 'border-tlb-yellow text-tlb-yellow' : 'border-gray-100 text-gray-400'}`}
+                        >
+                            <Filter size={18} />
+                        </button>
+                        {showFilter && (
+                            <div className="absolute right-0 top-full mt-2 bg-white border border-gray-100 rounded-2xl shadow-xl z-20 p-2 min-w-[160px]">
+                                <button
+                                    onClick={() => { setStatusFilter(''); setShowFilter(false); }}
+                                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-colors ${!statusFilter ? 'bg-tlb-yellow/10 text-tlb-yellow' : 'text-gray-500 hover:bg-gray-50'}`}
+                                >
+                                    All Statuses
+                                </button>
+                                {STATUS_OPTIONS.map(opt => (
+                                    <button
+                                        key={opt.value}
+                                        onClick={() => { setStatusFilter(opt.value); setShowFilter(false); }}
+                                        className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-colors ${statusFilter === opt.value ? 'bg-tlb-yellow/10 text-tlb-yellow' : 'text-gray-500 hover:bg-gray-50'}`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Enquiries Table */}
@@ -126,7 +185,7 @@ export const Enquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                             <thead>
                                 <tr className="bg-gray-50/50 border-b border-gray-100">
                                     <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest">Student Name</th>
-                                    <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest">Batch Interested In</th>
+                                    <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest">Class / Batch</th>
                                     <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest text-center">Student Age</th>
                                     <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest">Date/Time</th>
                                     <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest">Contact Information</th>
@@ -143,7 +202,7 @@ export const Enquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                             </div>
                                         </td>
                                     </tr>
-                                ) : sorted.length === 0 ? (
+                                ) : filtered.length === 0 ? (
                                     <tr>
                                         <td colSpan={6} className="px-6 py-16 text-center">
                                             <div className="flex flex-col items-center gap-3 text-gray-300">
@@ -152,22 +211,27 @@ export const Enquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                             </div>
                                         </td>
                                     </tr>
-                                ) : sorted.map((lead) => (
+                                ) : filtered.map((lead) => (
                                     <tr
                                         key={lead.id}
                                         onClick={() => setSelectedLead(lead)}
-                                        className={`hover:bg-gray-50/50 transition-colors cursor-pointer ${lead.status === 'New' ? 'bg-blue-50/20' : ''}`}
+                                        className={`hover:bg-gray-50/50 transition-colors cursor-pointer ${lead.status === 'new' ? 'bg-blue-50/20' : ''}`}
                                     >
                                         <td className="px-6 py-5">
                                             <div className="flex items-center gap-2">
                                                 <span className="font-bold text-sm text-gray-900">{lead.studentName}</span>
-                                                {lead.status === 'New' && (
+                                                {lead.status === 'new' && (
                                                     <span className="bg-blue-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded uppercase">New</span>
                                                 )}
                                             </div>
                                         </td>
                                         <td className="px-6 py-5">
-                                            <span className="text-sm text-gray-600 font-medium">{lead.batch}</span>
+                                            <div>
+                                                {lead.classTitle && (
+                                                    <p className="text-xs font-bold text-gray-700">{lead.classTitle}</p>
+                                                )}
+                                                <p className="text-xs text-gray-400">{lead.batch}</p>
+                                            </div>
                                         </td>
                                         <td className="px-6 py-5 text-center">
                                             <span className="text-sm text-gray-500">{lead.age}</span>
@@ -187,12 +251,12 @@ export const Enquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                                 <div className="flex items-center gap-3">
                                                     <span className="text-sm font-black text-gray-700 whitespace-nowrap">{lead.contact}</span>
                                                     <div className="flex gap-1">
-                                                        <button title="Call" className="bg-emerald-50 text-emerald-600 p-2 rounded-lg hover:bg-emerald-100 transition-colors shadow-sm border border-emerald-100">
+                                                        <a href={`tel:${lead.contact}`} title="Call" className="bg-emerald-50 text-emerald-600 p-2 rounded-lg hover:bg-emerald-100 transition-colors shadow-sm border border-emerald-100">
                                                             <Phone size={14} />
-                                                        </button>
-                                                        <button title="WhatsApp" className="bg-green-50 text-green-600 p-2 rounded-lg hover:bg-green-100 transition-colors shadow-sm border border-green-100">
+                                                        </a>
+                                                        <a href={`https://wa.me/91${lead.contact.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="WhatsApp" className="bg-green-50 text-green-600 p-2 rounded-lg hover:bg-green-100 transition-colors shadow-sm border border-green-100">
                                                             <MessageCircle size={14} />
-                                                        </button>
+                                                        </a>
                                                     </div>
                                                 </div>
                                             )}
@@ -201,17 +265,11 @@ export const Enquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                             <select
                                                 value={lead.status}
                                                 onChange={(e) => updateStatus(lead.id, e.target.value as EnquiryStatus)}
-                                                className={`text-xs font-bold rounded-xl px-3 py-2 border outline-none cursor-pointer transition-all shadow-sm ${
-                                                    lead.status === 'New' ? 'bg-blue-500 text-white border-blue-600' :
-                                                    lead.status === 'Contacted' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
-                                                    lead.status === 'Converted' ? 'bg-purple-100 text-purple-700 border-purple-200' :
-                                                    'bg-gray-100 text-gray-600 border-gray-200'
-                                                }`}
+                                                className={`text-xs font-bold rounded-xl px-3 py-2 border outline-none cursor-pointer transition-all shadow-sm ${statusStyle(lead.status)}`}
                                             >
-                                                <option value="New">New</option>
-                                                <option value="Contacted">Contacted</option>
-                                                <option value="Converted">Converted</option>
-                                                <option value="Lost">Lost</option>
+                                                {STATUS_OPTIONS.map(opt => (
+                                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                                ))}
                                             </select>
                                         </td>
                                     </tr>
@@ -241,6 +299,12 @@ export const Enquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                         </div>
 
                         <div className="space-y-3">
+                            {selectedLead.classTitle && (
+                                <div className="bg-gray-50 rounded-xl px-4 py-3">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Class</p>
+                                    <p className="text-sm font-bold mt-0.5">{selectedLead.classTitle}</p>
+                                </div>
+                            )}
                             <div className="bg-gray-50 rounded-xl px-4 py-3">
                                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Batch Interested</p>
                                 <p className="text-sm font-bold mt-0.5">{selectedLead.batch}</p>
@@ -270,6 +334,20 @@ export const Enquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                             </div>
                         )}
 
+                        {/* Status */}
+                        <div>
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Status</label>
+                            <select
+                                value={selectedLead.status}
+                                onChange={(e) => updateStatus(selectedLead.id, e.target.value as EnquiryStatus)}
+                                className={`text-xs font-bold rounded-xl px-4 py-3 border outline-none cursor-pointer transition-all shadow-sm w-full ${statusStyle(selectedLead.status)}`}
+                            >
+                                {STATUS_OPTIONS.map(opt => (
+                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                ))}
+                            </select>
+                        </div>
+
                         {/* Internal Notes */}
                         <div>
                             <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
@@ -284,15 +362,28 @@ export const Enquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                         </div>
 
                         {/* Contact Actions */}
-                        {selectedLead.isUnlocked && (
-                            <div className="flex gap-3">
-                                <button className="flex-1 bg-emerald-500 text-white py-3 rounded-2xl font-bold text-sm flex items-center justify-center gap-2">
-                                    <Phone size={16} /> Call
-                                </button>
-                                <button className="flex-1 bg-green-500 text-white py-3 rounded-2xl font-bold text-sm flex items-center justify-center gap-2">
-                                    <MessageCircle size={16} /> WhatsApp
-                                </button>
+                        {selectedLead.isUnlocked ? (
+                            <div className="space-y-3">
+                                <div className="bg-gray-50 rounded-xl px-4 py-3">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Mobile</p>
+                                    <p className="text-sm font-black mt-0.5">{selectedLead.contact}</p>
+                                </div>
+                                <div className="flex gap-3">
+                                    <a href={`tel:${selectedLead.contact}`} className="flex-1 bg-emerald-500 text-white py-3 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-emerald-600 transition-colors">
+                                        <Phone size={16} /> Call
+                                    </a>
+                                    <a href={`https://wa.me/91${selectedLead.contact.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="flex-1 bg-green-500 text-white py-3 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-green-600 transition-colors">
+                                        <MessageCircle size={16} /> WhatsApp
+                                    </a>
+                                </div>
                             </div>
+                        ) : (
+                            <button
+                                onClick={() => unlockLead(selectedLead.id)}
+                                className="w-full bg-tlb-yellow text-tlb-dark py-3 rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:brightness-95 transition-all"
+                            >
+                                <Lock size={16} /> Unlock Contact Info
+                            </button>
                         )}
                     </div>
                 </div>

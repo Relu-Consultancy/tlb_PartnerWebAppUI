@@ -132,21 +132,33 @@ Request → 401 Unauthorized?
 
 | Function | Method | Endpoint | Payload | Used By |
 |----------|--------|----------|---------|---------|
+| `getClassMetaCategories` | GET | `/api/v1/listings/classes/metadata/categories/` | — | CreateClassIdentity |
+| `getClassMetaFormats` | GET | `/api/v1/listings/classes/metadata/formats/` | — | CreateClassIdentity |
 | `getClassListings` | GET | `/api/v1/partner/listings/classes/` | — | ServiceListings |
-| `getClassListingDetail` | GET | `/api/v1/partner/listings/classes/<id>/` | — | CreateClass details |
+| `getClassListingDetail` | GET | `/api/v1/partner/listings/classes/<id>/` | — | All class wizard steps (media embedded here) |
 | `createClassDraft` | POST | `/api/v1/partner/listings/classes/` | `{ title, short_description, description }` | CreateClassIdentity |
-| `updateClassListing` | PATCH | `/api/v1/partner/listings/classes/<id>/` | Partial class fields | CreateClassIdentity |
-| `setClassListingLive` | POST | `/api/v1/partner/listings/classes/<id>/live/` | — | Wizard submit |
+| `updateClassListing` | PATCH | `/api/v1/partner/listings/classes/<id>/` | Partial class fields | CreateClassIdentity, CreateClassPolicies |
 | `submitClassListing` | POST | `/api/v1/partner/listings/classes/<id>/submit/` | — | CreateClassPreview |
+| `setClassListingLive` | POST | `/api/v1/partner/listings/classes/<id>/live/` | `{ is_live: bool }` | (available, not yet wired in UI) |
 | `getClassBatches` | GET | `/api/v1/partner/listings/classes/<id>/batches/` | — | CreateClassBatch |
 | `createClassBatch` | POST | `/api/v1/partner/listings/classes/<id>/batches/` | Batch JSON | CreateClassBatch |
 | `updateClassBatch` | PUT | `/api/v1/partner/listings/classes/<id>/batches/<bid>/` | Batch JSON | CreateClassBatch |
 | `deleteClassBatch` | DELETE | `/api/v1/partner/listings/classes/<id>/batches/<bid>/` | — | CreateClassBatch |
-| `getClassMedia` | GET | `/api/v1/partner/listings/classes/<id>/media/` | — | CreateClassMedia |
 | `uploadClassMedia` | POST | `/api/v1/partner/listings/classes/<id>/media/` | FormData | CreateClassMedia |
 | `deleteClassMedia` | DELETE | `/api/v1/partner/listings/classes/<id>/media/<mid>/` | — | CreateClassMedia |
 
+> **Class has TWO separate delivery/type fields — do not conflate them:**
+> - `mode` → delivery method: `"offline"` / `"online"` / `"hybrid"` (fetched from `formats.modes[]`)
+> - `format` → class type: `"workshop"` / `"camp"` / `"masterclass"` / `"bootcamp"` / `"demo"` / `"meetup"` / `"webinar"` / etc. (fetched from `formats.formats[]`)
+> Both fields are **required by the submit endpoint**. Sending the wrong values (e.g. `"offline"` for `format`, or `"physical"` for either) causes a 400 choice validation error.
+>
+> **No GET `/media/` endpoint for classes:** `GET /api/v1/partner/listings/classes/<id>/media/` does not exist (returns 405). Media is embedded in the listing detail response under `service.media`. Always use `getClassListingDetail` to load media.
+>
 > **Class batch payload:** `days` uses 3-letter abbreviations (`mon`, `tue`, `wed`, `thu`, `fri`, `sat`, `sun`); capacity field is `capacity` (not `total_seats`); no `start_date`/`end_date`/`fee` fields exist on this endpoint.
+>
+> **Class FAQs:** Sent inline in the PATCH body as `faqs: [{question, answer}]` — replaces the entire list. No dedicated `/faqs/` sub-endpoint (unlike Programs which has individual FAQ CRUD).
+>
+> **Class submit validation — all fields required before `POST .../submit/`:** `title`, `description`, `format` (class type), `mode`, `category_id`, `subcategory_id`, `address` (for offline/hybrid), cover image, ≥1 batch.
 
 **Enquiries (Classes):**
 
@@ -473,17 +485,17 @@ Theme color: `amber`. All wizard screens use `themeColor="amber"`.
 | 4 | **CreateVenuePackages** | `getVenuePackages` (on mount); `createVenuePackage` or `updateVenuePackage` (dirty packages on Next); `deleteVenuePackage` (on Delete) | Package fields: `name` (required), `price`, `description`, `duration_minutes?`, `max_guests?`. Optional fields omitted from payload if blank or < 1. Dirty tracking: only changed packages are saved on Next. |
 | 5 | **CreateVenuePreview** | `getVenueListingDetail` (single call — returns all sub-resources inline) | Venue detail response includes `media`, `availability`, `packages`, `discovery`, `occasions`, `required_attendee_fields` — no extra fetches needed. Cover = `media.find(m => m.media_type === 'cover')`, gallery = `media.filter(m => m.media_type === 'gallery')`. Readiness check: `title`, `city`, `address`, `subcategory`. Submit → `clearCurrentVenueDraftId()` → navigate to `SERVICE_LISTINGS`. |
 
-### 6.9 Class Creation Wizard (`src/screens/classes/`) — Steps 1–3 API-Integrated
+### 6.9 Class Creation Wizard (`src/screens/classes/`) — Fully API-Integrated
 
 Theme color: `yellow`. All wizard screens use `themeColor="yellow"`.
 
 | Step | Screen | API Calls | Key Behavior |
 |------|--------|-----------|--------------|
-| 1 | **CreateClassIdentity** | `getClassListingDetail` (on mount if draft exists); `createClassDraft` + `updateClassListing` (on Next) | Creates a real draft via `POST /classes/` on first Next click; stores ID via `setCurrentClassDraftId()`. Pre-fills from existing draft if `current_class_draft_id` is set. Tag selection is **single-select** (toggle — deselect by clicking again). Location shown only for Physical/Hybrid formats. |
+| 1 | **CreateClassIdentity** | `getClassMetaCategories` + `getClassMetaFormats` (on mount, parallel); `getClassListingDetail` (on mount if draft exists); `createClassDraft` + `updateClassListing` (on Next) | Creates draft via `POST /classes/` on first Next; stores ID via `setCurrentClassDraftId()`. Fetches categories (with subcategories) and class formats from API — no hardcoded lists. Sends both `mode` (delivery: offline/online/hybrid) AND `format` (class type: workshop/camp/etc.) as separate fields. Sends `address` for offline/hybrid. Format selection is required — blocks Next with error if unset. |
 | 2 | **CreateClassBatch** | `getClassBatches` (on mount); `createClassBatch`, `updateClassBatch` (dirty batches on Next); `deleteClassBatch` (staged on delete, flushed on Next) | Day abbreviations: `mon/tue/wed/thu/fri/sat/sun`. Capacity field: `capacity`. No `start_date`/`end_date`/`fee`. Dirty-only saves on Next. |
-| 3 | **CreateClassMedia** | `getClassMedia` (on mount); `uploadClassMedia`, `deleteClassMedia` (immediate) | Cover (1, 5MB), gallery (up to 5, 5MB each), video (1, 100MB). Cover required warning shown if missing. Media URL resolved defensively: `item.url \|\| item.file_url`. |
-| 4 | **CreateClassPolicies** | — | Local state only — not yet API-integrated |
-| 5 | **CreateClassPreview** | — | Local state only — not yet API-integrated |
+| 3 | **CreateClassMedia** | `getClassListingDetail` (on mount, extracts `service.media`); `uploadClassMedia`, `deleteClassMedia` (immediate) | Cover (1, 5MB), gallery (up to 5, 5MB each), video (1, 100MB). No GET `/media/` endpoint — media embedded in listing detail. Cover required warning shown if missing. Media URL resolved defensively: `item.url \|\| item.file_url`. |
+| 4 | **CreateClassPolicies** | `getClassListingDetail` (on mount); `updateClassListing` (on Next) | Controlled inputs for cancellation policy and refund policy. FAQs sent inline in PATCH body as `faqs: [{question, answer}]` (replaces entire list — no dedicated `/faqs/` endpoint for classes). |
+| 5 | **CreateClassPreview** | `getClassListingDetail` (on mount); `submitClassListing` (on Publish) | Loads real listing data. Readiness check: title, description, `format`, cover image, ≥1 batch — all must be present or Submit is blocked with a missing-fields list. Submit → success/under_review/error modal → `clearCurrentClassDraftId()` → `SERVICE_LISTINGS`. |
 
 ### 6.10 Enquiries — `Enquiries.tsx` / `ProgramEnquiries.tsx`
 
@@ -522,7 +534,7 @@ Partially API-integrated: bank account details are fetched from the partner prof
 | Screen Group | Status | Notes |
 |-------------|--------|-------|
 | **Create Class** steps 4–5 (Policies, Preview) | Local state only | Steps 1–3 are integrated; submit endpoint not wired |
-| **Create Program** (5 steps) | Local state only | Programs API is in `listings.ts`; wizard screens not yet wired up |
+| **Create Program** (5 steps) | ✅ Fully integrated | Identity → Batch → Media → Policies+FAQs → Preview+Submit; all 5 steps wired to API |
 | **Attendees** | Empty state UI | No attendees API — mock data removed, starts with `[]` |
 | **Packages** | Placeholder UI | No packages API |
 | **FinancialHub** (transactions) | Empty state, no mock data | Bank details fetched; financial API pending |
@@ -621,11 +633,11 @@ classDiagram
 | BRAND_PROFILE | ✅ | — | BrandProfile | ✅ Full profile CRUD |
 | PREVIEW_PROFILE | ✅ | — | PreviewProfile | ✅ Profile read |
 | SERVICE_LISTINGS | ✅ | — | ServiceListings | ✅ Parallel fetch: events + venues + classes + programs (tagged at fetch time) |
-| CREATE_CLASS_IDENTITY | ✅/❌ | Classes | CreateClassIdentity | ✅ createClassDraft + updateClassListing (theme: yellow) |
+| CREATE_CLASS_IDENTITY | ✅/❌ | Classes | CreateClassIdentity | ✅ API categories+formats; mode+format fields; address for offline/hybrid (theme: yellow) |
 | CREATE_CLASS_BATCH | ✅/❌ | Classes | CreateClassBatch | ✅ Batch CRUD — days=3-letter abbr, capacity field |
-| CREATE_CLASS_MEDIA | ✅/❌ | Classes | CreateClassMedia | ✅ Cover/gallery/video upload; getClassMedia on mount |
-| CREATE_CLASS_POLICIES | ✅/❌ | Classes | CreateClassPolicies | ❌ Local only |
-| CREATE_CLASS_PREVIEW | ✅/❌ | Classes | CreateClassPreview | ❌ Local only |
+| CREATE_CLASS_MEDIA | ✅/❌ | Classes | CreateClassMedia | ✅ Cover/gallery/video; media from listing detail (no GET /media/) |
+| CREATE_CLASS_POLICIES | ✅/❌ | Classes | CreateClassPolicies | ✅ PATCH policies + inline faqs[] array |
+| CREATE_CLASS_PREVIEW | ✅/❌ | Classes | CreateClassPreview | ✅ Full detail + readiness check + submit modals |
 | CREATE_EVENT_DETAILS | ✅/❌ | — | CreateEventDetails | ✅ Meta + draft create/update (theme: blue) |
 | CREATE_EVENT_SCHEDULE | ✅/❌ | — | CreateEventSchedule | ✅ Schedule + tickets CRUD (theme: blue) |
 | CREATE_EVENT_MEDIA | ✅/❌ | — | CreateEventMedia | ✅ Cover/gallery/video upload (theme: blue) |
@@ -635,7 +647,11 @@ classDiagram
 | CREATE_VENUE_AVAILABILITY | ✅/❌ | Venues | CreateVenueAvailability | ✅ Slot CRUD |
 | CREATE_VENUE_PACKAGES | ✅/❌ | Venues | CreateVenuePackages | ✅ Package CRUD |
 | CREATE_VENUE_PREVIEW | ✅/❌ | Venues | CreateVenuePreview | ✅ Single-call detail + submit |
-| CREATE_PROGRAM_* (5) | ✅/❌ | Programs | Program wizard | ❌ Local only (API in listings.ts, wizard not wired) |
+| CREATE_PROGRAM_IDENTITY | ✅/❌ | Programs | CreateProgramIdentity | ✅ createProgramDraft + updateProgramListing (theme: emerald) |
+| CREATE_PROGRAM_BATCH | ✅/❌ | Programs | CreateProgramBatch | ✅ Batch CRUD — days=3-letter abbr, capacity field |
+| CREATE_PROGRAM_MEDIA | ✅/❌ | Programs | CreateProgramMedia | ✅ Cover/gallery(max 10)/video upload; getProgramMedia on mount |
+| CREATE_PROGRAM_POLICIES | ✅/❌ | Programs | CreateProgramPolicies | ✅ cancellation/refund via PATCH; FAQ upsert via /faqs/ endpoint |
+| CREATE_PROGRAM_PREVIEW | ✅/❌ | Programs | CreateProgramPreview | ✅ Full detail + submit; success/under_review/error modals |
 | ENQUIRIES | ✅ | Classes | Enquiries | ✅ getClassEnquiries, unlock, status/notes PUT |
 | PROGRAM_ENQUIRIES | ✅ | Programs | ProgramEnquiries | ✅ getProgramListings → getProgramEnquiries per-listing, updateProgramEnquiry |
 | ATTENDEES | ✅ | — | Attendees | ❌ Placeholder |
@@ -665,8 +681,9 @@ classDiagram
 - **Venue Creation Wizard (5 steps)** — full lifecycle: draft create → location/capacity/media → occasions/discovery/attendee fields → availability slots → packages → preview + submit (theme: amber)
 - **Class Enquiries** — fully integrated with `getClassEnquiries`, `/unlock/`, and status/notes `PUT` endpoints.
 - **Classes listing endpoints** — All Class listing endpoints are now mapped and hitting the API correctly, using singular `/api/v1/partner/` base paths.
-- **Class Creation Wizard (steps 1–3)** — Identity screen now calls `createClassDraft` on first Next and stores draft ID; Batch screen uses real batch CRUD with correct day abbreviations and capacity field; Media screen fetches existing media on mount and uploads immediately.
+- **Class Creation Wizard (all 5 steps)** — Identity fetches categories+formats from API, sends both `mode` (delivery) and `format` (class type) as separate fields with correct values; Batch uses real CRUD; Media loads from listing detail (no GET `/media/`); Policies PATCHes inline FAQs; Preview loads real data, blocks submit if any required field missing, calls `submitClassListing`, shows result modals.
 - **Programs API** — Full endpoint set added to `listings.ts`: listings CRUD, batches, enquiries (per-listing), FAQs, media, archive/unarchive, and draft ID helpers (`getCurrentProgramDraftId`, `setCurrentProgramDraftId`, `clearCurrentProgramDraftId`).
+- **Program Creation Wizard (all 5 steps)** — Fully API-integrated: Identity creates/updates draft via `createProgramDraft`+`updateProgramListing`; Batch uses real CRUD with day abbreviations and capacity field; Media fetches on mount and uploads/deletes immediately (gallery max 10, cover required warning); Policies saves cancellation/refund via PATCH and upserts FAQs via dedicated `/faqs/` endpoint with dirty-tracking and delete staging; Preview fetches full listing, shows readiness check, submits via `submitProgramListing`, shows success/under_review/error modals.
 - **ProgramEnquiries** — Fully integrated with per-listing pattern: loads all programs, shows dropdown for multi-program partners, fetches enquiries per selected program, supports status update and partner notes via `updateProgramEnquiry`.
 
 ### ⚡ Partially Integrated
@@ -676,8 +693,6 @@ classDiagram
 ### ⏳ UI Ready — Awaiting Backend Endpoints
 
 - **FinancialHub** (transactions) — needs `GET /api/v1/partners/financial/transactions/`
-- **Class wizard steps 4–5** (Policies, Preview) — UI exists; submit flow not yet wired
-- **Program wizard** — All 5 steps are local state only; API is ready in `listings.ts`
 
 ### ⚠️ Needs Both UI and Backend
 
@@ -720,12 +735,59 @@ classDiagram
 - ❌ Class batch payload used wrong field names (`days_of_week` with full names, `total_seats`, extra `start_date`/`end_date`/`fee` fields) → corrected to `days` (3-letter abbr), `capacity`, no date/fee fields
 - ❌ `CreateClassMedia` and `CreateVenueDetails` broke when API returned `file_url` instead of `url` (or vice versa) → both now use `getUrl(item) = resolveUrl(item.url || item.file_url || '')` defensive helper
 - ❌ Class media API response parsed unsafely (assumed array) → now uses `Array.isArray(raw) ? raw : []`
+- ❌ `CreateClassMedia` and `CreateProgramMedia` called `getClassMedia`/`getProgramMedia` (GET `/media/`) on mount → API returns 405 because GET is not defined for those endpoints; media is embedded in the listing detail response (`service.media`). Fixed: both screens now call `getClassListingDetail`/`getProgramListingDetail` on mount and extract `srv.media || d.media`.
+- ❌ `CreateClassIdentity` used a hardcoded local category string list → never sent `category_id`/`subcategory_id` to the API. Fixed: now fetches categories from `GET /api/v1/listings/classes/metadata/categories/` and sends `category_id`/`subcategory_id` (numeric IDs).
+- ❌ `CreateClassIdentity` sent `mode: 'offline'` but class submit endpoint required a separate `format` field → two distinct fields: `mode` (delivery: offline/online/hybrid) and `format` (class type: workshop/camp/masterclass/bootcamp/demo/etc.). Discovered via `GET /api/v1/listings/classes/metadata/formats/`.
+- ❌ `CreateClassIdentity` sent `format: 'offline'` then `format: 'physical'` — both invalid. Valid `format` choices fetched from metadata: `workshop`, `camp`, `masterclass`, `competition`, `tournament`, `showcase`, `bootcamp`, `demo`, `meetup`, `webinar`.
+- ❌ `CreateClassIdentity` did not collect or send `address` → submit endpoint requires `address` for offline/hybrid classes. Fixed: separate `city` + `address` fields shown for offline/hybrid.
+- ❌ `CreateClassPolicies` had uncontrolled textarea inputs (no value/onChange) and zero API calls → nothing was saved on Next. Fixed: controlled state + `updateClassListing` PATCH with inline `faqs` array.
+- ❌ `CreateClassPreview` called `onNext={() => onNavigate('SERVICE_LISTINGS')}` — no submit API call. Draft sat as incomplete forever. Fixed: now calls `submitClassListing(draftId)` with result modals.
+- ❌ `CreateClassPreview` readiness check did not include `format` → submit button was enabled even when format was not set on the draft. Fixed: `format` now in missing-items list; Submit blocked until format is present.
 
 ---
 
-## 13. Test Infrastructure
+## 13. Recurring Issue Pattern — Submit-Time Validation Failures
 
-### 13.1 Setup
+> **This pattern has re-occurred multiple times across classes, programs, and events. Document it here so future integrations avoid it.**
+
+### The Problem
+
+The API's `POST .../submit/` endpoint enforces strict field-completeness validation that is **not enforced** by the individual wizard step PATCH endpoints. This means a wizard can appear to work correctly (each step returns 200) but the final Submit fails with a 400 listing which fields are missing or invalid.
+
+**Class wizard submit failures encountered (in order):**
+
+| Error | Root Cause | Fix |
+|-------|-----------|-----|
+| `Cannot submit. Missing: category, subcategory` | Identity screen used hardcoded local string list, never sent `category_id`/`subcategory_id` | Fetch categories from metadata API; send numeric IDs |
+| `Cannot submit. Missing: format, address` | `format` (class type) was never a field in the identity screen; `address` not collected | Add `format` selector (from metadata); add `address` field for offline/hybrid |
+| `{'format': ["offline" is not a valid choice]}` | Sent `format: 'offline'` — valid for `mode` but not for `format` | Fetch valid format values from `/metadata/formats/`; `format` takes `workshop`/`camp`/etc. |
+| `{'format': ["physical" is not a valid choice]}` | Changed to `format: 'physical'` — also invalid | Use correct API values from metadata endpoint |
+| `Cannot submit. Missing: format` | Draft created before format fix; preview readiness check didn't block submit | Add `format` to preview's missing-items check; add validation in identity step |
+
+### Prevention Checklist for New Wizard Integrations
+
+Before declaring a wizard "integrated":
+
+1. **Probe the metadata endpoint** — `GET /api/v1/listings/<type>/metadata/` or `/metadata/formats/`, `/metadata/categories/` — to discover all required fields and their valid choice values.
+2. **Check what `POST .../submit/` validates** — read the API docs or trigger a submit on a minimal draft to see the full list of missing fields.
+3. **Mirror submit requirements in the preview readiness check** — every field the backend requires must block the Submit button client-side if missing.
+4. **Use `OPTIONS` on the PATCH endpoint** — or check the db-spec doc — to find all field names. Field names differ across entity types (e.g. `mode` vs `format`, `category_id` vs `occasion_ids`).
+5. **Test with a real new draft** — not an old draft created before the fix. Old drafts may be missing fields set by earlier (broken) screens.
+
+### Field Name Gotchas by Entity Type
+
+| Entity | Delivery field | Type/format field | Category fields | Address requirement |
+|--------|---------------|-------------------|-----------------|---------------------|
+| Events | `mode` (online/offline/hybrid) | `format` (from API formats list) | `category_id`, `subcategory_id` | `address` for offline/hybrid |
+| Classes | `mode` (online/offline/hybrid) | `format` (workshop/camp/etc. — from `/metadata/formats/`) | `category_id`, `subcategory_id` | `address` for offline/hybrid |
+| Programs | `mode` (online/offline/hybrid) | — | `category_id`, `subcategory_id` | city/address for offline/hybrid |
+| Venues | `location_type` | — | `category_id`, `subcategory_id` | `address`, `city`, `area` always |
+
+---
+
+## 14. Test Infrastructure
+
+### 14.1 Setup
 
 | File | Purpose |
 |------|---------|
@@ -734,7 +796,7 @@ classDiagram
 | `src/test/msw/handlers.ts` | Default handlers for all API endpoints; exports `DRAFT_ID`, `mockDraft`, `mockCategories`, `mockFormats`, `mockAgeGroups`, `mockListing` |
 | `src/test/msw/server.ts` | `setupServer(...handlers)` from msw/node |
 
-### 13.2 Test Files (122 tests — all passing)
+### 14.2 Test Files (122 tests — all passing)
 
 | File | Tests | Coverage |
 |------|-------|----------|
@@ -745,7 +807,7 @@ classDiagram
 | `src/screens/events/__tests__/CreateEventPreview.test.tsx` | 19 | Event detail display, missing fields list, all 3 modal variants (success/under_review/error), modal close → navigate + clear draft ID |
 | `src/screens/services/__tests__/ServiceListings.test.tsx` | 29 | Loading, tabs, search filter, Edit → sets draft ID + navigates, Locked for pending/published, Add Listing navigation |
 
-### 13.3 Modal Variant Routing (Critical Test)
+### 14.3 Modal Variant Routing (Critical Test)
 
 `CreateEventPreview` submit error handling is tested for correctness of modal variant selection:
 
@@ -756,7 +818,7 @@ classDiagram
 | Any other error code | `error` — "Submission Failed" (red) | ✅ |
 | Non-`PARTNER_UNDER_REVIEW` code does NOT show profile modal | — | ✅ |
 
-### 13.4 Run Commands
+### 14.4 Run Commands
 
 ```bash
 npm test           # vitest run (CI mode, single pass)
@@ -768,7 +830,7 @@ npm run test:ui    # vitest --ui (browser UI)
 
 ---
 
-## 14. Backend Documentation
+## 15. Backend Documentation
 
 | File | Purpose |
 |------|---------|
@@ -779,4 +841,4 @@ npm run test:ui    # vitest --ui (browser UI)
 
 ---
 
-*Last updated: 2026-05-14 — Phase 10 (Programs API full endpoint set, Class wizard steps 1–3 API integration, ProgramEnquiries per-listing pattern, defensive media field handling)*
+*Last updated: 2026-05-15 — Phase 11 (Class wizard all 5 steps fully integrated; class metadata endpoints; format vs mode split; submit-time validation pattern documented)*

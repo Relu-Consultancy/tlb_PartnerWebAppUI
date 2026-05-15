@@ -17,14 +17,29 @@ interface ProgramLead {
     age: string;
     receivedOn: string;
     contact: string;
-    isUnlocked: boolean;
+    email?: string;
     status: EnquiryStatus;
     message?: string;
     area?: string;
     notes: string;
 }
 
-const statusToApi = (s: EnquiryStatus) => s.toLowerCase();
+const STATUS_OPTIONS: { value: EnquiryStatus; label: string }[] = [
+    { value: 'new',       label: 'New' },
+    { value: 'contacted', label: 'Contacted' },
+    { value: 'enrolled',  label: 'Enrolled' },
+    { value: 'closed',    label: 'Closed' },
+];
+
+const statusStyle = (s: EnquiryStatus) => {
+    switch (s) {
+        case 'new':       return 'bg-emerald-500 text-white border-emerald-600';
+        case 'contacted': return 'bg-blue-100 text-blue-700 border-blue-200';
+        case 'enrolled':  return 'bg-purple-100 text-purple-700 border-purple-200';
+        case 'closed':    return 'bg-gray-100 text-gray-600 border-gray-200';
+        default:          return 'bg-gray-100 text-gray-600 border-gray-200';
+    }
+};
 
 export const ProgramEnquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
     const [programs, setPrograms] = useState<ProgramOption[]>([]);
@@ -75,9 +90,9 @@ export const ProgramEnquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar })
                 format: item.program_format || item.format || '',
                 age: item.student_age != null ? String(item.student_age) : 'N/A',
                 receivedOn: item.created_at ? new Date(item.created_at).toLocaleDateString() : '',
-                contact: item.contact_number || 'Hidden',
-                isUnlocked: !!item.is_unlocked,
-                status: (item.status ? (item.status.charAt(0).toUpperCase() + item.status.slice(1)) : 'New') as EnquiryStatus,
+                contact: item.contact_number || '',
+                email: item.email || '',
+                status: (item.status || 'new') as EnquiryStatus,
                 message: item.message,
                 area: item.area,
                 notes: item.partner_note || '',
@@ -94,7 +109,7 @@ export const ProgramEnquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar })
         setLeads(prev => prev.map(l => l.id === id ? { ...l, status } : l));
         if (selectedLead?.id === id) setSelectedLead(prev => prev ? { ...prev, status } : prev);
         try {
-            await updateProgramEnquiry(listingId, id, { status: statusToApi(status) });
+            await updateProgramEnquiry(listingId, id, { status });
         } catch (e) {
             console.error('Failed to update status', e);
             if (selectedProgramId) loadEnquiries(selectedProgramId);
@@ -117,7 +132,7 @@ export const ProgramEnquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar })
             (l.parentName || '').toLowerCase().includes(search.toLowerCase()) ||
             l.program.toLowerCase().includes(search.toLowerCase())
         )
-        .sort((a, b) => (a.status === 'New' ? -1 : 1) - (b.status === 'New' ? -1 : 1));
+        .sort((a, b) => (a.status === 'new' ? -1 : 1) - (b.status === 'new' ? -1 : 1));
 
     const isLoading = loadingPrograms || loadingEnquiries;
 
@@ -211,12 +226,12 @@ export const ProgramEnquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar })
                                     <tr
                                         key={lead.id}
                                         onClick={() => setSelectedLead(lead)}
-                                        className={`hover:bg-gray-50/50 transition-colors cursor-pointer ${lead.status === 'New' ? 'bg-emerald-50/20' : ''}`}
+                                        className={`hover:bg-gray-50/50 transition-colors cursor-pointer ${lead.status === 'new' ? 'bg-emerald-50/20' : ''}`}
                                     >
                                         <td className="px-5 py-5">
                                             <div className="flex items-center gap-2">
                                                 <span className="font-bold text-sm text-gray-900">{lead.studentName}</span>
-                                                {lead.status === 'New' && (
+                                                {lead.status === 'new' && (
                                                     <span className="bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded uppercase">New</span>
                                                 )}
                                             </div>
@@ -239,9 +254,7 @@ export const ProgramEnquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar })
                                             <span className="text-[11px] font-bold text-gray-400">{lead.receivedOn}</span>
                                         </td>
                                         <td className="px-5 py-5" onClick={(e) => e.stopPropagation()}>
-                                            {!lead.isUnlocked ? (
-                                                <span className="text-xs text-gray-400 italic">Locked</span>
-                                            ) : (
+                                            {lead.contact ? (
                                                 <div className="flex items-center gap-3">
                                                     <span className="text-sm font-black text-gray-700 whitespace-nowrap">{lead.contact}</span>
                                                     <div className="flex gap-1">
@@ -253,23 +266,19 @@ export const ProgramEnquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar })
                                                         </button>
                                                     </div>
                                                 </div>
+                                            ) : (
+                                                <span className="text-xs text-gray-400 italic">No contact</span>
                                             )}
                                         </td>
                                         <td className="px-5 py-5" onClick={(e) => e.stopPropagation()}>
                                             <select
                                                 value={lead.status}
                                                 onChange={(e) => updateStatus(lead.id, lead.listingId, e.target.value as EnquiryStatus)}
-                                                className={`text-xs font-bold rounded-xl px-3 py-2 border outline-none cursor-pointer transition-all shadow-sm ${
-                                                    lead.status === 'New' ? 'bg-emerald-500 text-white border-emerald-600' :
-                                                    lead.status === 'Contacted' ? 'bg-blue-100 text-blue-700 border-blue-200' :
-                                                    lead.status === 'Converted' ? 'bg-purple-100 text-purple-700 border-purple-200' :
-                                                    'bg-gray-100 text-gray-600 border-gray-200'
-                                                }`}
+                                                className={`text-xs font-bold rounded-xl px-3 py-2 border outline-none cursor-pointer transition-all shadow-sm ${statusStyle(lead.status)}`}
                                             >
-                                                <option value="New">New</option>
-                                                <option value="Contacted">Contacted</option>
-                                                <option value="Converted">Converted</option>
-                                                <option value="Lost">Lost</option>
+                                                {STATUS_OPTIONS.map(opt => (
+                                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                                ))}
                                             </select>
                                         </td>
                                     </tr>
@@ -345,7 +354,7 @@ export const ProgramEnquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar })
                             />
                         </div>
 
-                        {selectedLead.isUnlocked && (
+                        {selectedLead.contact && (
                             <div className="flex gap-3">
                                 <button className="flex-1 bg-emerald-500 text-white py-3 rounded-2xl font-bold text-sm flex items-center justify-center gap-2">
                                     <Phone size={16} /> Call

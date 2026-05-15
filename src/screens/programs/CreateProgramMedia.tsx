@@ -1,82 +1,327 @@
-import React from 'react';
-import { ArrowRight, Camera, Play, Star, Link2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ArrowRight, Camera, Play, Trash2, Loader2, Image as ImageIcon } from 'lucide-react';
 import { Screen } from '../../types';
 import { WizardLayout, WizardNavigation } from '../../components/ui';
+import {
+    getCurrentProgramDraftId,
+    getProgramListingDetail,
+    uploadProgramMedia,
+    deleteProgramMedia,
+} from '../../api/listings';
 
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
 
-export const CreateProgramMedia: React.FC<Props> = ({ onNavigate }) => (
-    <WizardLayout
-        title="New Listing"
-        stepText="Stage 3 of 5"
-        subtitle="Visual Storefront"
-        progressPercentage={60}
-        themeColor="emerald"
-        onBack={() => onNavigate('CREATE_PROGRAM_BATCH')}
-    >
-        <div className="space-y-1">
-            <h2 className="text-2xl font-black">Visual Storefront</h2>
-            <p className="text-sm text-gray-400">High-conversion media assets that showcase your class.</p>
-        </div>
+interface MediaItem {
+    id: number;
+    media_type: 'cover' | 'gallery' | 'video';
+    url?: string;
+    file_url?: string;
+}
 
-        {/* Gallery Upload */}
-        <div>
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">Gallery Photos / Short Teaser</label>
-            <div className="flex flex-wrap gap-3">
-                {/* Upload buttons */}
-                <div className="w-24 h-24 bg-tlb-yellow/10 rounded-2xl border-2 border-dashed border-tlb-yellow/30 flex flex-col items-center justify-center text-tlb-yellow cursor-pointer hover:bg-tlb-yellow/20 transition-colors">
-                    <Camera size={24} />
-                    <span className="text-[10px] font-bold mt-1">Add Photo</span>
-                </div>
-                <div className="w-24 h-24 bg-blue-50 rounded-2xl border-2 border-dashed border-blue-200 flex flex-col items-center justify-center text-blue-400 cursor-pointer hover:bg-blue-100 transition-colors">
-                    <Play size={24} />
-                    <span className="text-[10px] font-bold mt-1">Add Teaser</span>
-                </div>
-                {/* Mock uploaded photos */}
-                {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="w-24 h-24 rounded-2xl overflow-hidden shadow-sm relative group cursor-pointer">
-                        <img loading="lazy" src={`https://picsum.photos/seed/class${i}/400/400`} alt={`Photo ${i}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                        {i === 1 && (
-                            <div className="absolute top-2 right-2 bg-tlb-yellow p-1.5 rounded-lg shadow">
-                                <Star size={10} className="text-tlb-dark" />
-                            </div>
-                        )}
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                            <Star size={16} className="text-white" />
-                        </div>
-                    </div>
-                ))}
-            </div>
-            <p className="text-xs text-gray-300 mt-2">⭐ Tap a photo to set it as the <strong>Feature Image</strong> (main thumbnail)</p>
-        </div>
+const API_BASE = 'https://tlb-api.reluconsultancy.in';
+const COVER_MAX   = 5  * 1024 * 1024;
+const GALLERY_MAX = 5  * 1024 * 1024;
+const VIDEO_MAX   = 100 * 1024 * 1024;
+const GALLERY_LIMIT = 10;
 
-        {/* Video Link */}
-        <div>
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Video Link</label>
-            <div className="flex items-center gap-3 border border-gray-100 bg-white rounded-2xl px-4 py-3">
-                <Link2 size={18} className="text-gray-300" />
-                <input className="bg-transparent flex-1 text-sm outline-none" placeholder="YouTube or Instagram Reels URL" />
-            </div>
-            <p className="text-xs text-gray-300 mt-1">Paste a single video URL to embed on your listing page.</p>
-        </div>
+const resolveUrl = (url: string | undefined) => {
+    if (!url) return '';
+    if (url.startsWith('http')) return url;
+    return `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
+};
 
-        {/* Feature Image note */}
-        <div className="bg-tlb-yellow/5 border border-tlb-yellow/20 rounded-2xl p-4">
-            <div className="flex items-start gap-3">
-                <Star size={18} className="text-tlb-yellow shrink-0 mt-0.5" />
-                <div>
-                    <p className="text-sm font-bold">Feature Image</p>
-                    <p className="text-xs text-gray-500 mt-0.5">The starred photo will appear as the main thumbnail in search results and listings.</p>
-                </div>
-            </div>
-        </div>
+const getUrl = (item: MediaItem) => resolveUrl(item.url || item.file_url || '');
 
-        <WizardNavigation 
-            onBack={() => onNavigate('CREATE_PROGRAM_BATCH')}
-            onNext={() => onNavigate('CREATE_PROGRAM_POLICIES')}
-            nextText="Next: Policies"
-            nextIcon={<ArrowRight size={18} />}
+export const CreateProgramMedia: React.FC<Props> = ({ onNavigate }) => {
+    const [draftId, setDraftId] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
+    const [busyKind, setBusyKind] = useState<'cover' | 'gallery' | 'video' | null>(null);
+
+    const [cover, setCover] = useState<MediaItem | null>(null);
+    const [gallery, setGallery] = useState<MediaItem[]>([]);
+    const [video, setVideo] = useState<MediaItem | null>(null);
+
+    const coverInputRef   = useRef<HTMLInputElement>(null);
+    const galleryInputRef = useRef<HTMLInputElement>(null);
+    const videoInputRef   = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        const id = getCurrentProgramDraftId();
+        if (!id) {
+            setLoadError('No active draft. Start from "Identity & Story".');
+            setLoading(false);
+            return;
+        }
+        setDraftId(id);
+        (async () => {
+            try {
+                const res = await getProgramListingDetail(id);
+                const d = res.data || res;
+                // Per API 11.3, media is at top level
+                const raw: MediaItem[] = Array.isArray(d.media) ? d.media : [];
+                setCover(raw.find(m => m.media_type === 'cover') || null);
+                setGallery(raw.filter(m => m.media_type === 'gallery'));
+                setVideo(raw.find(m => m.media_type === 'video') || null);
+            } catch (err: any) {
+                setLoadError(err?.message || 'Failed to load media.');
+            } finally {
+                setLoading(false);
+            }
+        })();
+    }, []);
+
+    const handleCoverPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!draftId || !e.target.files?.[0]) return;
+        const file = e.target.files[0];
+        if (file.size > COVER_MAX) { alert('Cover must be under 5 MB.'); e.target.value = ''; return; }
+        setBusyKind('cover');
+        try {
+            if (cover) await deleteProgramMedia(draftId, cover.id);
+            const res = await uploadProgramMedia(draftId, file, 'cover');
+            setCover(res.data || res);
+        } catch (err: any) {
+            alert(err?.message || 'Failed to upload cover.');
+        } finally {
+            setBusyKind(null);
+            e.target.value = '';
+        }
+    };
+
+    const handleGalleryPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!draftId || !e.target.files?.length) return;
+        const files: File[] = Array.from(e.target.files);
+        setBusyKind('gallery');
+        try {
+            for (const file of files) {
+                if (gallery.length >= GALLERY_LIMIT) { alert(`Gallery limit (${GALLERY_LIMIT}) reached.`); break; }
+                if (file.size > GALLERY_MAX) { alert(`${file.name} is over 5 MB — skipped.`); continue; }
+                const res = await uploadProgramMedia(draftId, file, 'gallery');
+                setGallery(prev => [...prev, res.data || res]);
+            }
+        } catch (err: any) {
+            alert(err?.message || 'Failed to upload gallery image.');
+        } finally {
+            setBusyKind(null);
+            e.target.value = '';
+        }
+    };
+
+    const handleVideoPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!draftId || !e.target.files?.[0]) return;
+        const file = e.target.files[0];
+        if (file.size > VIDEO_MAX) { alert('Video must be under 100 MB.'); e.target.value = ''; return; }
+        setBusyKind('video');
+        try {
+            if (video) await deleteProgramMedia(draftId, video.id);
+            const res = await uploadProgramMedia(draftId, file, 'video');
+            setVideo(res.data || res);
+        } catch (err: any) {
+            alert(err?.message || 'Failed to upload video.');
+        } finally {
+            setBusyKind(null);
+            e.target.value = '';
+        }
+    };
+
+    const handleDeleteCover = async () => {
+        if (!draftId || !cover) return;
+        try {
+            await deleteProgramMedia(draftId, cover.id);
+            setCover(null);
+        } catch (err: any) {
+            alert(err?.message || 'Failed to delete cover.');
+        }
+    };
+
+    const handleDeleteGallery = async (mediaId: number) => {
+        if (!draftId) return;
+        try {
+            await deleteProgramMedia(draftId, mediaId);
+            setGallery(prev => prev.filter(m => m.id !== mediaId));
+        } catch (err: any) {
+            alert(err?.message || 'Failed to delete image.');
+        }
+    };
+
+    const handleDeleteVideo = async () => {
+        if (!draftId || !video) return;
+        try {
+            await deleteProgramMedia(draftId, video.id);
+            setVideo(null);
+        } catch (err: any) {
+            alert(err?.message || 'Failed to delete video.');
+        }
+    };
+
+    if (loading || loadError) {
+        return (
+            <WizardLayout
+                title="New Program"
+                stepText="Stage 3 of 5"
+                subtitle="Visual Storefront"
+                progressPercentage={60}
+                themeColor="emerald"
+                onBack={() => onNavigate('CREATE_PROGRAM_BATCH')}
+            >
+                {loading
+                    ? <div className="flex items-center justify-center gap-2 text-gray-400 text-xs font-bold py-12">
+                          <Loader2 size={16} className="animate-spin" /> Loading media…
+                      </div>
+                    : <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-xs font-bold text-red-600">
+                          {loadError}
+                      </div>
+                }
+            </WizardLayout>
+        );
+    }
+
+    return (
+        <WizardLayout
+            title="New Program"
+            stepText="Stage 3 of 5"
+            subtitle="Visual Storefront"
+            progressPercentage={60}
             themeColor="emerald"
-        />
-    </WizardLayout>
-);
+            onBack={() => onNavigate('CREATE_PROGRAM_BATCH')}
+        >
+            <div className="space-y-1">
+                <h2 className="text-2xl font-black">Visual Storefront</h2>
+                <p className="text-sm text-gray-400">High-quality media that makes your program stand out.</p>
+            </div>
+
+            {/* Cover Image */}
+            <div>
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">
+                    Cover Image <span className="text-red-400">*</span>
+                </label>
+                <input ref={coverInputRef} type="file" accept="image/jpeg,image/png" className="hidden" onChange={handleCoverPick} />
+                {cover ? (
+                    <div className="relative w-full sm:w-80 aspect-[16/9] rounded-2xl overflow-hidden border border-gray-200">
+                        <img src={getUrl(cover)} alt="Cover" className="w-full h-full object-cover" />
+                        <button
+                            onClick={handleDeleteCover}
+                            className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-lg shadow text-red-500 hover:bg-white"
+                            aria-label="Remove cover"
+                        >
+                            <Trash2 size={14} />
+                        </button>
+                        <button
+                            onClick={() => coverInputRef.current?.click()}
+                            disabled={busyKind === 'cover'}
+                            className="absolute bottom-2 right-2 bg-white/90 px-3 py-1.5 rounded-lg shadow text-xs font-bold text-emerald-600 hover:bg-white disabled:opacity-50"
+                        >
+                            {busyKind === 'cover' ? 'Uploading…' : 'Change'}
+                        </button>
+                    </div>
+                ) : (
+                    <button
+                        onClick={() => coverInputRef.current?.click()}
+                        disabled={busyKind === 'cover'}
+                        className="w-full sm:w-80 aspect-[16/9] bg-emerald-50 rounded-2xl border-2 border-dashed border-emerald-300/50 flex flex-col items-center justify-center text-emerald-500 hover:bg-emerald-100/50 transition-colors disabled:opacity-60"
+                    >
+                        {busyKind === 'cover' ? <Loader2 size={28} className="animate-spin" /> : <Camera size={28} />}
+                        <span className="text-xs font-bold mt-2">{busyKind === 'cover' ? 'Uploading…' : 'Upload Cover'}</span>
+                        <span className="text-[10px] text-emerald-400/80 mt-1">JPG/PNG · Max 5 MB</span>
+                    </button>
+                )}
+            </div>
+
+            {/* Gallery */}
+            <div>
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">
+                    Gallery Photos
+                    <span className="text-gray-300 font-normal normal-case ml-1">({gallery.length}/{GALLERY_LIMIT})</span>
+                </label>
+                <input
+                    ref={galleryInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png"
+                    multiple
+                    className="hidden"
+                    onChange={handleGalleryPick}
+                />
+                <div className="flex flex-wrap gap-3">
+                    {gallery.map((g) => (
+                        <div key={g.id} className="relative w-24 h-24 rounded-2xl overflow-hidden border border-gray-200 group">
+                            <img src={getUrl(g)} alt="Gallery" className="w-full h-full object-cover" />
+                            <button
+                                onClick={() => handleDeleteGallery(g.id)}
+                                className="absolute top-1 right-1 bg-white/90 p-1 rounded-md text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                aria-label="Remove image"
+                            >
+                                <Trash2 size={12} />
+                            </button>
+                        </div>
+                    ))}
+                    {gallery.length < GALLERY_LIMIT && (
+                        <button
+                            onClick={() => galleryInputRef.current?.click()}
+                            disabled={busyKind === 'gallery'}
+                            className="w-24 h-24 bg-emerald-50 rounded-2xl border-2 border-dashed border-emerald-300/50 flex flex-col items-center justify-center text-emerald-500 hover:bg-emerald-100/50 transition-colors disabled:opacity-60"
+                        >
+                            {busyKind === 'gallery'
+                                ? <Loader2 size={20} className="animate-spin" />
+                                : <ImageIcon size={20} />}
+                            <span className="text-[10px] font-bold mt-1">{busyKind === 'gallery' ? 'Uploading…' : 'Add Photo'}</span>
+                        </button>
+                    )}
+                </div>
+                <p className="text-[10px] text-gray-400 mt-2">JPG/PNG · Max 5 MB each · Up to {GALLERY_LIMIT}</p>
+            </div>
+
+            {/* Video */}
+            <div>
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">
+                    Promo Video <span className="text-gray-300 font-normal normal-case ml-1">(optional)</span>
+                </label>
+                <input ref={videoInputRef} type="file" accept="video/mp4,video/quicktime" className="hidden" onChange={handleVideoPick} />
+                {video ? (
+                    <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 flex items-center gap-3">
+                        <div className="bg-emerald-50 p-3 rounded-xl text-emerald-500"><Play size={20} /></div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold truncate">Video uploaded</p>
+                            <a
+                                href={getUrl(video)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[10px] text-emerald-600 truncate block hover:underline"
+                            >
+                                {video.url || video.file_url}
+                            </a>
+                        </div>
+                        <button onClick={handleDeleteVideo} className="text-red-500 p-2"><Trash2 size={16} /></button>
+                    </div>
+                ) : (
+                    <button
+                        onClick={() => videoInputRef.current?.click()}
+                        disabled={busyKind === 'video'}
+                        className="w-full bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200 p-4 flex items-center gap-4 hover:bg-gray-100 disabled:opacity-60"
+                    >
+                        <div className="bg-gray-200 p-3 rounded-xl text-gray-500">
+                            {busyKind === 'video' ? <Loader2 size={20} className="animate-spin" /> : <Play size={20} />}
+                        </div>
+                        <div className="flex-1 text-left">
+                            <p className="text-sm font-bold">{busyKind === 'video' ? 'Uploading…' : 'Upload Promo Video'}</p>
+                            <p className="text-[10px] text-gray-400">MP4 / MOV · Max 100 MB</p>
+                        </div>
+                    </button>
+                )}
+            </div>
+
+            {!cover && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-[11px] font-bold text-amber-700">
+                    Cover image is required to submit this listing.
+                </div>
+            )}
+
+            <WizardNavigation
+                onBack={() => onNavigate('CREATE_PROGRAM_BATCH')}
+                onNext={() => onNavigate('CREATE_PROGRAM_POLICIES')}
+                nextText="Next: Policies"
+                nextIcon={<ArrowRight size={18} />}
+                themeColor="emerald"
+            />
+        </WizardLayout>
+    );
+};

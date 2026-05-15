@@ -163,7 +163,7 @@ export interface EventListingData {
 // ---------------------------------------------------------------------------
 // Enquiries (CRM)
 // ---------------------------------------------------------------------------
-export type EnquiryStatus = 'New' | 'Contacted' | 'Converted' | 'Lost';
+export type EnquiryStatus = 'new' | 'contacted' | 'trial_booked' | 'enrolled' | 'closed';
 
 export interface EnquiryData {
   id: string;

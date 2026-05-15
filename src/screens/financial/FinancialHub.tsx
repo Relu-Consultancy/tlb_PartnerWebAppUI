@@ -1,132 +1,284 @@
-import React, { useState } from 'react';
-import {
-    Menu, TrendingUp, ReceiptIndianRupee, ArrowUpRight, Building2, Filter,
-    CheckCircle2, Download, ShieldAlert
-} from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Menu, DollarSign, Download, ShieldCheck, AlertCircle, Building2, Smartphone, X, Loader2, Inbox } from 'lucide-react';
 import { Screen } from '../../types';
+import { getCurrentPartner } from '../../api/onboarding';
 
-interface FinancialHubProps {
-    onNavigate: (screen: Screen) => void;
-    onOpenSidebar: () => void;
+interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
+
+interface BankAccount {
+    accountHolderName: string;
+    maskedNumber: string;
+    ifscCode: string;
+    isVerified: boolean;
 }
 
-export const FinancialHub: React.FC<FinancialHubProps> = ({ onNavigate, onOpenSidebar }) => {
-    const [isBankVerified] = useState(true);
+interface Transaction {
+    id: string;
+    date: string;
+    amount: string;
+    status: string;
+}
 
-    const transactions = [
-        { id: '1', label: 'Payout from TLB', date: 'Oct 24, 2023', amount: '+$2,400.00', status: 'SETTLED', type: 'in' as const },
-        { id: '2', label: 'Withdrawal to Chase', date: 'Oct 23, 2023', amount: '-$1,200.00', status: 'PENDING', type: 'out' as const },
-    ];
+const maskAccount = (num: string): string => {
+    if (!num) return '•••• •••• •••• ••••';
+    const cleaned = num.replace(/\D/g, '');
+    const last4 = cleaned.slice(-4);
+    return `•••• •••• •••• ${last4}`;
+};
+
+const FinancialHub: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
+    const [loading, setLoading] = useState(true);
+    const [bank, setBank] = useState<BankAccount | null>(null);
+    const [isKycVerified, setIsKycVerified] = useState(false);
+    const [transactions] = useState<Transaction[]>([]);
+    const [activeModal, setActiveModal] = useState<'bank' | 'upi' | null>(null);
+
+    useEffect(() => {
+        const fetchProfile = async () => {
+            try {
+                const res = await getCurrentPartner();
+                const partner = res.data || res;
+
+                // Bank details may be nested under bank_account, verification, or at root level
+                const raw = partner.bank_account || partner.verification || partner;
+                const accountHolderName: string =
+                    raw.account_holder_name || partner.account_holder_name || '';
+                const accountNumber: string =
+                    raw.account_number || partner.account_number || '';
+                const ifscCode: string =
+                    raw.ifsc_code || partner.ifsc_code || '';
+
+                if (accountHolderName || accountNumber) {
+                    setBank({
+                        accountHolderName,
+                        maskedNumber: maskAccount(accountNumber),
+                        ifscCode,
+                        isVerified: raw.is_verified ?? partner.status === 'approved',
+                    });
+                }
+
+                setIsKycVerified(partner.status === 'approved');
+            } catch {
+                // Profile fetch failed — show empty state, don't block the screen
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchProfile();
+    }, []);
 
     return (
-        <div className="min-h-screen bg-gray-50 pb-24">
-            <header className="bg-white p-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
-                <button onClick={onOpenSidebar} className="p-2 -ml-2"><Menu size={24} /></button>
-                <h1 className="font-black text-lg">Financial Hub</h1>
-                <div className="w-10 h-10 rounded-full bg-tlb-yellow/10 flex items-center justify-center text-tlb-yellow"><CheckCircle2 size={24} /></div>
-            </header>
-            <main className="p-6">
-                <div className="tlb-content space-y-8">
+        <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
+            <main className="flex-1 w-full md:w-auto h-screen overflow-y-auto">
+                <header className="bg-white p-6 md:p-10 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
+                    <div className="flex items-center gap-4">
+                        <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors"><Menu size={24} /></button>
+                        <div>
+                            <h1 className="text-2xl font-black text-gray-900 tracking-tight">Pay-outs & Finance</h1>
+                            <p className="text-sm font-bold text-gray-400 mt-1">Manage settlements and bank details</p>
+                        </div>
+                    </div>
+                </header>
 
-                    {/* Settlement Status */}
-                    <section className="space-y-4">
-                        <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Settlement Status</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            <div className="tlb-card p-5">
-                                <div className="flex items-center gap-2 text-[10px] font-black text-tlb-yellow uppercase tracking-widest mb-3"><TrendingUp size={12} /> Total Earned</div>
-                                <p className="text-2xl font-black">$12,450</p>
-                                <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mt-1 flex items-center gap-1"><ArrowUpRight size={10} /> +12.5%</p>
-                            </div>
-                            <div className="tlb-card p-5">
-                                <div className="flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3"><ReceiptIndianRupee size={12} /> Commission Deducted</div>
-                                <p className="text-2xl font-black text-red-500">-$1,249</p>
-                                <p className="text-[10px] text-gray-400 font-bold mt-1">10% TLB fee</p>
-                            </div>
-                            <div className="tlb-card p-5 border-tlb-yellow/30">
-                                <div className="flex items-center gap-2 text-[10px] font-black text-tlb-yellow uppercase tracking-widest mb-3"><ReceiptIndianRupee size={12} /> Final Payout Pending</div>
-                                <p className="text-2xl font-black">$3,200</p>
-                                <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mt-1 flex items-center gap-1"><ArrowUpRight size={10} /> +5.2%</p>
+                <div className="p-4 md:p-8 tlb-content space-y-6">
+                    {/* Settlement Status Overview */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm relative overflow-hidden group">
+                            <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-1 relative z-10">Total Earned</p>
+                            <h3 className="text-3xl font-black text-gray-900 relative z-10">—</h3>
+                            <div className="absolute right-0 bottom-0 opacity-5 group-hover:scale-110 transition-transform"><DollarSign size={100} /></div>
+                        </div>
+                        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm relative overflow-hidden group">
+                            <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-1 relative z-10">Commission Deducted</p>
+                            <h3 className="text-3xl font-black text-red-400 relative z-10">—</h3>
+                        </div>
+                        <div className="bg-gradient-to-br from-tlb-dark to-gray-900 p-6 rounded-3xl shadow-lg relative overflow-hidden group">
+                            <p className="text-[11px] font-black text-gray-300 uppercase tracking-widest mb-1 relative z-10">Final Payout Pending</p>
+                            <h3 className="text-3xl font-black text-tlb-yellow relative z-10">—</h3>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Transaction History */}
+                        <div className="lg:col-span-2 space-y-4">
+                            <h2 className="text-lg font-black text-gray-900">Transaction History</h2>
+                            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-gray-50/50 border-b border-gray-100">
+                                            <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest">Date</th>
+                                            <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest">Amount</th>
+                                            <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+                                            <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest text-right">Invoice</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-50">
+                                        {transactions.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={4} className="px-6 py-16 text-center">
+                                                    <div className="flex flex-col items-center gap-3 text-gray-300">
+                                                        <Inbox size={36} />
+                                                        <p className="text-sm font-bold">No transactions yet</p>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ) : transactions.map(tx => (
+                                            <tr key={tx.id} className="hover:bg-gray-50/50 transition-colors">
+                                                <td className="px-6 py-4 text-sm font-bold text-gray-700">{tx.date}</td>
+                                                <td className="px-6 py-4 font-black text-gray-900">{tx.amount}</td>
+                                                <td className="px-6 py-4">
+                                                    <span className="text-[10px] bg-emerald-50 text-emerald-600 font-black px-2 py-1 rounded uppercase tracking-widest">{tx.status}</span>
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    <button className="text-[11px] font-bold text-blue-500 hover:text-blue-600 flex items-center gap-1 justify-end w-full">
+                                                        <Download size={14} /> Download
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
-                    </section>
 
-                    <button className="tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20"><ReceiptIndianRupee size={20} /> Withdraw Funds</button>
+                        {/* Payout Methods Card */}
+                        <div className="space-y-6">
+                            <h2 className="text-lg font-black text-gray-900">Payout Methods</h2>
 
-                    {/* Bank Details Card */}
-                    <section className="space-y-4">
-                        <h3 className="font-black text-xl">Bank Details</h3>
-                        {isBankVerified ? (
-                            <div className="bg-tlb-dark rounded-[2rem] p-8 text-white relative overflow-hidden shadow-2xl">
-                                <div className="absolute top-0 right-0 w-32 h-32 bg-tlb-yellow/10 rounded-full -translate-y-1/2 translate-x-1/2" />
-                                <div className="relative flex justify-between items-start">
-                                    <div className="flex gap-4">
-                                        <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center"><Building2 size={24} className="text-white" /></div>
-                                        <div>
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <CheckCircle2 size={14} className="text-emerald-400" />
-                                                <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Verified Account</span>
+                            {/* Bank Account Card */}
+                            <div className="bg-gradient-to-br from-gray-900 to-black p-6 rounded-3xl text-white shadow-xl relative overflow-hidden mt-2">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -mr-10 -mt-10" />
+                                <div className="absolute bottom-0 left-0 w-24 h-24 bg-tlb-yellow/10 rounded-full blur-xl -ml-10 -mb-10" />
+
+                                <div className="relative z-10 flex justify-between items-start mb-8">
+                                    <div className="text-[10px] font-black tracking-widest uppercase text-gray-400">Primary Bank</div>
+                                    <div className="h-6 px-3 bg-white/10 rounded flex items-center justify-center backdrop-blur-sm border border-white/5">
+                                        <span className="text-[9px] font-bold tracking-wider">BANKING</span>
+                                    </div>
+                                </div>
+
+                                {loading ? (
+                                    <div className="relative z-10 flex items-center gap-2 text-gray-400 py-4">
+                                        <Loader2 size={14} className="animate-spin" />
+                                        <span className="text-xs font-bold">Loading…</span>
+                                    </div>
+                                ) : (
+                                    <div className="relative z-10 space-y-4">
+                                        <div className="text-xl font-black tracking-[0.2em] font-mono text-gray-100">
+                                            {bank ? bank.maskedNumber : '—'}
+                                        </div>
+                                        <div className="flex justify-between items-end">
+                                            <div>
+                                                <p className="text-[8px] text-gray-400 font-bold uppercase tracking-widest mb-1">Account Holder</p>
+                                                <p className="font-bold text-sm tracking-wide">
+                                                    {bank ? bank.accountHolderName : 'Not linked'}
+                                                </p>
+                                                {bank?.ifscCode && (
+                                                    <p className="text-[10px] text-gray-400 font-mono mt-0.5">{bank.ifscCode}</p>
+                                                )}
                                             </div>
-                                            <h4 className="font-bold text-lg">Chase Business</h4>
-                                            <p className="text-2xl font-black mt-2 tracking-widest text-white/90">**** 8821</p>
+                                            {bank?.isVerified && <ShieldCheck size={22} className="text-emerald-400" />}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Add / Update Buttons */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <button onClick={() => setActiveModal('bank')} className="bg-white border border-gray-100 hover:border-tlb-yellow hover:shadow-md hover:-translate-y-0.5 transition-all p-5 rounded-2xl flex flex-col items-center justify-center gap-3 group shadow-sm">
+                                    <div className="w-12 h-12 bg-gray-50 group-hover:bg-tlb-yellow/10 group-hover:text-tlb-yellow rounded-full flex items-center justify-center text-gray-400 transition-colors">
+                                        <Building2 size={24} />
+                                    </div>
+                                    <span className="text-xs font-bold text-gray-600">{bank ? 'Update Bank' : 'Add Bank'}</span>
+                                </button>
+                                <button onClick={() => setActiveModal('upi')} className="bg-white border border-gray-100 hover:border-tlb-yellow hover:shadow-md hover:-translate-y-0.5 transition-all p-5 rounded-2xl flex flex-col items-center justify-center gap-3 group shadow-sm">
+                                    <div className="w-12 h-12 bg-gray-50 group-hover:bg-tlb-yellow/10 group-hover:text-tlb-yellow rounded-full flex items-center justify-center text-gray-400 transition-colors">
+                                        <Smartphone size={24} />
+                                    </div>
+                                    <span className="text-xs font-bold text-gray-600">Add UPI ID</span>
+                                </button>
+                            </div>
+
+                            {/* KYC Warning */}
+                            {!loading && !isKycVerified && (
+                                <div className="bg-orange-50 border border-orange-100 p-4 rounded-2xl">
+                                    <div className="flex items-start gap-3">
+                                        <AlertCircle size={18} className="text-orange-500 shrink-0 mt-0.5" />
+                                        <div>
+                                            <h4 className="text-sm font-bold text-orange-800">Action Required</h4>
+                                            <p className="text-[11px] text-orange-600 mt-1 leading-relaxed">
+                                                Please provide a cancelled cheque to verify your account.
+                                            </p>
+                                            <button onClick={() => onNavigate('IDENTITY_VERIFICATION')} className="text-xs font-bold text-orange-700 mt-2 hover:underline">Complete KYC</button>
                                         </div>
                                     </div>
                                 </div>
-                                <button onClick={() => onNavigate('BANK_SETUP_HUB')} className="relative mt-6 text-[10px] font-bold text-white/60 hover:text-white uppercase tracking-widest">Add another account</button>
-                            </div>
-                        ) : (
-                            <div className="tlb-card p-8 border-2 border-dashed border-amber-200 bg-amber-50/30">
-                                <div className="flex flex-col items-center justify-center text-center gap-4">
-                                    <div className="w-14 h-14 rounded-full bg-amber-100 flex items-center justify-center text-amber-600"><ShieldAlert size={28} /></div>
-                                    <div>
-                                        <h4 className="font-black text-lg text-tlb-dark">Bank Account Not Verified</h4>
-                                        <p className="text-sm text-gray-500 mt-1">Add your bank details and upload a cancelled cheque to receive payouts.</p>
-                                    </div>
-                                    <button
-                                        onClick={() => onNavigate('BANK_SETUP_HUB')}
-                                        className="tlb-button px-8 py-3 shadow-lg shadow-tlb-yellow/20"
-                                    >
-                                        Complete KYC to Receive Payouts
-                                    </button>
-                                    <p className="text-[10px] text-gray-400 font-bold">Upload a cancelled cheque or bank statement</p>
-                                </div>
-                            </div>
-                        )}
-                    </section>
-
-                    {/* Transaction History */}
-                    <section className="space-y-4">
-                        <div className="flex justify-between items-center">
-                            <h3 className="font-black text-xl">Transaction History</h3>
-                            <button className="p-2 text-gray-400 hover:text-gray-600"><Filter size={20} /></button>
+                            )}
                         </div>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Every payout made to your bank</p>
-                        <div className="space-y-4">
-                            {transactions.map((tx) => (
-                                <div key={tx.id} className="tlb-card p-4 flex items-center gap-4">
-                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${tx.type === 'in' ? 'bg-emerald-50 text-emerald-500' : 'bg-orange-50 text-orange-500'}`}>
-                                        {tx.type === 'in' ? <CheckCircle2 size={24} /> : <ArrowUpRight size={24} />}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <h4 className="font-bold text-sm">{tx.label}</h4>
-                                        <p className="text-[10px] text-gray-400 font-bold uppercase mt-1">{tx.date}</p>
-                                    </div>
-                                    <div className="text-right shrink-0">
-                                        <p className={`font-black ${tx.type === 'in' ? 'text-emerald-500' : 'text-tlb-dark'}`}>{tx.amount}</p>
-                                        <p className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest mt-1 inline-block ${tx.status === 'SETTLED' ? 'bg-emerald-50 text-emerald-500' : 'bg-orange-50 text-orange-500'}`}>{tx.status}</p>
-                                    </div>
-                                    <button
-                                        className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold transition-colors shrink-0"
-                                        title="Download Invoice"
-                                    >
-                                        <Download size={14} />
-                                        <span className="hidden sm:inline">Invoice</span>
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    </section>
+                    </div>
                 </div>
             </main>
+
+            {/* Add Bank Modal */}
+            {activeModal === 'bank' && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm">
+                    <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
+                        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+                            <h2 className="font-black text-xl">{bank ? 'Update Bank Account' : 'Add Bank Account'}</h2>
+                            <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500 hover:text-gray-900">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Account Holder Name</label>
+                                <input type="text" className="tlb-input w-full" placeholder="As per bank records" defaultValue={bank?.accountHolderName} />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Account Number</label>
+                                <input type="text" className="tlb-input w-full" placeholder="e.g. 1234567890" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Re-enter Account Number</label>
+                                <input type="text" className="tlb-input w-full" placeholder="e.g. 1234567890" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">IFSC Code</label>
+                                <input type="text" className="tlb-input w-full" placeholder="e.g. HDFC0001234" defaultValue={bank?.ifscCode} />
+                            </div>
+                        </div>
+                        <div className="p-6 bg-gray-50 border-t border-gray-100">
+                            <button onClick={() => setActiveModal(null)} className="tlb-button w-full shadow-lg shadow-tlb-yellow/20 py-4">Save Bank Details</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Add UPI Modal */}
+            {activeModal === 'upi' && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm">
+                    <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
+                        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+                            <h2 className="font-black text-xl">Add UPI ID</h2>
+                            <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500 hover:text-gray-900">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">UPI ID</label>
+                                <input type="text" className="tlb-input w-full" placeholder="e.g. john@okhdfcbank" />
+                            </div>
+                        </div>
+                        <div className="p-6 bg-gray-50 border-t border-gray-100 flex flex-col gap-3">
+                            <button onClick={() => setActiveModal(null)} className="tlb-button w-full shadow-lg shadow-tlb-yellow/20 py-4">Verify & Save</button>
+                            <p className="text-[10px] text-gray-400 text-center uppercase tracking-widest font-bold">A test charge of ₹1 may be applied</p>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
+
+export default FinancialHub;

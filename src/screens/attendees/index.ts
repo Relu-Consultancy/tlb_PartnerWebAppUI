@@ -1,1 +1,2 @@
-export { Attendees } from './Attendees';
+import { default as Attendees } from './Attendees';
+export default Attendees;

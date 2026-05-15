@@ -1,235 +1,454 @@
-import React from 'react';
-import {
-    ArrowLeft,
-    Plus,
-    Search,
-    Calendar,
-    MapPin,
-    Users,
-    Clock,
-    ImageIcon
-} from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowRight, MapPin, Check, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
+import { WizardLayout, WizardNavigation } from '../../components/ui';
+import {
+    getEventMetaCategories,
+    getEventMetaFormats,
+    getEventMetaAgeGroups,
+    createEventDraft,
+    updateListing,
+    getListingDetail,
+    getCurrentDraftId,
+    setCurrentDraftId,
+} from '../../api/listings';
 
-interface EventProps {
-    onNavigate: (screen: Screen) => void;
-    onOpenSidebar: () => void;
+interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
+
+interface ApiCategory { id: number; name: string; slug: string; subcategories: { id: number; name: string; slug: string }[] }
+interface ApiFormat { value: string; label: string }
+interface StaticRange { min_age: number; max_age: number }
+interface AgeGroupsMeta {
+    static_ranges: StaticRange[];
+    custom_range: { enabled: boolean; min_allowed_age: number; max_allowed_age: number };
 }
 
-export const CreateEventDetails: React.FC<EventProps> = ({ onNavigate, onOpenSidebar }) => (
-    <div className="min-h-screen bg-[#FDFCF8] pb-24">
-        {/* Header & Stepper */}
-        <header className="bg-white p-4 sm:p-6 sticky top-0 z-30 border-b border-gray-100">
-            <div className="flex items-center justify-between mb-6">
-                <button onClick={() => onNavigate('EVENT_LISTINGS')} className="p-2 -ml-2 rounded-full hover:bg-gray-50"><ArrowLeft size={24} /></button>
-                <h1 className="font-black text-lg">Create New Event</h1>
-                <div className="w-8"></div> {/* Spacer */}
+type Mode = 'online' | 'offline' | 'hybrid';
+
+const MODE_META: { value: Mode; label: string; icon: string }[] = [
+    { value: 'online', label: 'Online', icon: '💻' },
+    { value: 'offline', label: 'Offline', icon: '📍' },
+    { value: 'hybrid', label: 'Hybrid', icon: '🔄' },
+];
+
+export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
+    const [title, setTitle] = useState('');
+    const [description, setDescription] = useState('');
+
+    // Metadata
+    const [categories, setCategories] = useState<ApiCategory[]>([]);
+    const [formats, setFormats] = useState<ApiFormat[]>([]);
+    const [ageMeta, setAgeMeta] = useState<AgeGroupsMeta | null>(null);
+    const [metaLoading, setMetaLoading] = useState(true);
+    const [metaError, setMetaError] = useState<string | null>(null);
+
+    // Selections
+    const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+    const [selectedSubcategoryId, setSelectedSubcategoryId] = useState<number | null>(null);
+    const [selectedFormat, setSelectedFormat] = useState<string>('');
+    const [ageGroupType, setAgeGroupType] = useState<'static' | 'custom'>('static');
+    const [staticAgeKey, setStaticAgeKey] = useState<string>(''); // "min-max"
+    const [customMin, setCustomMin] = useState<string>('');
+    const [customMax, setCustomMax] = useState<string>('');
+    const [mode, setMode] = useState<Mode>('offline');
+    const [city, setCity] = useState('');
+    const [area, setArea] = useState('');
+    const [address, setAddress] = useState('');
+    const [meetingLink, setMeetingLink] = useState('');
+
+    const [saving, setSaving] = useState(false);
+    const [draftLoading, setDraftLoading] = useState(false);
+
+    // ─── Load metadata + existing draft (if any) ──────────────────────────
+    useEffect(() => {
+        let cancelled = false;
+        const load = async () => {
+            setMetaLoading(true);
+            try {
+                const [catsRes, fmtsRes, agesRes] = await Promise.all([
+                    getEventMetaCategories(),
+                    getEventMetaFormats(),
+                    getEventMetaAgeGroups(),
+                ]);
+                if (cancelled) return;
+                setCategories(catsRes.data || catsRes || []);
+                setFormats(fmtsRes.data || fmtsRes || []);
+                setAgeMeta(agesRes.data || agesRes || null);
+            } catch (err: any) {
+                if (!cancelled) setMetaError(err?.message || 'Failed to load event metadata');
+            } finally {
+                if (!cancelled) setMetaLoading(false);
+            }
+
+            const draftId = getCurrentDraftId();
+            if (draftId && !cancelled) {
+                setDraftLoading(true);
+                try {
+                    const res = await getListingDetail(draftId);
+                    const d = res.data || res;
+                    if (cancelled) return;
+                    setTitle(d.title || '');
+                    setDescription(d.description || '');
+                    setSelectedCategoryId(d.category?.id ?? null);
+                    setSelectedSubcategoryId(d.subcategory?.id ?? null);
+                    setSelectedFormat(d.format || '');
+                    if (d.age_group) {
+                        setAgeGroupType(d.age_group.type || 'static');
+                        if (d.age_group.type === 'static') {
+                            setStaticAgeKey(`${d.age_group.min_age}-${d.age_group.max_age}`);
+                        } else {
+                            setCustomMin(String(d.age_group.min_age ?? ''));
+                            setCustomMax(String(d.age_group.max_age ?? ''));
+                        }
+                    }
+                    if (d.mode) setMode(d.mode);
+                    setCity(d.city || '');
+                    setArea(d.area || '');
+                    setAddress(d.address || '');
+                    setMeetingLink(d.meeting_link || '');
+                } catch (err) {
+                    console.warn('Could not load existing draft', err);
+                } finally {
+                    if (!cancelled) setDraftLoading(false);
+                }
+            }
+        };
+        load();
+        return () => { cancelled = true; };
+    }, []);
+
+    const selectedCategory = categories.find(c => c.id === selectedCategoryId);
+    const subcategories = selectedCategory?.subcategories || [];
+
+    const buildAgeGroup = () => {
+        if (ageGroupType === 'static') {
+            if (!staticAgeKey) return null;
+            const [min, max] = staticAgeKey.split('-').map(Number);
+            return { type: 'static', min_age: min, max_age: max };
+        }
+        const min = parseInt(customMin, 10);
+        const max = parseInt(customMax, 10);
+        if (isNaN(min) || isNaN(max)) return null;
+        return { type: 'custom', min_age: min, max_age: max };
+    };
+
+    const handleNext = async () => {
+        if (!title.trim()) {
+            alert('Please enter an event title.');
+            return;
+        }
+        setSaving(true);
+        try {
+            // 1. Create draft if none exists yet
+            let draftId = getCurrentDraftId();
+            if (!draftId) {
+                const createRes = await createEventDraft({
+                    title: title.trim(),
+                    description: description.trim() || undefined,
+                });
+                const data = createRes.data || createRes;
+                draftId = data.id;
+                if (!draftId) throw new Error('Server did not return a draft id.');
+                setCurrentDraftId(draftId);
+            }
+
+            // 2. Build update payload from current selections
+            const payload: Record<string, any> = {
+                title: title.trim(),
+                description: description.trim(),
+                mode,
+            };
+            if (selectedCategoryId) payload.category_id = selectedCategoryId;
+            if (selectedSubcategoryId) payload.subcategory_id = selectedSubcategoryId;
+            if (selectedFormat) payload.format = selectedFormat;
+            const ageGroup = buildAgeGroup();
+            if (ageGroup) payload.age_group = ageGroup;
+            if (mode === 'offline' || mode === 'hybrid') {
+                if (city) payload.city = city;
+                if (area) payload.area = area;
+                if (address) payload.address = address;
+            }
+            if (mode === 'online' || mode === 'hybrid') {
+                if (meetingLink) payload.meeting_link = meetingLink;
+            }
+
+            await updateListing(draftId, payload);
+            onNavigate('CREATE_EVENT_SCHEDULE');
+        } catch (err: any) {
+            console.error('Failed to save draft', err);
+            alert(err?.message || 'Failed to save event. Please try again.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const overlayLoading = metaLoading || draftLoading;
+
+    return (
+        <WizardLayout
+            title="New Event"
+            stepText="Step 1 of 4"
+            subtitle="Details"
+            progressPercentage={25}
+            themeColor="blue"
+            onBack={() => onNavigate('SERVICE_LISTINGS')}
+        >
+            {overlayLoading && (
+                <div className="flex items-center justify-center gap-2 text-gray-400 text-xs font-bold">
+                    <Loader2 size={14} className="animate-spin" /> Loading…
+                </div>
+            )}
+            {metaError && (
+                <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-xs font-bold text-red-600">
+                    {metaError}
+                </div>
+            )}
+
+            <div className="space-y-1">
+                <h2 className="text-2xl font-black">Event Details</h2>
+                <p className="text-sm text-gray-400">Define what your event is about.</p>
             </div>
 
-            {/* Stepper */}
-            <div className="flex justify-between items-center relative max-w-xs mx-auto px-4">
-                <div className="absolute left-[10%] right-[10%] top-4 h-0.5 bg-gray-100 -z-10"></div>
-                <div className="absolute left-[10%] right-[50%] top-4 h-0.5 bg-tlb-yellow -z-10"></div>
-
-                <div className="flex flex-col items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-tlb-yellow flex items-center justify-center text-sm font-black text-tlb-dark shadow-sm">1</div>
-                    <span className="text-[10px] font-bold text-tlb-yellow">Details</span>
-                </div>
-                <div className="flex flex-col items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-white border-2 border-gray-100 flex items-center justify-center text-sm font-black text-gray-300">2</div>
-                    <span className="text-[10px] font-bold text-gray-300">Tickets</span>
-                </div>
-                <div className="flex flex-col items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-white border-2 border-gray-100 flex items-center justify-center text-sm font-black text-gray-300">3</div>
-                    <span className="text-[10px] font-bold text-gray-300">Publish</span>
-                </div>
-            </div>
-        </header>
-
-        <main className="p-4 sm:p-6 max-w-3xl mx-auto space-y-6">
-
-            {/* Basic Info */}
-            <div className="bg-white rounded-[2rem] p-6 border border-gray-100 shadow-sm space-y-6">
-                <div className="flex items-center gap-3">
-                    <div className="bg-tlb-yellow/10 p-2 rounded-xl text-tlb-yellow"><ImageIcon size={20} /></div>
-                    <h2 className="font-black text-lg">Basic Info</h2>
-                </div>
-
-                <div className="space-y-4">
-                    <div>
-                        <label className="text-xs font-bold text-tlb-dark mb-2 block">Event Name</label>
-                        <input className="tlb-input bg-[#F8F9FA] border-gray-100 text-sm" placeholder="e.g. The Midnight Masquerade" />
-                    </div>
-                    <div>
-                        <label className="text-xs font-bold text-tlb-dark mb-2 block">Event Banner</label>
-                        <div className="aspect-[2/1] bg-[#F8F9FA] rounded-[1.5rem] border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-400 gap-3 cursor-pointer hover:bg-gray-50 transition-colors">
-                            <ImageIcon size={32} />
-                            <p className="text-[10px] font-bold">Recommended: 1200 x 675px</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Schedule */}
-            <div className="bg-white rounded-[2rem] p-6 border border-gray-100 shadow-sm space-y-6">
-                <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-3">
-                        <div className="bg-tlb-yellow/10 p-2 rounded-xl text-tlb-yellow"><Calendar size={20} /></div>
-                        <h2 className="font-black text-lg">Schedule</h2>
-                    </div>
-                    <div className="bg-[#F8F9FA] flex rounded-lg p-1 border border-gray-100">
-                        <button className="px-3 py-1 text-[10px] font-black bg-white rounded-md shadow-sm">Single</button>
-                        <button className="px-3 py-1 text-[10px] font-black text-gray-400">Slots</button>
-                    </div>
-                </div>
-
-                <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="text-[10px] font-bold text-gray-400 mb-2 block">Date</label>
-                            <div className="relative">
-                                <input type="text" placeholder="mm/dd/yyyy" className="tlb-input bg-[#F8F9FA] border-gray-100 text-sm pr-10" />
-                                <Calendar size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                            </div>
-                        </div>
-                        <div>
-                            <label className="text-[10px] font-bold text-gray-400 mb-2 block">Time</label>
-                            <div className="relative">
-                                <input type="text" placeholder="-- : -- --" className="tlb-input bg-[#F8F9FA] border-gray-100 text-sm pl-10 text-center" />
-                                <Clock size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                            </div>
-                        </div>
-                    </div>
-
-                    <button className="w-full py-3 border-2 border-dashed border-gray-200 rounded-2xl text-tlb-dark font-black text-xs flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors">
-                        <Plus size={16} /> Add Another Slot
-                    </button>
-                </div>
-            </div>
-
-            {/* Category & Language */}
-            <div className="bg-white rounded-[2rem] p-6 border border-gray-100 shadow-sm space-y-6">
-                <div className="flex items-center gap-3">
-                    <div className="bg-tlb-yellow/10 p-2 rounded-xl text-tlb-yellow flex gap-0.5"><div className="w-1.5 h-1.5 bg-tlb-yellow rounded-full"></div><div className="w-1.5 h-1.5 bg-tlb-yellow rounded-full"></div><div className="w-1.5 h-1.5 bg-tlb-yellow rounded-full"></div></div>
-                    <h2 className="font-black text-lg">Category & Language</h2>
-                </div>
-
-                <div className="space-y-4">
-                    <div>
-                        <label className="text-[10px] font-bold text-tlb-dark mb-2 block">Event Category</label>
-                        <select className="tlb-input bg-[#F8F9FA] border-gray-100 text-sm appearance-none">
-                            <option>Musical Theater</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label className="text-[10px] font-bold text-tlb-dark mb-2 block">Performance Language(s)</label>
-                        <div className="flex flex-wrap gap-2">
-                            {['English', 'Spanish', 'French'].map((lang, i) => (
-                                <button key={lang} className={`px-4 py-2 rounded-full text-xs font-bold border ${i === 0 ? 'border-tlb-yellow text-tlb-dark bg-tlb-yellow/5' : 'border-gray-200 text-gray-400'}`}>
-                                    {lang}
-                                </button>
-                            ))}
-                            <button className="px-4 py-2 rounded-full text-xs font-bold border border-gray-200 text-gray-500 uppercase tracking-widest">+ Add</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Age Groups */}
-            <div className="bg-white rounded-[2rem] p-6 border border-gray-100 shadow-sm space-y-6">
-                <div className="flex items-center gap-3">
-                    <div className="bg-tlb-yellow/10 p-2 rounded-xl text-tlb-yellow"><Users size={20} /></div>
-                    <h2 className="font-black text-lg">Age Groups</h2>
-                </div>
-
-                <div>
-                    <label className="text-[10px] font-bold text-tlb-dark mb-3 block">Target Audience</label>
-                    <div className="flex flex-wrap gap-2 mb-2">
-                        {[
-                            { label: '0-3', active: true },
-                            { label: '4-7', active: true },
-                            { label: '8-12', active: false },
-                            { label: '13-16', active: false },
-                            { label: '17-18', active: false },
-                            { label: '18+ (Parents)', active: false },
-                        ].map((age) => (
-                            <button key={age.label} className={`px-4 py-2 rounded-full text-xs font-bold border ${age.active ? 'border-tlb-yellow text-tlb-dark bg-tlb-yellow/5' : 'border-gray-200 text-gray-400'}`}>
-                                {age.label}
-                            </button>
-                        ))}
-                    </div>
-                    <p className="text-[10px] text-gray-400 italic">Select all that apply for your production.</p>
-                </div>
-            </div>
-
-            {/* Location */}
-            <div className="bg-white rounded-[2rem] p-6 border border-gray-100 shadow-sm space-y-6">
-                <div className="flex items-center gap-3">
-                    <div className="bg-tlb-yellow/10 p-2 rounded-xl text-tlb-yellow"><MapPin size={20} /></div>
-                    <h2 className="font-black text-lg">Location</h2>
-                </div>
-
-                <div className="space-y-4">
-                    <div>
-                        <label className="text-[10px] font-bold text-tlb-dark mb-2 block">Venue Address</label>
-                        <div className="relative">
-                            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                            <input className="tlb-input bg-[#F8F9FA] border-gray-100 text-sm pl-11" placeholder="Search for theater or address" />
-                        </div>
-                    </div>
-
-                    <div className="h-40 bg-[#E9ECEF] rounded-[1.5rem] relative overflow-hidden flex items-center justify-center">
-                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">MAP PREVIEW</span>
-                        <div className="absolute bottom-3 left-3 bg-white p-2 rounded-xl shadow-sm">
-                            <p className="font-black text-[10px]">Majestic Theatre</p>
-                            <p className="text-[8px] text-gray-500">245 W 44th St, New York</p>
-                        </div>
-                    </div>
-                </div>
+            {/* Title */}
+            <div>
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Event Title</label>
+                <input
+                    className="tlb-input w-full"
+                    placeholder="e.g. Summer Art Festival"
+                    maxLength={200}
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                />
             </div>
 
             {/* Description */}
-            <div className="bg-white rounded-[2rem] p-6 border border-gray-100 shadow-sm space-y-6">
-                <div className="flex items-center gap-3">
-                    <div className="bg-tlb-yellow/10 p-2 rounded-xl text-tlb-yellow"><span className="text-xl font-black">☰</span></div>
-                    <h2 className="font-black text-lg">Description</h2>
+            <div>
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Description</label>
+                <textarea
+                    className="tlb-input w-full min-h-[140px] resize-y"
+                    placeholder="Tell parents & attendees what this event is about, what to expect, what to bring..."
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                />
+            </div>
+
+            {/* Category */}
+            <div>
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">Category</label>
+                {categories.length === 0 && !metaLoading ? (
+                    <p className="text-xs text-gray-400">No categories available.</p>
+                ) : (
+                    <div className="max-h-[300px] overflow-y-auto rounded-2xl">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pr-1">
+                            {categories.map((cat) => (
+                                <button
+                                    key={cat.id}
+                                    onClick={() => { setSelectedCategoryId(cat.id); setSelectedSubcategoryId(null); }}
+                                    className={`relative p-4 rounded-2xl border-2 text-center transition-all ${selectedCategoryId === cat.id
+                                        ? 'border-blue-400 bg-blue-50'
+                                        : 'border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm'
+                                    }`}
+                                >
+                                    {selectedCategoryId === cat.id && (
+                                        <div className="absolute top-2 right-2 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                                            <Check size={12} className="text-white" />
+                                        </div>
+                                    )}
+                                    <span className="text-xs font-bold text-gray-700 leading-tight">{cat.name}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Subcategory */}
+            {selectedCategory && subcategories.length > 0 && (
+                <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Sub-Category</label>
+                    <div className="flex gap-2 overflow-x-auto pb-2">
+                        {subcategories.map((s) => (
+                            <button
+                                key={s.id}
+                                onClick={() => setSelectedSubcategoryId(selectedSubcategoryId === s.id ? null : s.id)}
+                                className={`px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap shrink-0 transition-all ${
+                                    selectedSubcategoryId === s.id
+                                        ? 'bg-blue-500 text-white shadow-sm'
+                                        : 'bg-white border border-gray-200 text-gray-500 hover:border-blue-300'
+                                }`}
+                            >
+                                {s.name}
+                            </button>
+                        ))}
+                    </div>
                 </div>
+            )}
 
-                <div className="space-y-6">
-                    <div>
-                        <label className="text-[10px] font-bold text-tlb-dark mb-2 block">About the Event</label>
-                        <div className="border border-gray-100 rounded-2xl overflow-hidden bg-[#F8F9FA]">
-                            <div className="flex gap-4 p-3 border-b border-gray-100 bg-white">
-                                <button className="font-serif font-bold text-gray-700">B</button>
-                                <button className="italic font-serif text-gray-700">I</button>
-                                <button className="text-gray-700">≡</button>
-                            </div>
-                            <textarea className="w-full bg-transparent p-4 min-h-[120px] outline-none text-sm resize-y" placeholder="Tell your audience what makes this event special..."></textarea>
-                        </div>
-                    </div>
-
-                    <div>
-                        <div className="flex justify-between items-center mb-2">
-                            <label className="text-[10px] font-bold text-tlb-dark">Terms & Conditions</label>
-                            <button className="text-[8px] font-bold text-tlb-yellow uppercase tracking-widest">TEMPLATES</button>
-                        </div>
-                        <textarea className="tlb-input bg-[#F8F9FA] border-gray-100 text-sm min-h-[80px] resize-y" placeholder="Refund policy, age restrictions, etc."></textarea>
-                    </div>
-
-                    <button className="flex items-center gap-2 text-[10px] font-bold text-tlb-yellow uppercase tracking-widest">
-                        <Plus size={14} /> Add FAQ Section
-                    </button>
+            {/* Format (single-select) */}
+            <div>
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">Event Format</label>
+                <div className="flex flex-wrap gap-2">
+                    {formats.map((f) => (
+                        <button
+                            key={f.value}
+                            onClick={() => setSelectedFormat(selectedFormat === f.value ? '' : f.value)}
+                            className={`px-3.5 py-2 rounded-full text-xs font-bold transition-all ${selectedFormat === f.value
+                                ? 'bg-purple-500 text-white shadow-sm'
+                                : 'bg-white border border-gray-200 text-gray-500 hover:border-purple-300'
+                            }`}
+                        >
+                            {f.label}
+                        </button>
+                    ))}
                 </div>
             </div>
 
-        </main>
+            {/* Age Group */}
+            {ageMeta && (
+                <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">Age Group</label>
+                    {/* Type toggle */}
+                    <div className="flex gap-2 mb-3">
+                        <button
+                            onClick={() => setAgeGroupType('static')}
+                            className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${ageGroupType === 'static'
+                                ? 'bg-tlb-dark text-tlb-yellow'
+                                : 'bg-white border border-gray-200 text-gray-500'
+                            }`}
+                        >
+                            Preset
+                        </button>
+                        {ageMeta.custom_range.enabled && (
+                            <button
+                                onClick={() => setAgeGroupType('custom')}
+                                className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${ageGroupType === 'custom'
+                                    ? 'bg-tlb-dark text-tlb-yellow'
+                                    : 'bg-white border border-gray-200 text-gray-500'
+                                }`}
+                            >
+                                Custom
+                            </button>
+                        )}
+                    </div>
 
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-md border-t border-gray-100 z-40">
-            <div className="max-w-3xl mx-auto">
-                <button onClick={() => onNavigate('CREATE_EVENT_TICKETS')} className="w-full bg-tlb-yellow text-tlb-dark font-black py-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-tlb-yellow/20">
-                    Next: Ticket Setup <ArrowLeft size={20} className="rotate-180" />
-                </button>
+                    {ageGroupType === 'static' ? (
+                        <div className="flex flex-wrap gap-2">
+                            {ageMeta.static_ranges.map((r) => {
+                                const key = `${r.min_age}-${r.max_age}`;
+                                return (
+                                    <button
+                                        key={key}
+                                        onClick={() => setStaticAgeKey(staticAgeKey === key ? '' : key)}
+                                        className={`px-3.5 py-2 rounded-full text-xs font-bold transition-all ${staticAgeKey === key
+                                            ? 'bg-blue-500 text-white shadow-sm'
+                                            : 'bg-white border border-gray-200 text-gray-500 hover:border-blue-300'
+                                        }`}
+                                    >
+                                        {r.min_age}–{r.max_age} yrs
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-3">
+                            <input
+                                type="number"
+                                placeholder="Min"
+                                min={ageMeta.custom_range.min_allowed_age}
+                                max={ageMeta.custom_range.max_allowed_age}
+                                className="tlb-input w-24 text-center"
+                                value={customMin}
+                                onChange={(e) => setCustomMin(e.target.value)}
+                            />
+                            <span className="text-gray-400 font-bold text-sm">to</span>
+                            <input
+                                type="number"
+                                placeholder="Max"
+                                min={ageMeta.custom_range.min_allowed_age}
+                                max={ageMeta.custom_range.max_allowed_age}
+                                className="tlb-input w-24 text-center"
+                                value={customMax}
+                                onChange={(e) => setCustomMax(e.target.value)}
+                            />
+                            <span className="text-gray-400 font-bold text-sm">yrs</span>
+                            <span className="text-[10px] text-gray-300 ml-2">
+                                Allowed: {ageMeta.custom_range.min_allowed_age}–{ageMeta.custom_range.max_allowed_age}
+                            </span>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Mode */}
+            <div>
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">Mode</label>
+                <div className="grid grid-cols-3 gap-3">
+                    {MODE_META.map((m) => (
+                        <button
+                            key={m.value}
+                            onClick={() => setMode(m.value)}
+                            className={`p-4 rounded-2xl border-2 text-center transition-all ${mode === m.value
+                                ? 'border-blue-400 bg-blue-50'
+                                : 'border-gray-100 bg-white hover:border-gray-200'
+                            }`}
+                        >
+                            <span className="text-lg">{m.icon}</span>
+                            <p className={`text-xs font-bold mt-1.5 ${mode === m.value ? 'text-blue-600' : 'text-gray-500'}`}>{m.label}</p>
+                        </button>
+                    ))}
+                </div>
             </div>
-        </div>
-    </div>
-);
+
+            {/* Location (offline / hybrid) */}
+            {(mode === 'offline' || mode === 'hybrid') && (
+                <div className="space-y-3">
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block">
+                        <MapPin size={12} className="inline mr-1" /> Venue Location
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                        <input
+                            className="tlb-input w-full"
+                            placeholder="City"
+                            maxLength={100}
+                            value={city}
+                            onChange={(e) => setCity(e.target.value)}
+                        />
+                        <input
+                            className="tlb-input w-full"
+                            placeholder="Area / Neighborhood"
+                            maxLength={100}
+                            value={area}
+                            onChange={(e) => setArea(e.target.value)}
+                        />
+                    </div>
+                    <textarea
+                        className="tlb-input w-full min-h-[80px] resize-y"
+                        placeholder="Full address (street, building, pincode)"
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                    />
+                </div>
+            )}
+
+            {/* Meeting link (online / hybrid) */}
+            {(mode === 'online' || mode === 'hybrid') && (
+                <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Meeting Link</label>
+                    <input
+                        className="tlb-input w-full"
+                        placeholder="https://meet.google.com/..."
+                        value={meetingLink}
+                        onChange={(e) => setMeetingLink(e.target.value)}
+                    />
+                </div>
+            )}
+
+            <WizardNavigation
+                onNext={saving ? () => {} : handleNext}
+                nextText={saving ? 'Saving…' : 'Next: Schedule & Pricing'}
+                nextIcon={saving ? <Loader2 size={20} className="animate-spin" /> : <ArrowRight size={20} />}
+                themeColor="blue"
+            />
+        </WizardLayout>
+    );
+};

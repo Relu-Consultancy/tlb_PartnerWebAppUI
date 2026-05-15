@@ -29,7 +29,7 @@ export const OnboardingComplete: React.FC<OnboardingProps> = ({ onNavigate }) =>
 
                         <div className="w-32 h-32 rounded-full border-4 border-tlb-yellow p-1 mb-8 shadow-2xl shadow-tlb-yellow/20">
                             <div className="w-full h-full rounded-full overflow-hidden relative">
-                                <img src="https://picsum.photos/seed/spotlight/200/200" alt="Spotlight" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                <img loading="lazy" src="https://picsum.photos/seed/spotlight/200/200" alt="Spotlight" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
                             </div>
                         </div>
@@ -44,9 +44,9 @@ export const OnboardingComplete: React.FC<OnboardingProps> = ({ onNavigate }) =>
                 <h3 className="font-black text-xl mb-6">Next Steps</h3>
                 <div className="space-y-4">
                     {[
-                        { icon: PlusCircle, title: 'Create Your First Event', desc: 'Launch your show to the TLB community', screen: 'CREATE_EVENT_DETAILS' },
-                        { icon: UserCircle, title: 'Complete Your Profile', desc: 'Add photos and social media links', screen: 'EDIT_PROFILE' },
-                        { icon: BarChart3, title: 'Explore Dashboard', desc: 'View performance and ticket sales', screen: 'DASHBOARD' }
+                        { icon: PlusCircle, title: 'Create Your First Listing', desc: 'Add a class to your storefront', screen: 'CREATE_CLASS_IDENTITY' },
+                        { icon: UserCircle, title: 'Complete Your Profile', desc: 'Add photos and social media links', screen: 'BRAND_PROFILE' },
+                        { icon: BarChart3, title: 'Explore Dashboard', desc: 'View performance and ticket sales', screen: 'HOME' }
                     ].map((item, i) => (
                         <button
                             key={i}
@@ -65,7 +65,7 @@ export const OnboardingComplete: React.FC<OnboardingProps> = ({ onNavigate }) =>
                     ))}
                 </div>
 
-                <button onClick={() => onNavigate('DASHBOARD')} className="tlb-button w-full py-4 mt-12 shadow-lg shadow-tlb-yellow/20">
+                <button onClick={() => onNavigate('HOME')} className="tlb-button w-full py-4 mt-12 shadow-lg shadow-tlb-yellow/20">
                     Go to My Dashboard <ArrowRight size={20} />
                 </button>
             </div>

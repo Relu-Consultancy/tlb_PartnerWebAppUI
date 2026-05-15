@@ -1,14 +1,41 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { ChevronRight, Smartphone, ArrowRight } from 'lucide-react';
 import { Screen } from '../../types';
+import { verifyOtp, requestOtp } from '../../api/auth';
+import { setAuthToken, setRefreshToken } from '../../api/client';
 
 interface AuthProps {
     onNavigate: (screen: Screen) => void;
+    authData?: { value: string; type: 'email' | 'phone' } | null;
 }
 
-export const OTPVerify: React.FC<AuthProps> = ({ onNavigate }) => {
+export const OTPVerify: React.FC<AuthProps> = ({ onNavigate, authData }) => {
     const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
+    const [loading, setLoading] = useState(false);
+    const [resending, setResending] = useState(false);
+    const [countdown, setCountdown] = useState(30);
     const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+    useEffect(() => {
+        if (countdown <= 0) return;
+        const timer = setTimeout(() => setCountdown(c => c - 1), 1000);
+        return () => clearTimeout(timer);
+    }, [countdown]);
+
+    const handleResend = async () => {
+        if (!authData) return;
+        setResending(true);
+        try {
+            await requestOtp(authData.value, authData.type === 'email' ? 'email' : 'phone');
+            setOtp(['', '', '', '', '', '']);
+            setCountdown(30);
+            inputRefs.current[0]?.focus();
+        } catch {
+            alert('Failed to resend OTP. Please try again.');
+        } finally {
+            setResending(false);
+        }
+    };
 
     const handleChange = (index: number, value: string) => {
         if (!/^\d*$/.test(value)) return;
@@ -56,7 +83,7 @@ export const OTPVerify: React.FC<AuthProps> = ({ onNavigate }) => {
 
                 <h1 className="text-4xl font-black text-center mb-4">Secure Verification</h1>
                 <p className="text-center text-gray-500 leading-relaxed mb-10">
-                    We've sent a 6-digit code to your registered mobile number for the <span className="font-bold text-tlb-dark">TLB Partner Portal</span>.
+                    We've sent a 6-digit code to your {authData?.type === 'email' ? 'email address' : 'registered mobile number'} <span className="font-bold text-tlb-dark">{authData?.value}</span> for the <span className="font-bold text-tlb-dark">TLB Partner Portal</span>.
                 </p>
 
                 <div className="flex justify-between gap-2 mb-8">
@@ -77,17 +104,58 @@ export const OTPVerify: React.FC<AuthProps> = ({ onNavigate }) => {
                 </div>
 
                 <p className="text-center text-gray-400 font-medium mb-12">
-                    Didn't receive the code? <span className="text-tlb-yellow font-bold">Resend in 00:45</span>
+                    Didn't receive the code?{' '}
+                    {countdown > 0 ? (
+                        <span className="text-tlb-yellow font-bold">
+                            Resend in 00:{String(countdown).padStart(2, '0')}
+                        </span>
+                    ) : (
+                        <button
+                            onClick={handleResend}
+                            disabled={resending}
+                            className="text-tlb-yellow font-bold underline disabled:opacity-50"
+                        >
+                            {resending ? 'Sending...' : 'Resend OTP'}
+                        </button>
+                    )}
                     <br />
-                    <button className="text-xs underline mt-2 opacity-50">Change Number?</button>
+                    <button onClick={() => onNavigate('LOGIN')} className="text-xs underline mt-2 opacity-50">Change Number/Email?</button>
                 </p>
 
-                <button onClick={() => onNavigate('DASHBOARD')} className="tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20">
-                    Verify Identity <ChevronRight size={20} />
+                <button 
+                    onClick={async () => {
+                        const code = otp.join('');
+                        if (code.length !== 6 || !authData) return;
+                        setLoading(true);
+                        try {
+                            const res = await verifyOtp(authData.value, code, 'partner');
+                            const data = res.data || res;
+                            const access = data.access_token || data.access;
+                            const refresh = data.refresh_token || data.refresh;
+
+                            if (access) {
+                                setAuthToken(access);
+                                if (refresh) setRefreshToken(refresh);
+                                onNavigate('HOME');
+                            } else {
+                                throw new Error('No access token received');
+                            }
+                        } catch (error) {
+                            console.error('Failed to verify OTP', error);
+                            alert('Invalid OTP. Please try again.');
+                        } finally {
+                            setLoading(false);
+                        }
+                    }} 
+                    disabled={otp.join('').length !== 6 || loading || !authData}
+                    className={`tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20 ${(otp.join('').length !== 6 || loading || !authData) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                    {loading ? 'Verifying...' : 'Verify Identity'} <ChevronRight size={20} />
                 </button>
 
-                <p className="mt-12 text-center text-gray-300 text-[10px] font-bold tracking-widest uppercase">
-                    The Little Broadway — Partner Portal V2.0
+                <p className="mt-8 text-center text-gray-300 text-[10px]">
+                    © 2026 The Little Broadway. All rights reserved.<br />
+                    The Little Broadway — Partner Portal V3.0
                 </p>
             </div>
         </div>

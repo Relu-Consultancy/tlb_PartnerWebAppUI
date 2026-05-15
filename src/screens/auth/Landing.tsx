@@ -17,7 +17,7 @@ export const Landing: React.FC<AuthProps> = ({ onNavigate }) => (
         </header>
 
         <main className="flex-1 px-4 sm:px-6 pb-12">
-            <div className="max-w-lg mx-auto md:max-w-3xl">
+            <div>
                 {/* Hero */}
                 <div className="mt-6 mb-10">
                     <span className="bg-tlb-yellow/20 text-tlb-yellow px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase">Partner Network</span>
@@ -32,7 +32,7 @@ export const Landing: React.FC<AuthProps> = ({ onNavigate }) => (
 
                 {/* Theater Image */}
                 <div className="rounded-2xl sm:rounded-3xl overflow-hidden mb-12 shadow-xl">
-                    <img src="https://picsum.photos/seed/theater/800/450" alt="Theater" className="w-full h-52 sm:h-64 object-cover" referrerPolicy="no-referrer" />
+                    <img loading="lazy" src="https://picsum.photos/seed/theater/800/450" alt="Theater" className="w-full h-70 sm:h-100 object-cover" referrerPolicy="no-referrer" />
                 </div>
 
                 {/* Empowering Broadway */}
@@ -76,11 +76,11 @@ export const Landing: React.FC<AuthProps> = ({ onNavigate }) => (
                                 </div>
                             </div>
                         ))}
-                    </div>
+                    </div>  
                 </section>
 
                 {/* CTA */}
-                <div className="bg-tlb-dark rounded-[2rem] sm:rounded-[2.5rem] p-8 sm:p-10 text-center text-white">
+                <div className="bg-tlb-dark rounded-[2rem] sm:rounded-[2.5rem] p-8 sm:p-30 text-center text-white">
                     <h2 className="text-2xl sm:text-3xl font-black mb-3">Ready for the Spotlight?</h2>
                     <p className="text-gray-400 mb-6 text-sm sm:text-base">Join the network that powers the next generation of Broadway excellence.</p>
                     <button onClick={() => onNavigate('PARTNER_ACCESS')} className="tlb-button w-full sm:w-auto py-3 sm:px-12 mx-auto">Apply Now</button>
@@ -88,31 +88,39 @@ export const Landing: React.FC<AuthProps> = ({ onNavigate }) => (
             </div>
         </main>
 
-        <footer className="px-4 sm:px-8 py-10 bg-gray-50 border-t border-gray-100">
-            <div className="max-w-lg mx-auto md:max-w-3xl">
-                <div className="flex items-center gap-2 mb-6">
-                    <div className="w-6 h-6 bg-gray-300 rounded flex items-center justify-center text-white font-bold text-[8px]">TLB</div>
-                    <span className="font-bold text-gray-400 text-sm">The Little Broadway</span>
-                </div>
-                <div className="grid grid-cols-2 gap-6">
-                    <div>
-                        <h4 className="font-bold mb-3 text-sm">Platform</h4>
-                        <ul className="space-y-1.5 text-gray-400 text-sm">
-                            <li>Venues</li>
-                            <li>Events</li>
-                            <li>Classes</li>
-                        </ul>
+        <footer className="mt-4">
+            {/* Full logo — let image render at its natural aspect ratio so nothing is cropped */}
+            <img
+                src="/tlbAppIcon.png"
+                alt="The Little Broadway"
+                className="block mx-auto w-32 h-32"
+            />
+
+            {/* Links & copyright on dark strip */}
+            <div className="bg-tlb-dark px-6 sm:px-10 py-8">
+                <div className="max-w-lg mx-auto">
+                    <div className="grid grid-cols-2 gap-8 mb-8 text-center sm:text-left">
+                        <div>
+                            <h4 className="text-[10px] font-black text-tlb-yellow uppercase tracking-widest mb-3">Platform</h4>
+                            <ul className="space-y-2 text-gray-400 text-sm">
+                                <li>Venues</li>
+                                <li>Events</li>
+                                <li>Classes</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 className="text-[10px] font-black text-tlb-yellow uppercase tracking-widest mb-3">Company</h4>
+                            <ul className="space-y-2 text-gray-400 text-sm">
+                                <li>About</li>
+                                <li>Legal</li>
+                                <li>Privacy</li>
+                            </ul>
+                        </div>
                     </div>
-                    <div>
-                        <h4 className="font-bold mb-3 text-sm">Company</h4>
-                        <ul className="space-y-1.5 text-gray-400 text-sm">
-                            <li>About</li>
-                            <li>Legal</li>
-                            <li>Privacy</li>
-                        </ul>
+                    <div className="border-t border-white/10 pt-6 text-center">
+                        <p className="text-gray-500 text-[11px]">© 2026 The Little Broadway. All rights reserved.</p>
                     </div>
                 </div>
-                <p className="mt-8 text-center text-gray-300 text-[10px]">© 2024 The Little Broadway. All rights reserved.</p>
             </div>
         </footer>
     </div>

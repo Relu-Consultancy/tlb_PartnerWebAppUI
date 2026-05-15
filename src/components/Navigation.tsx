@@ -1,16 +1,18 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  LayoutDashboard,
-  ReceiptIndianRupee,
-  CalendarDays,
-  BarChart3,
+  Home,
   UserCircle,
-  Eye,
+  CalendarDays,
+  Inbox,
   LogOut,
-  X
+  X,
+  Users,
+  DollarSign,
+  Package
 } from 'lucide-react';
 import { Screen } from '../types';
+import { usePartner } from '../context/PartnerContext';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -20,14 +22,48 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen, onNavigate }) => {
-  const menuItems = [
-    { id: 'DASHBOARD', label: 'Dashboard', icon: LayoutDashboard, sub: 'OVERVIEW' },
-    { id: 'FINANCIAL_HUB', label: 'Payouts', icon: ReceiptIndianRupee, sub: 'FINANCES & SHOWS' },
-    { id: 'EVENT_LISTINGS', label: 'My Events and Listings', icon: CalendarDays, sub: 'SCHEDULE & TIX' },
-    { id: 'ANALYTICS', label: 'Analytics and Revenue', icon: BarChart3, sub: 'INSIGHTS & GROWTH' },
-    { id: 'EDIT_PROFILE', label: 'Brand Profile Section', icon: UserCircle, sub: 'BUSINESS DETAILS' },
-    { id: 'PREVIEW_PROFILE', label: 'Preview Profile', icon: Eye, sub: 'PUBLIC VIEW' },
+  const { allowedEntities } = usePartner();
+
+  // Build dynamic sidebar label for "My Listings"
+  const listingsLabel = (() => {
+    if (allowedEntities.length === 0) return 'My Listings';
+    if (allowedEntities.length === 1) {
+      const e = allowedEntities[0];
+      if (e === 'Classes') return 'My Services';
+      if (e === 'Events') return 'My Events';
+      if (e === 'Programs') return 'My Programs';
+      if (e === 'Venues') return 'My Venues';
+    }
+    return 'My Listings';
+  })();
+
+  const listingsSub = (() => {
+    if (allowedEntities.length === 0) return 'ALL LISTINGS';
+    if (allowedEntities.length === 1) {
+      const e = allowedEntities[0];
+      if (e === 'Classes') return 'CLASSES & BATCHES';
+      if (e === 'Events') return 'EVENTS & SHOWS';
+      if (e === 'Programs') return 'LONG-TERM PROGRAMS';
+      if (e === 'Venues') return 'YOUR SPACES';
+    }
+    return allowedEntities.slice(0, 2).join(' & ').toUpperCase();
+  })();
+
+  const hasClasses = allowedEntities.includes('Classes');
+  const hasPrograms = allowedEntities.includes('Programs');
+
+    const menuItems = [
+    { id: 'HOME', label: 'Home', icon: Home, sub: 'STATS & ALERTS', visible: true },
+    { id: 'BRAND_PROFILE', label: 'Brand Profile', icon: UserCircle, sub: 'YOUR STOREFRONT', visible: true },
+    { id: 'SERVICE_LISTINGS', label: listingsLabel, icon: CalendarDays, sub: listingsSub, visible: true },
+    { id: 'ATTENDEES', label: 'Attendees', icon: Users, sub: 'MANAGE GUESTS', visible: true },
+    { id: 'ENQUIRIES', label: 'Class Enquiry Management', icon: Inbox, sub: 'CLASS LEAD INBOX', visible: hasClasses },
+    { id: 'PROGRAM_ENQUIRIES', label: 'Program Enquiry Management', icon: Inbox, sub: 'PROGRAM CRM', visible: hasPrograms },
+    { id: 'PACKAGES', label: 'Packages', icon: Package, sub: 'CREDITS & BILLING', visible: false },
+    { id: 'FINANCIAL_HUB', label: 'Pay-outs & Finance', icon: DollarSign, sub: 'EARNINGS & TAX', visible: true },
   ];
+
+  const visibleItems = menuItems.filter(item => item.visible);
 
   return (
     <AnimatePresence>
@@ -50,11 +86,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen
             <div className="flex justify-between items-center mb-8">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-tlb-yellow">
-                  <img src="https://picsum.photos/seed/partner/100/100" alt="Profile" referrerPolicy="no-referrer" />
+                  <img loading="lazy" src="https://picsum.photos/seed/partner/100/100" alt="Profile" referrerPolicy="no-referrer" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-lg leading-tight">The Little Broadway</h3>
-                  <span className="text-[10px] font-bold text-tlb-yellow tracking-widest uppercase">Premium Partner</span>
+                  <h3 className="font-bold text-lg leading-tight">TLB Partner</h3>
+                  <span className="text-[10px] font-bold text-tlb-yellow tracking-widest uppercase">Verified Partner</span>
                 </div>
               </div>
               <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
@@ -63,7 +99,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen
             </div>
 
             <nav className="flex-1 space-y-2">
-              {menuItems.map((item) => (
+              {visibleItems.map((item) => (
                 <button
                   key={item.id}
                   onClick={() => {
@@ -71,8 +107,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen
                     onClose();
                   }}
                   className={`w-full flex items-center gap-4 p-4 rounded-2xl transition-all ${currentScreen === item.id
-                      ? 'bg-tlb-yellow/10 text-tlb-dark border-l-4 border-tlb-yellow'
-                      : 'text-gray-500 hover:bg-gray-50'
+                    ? 'bg-tlb-yellow/10 text-tlb-dark border-l-4 border-tlb-yellow'
+                    : 'text-gray-500 hover:bg-gray-50'
                     }`}
                 >
                   <div className={`p-2 rounded-xl ${currentScreen === item.id ? 'bg-tlb-yellow text-tlb-dark' : 'bg-gray-100 text-gray-400'}`}>
@@ -88,13 +124,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen
 
             <div className="pt-6 border-t border-gray-100">
               <button
-                onClick={() => onNavigate('LANDING')}
+                onClick={() => { onClose(); onNavigate('LANDING'); }}
                 className="w-full flex items-center gap-4 p-4 text-gray-400 hover:text-red-500 transition-colors"
               >
                 <LogOut size={20} />
                 <span className="font-bold text-sm uppercase tracking-widest">Sign Out</span>
               </button>
-              <p className="text-[10px] text-gray-300 mt-4 text-center">TLB Broadway Partner v2.4.0</p>
+              <p className="text-[10px] text-gray-300 mt-4 text-center">TLB Partner Portal v3.0.0</p>
             </div>
           </motion.div>
         </>

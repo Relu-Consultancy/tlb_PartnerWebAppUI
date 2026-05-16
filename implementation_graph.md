@@ -3,6 +3,7 @@
 > **Definitive architectural reference for the TLB Partner Portal.**
 > Base URL: `https://tlb-api.reluconsultancy.in`
 > Framework: React + Vite + TypeScript (SPA)
+> Last Updated: May 15, 2026 (10:30 PM IST)
 
 ---
 
@@ -147,10 +148,8 @@ Request → 401 Unauthorized?
 | `uploadClassMedia` | POST | `/api/v1/partner/listings/classes/<id>/media/` | FormData | CreateClassMedia |
 | `deleteClassMedia` | DELETE | `/api/v1/partner/listings/classes/<id>/media/<mid>/` | — | CreateClassMedia |
 
-> **Class has TWO separate delivery/type fields — do not conflate them:**
-> - `mode` → delivery method: `"offline"` / `"online"` / `"hybrid"` (fetched from `formats.modes[]`)
-> - `format` → class type: `"workshop"` / `"camp"` / `"masterclass"` / `"bootcamp"` / `"demo"` / `"meetup"` / `"webinar"` / etc. (fetched from `formats.formats[]`)
-> Both fields are **required by the submit endpoint**. Sending the wrong values (e.g. `"offline"` for `format`, or `"physical"` for either) causes a 400 choice validation error.
+> **Class delivery mode:**
+> - `mode` → delivery method: `"offline"` / `"online"` / `"hybrid"` (fetched from `data.modes[]` at `/api/v1/listings/classes/metadata/formats/`). There is no separate `format` field for classes.
 >
 > **No GET `/media/` endpoint for classes:** `GET /api/v1/partner/listings/classes/<id>/media/` does not exist (returns 405). Media is embedded in the listing detail response under `service.media`. Always use `getClassListingDetail` to load media.
 >
@@ -158,7 +157,7 @@ Request → 401 Unauthorized?
 >
 > **Class FAQs:** Sent inline in the PATCH body as `faqs: [{question, answer}]` — replaces the entire list. No dedicated `/faqs/` sub-endpoint (unlike Programs which has individual FAQ CRUD).
 >
-> **Class submit validation — all fields required before `POST .../submit/`:** `title`, `description`, `format` (class type), `mode`, `category_id`, `subcategory_id`, `address` (for offline/hybrid), cover image, ≥1 batch.
+> **Class submit validation — all fields required before `POST .../submit/`:** `title`, `description`, `mode`, `category_id`, `subcategory_id`, `address` (for offline/hybrid), cover image, ≥1 batch.
 
 **Enquiries (Classes):**
 
@@ -173,6 +172,9 @@ Request → 401 Unauthorized?
 
 | Function | Method | Endpoint | Payload | Used By |
 |----------|--------|----------|---------|---------|
+| `getProgramMetaCategories` | GET | `/api/v1/listings/programs/metadata/categories/` | — | CreateProgramIdentity |
+| `getProgramMetaFormats` | GET | `/api/v1/listings/programs/metadata/formats/` | — | CreateProgramIdentity |
+| `getProgramMetaTags` | GET | `/api/v1/listings/programs/metadata/tags/` | — | CreateProgramIdentity |
 | `getProgramListings` | GET | `/api/v1/partner/listings/programs/` | — | ServiceListings |
 | `getProgramListingDetail` | GET | `/api/v1/partner/listings/programs/<id>/` | — | Program wizard steps |
 | `createProgramDraft` | POST | `/api/v1/partner/listings/programs/` | `{ title, short_description?, description? }` | CreateProgramIdentity |
@@ -196,6 +198,8 @@ Request → 401 Unauthorized?
 | `deleteProgramMedia` | DELETE | `/api/v1/partner/listings/programs/<id>/media/<mid>/` | — | CreateProgramMedia |
 
 > **Program enquiries are per-listing (not global):** `ProgramEnquiries.tsx` fetches all programs on mount, then loads `GET /api/v1/partner/listings/programs/<id>/enquiries/` for the selected program. A dropdown appears when more than one program exists.
+>
+> **Program Enquiry Schema Differences:** Programs use `enrolled` status instead of `trial_booked` (used by classes). Additionally, contact information (`contact_number`, `email`) is available directly in the response payload (no `/unlock/` endpoint is required for programs).
 
 > **Venue media field:** `url` (not `file_url`) — response shape: `{ id, url, media_type }`  
 > **Venue detail response** includes all sub-resources inline: `media`, `availability`, `packages`, `discovery`, `occasions`, `required_attendee_fields` — Preview uses a single `getVenueListingDetail` call.  

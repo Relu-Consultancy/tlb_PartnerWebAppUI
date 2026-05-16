@@ -447,9 +447,10 @@ export const updateClassListing = async (listingId: string, data: Record<string,
     return response.json();
 };
 
-export const setClassListingLive = async (listingId: string) => {
+export const setClassListingLive = async (listingId: string, isLive: boolean) => {
     const response = await apiClient(`/api/v1/partner/listings/classes/${listingId}/live/`, {
         method: 'POST',
+        body: JSON.stringify({ is_live: isLive }),
     });
     if (!response.ok) await handleError(response, 'Failed to update class live status');
     return response.json();

@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, Plus, Search, Filter, Users, Edit3, CalendarDays, BarChart3, MapPin, Layers, Loader2, Clock, X, Check, SlidersHorizontal } from 'lucide-react';
+import { Menu, Plus, Search, Filter, Users, Edit3, CalendarDays, BarChart3, MapPin, Layers, Loader2, Clock, X, Check, SlidersHorizontal, Play, Pause, Archive, ArchiveRestore } from 'lucide-react';
 import { Screen, EntityType } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
 import { EntityPickerSheet } from '../../components/EntityPickerSheet';
-import { getEventListings, getVenueListings, getClassListings, getProgramListings, setCurrentDraftId, clearCurrentDraftId, setCurrentVenueDraftId, clearCurrentVenueDraftId, setCurrentClassDraftId, clearCurrentClassDraftId, setCurrentProgramDraftId, clearCurrentProgramDraftId } from '../../api/listings';
+import { getEventListings, getVenueListings, getClassListings, getProgramListings, setCurrentDraftId, clearCurrentDraftId, setCurrentVenueDraftId, clearCurrentVenueDraftId, setCurrentClassDraftId, clearCurrentClassDraftId, setCurrentProgramDraftId, clearCurrentProgramDraftId, setClassListingLive, archiveProgramListing, unarchiveProgramListing } from '../../api/listings';
 
 interface Props {
     onNavigate: (screen: Screen) => void;
     onOpenSidebar: () => void;
 }
 
-type ListingStatus = 'draft' | 'pending' | 'published' | 'rejected';
+type ListingStatus = 'draft' | 'pending' | 'published' | 'rejected' | 'archived';
 
 interface Listing {
     id: string;
@@ -21,6 +21,7 @@ interface Listing {
     status: ListingStatus;
     coverUrl?: string;
     startDateTime?: string;
+    isLive?: boolean;
 }
 
 const entityBadgeConfig: Record<EntityType, { color: string; bg: string; icon: any }> = {
@@ -35,6 +36,7 @@ const statusBadge: Record<ListingStatus, { label: string; bg: string; color: str
     pending:   { label: 'In Review', bg: 'bg-amber-50',    color: 'text-amber-600' },
     published: { label: 'Live',      bg: 'bg-emerald-50',  color: 'text-emerald-600' },
     rejected:  { label: 'Rejected',  bg: 'bg-red-50',      color: 'text-red-500' },
+    archived:  { label: 'Archived',  bg: 'bg-gray-200',    color: 'text-gray-600' },
 };
 
 const listingTypeToEntity = (lt: string): EntityType => {
@@ -156,6 +158,7 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                         status: (item.status as ListingStatus) || 'draft',
                         coverUrl: item.cover_url || item.cover,
                         startDateTime: item.start_datetime,
+                        isLive: item.is_live,
                     }));
                     setListings(normalized);
                 }
@@ -204,6 +207,30 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
             onNavigate('CREATE_PROGRAM_IDENTITY');
         } else {
             onNavigate('CREATE_CLASS_IDENTITY');
+        }
+    };
+
+    const handleToggleLive = async (listing: Listing) => {
+        try {
+            const newState = !listing.isLive;
+            await setClassListingLive(listing.id, newState);
+            setListings(prev => prev.map(l => l.id === listing.id ? { ...l, isLive: newState } : l));
+        } catch (err: any) {
+            alert(err.message || 'Failed to update live status');
+        }
+    };
+
+    const handleToggleArchive = async (listing: Listing) => {
+        try {
+            if (listing.status === 'archived') {
+                await unarchiveProgramListing(listing.id);
+                setListings(prev => prev.map(l => l.id === listing.id ? { ...l, status: 'draft' } : l));
+            } else {
+                await archiveProgramListing(listing.id);
+                setListings(prev => prev.map(l => l.id === listing.id ? { ...l, status: 'archived' } : l));
+            }
+        } catch (err: any) {
+            alert(err.message || 'Failed to update archive status');
         }
     };
 
@@ -352,29 +379,52 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                                                         </p>
                                                     )}
                                                 </div>
-                                                <span className={`shrink-0 mt-0.5 px-3 py-1.5 rounded-xl text-[11px] font-black border ${sb.bg} ${sb.color} ${
-                                                    listing.status === 'published' ? 'border-emerald-200' :
-                                                    listing.status === 'pending'   ? 'border-amber-200' :
-                                                    listing.status === 'rejected'  ? 'border-red-200' :
-                                                    'border-gray-200'
+                                                <span className={`shrink-0 mt-0.5 px-3 py-1.5 rounded-xl text-[11px] font-black border ${
+                                                    listing.status === 'published'
+                                                        ? (listing.isLive === false ? 'bg-amber-50 text-amber-600 border-amber-200' : 'bg-emerald-50 text-emerald-600 border-emerald-200')
+                                                        : sb.bg + ' ' + sb.color + ' ' + (
+                                                            listing.status === 'pending' ? 'border-amber-200' :
+                                                            listing.status === 'rejected' ? 'border-red-200' :
+                                                            'border-gray-200'
+                                                        )
                                                 }`}>
-                                                    {sb.label}
+                                                    {listing.status === 'published' ? (listing.isLive === false ? 'Paused' : 'Live') : sb.label}
                                                 </span>
                                             </div>
                                         </div>
 
-                                        <div className="border-t border-gray-100 px-5 py-3 flex justify-end">
+                                        <div className="border-t border-gray-100 px-5 py-3 flex justify-end gap-6">
+                                            {listing.entityType === 'Classes' && listing.status === 'published' && (
+                                                <button
+                                                    onClick={() => handleToggleLive(listing)}
+                                                    className={`flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest ${
+                                                        listing.isLive ? 'text-amber-500 hover:text-amber-600' : 'text-emerald-500 hover:text-emerald-600'
+                                                    }`}
+                                                >
+                                                    {listing.isLive ? <Pause size={14} /> : <Play size={14} />}
+                                                    {listing.isLive ? 'Pause Class' : 'Make Live'}
+                                                </button>
+                                            )}
+                                            {listing.entityType === 'Programs' && (listing.status === 'published' || listing.status === 'archived') && (
+                                                <button
+                                                    onClick={() => handleToggleArchive(listing)}
+                                                    className={`flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-gray-500 hover:text-gray-700`}
+                                                >
+                                                    {listing.status === 'archived' ? <ArchiveRestore size={14} /> : <Archive size={14} />}
+                                                    {listing.status === 'archived' ? 'Unarchive' : 'Archive'}
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={() => handleEdit(listing)}
-                                                disabled={listing.status === 'published'}
+                                                disabled={listing.status === 'published' || listing.status === 'archived'}
                                                 className={`flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest ${
-                                                    listing.status === 'published'
+                                                    listing.status === 'published' || listing.status === 'archived'
                                                         ? 'text-gray-300 cursor-not-allowed'
                                                         : 'text-tlb-yellow hover:underline'
                                                 }`}
                                             >
                                                 <Edit3 size={14} />
-                                                {listing.status === 'published' ? 'Locked' : 'Edit Listing'}
+                                                {listing.status === 'published' || listing.status === 'archived' ? 'Locked' : 'Edit Listing'}
                                             </button>
                                         </div>
                                     </div>
@@ -448,7 +498,7 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                                             className={`flex items-center justify-between px-4 py-3 rounded-2xl border-2 text-sm font-bold transition-all ${active ? 'border-tlb-yellow bg-tlb-yellow/10 text-tlb-dark' : 'border-gray-100 bg-white text-gray-500 hover:border-gray-200'}`}
                                         >
                                             <div className="flex items-center gap-2">
-                                                <span className={`w-2 h-2 rounded-full ${key === 'published' ? 'bg-emerald-500' : key === 'pending' ? 'bg-amber-500' : key === 'draft' ? 'bg-gray-400' : 'bg-red-500'}`} />
+                                                <span className={`w-2 h-2 rounded-full ${key === 'published' ? 'bg-emerald-500' : key === 'pending' ? 'bg-amber-500' : key === 'draft' ? 'bg-gray-400' : key === 'archived' ? 'bg-gray-500' : 'bg-red-500'}`} />
                                                 {s.label}
                                             </div>
                                             {active && <Check size={14} className="text-tlb-dark" />}

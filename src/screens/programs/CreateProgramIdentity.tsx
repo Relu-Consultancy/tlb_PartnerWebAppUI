@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, MapPin, Tag, Check, ChevronDown, Loader2 } from 'lucide-react';
+import { ArrowRight, MapPin, Tag, Check, ChevronDown, Loader2, MessageCircle, CalendarCheck } from 'lucide-react';
 import { Screen } from '../../types';
 import { WizardLayout, WizardNavigation } from '../../components/ui';
 import {
@@ -28,6 +28,7 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
     const [maxCapacity, setMaxCapacity] = useState('');
     const [totalHours, setTotalHours] = useState('');
     const [moduleCount, setModuleCount] = useState('');
+    const [bookingType, setBookingType] = useState<'enquiry' | 'direct_booking'>('enquiry');
     const [programFormat, setProgramFormat] = useState('');
     const [deliveryMode, setDeliveryMode] = useState('offline');
     const [city, setCity] = useState('');
@@ -92,6 +93,8 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                 if (d.module_count != null) setModuleCount(String(d.module_count));
                 if (d.program_format) setProgramFormat(d.program_format);
                 if (d.delivery_mode) setDeliveryMode(d.delivery_mode);
+                const loadedBookingType = d.booking_type;
+                if (loadedBookingType === 'enquiry' || loadedBookingType === 'direct_booking') setBookingType(loadedBookingType);
                 setCity(d.city || '');
                 setArea(d.area || '');
                 setAddress(d.address || '');
@@ -126,6 +129,7 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                     title: title.trim(),
                     short_description: shortDesc.trim() || undefined,
                     description: description.trim() || undefined,
+                    booking_type: bookingType,
                 });
                 const d = res.data || res;
                 draftId = d.id;
@@ -138,6 +142,7 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                 short_description: shortDesc.trim(),
                 description: description.trim(),
                 delivery_mode: deliveryMode,
+                booking_type: bookingType,
             };
             if (programFormat) payload.program_format = programFormat;
             if (minAge) payload.min_age = Number(minAge);
@@ -284,6 +289,51 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                         ))}
                     </div>
                 )}
+            </div>
+
+            {/* Booking Type */}
+            <div>
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">
+                    Listing Type <span className="text-red-400">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                    {([
+                        {
+                            value: 'enquiry',
+                            label: 'Enquiry',
+                            icon: <MessageCircle size={22} />,
+                            desc: 'Parents express interest and you follow up to confirm.',
+                        },
+                        {
+                            value: 'direct_booking',
+                            label: 'Direct Booking',
+                            icon: <CalendarCheck size={22} />,
+                            desc: 'Parents directly book and pay for a seat online.',
+                        },
+                    ] as const).map((opt) => (
+                        <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setBookingType(opt.value)}
+                            className={`relative flex flex-col items-start gap-2 p-4 rounded-2xl border-2 text-left transition-all ${
+                                bookingType === opt.value
+                                    ? 'border-emerald-400 bg-emerald-50'
+                                    : 'border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm'
+                            }`}
+                        >
+                            {bookingType === opt.value && (
+                                <div className="absolute top-2.5 right-2.5 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center">
+                                    <Check size={11} className="text-white" />
+                                </div>
+                            )}
+                            <span className={bookingType === opt.value ? 'text-emerald-600' : 'text-gray-400'}>
+                                {opt.icon}
+                            </span>
+                            <span className="text-sm font-black text-gray-800 pr-6">{opt.label}</span>
+                            <span className="text-[11px] text-gray-400 leading-snug">{opt.desc}</span>
+                        </button>
+                    ))}
+                </div>
             </div>
 
             {/* Target Age Group */}

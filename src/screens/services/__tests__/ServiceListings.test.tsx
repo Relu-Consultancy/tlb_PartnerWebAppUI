@@ -99,22 +99,19 @@ describe('ServiceListings — tabs', () => {
     });
 
     it('filters to show only selected entity type', async () => {
-        server.use(http.get(`${BASE}/api/v1/partner/listings/events/`, () =>
-            HttpResponse.json({
-                success: true,
-                data: [
-                    { id: '1', title: 'My Event', status: 'draft', listing_type: 'event', category: { id: 1, name: 'Dance' } },
-                    { id: '2', title: 'My Class', status: 'draft', listing_type: 'class', category: { id: 3, name: 'Sports' } },
-                ],
-            })));
+        server.use(
+            http.get(`${BASE}/api/v1/partner/listings/events/`, () =>
+                HttpResponse.json({ success: true, data: [{ id: '1', title: 'My Event', status: 'draft', listing_type: 'event', category: { id: 1, name: 'Dance' } }] })),
+            http.get(`${BASE}/api/v1/partner/listings/classes/`, () =>
+                HttpResponse.json({ success: true, data: [{ id: '2', title: 'My Class', status: 'draft', listing_type: 'class', category: { id: 3, name: 'Sports' } }] }))
+        );
         renderWithPartner(['Events', 'Classes']);
         const user = userEvent.setup();
         await waitFor(() => screen.getByText('My Event'));
+        await waitFor(() => screen.getByText('My Class'));
         // Click on Events tab
-        const eventTabs = screen.getAllByText('Events');
-        // Find the tab button (not the badge)
-        const eventTabBtn = eventTabs.find(el => el.closest('button')?.textContent?.includes('Events'));
-        if (eventTabBtn) await user.click(eventTabBtn);
+        const eventTabBtns = screen.getAllByRole('button').filter(b => b.textContent?.startsWith('Events'));
+        if (eventTabBtns.length > 0) await user.click(eventTabBtns[0]);
         await waitFor(() =>
             expect(screen.queryByText('My Class')).not.toBeInTheDocument()
         );
@@ -165,7 +162,7 @@ describe('ServiceListings — edit and create navigation', () => {
         expect(mockNavigate).toHaveBeenCalledWith('CREATE_EVENT_DETAILS');
     });
 
-    it('shows Locked button for pending listings (not editable)', async () => {
+    it('shows Edit Listing button for pending listings (still editable)', async () => {
         server.use(http.get(`${BASE}/api/v1/partner/listings/events/`, () =>
             HttpResponse.json({
                 success: true,
@@ -179,9 +176,9 @@ describe('ServiceListings — edit and create navigation', () => {
             })));
         renderWithPartner();
         await waitFor(() =>
-            expect(screen.getByText('Locked')).toBeInTheDocument()
+            expect(screen.getByText('Edit Listing')).toBeInTheDocument()
         );
-        expect(screen.queryByText('Edit Listing')).not.toBeInTheDocument();
+        expect(screen.queryByText('Locked')).not.toBeInTheDocument();
     });
 
     it('shows Locked button for published listings', async () => {

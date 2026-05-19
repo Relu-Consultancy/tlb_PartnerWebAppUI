@@ -81,7 +81,7 @@ describe('getEventMetaCategories', () => {
     });
 
     it('throws ApiError on server failure', async () => {
-        server.use(http.get(`${BASE}/api/v1/listings/metadata/categories/`, () =>
+        server.use(http.get(`${BASE}/api/v1/listings/events/metadata/categories/`, () =>
             HttpResponse.json({ error: { code: 'SERVER_ERROR', message: 'Internal error' } }, { status: 500 })));
         await expect(getEventMetaCategories()).rejects.toBeInstanceOf(ApiError);
     });

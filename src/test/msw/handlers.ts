@@ -112,6 +112,7 @@ export const mockClassDraft = {
     category: { id: 1, name: 'Dance' },
     subcategory: { id: 2, name: 'Classical' },
     format: 'workshop',
+    booking_type: 'enquiry',
     is_live: false,
     created_at: '2026-05-07T12:00:00Z',
 };
@@ -166,6 +167,7 @@ export const mockProgramDraft = {
     description: 'Detailed program description',
     status: 'draft',
     delivery_mode: 'offline',
+    booking_type: 'enquiry',
     min_age: 8,
     max_age: 14,
     max_capacity: 30,
@@ -222,14 +224,34 @@ export const mockVenueDraft = {
 // ─── Default handlers ─────────────────────────────────────────────────────────
 
 export const handlers = [
+    // Auth endpoints
+    http.post(`${BASE}/api/v1/auth/request-otp/`, () =>
+        HttpResponse.json({ success: true, message: 'OTP sent' })),
+
+    http.post(`${BASE}/api/v1/auth/verify-otp/`, () =>
+        HttpResponse.json({ success: true, data: { access_token: 'test-access-token', refresh_token: 'test-refresh-token' } })),
+
+    http.get(`${BASE}/api/v1/auth/me/`, () =>
+        HttpResponse.json({ success: true, data: { id: 1, email: 'test@example.com' } })),
+
+    http.post(`${BASE}/api/v1/auth/logout/`, () =>
+        HttpResponse.json({ success: true })),
+
+    // Partner endpoints
+    http.get(`${BASE}/api/v1/partners/me/`, () =>
+        HttpResponse.json({ success: true, data: { id: 1, status: 'activated_limited', is_active: true, is_verified: false, business_name: 'Test Studio', bank_account: null } })),
+
+    http.post(`${BASE}/api/v1/partner/verification/`, () =>
+        HttpResponse.json({ success: true, data: { status: 'under_review' } })),
+
     // Event metadata
-    http.get(`${BASE}/api/v1/listings/metadata/categories/`, () =>
+    http.get(`${BASE}/api/v1/listings/events/metadata/categories/`, () =>
         HttpResponse.json({ success: true, data: mockCategories })),
 
-    http.get(`${BASE}/api/v1/listings/metadata/formats/`, () =>
+    http.get(`${BASE}/api/v1/listings/events/metadata/formats/`, () =>
         HttpResponse.json({ success: true, data: mockFormats })),
 
-    http.get(`${BASE}/api/v1/listings/metadata/age-groups/`, () =>
+    http.get(`${BASE}/api/v1/listings/events/metadata/age-groups/`, () =>
         HttpResponse.json({ success: true, data: mockAgeGroups })),
 
     // Venue metadata
@@ -291,7 +313,11 @@ export const handlers = [
         HttpResponse.json({ success: true, data: mockCategories })),
 
     http.get(`${BASE}/api/v1/listings/classes/metadata/formats/`, () =>
-        HttpResponse.json({ success: true, data: mockFormats })),
+        HttpResponse.json({ success: true, data: { modes: [
+            { value: 'online', label: 'Online' },
+            { value: 'offline', label: 'Offline' },
+            { value: 'hybrid', label: 'Hybrid' },
+        ]}})),
 
     // ─── Class fixtures ───────────────────────────────────────────────────────
 

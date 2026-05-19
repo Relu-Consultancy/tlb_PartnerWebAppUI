@@ -176,8 +176,8 @@ describe('getClassMetaCategories', () => {
 describe('getClassMetaFormats', () => {
     it('returns format list', async () => {
         const res = await getClassMetaFormats();
-        const data = res.data || res;
-        expect(data[0]).toMatchObject({ value: 'workshop', label: 'Workshop' });
+        const modes = res.data?.modes || res.data || res;
+        expect(modes[0]).toMatchObject({ value: 'online', label: 'Online' });
     });
 });
 

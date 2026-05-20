@@ -9,7 +9,15 @@
       "Bash(npx tsc *)",
       "Bash(npm test *)",
       "Bash(git commit *)",
-      "Bash(git stash *)"
+      "Bash(git stash *)",
+      "Bash(npm install *)",
+      "Read(//c/Program Files \\(x86\\)/Microsoft/Edge/Application/**)",
+      "Read(//c/Program Files/Google/Chrome/Application/**)",
+      "Bash(npx vitest *)",
+      "Bash(npx ts-node *)",
+      "Bash(Get-ChildItem -Path \"E:\\\\tlb-partner-portal\\\\src\\\\screens\\\\classes\" -Recurse -File)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Select-String -Pattern \"CreateClassIdentity|CreateProgramIdentity|error TS\")"
     ]
   }
 }

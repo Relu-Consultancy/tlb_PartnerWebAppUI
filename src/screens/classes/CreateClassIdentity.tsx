@@ -47,13 +47,15 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
         let cancelled = false;
         (async () => {
             setMetaLoading(true);
+            let catsData: ApiCategory[] = [];
             try {
                 const [catsRes, fmtsRes] = await Promise.all([
                     getClassMetaCategories(),
                     getClassMetaFormats(),
                 ]);
                 if (!cancelled) {
-                    setCategories(catsRes.data || catsRes || []);
+                    catsData = catsRes.data || catsRes || [];
+                    setCategories(catsData);
                     const fmtData = fmtsRes.data || fmtsRes;
                     // API returns { modes: [...] } — delivery modes, not formats
                     setModes(Array.isArray(fmtData.modes) ? fmtData.modes : []);
@@ -93,7 +95,13 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
                 const catId = srv.category?.id ?? d.category?.id;
                 const subId = srv.subcategory?.id ?? d.subcategory?.id;
                 if (catId) setSelectedCategoryId(catId);
-                if (subId) setSelectedSubcategoryId(subId);
+                if (subId) {
+                    // Validate the stored subcategory still belongs to the stored category.
+                    // A previous save bug could have left them mismatched — reset if so.
+                    const cat = catsData.find(c => c.id === catId);
+                    const isValid = cat?.subcategories.some(s => s.id === subId) ?? false;
+                    setSelectedSubcategoryId(isValid ? subId : null);
+                }
             } catch (e) {
                 console.warn('Failed to load class draft', e);
             }
@@ -106,6 +114,10 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
 
     const handleNext = async () => {
         if (!title.trim()) { setSaveError('Class title is required.'); return; }
+        if (selectedCategoryId != null && selectedSubcategoryId == null) {
+            setSaveError('Please select a subcategory for the chosen category.');
+            return;
+        }
         if (saving) return;
         setSaveError('');
         setSaving(true);
@@ -141,8 +153,12 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
                 payload.meeting_link = meetingLink.trim();
             }
             if (tag) payload.tags = [tag];
-            if (selectedCategoryId != null) payload.category_id = selectedCategoryId;
-            if (selectedSubcategoryId != null) payload.subcategory_id = selectedSubcategoryId;
+            if (selectedCategoryId != null) {
+                payload.category_id = selectedCategoryId;
+                payload.subcategory_id = selectedSubcategoryId; // always send alongside category to clear any stale subcategory on the backend
+            } else if (selectedSubcategoryId != null) {
+                payload.subcategory_id = selectedSubcategoryId;
+            }
 
             await updateClassListing(draftId!, payload);
             onNavigate('CREATE_CLASS_BATCH');

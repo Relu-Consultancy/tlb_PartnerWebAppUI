@@ -6,6 +6,7 @@
 import React, { useState, useEffect, Suspense, lazy, useCallback } from 'react';
 import { Screen, EntityType } from './types';
 import { PartnerProvider, usePartner } from './context/PartnerContext';
+import { Loader } from './components/ui';
 
 // Helper for lazy loading named exports
 const lazyImport = <T extends Record<string, any>>(
@@ -268,7 +269,7 @@ function AppInner() {
   if (initializing) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 gap-4">
-        <div className="w-14 h-14 border-4 border-gray-200 border-t-tlb-yellow rounded-full animate-spin"></div>
+        <Loader />
         <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Loading your session…</p>
       </div>
     );
@@ -281,7 +282,7 @@ function AppInner() {
     <div className="font-sans text-tlb-dark">
       <Suspense fallback={
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
-          <div className="w-12 h-12 border-4 border-gray-200 border-t-tlb-yellow rounded-full animate-spin"></div>
+          <Loader />
         </div>
       }>
         <Component

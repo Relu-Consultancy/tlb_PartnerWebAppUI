@@ -1,13 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Menu, Bell, UserCircle, CheckCircle2,
-  Inbox, Eye, BarChart3, CreditCard, Plus, CalendarDays, MapPin, Ticket, Loader2,
+  Inbox, Eye, BarChart3, CreditCard, Plus, CalendarDays, MapPin, Ticket,
   TrendingUp, TrendingDown, Users, Target, Activity, Star, ArrowRight,
   Clock, DollarSign, Percent, Zap, BookOpen, Award
 } from 'lucide-react';
 import { Screen } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
 import { EntityPickerSheet } from '../../components/EntityPickerSheet';
+import { Loader } from '../../components/ui';
 import {
   getPartnerDashboard, getCurrentPartner, getBusinessProfile,
   getExtendedProfile, getPartnerMedia
@@ -411,7 +412,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 size={32} className="text-tlb-yellow animate-spin" />
+        <Loader />
       </div>
     );
   }

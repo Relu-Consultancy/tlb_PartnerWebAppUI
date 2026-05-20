@@ -54,6 +54,7 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
         let cancelled = false;
         (async () => {
             setMetaLoading(true);
+            let catsData: ApiCategory[] = [];
             try {
                 const [catsRes, fmtsRes, tagsRes] = await Promise.all([
                     getProgramMetaCategories(),
@@ -62,7 +63,8 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                 ]);
                 if (!cancelled) {
                     // Categories: response.data is array
-                    setCategories(catsRes.data || catsRes || []);
+                    catsData = catsRes.data || catsRes || [];
+                    setCategories(catsData);
                     // Formats: response.data has { formats: [...], delivery_modes: [...] }
                     const fmtData = fmtsRes.data || fmtsRes;
                     setFormats(Array.isArray(fmtData.formats) ? fmtData.formats : []);
@@ -100,8 +102,16 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                 setAddress(d.address || '');
                 setMeetingLink(d.meeting_link || '');
                 // Category & subcategory come as objects { id, name }
-                if (d.category?.id) setSelectedCategoryId(d.category.id);
-                if (d.subcategory?.id) setSelectedSubcategoryId(d.subcategory.id);
+                const catId = d.category?.id;
+                const subId = d.subcategory?.id;
+                if (catId) setSelectedCategoryId(catId);
+                if (subId) {
+                    // Validate the stored subcategory still belongs to the stored category.
+                    // A previous save bug could have left them mismatched — reset if so.
+                    const cat = catsData.find(c => c.id === catId);
+                    const isValid = cat?.subcategories.some(s => s.id === subId) ?? false;
+                    setSelectedSubcategoryId(isValid ? subId : null);
+                }
                 const loadedTags = d.tags || [];
                 if (loadedTags.length > 0) {
                     const firstTag = loadedTags[0];
@@ -119,6 +129,10 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
 
     const handleNext = async () => {
         if (!title.trim()) { setError('Program title is required.'); return; }
+        if (selectedCategoryId != null && selectedSubcategoryId == null) {
+            setError('Please select a subcategory for the chosen category.');
+            return;
+        }
         if (saving) return;
         setError('');
         setSaving(true);
@@ -159,8 +173,12 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                 payload.meeting_link = meetingLink.trim();
             }
             // Send IDs, not strings
-            if (selectedCategoryId != null) payload.category_id = selectedCategoryId;
-            if (selectedSubcategoryId != null) payload.subcategory_id = selectedSubcategoryId;
+            if (selectedCategoryId != null) {
+                payload.category_id = selectedCategoryId;
+                payload.subcategory_id = selectedSubcategoryId; // always send alongside category to clear any stale subcategory on the backend
+            } else if (selectedSubcategoryId != null) {
+                payload.subcategory_id = selectedSubcategoryId;
+            }
             if (selectedTagId != null) payload.tag_ids = [selectedTagId];
 
             await updateProgramListing(draftId!, payload);

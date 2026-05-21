@@ -9,7 +9,8 @@ import {
   X,
   Users,
   DollarSign,
-  Package
+  Package,
+  BarChart3,
 } from 'lucide-react';
 import { Screen } from '../types';
 import { usePartner } from '../context/PartnerContext';
@@ -53,7 +54,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen
   const hasPrograms = allowedEntities.includes('Programs');
 
     const menuItems = [
-    { id: 'HOME', label: 'Home', icon: Home, sub: 'STATS & ALERTS', visible: true },
+    { id: 'HOME', label: 'Home', icon: Home, sub: 'OVERVIEW & SUMMARY', visible: true },
+    { id: 'STATISTICS', label: 'Statistics', icon: BarChart3, sub: 'ANALYTICS & TRENDS', visible: true },
     { id: 'BRAND_PROFILE', label: 'Brand Profile', icon: UserCircle, sub: 'YOUR STOREFRONT', visible: true },
     { id: 'SERVICE_LISTINGS', label: listingsLabel, icon: CalendarDays, sub: listingsSub, visible: true },
     { id: 'ATTENDEES', label: 'Attendees', icon: Users, sub: 'MANAGE GUESTS', visible: true },

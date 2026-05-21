@@ -54,7 +54,8 @@ export type Screen =
   | 'PROGRAM_ENQUIRIES'
   | 'PACKAGES'
   | 'ATTENDEES'
-  | 'FINANCIAL_HUB';
+  | 'FINANCIAL_HUB'
+  | 'STATISTICS';
 
 // ---------------------------------------------------------------------------
 // Partner

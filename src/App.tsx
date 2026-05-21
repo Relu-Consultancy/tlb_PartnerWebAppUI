@@ -71,6 +71,9 @@ const CreateVenuePreview = lazyImport(() => import('./screens/venues'), 'CreateV
 const Enquiries = lazyImport(() => import('./screens/enquiries'), 'Enquiries');
 const ProgramEnquiries = lazyImport(() => import('./screens/enquiries'), 'ProgramEnquiries');
 
+// Statistics
+const StatisticsScreen = lazyImport(() => import('./screens/statistics'), 'Statistics');
+
 import { Sidebar } from './components/Navigation';
 import { getAuthToken, getRefreshToken, setAuthToken, clearTokens } from './api/client';
 import { getCurrentPartner } from './api/onboarding';
@@ -144,6 +147,7 @@ const routes: Record<Screen, RouteConfig> = {
   ATTENDEES: { component: Attendees, hasSidebar: true },
   PACKAGES: { component: Packages, hasSidebar: true },
   FINANCIAL_HUB: { component: FinancialHub, hasSidebar: true },
+  STATISTICS: { component: StatisticsScreen, hasSidebar: true },
 };
 
 // ---------------------------------------------------------------------------

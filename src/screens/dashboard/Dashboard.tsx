@@ -1,198 +1,24 @@
-import React, { useState, useRef, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect } from 'react';
 import {
   Menu, Bell, UserCircle, CheckCircle2,
-  Inbox, Eye, BarChart3, CreditCard, Plus, CalendarDays, MapPin, Ticket,
-  TrendingUp, TrendingDown, Users, Target, Activity, Star, ArrowRight,
-  Clock, DollarSign, Percent, Zap, BookOpen, Award
+  Inbox, Eye, BarChart3, CreditCard, Plus, CalendarDays,
+  Ticket, Users, Award, DollarSign, MapPin, Percent,
 } from 'lucide-react';
 import { Screen } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
 import { EntityPickerSheet } from '../../components/EntityPickerSheet';
-import { Loader } from '../../components/ui';
+import { Loader, AreaSparkline, TrendBadge, fmtCurrency, trendPct } from '../../components/ui';
 import {
   getPartnerDashboard, getCurrentPartner, getBusinessProfile,
-  getExtendedProfile, getPartnerMedia
+  getExtendedProfile, getPartnerMedia, getPartnerFollowerCount
 } from '../../api/onboarding';
 
-// ─── Chart Primitives ─────────────────────────────────────────────────────────
-
-const AreaSparkline: React.FC<{ data: number[]; color: string; id: string }> = ({ data, color, id }) => {
-  if (data.length < 2) return null;
-  const h = 44, w = 100;
-  const max = Math.max(...data); const min = Math.min(...data);
-  const range = max - min || 1;
-  const pts = data.map((v, i) => {
-    const x = (i / (data.length - 1)) * w;
-    const y = h - ((v - min) / range) * (h - 8) - 4;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  });
-  const line = pts.join(' ');
-  const area = `0,${h} ${line} ${w},${h}`;
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="w-full h-full">
-      <defs>
-        <linearGradient id={`sp-${id}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.35" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <polygon points={area} fill={`url(#sp-${id})`} />
-      <polyline points={line} fill="none" stroke={color} strokeWidth="2.5"
-        strokeLinecap="round" strokeLinejoin="round" />
-      {(() => {
-        const last = pts[pts.length - 1].split(',').map(Number);
-        return <circle cx={last[0]} cy={last[1]} r="2.5" fill={color} />;
-      })()}
-    </svg>
-  );
-};
-
-const TrendAreaChart: React.FC<{
-  data: number[]; labels: string[]; color: string; id: string; formatY?: (v: number) => string;
-}> = ({ data, labels, color, id, formatY }) => {
-  if (data.length < 2) return null;
-  const h = 80, w = 400;
-  const max = Math.max(...data, 1); const min = 0;
-  const range = max - min;
-  const pts = data.map((v, i) => {
-    const x = (i / (data.length - 1)) * w;
-    const y = h - ((v - min) / range) * (h - 8) - 4;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  });
-  const line = pts.join(' ');
-  const area = `0,${h} ${line} ${w},${h}`;
-  const step = Math.ceil(labels.length / 5);
-  const shown = labels.map((l, i) => ({ l, i, show: i % step === 0 || i === labels.length - 1 })).filter(x => x.show);
-  return (
-    <div className="w-full">
-      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="w-full" style={{ height: 80 }}>
-        <defs>
-          <linearGradient id={`ta-${id}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity="0.3" />
-            <stop offset="100%" stopColor={color} stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        <polygon points={area} fill={`url(#ta-${id})`} />
-        <polyline points={line} fill="none" stroke={color} strokeWidth="2"
-          strokeLinecap="round" strokeLinejoin="round" />
-        {(() => {
-          const last = pts[pts.length - 1].split(',').map(Number);
-          return <circle cx={last[0]} cy={last[1]} r="3.5" fill="white" stroke={color} strokeWidth="2" />;
-        })()}
-      </svg>
-      <div className="flex justify-between mt-1.5 px-0.5">
-        {shown.map(({ l, i }) => (
-          <span key={i} className="text-[9px] text-gray-400 font-bold">{l}</span>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-const WeeklyBarChart: React.FC<{ data: number[]; labels: string[]; color: string; highlightLast?: boolean }> = ({
-  data, labels, color, highlightLast = true,
-}) => {
-  const max = Math.max(...data, 1);
-  const total = data.reduce((a, b) => a + b, 0);
-  return (
-    <div>
-      <div className="flex items-end gap-1.5 h-20">
-        {data.map((v, i) => {
-          const isLast = highlightLast && i === data.length - 1;
-          return (
-            <div key={i} className="flex-1 flex flex-col items-center gap-1.5">
-              {v > 0 ? (
-                <div
-                  className="w-full rounded-t-lg transition-all duration-500"
-                  style={{
-                    height: `${Math.max((v / max) * 64, 4)}px`,
-                    backgroundColor: color,
-                    opacity: isLast ? 1 : 0.45 + (i / data.length) * 0.45,
-                  }}
-                />
-              ) : (
-                <div className="w-full rounded-t-lg" style={{ height: 4, backgroundColor: '#F3F4F6' }} />
-              )}
-              <span className={`text-[9px] font-bold ${isLast ? 'text-gray-700' : 'text-gray-400'}`}>{labels[i]}</span>
-            </div>
-          );
-        })}
-      </div>
-      {total === 0 && (
-        <p className="text-center text-[10px] font-bold text-gray-300 mt-3 uppercase tracking-widest">No activity yet this week</p>
-      )}
-    </div>
-  );
-};
-
-const DonutChart: React.FC<{
-  segments: { value: number; color: string; label: string }[];
-  centerLabel?: string; centerSub?: string;
-}> = ({ segments, centerLabel, centerSub }) => {
-  const total = segments.reduce((a, b) => a + b.value, 0) || 1;
-  const r = 35, cx = 50, cy = 50, circ = 2 * Math.PI * r;
-  let acc = 0;
-  const arcs = segments.map(seg => {
-    const dash = (seg.value / total) * circ;
-    const arc = { ...seg, dash, acc };
-    acc += dash;
-    return arc;
-  });
-  const hasData = segments.some(s => s.value > 0);
-  return (
-    <svg viewBox="0 0 100 100" className="w-full h-full">
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#F3F4F6" strokeWidth="12" />
-      {hasData ? arcs.map((arc, i) => (
-        <circle key={i} cx={cx} cy={cy} r={r} fill="none"
-          stroke={arc.color} strokeWidth="12"
-          strokeDasharray={`${arc.dash} ${circ - arc.dash}`}
-          strokeDashoffset={circ / 4 - arc.acc}
-          transform="rotate(-90 50 50)"
-          strokeLinecap="butt"
-        />
-      )) : (
-        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#E5E7EB" strokeWidth="12" strokeDasharray="4 3" />
-      )}
-      {centerLabel && (
-        <text x="50" y="47" textAnchor="middle" fill="#111827" fontSize="13" fontWeight="900">{centerLabel}</text>
-      )}
-      {centerSub && (
-        <text x="50" y="58" textAnchor="middle" fill="#9CA3AF" fontSize="6.5" fontWeight="700">{centerSub}</text>
-      )}
-    </svg>
-  );
-};
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const fmtCurrency = (v: number) =>
-  v >= 100000 ? `₹${(v / 100000).toFixed(1)}L` : v >= 1000 ? `₹${(v / 1000).toFixed(0)}K` : `₹${v}`;
-
-const trendPct = (arr: number[]) => {
-  if (arr.length < 2) return 0;
-  const prev = arr[arr.length - 2]; const curr = arr[arr.length - 1];
-  return prev ? Math.round(((curr - prev) / prev) * 100) : 0;
-};
-
-const TrendBadge: React.FC<{ pct: number }> = ({ pct }) => {
-  if (pct === 0) return <span className="text-[9px] font-bold text-gray-300">—</span>;
-  const up = pct > 0;
-  return (
-    <span className={`inline-flex items-center gap-0.5 text-[9px] font-black ${up ? 'text-emerald-500' : 'text-red-400'}`}>
-      {up ? <TrendingUp size={10} /> : <TrendingDown size={10} />} {Math.abs(pct)}%
-    </span>
-  );
-};
-
-// ─── Types / Constants ────────────────────────────────────────────────────────
+// â”€â”€â”€ Types / Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const ACTIVE_STATUSES = new Set(['activated_limited', 'under_review', 'approved']);
 const VERIFICATION_SUBMITTED_STATUSES = new Set(['under_review', 'approved']);
 
-const MONTH_LABELS_6 = ['Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May'];
-const WEEK_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-// ─── Component ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface HomeProps { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
 
@@ -209,6 +35,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
   const [profileData, setProfileData] = useState<any>(null);
   const [extendedData, setExtendedData] = useState<any>(null);
   const [mediaItems, setMediaItems] = useState<any[]>([]);
+  const [followerCount, setFollowerCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -222,6 +49,12 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
           const pData = partnerRes.value.data || partnerRes.value;
           setPartnerData(pData);
           if (pData.categories?.length > 0) setAllowedEntities(pData.categories.map((c: any) => c.name || c));
+          const pid = pData.id || pData.partner_id;
+          if (pid) {
+            getPartnerFollowerCount(pid)
+              .then(res => setFollowerCount((res?.data ?? res)?.follower_count ?? 0))
+              .catch(() => {});
+          }
         }
         if (dashboardRes.status === 'fulfilled') setDashboardData(dashboardRes.value.data || dashboardRes.value);
         if (profileRes.status === 'fulfilled') setProfileData(profileRes.value.data || profileRes.value);
@@ -314,42 +147,21 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
   const quickLinks = [
     { label: 'Brand Profile', screen: 'BRAND_PROFILE' as Screen, icon: UserCircle },
     { label: 'My Listings', screen: 'SERVICE_LISTINGS' as Screen, icon: CalendarDays },
+    { label: 'Statistics', screen: 'STATISTICS' as Screen, icon: BarChart3 },
     ...(hasClassOrProgram ? [{ label: 'Enquiries', screen: 'ENQUIRIES' as Screen, icon: Inbox }] : []),
     { label: 'Finance', screen: 'FINANCIAL_HUB' as Screen, icon: CreditCard },
   ];
 
-  // ── Analytics data: API first, then stub fallback ──────────────────────────
+  // â”€â”€ KPI data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const d = dashboardData || {};
-
-  const weeklyActivity: number[] = d.weekly_activity ||
-    (hasEvents ? [0, 0, 0, 0, 0, 0, 0] :
-     hasVenues ? [0, 0, 0, 0, 0, 0, 0] :
-                 [0, 0, 0, 0, 0, 0, 0]);
-
-  const monthlyEnquiries: number[] = d.monthly_enquiries || [0, 0, 0, 0, 0, 0];
-  const monthlyRevenue: number[] = d.monthly_revenue || [0, 0, 0, 0, 0, 0];
-  const monthlyTickets: number[] = d.monthly_tickets || [0, 0, 0, 0, 0, 0];
-
-  const funnelNew = d.funnel_new ?? d.new_enquiries ?? 0;
-  const funnelContacted = d.funnel_contacted ?? 0;
-  const funnelConverted = d.funnel_converted ?? 0;
-  const convRate = funnelNew > 0 ? Math.round((funnelConverted / funnelNew) * 100) : 0;
-
-  const ticketsSold = d.tickets_sold ?? 0;
-  const totalRegistrations = d.total_registrations ?? 0;
   const upcomingEvents = d.upcoming_events ?? 0;
-  const eventReach = d.event_reach ?? 0;
-
+  const ticketsSold = d.tickets_sold ?? 0;
   const venueBookings = d.venue_bookings ?? 0;
   const occupancyRate = d.occupancy_rate ?? 0;
-  const upcomingReservations = d.upcoming_reservations ?? 0;
   const monthlyEarnings = d.monthly_earnings ?? 0;
 
-  const topListings: any[] = d.top_listings || [];
-  const recentActivity: any[] = d.recent_activity || [];
-
-  // ── KPI Metrics ─────────────────────────────────────────────────────────────
+  // â”€â”€ KPI Metrics â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const kpiMetrics = (() => {
     if (hasClassOrProgram) {
@@ -392,23 +204,6 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
     ];
   })();
 
-  // ── Section label helpers ──────────────────────────────────────────────────
-
-  const weeklyLabel = hasEvents ? 'Weekly Ticket Sales' :
-                      hasVenues ? 'Weekly Bookings' :
-                                  'Weekly Enquiries';
-
-  const trendLabel = hasEvents ? 'Ticket Sales Trend' :
-                     hasVenues ? 'Booking Revenue Trend' :
-                                 'Enquiry & Enrolment Trend';
-
-  const trendData = hasEvents ? monthlyTickets :
-                    hasVenues ? monthlyRevenue :
-                                monthlyEnquiries;
-
-  const trendColor = hasEvents ? '#8B5CF6' : hasVenues ? '#F59E0B' : '#3B82F6';
-  const trendId = hasEvents ? 'evtkt' : hasVenues ? 'vnrev' : 'clsenq';
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -420,7 +215,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
   return (
     <div className="min-h-screen bg-gray-50">
 
-      {/* ── Header ── */}
+      {/* â”€â”€ Header â”€â”€ */}
       <header className="bg-white p-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
         <button onClick={onOpenSidebar} className="p-2 -ml-2"><Menu size={24} /></button>
         <h1 className="font-black text-lg">TLB Partner</h1>
@@ -504,6 +299,13 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
                   </div>
                   <div className="w-px h-8 bg-gray-100" />
                   <div className="text-center">
+                    <p className="text-base font-black text-gray-900">
+                      {followerCount === null ? 'â€”' : followerCount.toLocaleString('en-IN')}
+                    </p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Followers</p>
+                  </div>
+                  <div className="w-px h-8 bg-gray-100" />
+                  <div className="text-center">
                     <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide ${
                       isVerified ? 'bg-emerald-50 text-emerald-600' :
                       verificationSubmitted ? 'bg-blue-50 text-blue-500' :
@@ -545,9 +347,9 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
       </header>
 
       <main className="p-6">
-        <div className="tlb-content space-y-8">
+        <div className="tlb-content space-y-6">
 
-          {/* ── Onboarding Tracker ── */}
+          {/* â”€â”€ Onboarding Tracker â”€â”€ */}
           {isActive && !isVerified && (
             <section className="bg-white border border-gray-100 rounded-3xl p-6 sm:p-8 shadow-sm">
               <div className="mb-6">
@@ -589,7 +391,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
                   <div className={`pt-0.5 ${!verificationSubmitted ? 'opacity-40' : ''}`}>
                     <p className="font-bold text-gray-900">Admin Review</p>
                     {verificationSubmitted
-                      ? <p className="text-[10px] text-tlb-yellow font-bold uppercase tracking-widest mt-0.5">In Progress — typically 24–48 hrs</p>
+                      ? <p className="text-[10px] text-tlb-yellow font-bold uppercase tracking-widest mt-0.5">In Progress â€” typically 24â€“48 hrs</p>
                       : <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">Unlocks after Step 2</p>}
                   </div>
                 </div>
@@ -597,12 +399,12 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
             </section>
           )}
 
-          {/* ── Welcome Banner ── */}
+          {/* â”€â”€ Welcome Banner â”€â”€ */}
           <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-tlb-dark to-gray-900 p-6 sm:p-8 text-white">
             <div className="absolute -right-6 -top-6 w-32 h-32 bg-tlb-yellow/10 rounded-full blur-2xl" />
             <div className="absolute -left-4 -bottom-4 w-24 h-24 bg-tlb-yellow/5 rounded-full blur-xl" />
             <div className="relative z-10">
-              <h2 className="text-2xl font-black leading-tight">Welcome back, {businessName}! 👋</h2>
+              <h2 className="text-2xl font-black leading-tight">Welcome back, {businessName}! ðŸ‘‹</h2>
               <p className="text-sm text-gray-400 mt-2 leading-relaxed max-w-lg">
                 Your profile is <span className="text-tlb-yellow font-black">{profileCompletion}% complete</span>.
                 {profileCompletion < 100 && (
@@ -621,7 +423,58 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
             </div>
           </section>
 
-          {/* ── KPI Cards ── */}
+          {/* â”€â”€ Profile Performance â”€â”€ */}
+          <section className="tlb-card p-6">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h3 className="font-black text-gray-900">Profile Performance</h3>
+                <p className="text-xs text-gray-400 mt-0.5">Visibility and engagement metrics</p>
+              </div>
+              <button onClick={() => onNavigate('BRAND_PROFILE')} className="text-xs font-bold text-tlb-yellow hover:underline">
+                Edit Profile
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              {[
+                { label: 'Profile Views', value: d.profile_views ?? 0, icon: Eye, color: 'text-purple-500', bg: 'bg-purple-50' },
+                { label: 'Followers', value: followerCount === null ? 'â€”' : followerCount.toLocaleString('en-IN'), icon: Users, color: 'text-blue-500', bg: 'bg-blue-50' },
+                { label: 'Completion', value: `${profileCompletion}%`, icon: Award, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+              ].map(stat => (
+                <div key={stat.label} className="flex flex-col items-center text-center gap-2">
+                  <div className={`w-10 h-10 ${stat.bg} rounded-xl flex items-center justify-center ${stat.color}`}>
+                    <stat.icon size={18} />
+                  </div>
+                  <div>
+                    <p className="text-xl font-black text-gray-900">{stat.value}</p>
+                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{stat.label}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-5 pt-4 border-t border-gray-100">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Profile Strength</span>
+                <span className="text-[10px] font-black text-gray-700">{profileCompletion}%</span>
+              </div>
+              <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-700"
+                  style={{
+                    width: `${profileCompletion}%`,
+                    backgroundColor: profileCompletion >= 80 ? '#10B981' : profileCompletion >= 50 ? '#FACC15' : '#F87171',
+                  }}
+                />
+              </div>
+              <p className="text-[10px] text-gray-400 mt-1.5">
+                {profileCompletion === 100 ? 'Your profile is fully complete!' :
+                 profileCompletion >= 80 ? 'Almost there! Add a few more details.' :
+                 profileCompletion >= 50 ? 'Good progress. Add bio, links & gallery.' :
+                 'Complete your profile to improve discoverability.'}
+              </p>
+            </div>
+          </section>
+
+          {/* â”€â”€ KPI Cards â”€â”€ */}
           <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {kpiMetrics.map((m) => {
               const sparkHasData = m.spark.some(v => v > 0);
@@ -648,386 +501,14 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
             })}
           </section>
 
-          {/* ── Weekly Activity ── */}
-          <section className="tlb-card p-6">
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <h3 className="font-black text-gray-900">{weeklyLabel}</h3>
-                <p className="text-xs text-gray-400 mt-0.5">Last 7 days</p>
-              </div>
-              <div className="bg-gray-50 rounded-xl px-3 py-1.5 flex items-center gap-1.5">
-                <Activity size={13} className="text-gray-400" />
-                <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
-                  Total: {weeklyActivity.reduce((a, b) => a + b, 0)}
-                </span>
-              </div>
-            </div>
-            <WeeklyBarChart
-              data={weeklyActivity}
-              labels={WEEK_LABELS}
-              color={hasEvents ? '#8B5CF6' : hasVenues ? '#F59E0B' : '#3B82F6'}
-            />
-          </section>
-
-          {/* ── Classes / Programs: Enquiry Insights ── */}
-          {hasClassOrProgram && (
-            <section className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-black text-gray-900">Enquiry Insights</h3>
-                <button onClick={() => onNavigate('ENQUIRIES')} className="text-xs font-bold text-tlb-yellow flex items-center gap-1 hover:underline">
-                  View All <ArrowRight size={12} />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Funnel Donut */}
-                <div className="tlb-card p-5">
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Conversion Funnel</p>
-                  <div className="flex items-center gap-4">
-                    <div className="w-28 h-28 shrink-0">
-                      <DonutChart
-                        segments={[
-                          { value: funnelNew, color: '#3B82F6', label: 'New' },
-                          { value: funnelContacted, color: '#FACC15', label: 'Contacted' },
-                          { value: funnelConverted, color: '#10B981', label: 'Converted' },
-                        ]}
-                        centerLabel={`${convRate}%`}
-                        centerSub="CONV. RATE"
-                      />
-                    </div>
-                    <div className="flex-1 space-y-2.5">
-                      {[
-                        { label: 'New Leads', value: funnelNew, color: 'bg-blue-500' },
-                        { label: 'Contacted', value: funnelContacted, color: 'bg-tlb-yellow' },
-                        { label: 'Converted', value: funnelConverted, color: 'bg-emerald-500' },
-                      ].map(item => (
-                        <div key={item.label} className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${item.color} shrink-0`} />
-                          <span className="text-xs text-gray-500 flex-1">{item.label}</span>
-                          <span className="text-xs font-black text-gray-900">{item.value}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  {funnelNew === 0 && (
-                    <p className="text-center text-[10px] font-bold text-gray-300 mt-3 uppercase tracking-widest">No enquiries yet</p>
-                  )}
-                </div>
-
-                {/* Stats Grid */}
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { label: 'Trial Requests', value: d.trial_requests ?? 0, icon: BookOpen, color: 'text-purple-500', bg: 'bg-purple-50' },
-                    { label: 'Avg. Response', value: d.avg_response_time ? `${d.avg_response_time}h` : '—', icon: Clock, color: 'text-blue-500', bg: 'bg-blue-50' },
-                    { label: 'Student Retention', value: d.retention_rate ? `${d.retention_rate}%` : '—', icon: Users, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-                    { label: 'Monthly Enrolments', value: d.monthly_enrolments?.toString() ?? '0', icon: Target, color: 'text-amber-500', bg: 'bg-amber-50' },
-                  ].map(stat => (
-                    <div key={stat.label} className="tlb-card p-4 flex flex-col gap-2">
-                      <div className={`w-8 h-8 ${stat.bg} rounded-xl flex items-center justify-center ${stat.color}`}>
-                        <stat.icon size={16} />
-                      </div>
-                      <div>
-                        <p className="text-xl font-black leading-none">{stat.value}</p>
-                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">{stat.label}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Monthly Enquiry Trend */}
-              <div className="tlb-card p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <p className="font-black text-gray-900">Monthly Trend</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Enquiries over last 6 months</p>
-                  </div>
-                  <span className="text-lg font-black text-blue-500">{monthlyEnquiries[monthlyEnquiries.length - 1]}</span>
-                </div>
-                <TrendAreaChart data={monthlyEnquiries} labels={MONTH_LABELS_6} color="#3B82F6" id="moenq" />
-              </div>
-            </section>
-          )}
-
-          {/* ── Events Analytics ── */}
-          {hasEvents && (
-            <section className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-black text-gray-900">Event Analytics</h3>
-                <button onClick={() => onNavigate('SERVICE_LISTINGS')} className="text-xs font-bold text-tlb-yellow flex items-center gap-1 hover:underline">
-                  My Events <ArrowRight size={12} />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {[
-                  { label: 'Upcoming', value: upcomingEvents, icon: CalendarDays, color: 'text-blue-500', bg: 'bg-blue-50' },
-                  { label: 'Tickets Sold', value: ticketsSold, icon: Ticket, color: 'text-purple-500', bg: 'bg-purple-50' },
-                  { label: 'Registrations', value: totalRegistrations, icon: Users, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-                  { label: 'Event Reach', value: eventReach, icon: Zap, color: 'text-amber-500', bg: 'bg-amber-50' },
-                ].map(stat => (
-                  <div key={stat.label} className="tlb-card p-4 flex flex-col gap-2">
-                    <div className={`w-8 h-8 ${stat.bg} rounded-xl flex items-center justify-center ${stat.color}`}>
-                      <stat.icon size={16} />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-black leading-none">{stat.value}</p>
-                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">{stat.label}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Ticket Sales Trend */}
-              <div className="tlb-card p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <p className="font-black text-gray-900">Ticket Sales Trend</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Monthly over last 6 months</p>
-                  </div>
-                  <span className="text-lg font-black text-purple-500">{monthlyTickets[monthlyTickets.length - 1]}</span>
-                </div>
-                <TrendAreaChart data={monthlyTickets} labels={MONTH_LABELS_6} color="#8B5CF6" id="evtkt" />
-              </div>
-
-              {/* Engagement Rate + Booking Trends */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="tlb-card p-5">
-                  <div className="w-8 h-8 bg-blue-50 rounded-xl flex items-center justify-center text-blue-500 mb-3">
-                    <Activity size={16} />
-                  </div>
-                  <p className="text-2xl font-black">{d.engagement_rate ? `${d.engagement_rate}%` : '—'}</p>
-                  <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">Engagement Rate</p>
-                </div>
-                <div className="tlb-card p-5">
-                  <div className="w-8 h-8 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-500 mb-3">
-                    <Target size={16} />
-                  </div>
-                  <p className="text-2xl font-black">{d.booking_conversion ? `${d.booking_conversion}%` : '—'}</p>
-                  <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">Booking Conv. Rate</p>
-                </div>
-              </div>
-            </section>
-          )}
-
-          {/* ── Venue Analytics ── */}
-          {hasVenues && (
-            <section className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-black text-gray-900">Venue Analytics</h3>
-                <button onClick={() => onNavigate('SERVICE_LISTINGS')} className="text-xs font-bold text-tlb-yellow flex items-center gap-1 hover:underline">
-                  My Venues <ArrowRight size={12} />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Occupancy Donut */}
-                <div className="tlb-card p-5">
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Occupancy Rate</p>
-                  <div className="flex items-center gap-4">
-                    <div className="w-28 h-28 shrink-0">
-                      <DonutChart
-                        segments={[
-                          { value: occupancyRate, color: '#10B981', label: 'Occupied' },
-                          { value: 100 - occupancyRate, color: '#F3F4F6', label: 'Available' },
-                        ]}
-                        centerLabel={`${occupancyRate}%`}
-                        centerSub="OCCUPANCY"
-                      />
-                    </div>
-                    <div className="flex-1 space-y-3">
-                      {[
-                        { label: 'Total Bookings', value: venueBookings, color: 'bg-blue-500' },
-                        { label: 'Upcoming', value: upcomingReservations, color: 'bg-amber-400' },
-                        { label: 'Monthly Earnings', value: fmtCurrency(monthlyEarnings), color: 'bg-emerald-500' },
-                      ].map(item => (
-                        <div key={item.label} className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${item.color} shrink-0`} />
-                          <span className="text-xs text-gray-500 flex-1">{item.label}</span>
-                          <span className="text-xs font-black text-gray-900">{item.value}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Venue Stats Grid */}
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { label: 'Bookings', value: venueBookings, icon: MapPin, color: 'text-blue-500', bg: 'bg-blue-50' },
-                    { label: 'Upcoming', value: upcomingReservations, icon: CalendarDays, color: 'text-amber-500', bg: 'bg-amber-50' },
-                    { label: 'Avg. Duration', value: d.avg_booking_hours ? `${d.avg_booking_hours}h` : '—', icon: Clock, color: 'text-purple-500', bg: 'bg-purple-50' },
-                    { label: 'Repeat Clients', value: d.repeat_clients ?? '—', icon: Star, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-                  ].map(stat => (
-                    <div key={stat.label} className="tlb-card p-4 flex flex-col gap-2">
-                      <div className={`w-8 h-8 ${stat.bg} rounded-xl flex items-center justify-center ${stat.color}`}>
-                        <stat.icon size={16} />
-                      </div>
-                      <div>
-                        <p className="text-xl font-black leading-none">{stat.value}</p>
-                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">{stat.label}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Monthly Booking Revenue Trend */}
-              <div className="tlb-card p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <p className="font-black text-gray-900">Revenue Trend</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Monthly earnings over last 6 months</p>
-                  </div>
-                  <span className="text-lg font-black text-amber-500">{fmtCurrency(monthlyRevenue[monthlyRevenue.length - 1])}</span>
-                </div>
-                <TrendAreaChart data={monthlyRevenue} labels={MONTH_LABELS_6} color="#F59E0B" id="vnrev" />
-              </div>
-            </section>
-          )}
-
-          {/* ── Revenue Snapshot (universal) ── */}
-          <section className="tlb-card p-6">
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <h3 className="font-black text-gray-900">{trendLabel}</h3>
-                <p className="text-xs text-gray-400 mt-0.5">6-month overview</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: trendColor }} />
-                <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
-                  {hasEvents ? 'Tickets' : hasVenues ? 'Revenue' : 'Enquiries'}
-                </span>
-              </div>
-            </div>
-            <TrendAreaChart data={trendData} labels={MONTH_LABELS_6} color={trendColor} id={trendId} />
-
-            {/* Category Breakdown */}
-            {hasClassOrProgram && (
-              <div className="mt-5 grid grid-cols-3 gap-3 pt-4 border-t border-gray-100">
-                {[
-                  { label: 'New', value: monthlyEnquiries[monthlyEnquiries.length - 1], pct: 100 },
-                  { label: 'Prev Month', value: monthlyEnquiries[monthlyEnquiries.length - 2], pct: monthlyEnquiries[monthlyEnquiries.length - 1] > 0 ? Math.round((monthlyEnquiries[monthlyEnquiries.length - 2] / Math.max(monthlyEnquiries[monthlyEnquiries.length - 1], 1)) * 100) : 0 },
-                  { label: 'Growth', value: `${trendPct(monthlyEnquiries) > 0 ? '+' : ''}${trendPct(monthlyEnquiries)}%`, pct: null },
-                ].map(item => (
-                  <div key={item.label} className="text-center">
-                    <p className="text-xl font-black text-gray-900">{item.value}</p>
-                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{item.label}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-
-          {/* ── Top Performing Listings ── */}
-          {topListings.length > 0 && (
-            <section>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-black text-gray-900">Top Performing Listings</h3>
-                <button onClick={() => onNavigate('SERVICE_LISTINGS')} className="text-xs font-bold text-tlb-yellow flex items-center gap-1 hover:underline">
-                  All Listings <ArrowRight size={12} />
-                </button>
-              </div>
-              <div className="space-y-3">
-                {topListings.slice(0, 3).map((listing: any, i: number) => (
-                  <div key={listing.id || i} className="tlb-card p-4 flex items-center gap-4">
-                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 font-black text-sm ${i === 0 ? 'bg-tlb-yellow text-tlb-dark' : i === 1 ? 'bg-gray-200 text-gray-600' : 'bg-orange-100 text-orange-600'}`}>
-                      {i + 1}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold text-sm truncate">{listing.title || 'Untitled'}</p>
-                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">{listing.listing_type || ''}</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-sm font-black text-gray-900">{listing.views ?? 0}</p>
-                      <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">views</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* ── Recent Activity ── */}
-          {recentActivity.length > 0 && (
-            <section>
-              <h3 className="font-black text-gray-900 mb-4">Recent Activity</h3>
-              <div className="tlb-card overflow-hidden">
-                {recentActivity.slice(0, 5).map((item: any, i: number) => (
-                  <div key={i} className="flex items-start gap-4 px-5 py-4 border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors">
-                    <div className="w-8 h-8 bg-tlb-yellow/10 text-tlb-yellow rounded-xl flex items-center justify-center shrink-0">
-                      <Activity size={14} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-gray-900">{item.title || item.text}</p>
-                      {item.description && <p className="text-xs text-gray-400 mt-0.5">{item.description}</p>}
-                    </div>
-                    <span className="text-[10px] text-gray-400 font-bold shrink-0 mt-0.5">{item.time || item.created_at || ''}</span>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* ── Profile Performance ── */}
-          <section className="tlb-card p-6">
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <h3 className="font-black text-gray-900">Profile Performance</h3>
-                <p className="text-xs text-gray-400 mt-0.5">Visibility and engagement metrics</p>
-              </div>
-              <button onClick={() => onNavigate('BRAND_PROFILE')} className="text-xs font-bold text-tlb-yellow flex items-center gap-1 hover:underline">
-                Edit Profile <ArrowRight size={12} />
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                { label: 'Profile Views', value: d.profile_views ?? 0, icon: Eye, color: 'text-purple-500', bg: 'bg-purple-50' },
-                { label: 'Completion', value: `${profileCompletion}%`, icon: Award, color: 'text-blue-500', bg: 'bg-blue-50' },
-              ].map(stat => (
-                <div key={stat.label} className="flex flex-col items-center text-center gap-2">
-                  <div className={`w-10 h-10 ${stat.bg} rounded-xl flex items-center justify-center ${stat.color}`}>
-                    <stat.icon size={18} />
-                  </div>
-                  <div>
-                    <p className="text-xl font-black text-gray-900">{stat.value}</p>
-                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{stat.label}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            {/* Profile completion bar */}
-            <div className="mt-5 pt-4 border-t border-gray-100">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Profile Strength</span>
-                <span className="text-[10px] font-black text-gray-700">{profileCompletion}%</span>
-              </div>
-              <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-700"
-                  style={{
-                    width: `${profileCompletion}%`,
-                    backgroundColor: profileCompletion >= 80 ? '#10B981' : profileCompletion >= 50 ? '#FACC15' : '#F87171',
-                  }}
-                />
-              </div>
-              <p className="text-[10px] text-gray-400 mt-1.5">
-                {profileCompletion === 100 ? 'Your profile is fully complete 🎉' :
-                 profileCompletion >= 80 ? 'Almost there! Add a few more details.' :
-                 profileCompletion >= 50 ? 'Good progress. Add bio, links & gallery.' :
-                 'Complete your profile to improve discoverability.'}
-              </p>
-            </div>
-          </section>
-
-          {/* ── CTA Button ── */}
+          {/* â”€â”€ CTA Button â”€â”€ */}
           <section>
             <button onClick={handleAddListing} className="tlb-button w-full py-5 shadow-lg shadow-tlb-yellow/20 text-base gap-3">
               <Plus size={22} /> {ctaLabel}
             </button>
           </section>
 
-          {/* ── Quick Links ── */}
+          {/* â”€â”€ Quick Links â”€â”€ */}
           <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {quickLinks.map((link) => (
               <button
@@ -1041,10 +522,11 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
             ))}
           </section>
 
+
         </div>
       </main>
 
-      {/* ── Footer ── */}
+      {/* â”€â”€ Footer â”€â”€ */}
       <footer className="mt-10 bg-tlb-dark text-white px-6 py-8">
         <div className="flex flex-col items-center gap-4">
           <img src="/tlbAppIcon.png" alt="The Little Broadway" className="w-14 h-14 rounded-2xl" />
@@ -1066,7 +548,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
           </div>
           <div className="w-full border-t border-white/10 my-2" />
           <p className="text-gray-500 text-[10px] text-center">
-            © 2026 The Little Broadway. All rights reserved.<br />Partner Portal V3.0
+            Â© 2026 The Little Broadway. All rights reserved.<br />Partner Portal V3.0
           </p>
         </div>
       </footer>

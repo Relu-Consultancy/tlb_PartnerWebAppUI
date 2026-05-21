@@ -786,3 +786,40 @@ export const deleteProgramMedia = async (listingId: string, mediaId: number) => 
     return response.json().catch(() => ({}));
 };
 
+// ─── Bookings ──────────────────────────────────────────────────────────────
+
+export const getBookings = async (params?: { status?: string; listing_id?: string; page?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.status) qs.set('status', params.status);
+    if (params?.listing_id) qs.set('listing_id', params.listing_id);
+    if (params?.page && params.page > 1) qs.set('page', String(params.page));
+    const query = qs.toString();
+    const url = query ? `/api/v1/partner/bookings/?${query}` : '/api/v1/partner/bookings/';
+    const response = await apiClient(url);
+    if (!response.ok) await handleError(response, 'Failed to load bookings');
+    return response.json();
+};
+
+export const getBookingDetail = async (bookingId: string) => {
+    const response = await apiClient(`/api/v1/partner/bookings/${bookingId}/`);
+    if (!response.ok) await handleError(response, 'Failed to load booking detail');
+    return response.json();
+};
+
+export const markBookingAttended = async (bookingId: string) => {
+    const response = await apiClient(`/api/v1/partner/bookings/${bookingId}/mark-attended/`, {
+        method: 'POST',
+    });
+    if (!response.ok) await handleError(response, 'Failed to mark booking as attended');
+    return response.json();
+};
+
+export const cancelBooking = async (bookingId: string, reason?: string) => {
+    const response = await apiClient(`/api/v1/partner/bookings/${bookingId}/cancel/`, {
+        method: 'POST',
+        body: JSON.stringify({ reason: reason || 'partner_cancellation' }),
+    });
+    if (!response.ok) await handleError(response, 'Failed to cancel booking');
+    return response.json();
+};
+

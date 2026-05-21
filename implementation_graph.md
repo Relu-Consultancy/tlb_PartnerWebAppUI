@@ -3,7 +3,7 @@
 > **Definitive architectural reference for the TLB Partner Portal.**
 > Base URL: `https://tlb-api.reluconsultancy.in`
 > Framework: React + Vite + TypeScript (SPA)
-> Last Updated: May 19, 2026
+> Last Updated: May 21, 2026
 
 ---
 
@@ -19,12 +19,14 @@ src/
 ├── context/
 │   └── PartnerContext.tsx   # Global context: allowedEntities (synced to sessionStorage)
 ├── components/
-│   ├── Navigation.tsx       # Sidebar component
-│   └── EntityPickerSheet.tsx# Bottom sheet for entity type selection
+│   ├── Navigation.tsx           # Sidebar component (Home, Statistics, Brand Profile, Listings, Attendees, Enquiries, Finance)
+│   ├── EntityPickerSheet.tsx    # Bottom sheet for entity type selection
+│   └── ui/
+│       └── DashboardCharts.tsx  # Shared SVG chart primitives: AreaSparkline, TrendAreaChart, WeeklyBarChart, DonutChart, fmtCurrency, trendPct, TrendBadge
 ├── screens/
 │   ├── auth/               # Landing, Login, OTPVerify, PartnerAccess, PartnerAccessOTP, PartnerCategory
 │   ├── onboarding/         # Registration, AppSubmitted, AppApproved, AgreementSubmit, IdentityVerification, BankSetup, OnboardingComplete
-│   ├── dashboard/          # Dashboard (Home)
+│   ├── dashboard/          # Dashboard (Home) — lean layout; analytics moved to Statistics
 │   ├── profile/            # BrandProfile (EditProfile), PreviewProfile
 │   ├── services/           # ServiceListings (shared dashboard for all entities)
 │   ├── classes/            # CreateClass* (5 steps)
@@ -32,7 +34,8 @@ src/
 │   ├── programs/           # CreateProgram* (5 steps)
 │   ├── venues/             # CreateVenue* (5 steps)
 │   ├── enquiries/          # Enquiries, ProgramEnquiries
-│   ├── attendees/          # Attendees
+│   ├── attendees/          # Attendees — full booking management (list, detail, mark-attended, cancel)
+│   ├── statistics/         # Statistics — dedicated analytics/charts screen
 │   ├── packages/           # Packages
 │   └── financial/          # FinancialHub
 ├── test/
@@ -197,6 +200,23 @@ Request → 401 Unauthorized?
 | `uploadProgramMedia` | POST | `/api/v1/partner/listings/programs/<id>/media/` | FormData | CreateProgramMedia |
 | `deleteProgramMedia` | DELETE | `/api/v1/partner/listings/programs/<id>/media/<mid>/` | — | CreateProgramMedia |
 
+**Bookings (Partner-wide):**
+
+| Function | Method | Endpoint | Payload | Used By |
+|----------|--------|----------|---------|---------|
+| `getBookings` | GET | `/api/v1/partner/bookings/` | Query: `status?`, `listing_id?`, `page?` | Attendees |
+| `getBookingDetail` | GET | `/api/v1/partner/bookings/{id}/` | — | Attendees (drawer) |
+| `markBookingAttended` | POST | `/api/v1/partner/bookings/{id}/mark-attended/` | — | Attendees (drawer action) |
+| `cancelBooking` | POST | `/api/v1/partner/bookings/{id}/cancel/` | `{ reason: string }` | Attendees (drawer action) |
+
+**Booking field reference:**
+
+| Field | Values | Notes |
+|-------|--------|-------|
+| `status` | `confirmed` / `attended` / `cancelled` | Filter param + display badge |
+| `payment_status` | `paid` / `pending` / `refunded` | Display badge only |
+| `booking_type` | `event` / `class` / `program` / `venue` | Display badge only |
+
 > **Program enquiries are per-listing (not global):** `ProgramEnquiries.tsx` fetches all programs on mount, then loads `GET /api/v1/partner/listings/programs/<id>/enquiries/` for the selected program. A dropdown appears when more than one program exists.
 >
 > **Program Enquiry Schema Differences:** Programs use `enrolled` status instead of `trial_booked` (used by classes). Additionally, contact information (`contact_number`, `email`) is available directly in the response payload (no `/unlock/` endpoint is required for programs).
@@ -237,7 +257,8 @@ Request → 401 Unauthorized?
 | `uploadPartnerMedia` | POST | `/api/v1/partners/media/` | FormData (file, media_type) | Registration, BrandProfile |
 | `deletePartnerMedia` | DELETE | `/api/v1/partners/media/{id}/` | — | Registration, BrandProfile |
 | `getCurrentPartner` | GET | `/api/v1/partners/me/` | — | **App.tsx** (session restore), Dashboard, Registration, **FinancialHub** |
-| `getPartnerDashboard` | GET | `/api/v1/partners/dashboard/` | — | Dashboard |
+| `getPartnerDashboard` | GET | `/api/v1/partners/dashboard/` | — | Dashboard, Statistics |
+| `getPartnerFollowerCount` | GET | `/api/v1/partner/{partner_id}/followers/count/` | — | Dashboard (profile popup + Profile Performance card) |
 | `activatePartner` | POST | `/api/v1/partners/activate/` | `{ is_active: true }` | (available, not actively used) |
 | `submitVerification` | POST | `/api/v1/partner/verification/` | PAN, bank, agreement | AgreementSubmit |
 
@@ -374,40 +395,46 @@ THEN
 | API Call | Purpose |
 |----------|---------|
 | `getCurrentPartner()` | Gets partner status, categories, profile data. Derives `isActive`, `isVerified`, `verificationSubmitted` from `status` field. |
-| `getPartnerDashboard()` | Gets dashboard metrics and analytics data. Only succeeds for `activated_limited+`. |
+| `getPartnerDashboard()` | Gets KPI metrics (new_enquiries, active_batches, profile_views, upcoming_events, etc.). Only succeeds for `activated_limited+`. |
 | `getBusinessProfile()` | Used for profile completion calculation (business name, social links) |
 | `getExtendedProfile()` | Used for profile completion calculation (bio, contact, logo, cover, address) |
 | `getPartnerMedia()` | Used for profile completion calculation (gallery images) |
+| `getPartnerFollowerCount(partnerId)` | Fire-and-forget after `getCurrentPartner()` resolves; sets `followerCount` state. Response: `{ partner_id, follower_count }` |
 
-**Dashboard Analytics Sections (entity-conditional):**
+**Dashboard Layout (lean — analytics moved to Statistics screen):**
 
-All chart data reads from `dashboardData` API fields first, then falls back to zeros with empty states.
+| Order | Section | Notes |
+|-------|---------|-------|
+| 1 | Onboarding Tracker | Conditional — only for `isActive && !isVerified` |
+| 2 | Welcome Banner | Dark gradient; shows `profileCompletion%` progress bar |
+| 3 | Profile Performance | Views, Followers (real-time), Completion % + strength bar |
+| 4 | KPI Cards (2–4 cards) | Entity-conditional; each card has `AreaSparkline` + `TrendBadge` |
+| 5 | CTA Button | "Add New Listing" / "Create Event" / etc. — opens EntityPickerSheet for multi-entity |
+| 6 | Quick Links grid | Brand Profile, My Listings, Statistics, Enquiries (if Classes/Programs), Finance |
+| 7 | Footer | Dark footer with `tlbAppIcon.png`, contact, platform links |
 
-| Section | Shown When | API Fields Consumed |
-|---------|------------|---------------------|
-| KPI Cards (4) with sparklines + trend % | Always | `new_enquiries`, `active_batches`, `profile_views`, `credit_balance`, `upcoming_events`, `tickets_sold`, `venue_bookings`, `occupancy_rate`, `weekly_*` arrays |
-| Weekly Activity bar chart | Always | `weekly_activity` (7-element array) |
-| Enquiry Funnel donut + conversion stats | Classes or Programs | `funnel_new`, `funnel_contacted`, `funnel_converted`, `trial_requests`, `avg_response_time`, `retention_rate`, `monthly_enrolments` |
-| Monthly Enquiry Trend area chart | Classes or Programs | `monthly_enquiries` (6-element array) |
-| Event Analytics stats grid | Events | `upcoming_events`, `tickets_sold`, `total_registrations`, `event_reach`, `engagement_rate`, `booking_conversion` |
-| Ticket Sales Trend area chart | Events | `monthly_tickets` (6-element array) |
-| Venue Occupancy donut + booking stats | Venues | `venue_bookings`, `occupancy_rate`, `upcoming_reservations`, `monthly_earnings`, `avg_booking_hours`, `repeat_clients` |
-| Venue Revenue Trend area chart | Venues | `monthly_revenue` (6-element array) |
-| 6-month Trend chart (universal) | Always | Adapts to `monthly_enquiries` / `monthly_tickets` / `monthly_revenue` by entity type |
-| Top Performing Listings | When `top_listings` array is non-empty | `top_listings[].{id, title, listing_type, views}` |
-| Recent Activity feed | When `recent_activity` array is non-empty | `recent_activity[].{title, description, time}` |
-| Profile Performance card | Always | `profile_views`, `credit_balance` + computed `profileCompletion` |
+**KPI Cards by entity type:**
 
-**Chart Primitives (pure SVG, no external library):**
+| Entity | Cards |
+|--------|-------|
+| Classes / Programs | New Enquiries, Active Batches, Profile Views |
+| Events | Upcoming Events, Tickets Sold, Profile Views, Total Revenue |
+| Venues | Venue Bookings, Occupancy Rate, Profile Views, Monthly Earnings |
+| None / fallback | New Enquiries, Active Batches, Profile Views |
+
+**Chart Primitives (pure SVG, no external library) — shared via `src/components/ui/DashboardCharts.tsx`:**
 
 | Component | Type | Used In |
 |-----------|------|---------|
-| `AreaSparkline` | Sparkline with gradient fill | KPI card bottoms |
-| `TrendAreaChart` | Full-width area chart with labeled x-axis | Monthly trend sections |
-| `WeeklyBarChart` | 7-bar activity chart with variable opacity | Weekly activity section |
-| `DonutChart` | Segmented ring with center label | Enquiry funnel, Venue occupancy |
+| `AreaSparkline` | Sparkline with gradient fill | Dashboard KPI card bottoms |
+| `TrendAreaChart` | Full-width area chart with labeled x-axis | Statistics monthly trend sections |
+| `WeeklyBarChart` | 7-bar activity chart with variable opacity | Statistics weekly activity section |
+| `DonutChart` | Segmented ring with center label | Statistics enquiry funnel, venue occupancy |
+| `TrendBadge` | Green/red % change pill | Dashboard KPI cards |
+| `fmtCurrency` | `₹X.XK` / `₹X.XL` formatter | KPI cards, Statistics revenue |
+| `trendPct` | Last-vs-second-to-last % helper | KPI cards, Statistics trends |
 
-**Dashboard Footer:** Dark (`bg-tlb-dark`) full-width footer appended below main content. Contains `tlbAppIcon.png` (w-14 h-14), tagline, contact details (email + phone), Platform section (Events / Classes / Venues), and copyright. The outer wrapper no longer has `pb-24` padding so no white gap appears below the footer.
+**Dashboard Footer:** Dark (`bg-tlb-dark`) full-width footer. Contains `tlbAppIcon.png`, tagline, contact details (email + phone), Platform section (Events / Classes / Venues), copyright.
 
 **Dashboard State Flags (all API-driven):**
 
@@ -420,7 +447,29 @@ All chart data reads from `dashboardData` API fields first, then falls back to z
 
 **Redirect logic:** If status is `otp_verified` → `PARTNER_CATEGORY`. If `category_selected` → `REGISTRATION`.
 
-### 6.4 Brand Profile (`EditProfile.tsx`)
+### 6.4 Statistics Screen (`src/screens/statistics/Statistics.tsx`)
+
+Dedicated analytics screen. All chart/analytics sections removed from Dashboard live here.
+
+| API Call | Purpose |
+|----------|---------|
+| `getPartnerDashboard()` | Single call on mount + on manual refresh |
+
+**Sections (entity-conditional):**
+
+| Section | Shown When | API Fields |
+|---------|------------|------------|
+| Weekly Activity bar chart | Always | `weekly_activity` (7-element array) |
+| Enquiry Insights (funnel donut + stats + trend) | Classes or Programs | `funnel_new/contacted/converted`, `trial_requests`, `avg_response_time`, `retention_rate`, `monthly_enrolments`, `monthly_enquiries[]` |
+| Event Analytics (stats grid + ticket sales trend) | Events | `upcoming_events`, `tickets_sold`, `total_registrations`, `event_reach`, `engagement_rate`, `booking_conversion`, `monthly_tickets[]` |
+| Venue Analytics (occupancy donut + revenue trend) | Venues | `venue_bookings`, `occupancy_rate`, `upcoming_reservations`, `monthly_earnings`, `avg_booking_hours`, `repeat_clients`, `monthly_revenue[]` |
+| 6-month Universal Trend | Always | `monthly_enquiries` / `monthly_tickets` / `monthly_revenue` by entity |
+| Top Performing Listings (up to 5) | `top_listings` non-empty | `top_listings[].{id, title, listing_type, views}` |
+| Recent Activity (up to 8) | `recent_activity` non-empty | `recent_activity[].{title, description, time}` |
+
+> **SVG gradient ID namespace:** All chart gradient IDs are prefixed `st-` (e.g. `st-moenq`, `st-evtkt`) to prevent conflicts if Dashboard and Statistics are mounted simultaneously.
+
+### 6.5 Brand Profile (`EditProfile.tsx`)
 
 | API Call | Purpose |
 |----------|---------|
@@ -431,7 +480,7 @@ All chart data reads from `dashboardData` API fields first, then falls back to z
 | `uploadPartnerMedia(file, type)` | Uploads gallery images (max 5, 5MB) or video (max 1, 100MB) |
 | `deletePartnerMedia(id)` | Removes gallery item |
 
-### 6.5 Preview Profile (`PreviewProfile.tsx`)
+### 6.6 Preview Profile (`PreviewProfile.tsx`)
 
 | API Call | Purpose |
 |----------|---------|
@@ -439,7 +488,7 @@ All chart data reads from `dashboardData` API fields first, then falls back to z
 | `getExtendedProfile()` | Bio, contact, logo, cover |
 | `getPartnerMedia()` | Gallery images/videos |
 
-### 6.6 Service Listings (`ServiceListings.tsx`)
+### 6.7 Service Listings (`ServiceListings.tsx`)
 
 | API Call | Purpose |
 |----------|---------|
@@ -466,7 +515,7 @@ All four calls run in parallel via `Promise.allSettled`. Items are tagged with `
 | State pattern | Temp state (`tmpStatuses`, `tmpTypes`, `tmpSort`) initialized from committed state on open; committed only on **Apply**; Reset clears temp without closing |
 | Active count | `filterStatuses.length + filterTypes.length + (sortBy !== 'newest' ? 1 : 0)` |
 
-### 6.7 Event Creation Wizard (`src/screens/events/`) — Fully API-Integrated
+### 6.8 Event Creation Wizard (`src/screens/events/`) — Fully API-Integrated
 
 Theme color: `blue`. All wizard screens use `themeColor="blue"`.
 
@@ -477,7 +526,7 @@ Theme color: `blue`. All wizard screens use `themeColor="blue"`.
 | 3 | **CreateEventMedia** | `getListingMedia` (on mount); `uploadListingMedia`, `deleteListingMedia` (immediate on change) | Cover upload replaces existing (delete-then-upload). Gallery up to 10 images, 5MB each. Video up to 100MB. All media ops are immediate (no batch on Next). Warns if no cover (required for submit). Media items have `file_url` field. |
 | 4 | **CreateEventPreview** | `getListingDetail` (on mount); `submitListing` (on Publish) | Renders full event from API. Client-side readiness check mirrors all backend submit requirements. Submit → `clearCurrentDraftId()` → navigate to `SERVICE_LISTINGS`. Non-draft events show locked state. |
 
-### 6.8 Venue Creation Wizard (`src/screens/venues/`) — Fully API-Integrated
+### 6.9 Venue Creation Wizard (`src/screens/venues/`) — Fully API-Integrated
 
 Theme color: `amber`. All wizard screens use `themeColor="amber"`.
 
@@ -489,7 +538,7 @@ Theme color: `amber`. All wizard screens use `themeColor="amber"`.
 | 4 | **CreateVenuePackages** | `getVenuePackages` (on mount); `createVenuePackage` or `updateVenuePackage` (dirty packages on Next); `deleteVenuePackage` (on Delete) | Package fields: `name` (required), `price`, `description`, `duration_minutes?`, `max_guests?`. Optional fields omitted from payload if blank or < 1. Dirty tracking: only changed packages are saved on Next. |
 | 5 | **CreateVenuePreview** | `getVenueListingDetail` (single call — returns all sub-resources inline) | Venue detail response includes `media`, `availability`, `packages`, `discovery`, `occasions`, `required_attendee_fields` — no extra fetches needed. Cover = `media.find(m => m.media_type === 'cover')`, gallery = `media.filter(m => m.media_type === 'gallery')`. Readiness check: `title`, `city`, `address`, `subcategory`. Submit → `clearCurrentVenueDraftId()` → navigate to `SERVICE_LISTINGS`. |
 
-### 6.9 Class Creation Wizard (`src/screens/classes/`) — Fully API-Integrated
+### 6.10 Class Creation Wizard (`src/screens/classes/`) — Fully API-Integrated
 
 Theme color: `yellow`. All wizard screens use `themeColor="yellow"`.
 
@@ -501,7 +550,7 @@ Theme color: `yellow`. All wizard screens use `themeColor="yellow"`.
 | 4 | **CreateClassPolicies** | `getClassListingDetail` (on mount); `updateClassListing` (on Next) | Controlled inputs for cancellation policy and refund policy. FAQs sent inline in PATCH body as `faqs: [{question, answer}]` (replaces entire list — no dedicated `/faqs/` endpoint for classes). |
 | 5 | **CreateClassPreview** | `getClassListingDetail` (on mount); `submitClassListing` (on Publish) | Loads real listing data. Readiness check: title, description, `format`, cover image, ≥1 batch — all must be present or Submit is blocked with a missing-fields list. Submit → success/under_review/error modal → `clearCurrentClassDraftId()` → `SERVICE_LISTINGS`. |
 
-### 6.10 Program Creation Wizard (`src/screens/programs/`) — Fully API-Integrated
+### 6.11 Program Creation Wizard (`src/screens/programs/`) — Fully API-Integrated
 
 Theme color: `emerald`. All wizard screens use `themeColor="emerald"`.
 
@@ -513,7 +562,7 @@ Theme color: `emerald`. All wizard screens use `themeColor="emerald"`.
 | 4 | **CreateProgramPolicies** | `getProgramListingDetail` (on mount); `updateProgramListing` (on Next) | Cancellation + refund policy via PATCH; FAQs via dedicated `/faqs/` endpoint with dirty tracking + delete staging. |
 | 5 | **CreateProgramPreview** | `getProgramListingDetail` (on mount); `submitProgramListing` (on Publish) | Readiness check mirrors submit requirements. Submit → success / under_review / error modal → `clearCurrentProgramDraftId()` → `SERVICE_LISTINGS`. |
 
-### 6.11 Enquiries — `Enquiries.tsx` / `ProgramEnquiries.tsx`
+### 6.12 Enquiries — `Enquiries.tsx` / `ProgramEnquiries.tsx`
 
 Both screens have **no mock data**. Both are fully API-integrated.
 
@@ -525,7 +574,7 @@ Both screens have **no mock data**. Both are fully API-integrated.
 | Credits banner | Label reads "Credits Remaining" — no hardcoded number |
 | Unlock / Status / Notes | `Enquiries` hits `/unlock/` and `PUT` update endpoints; `ProgramEnquiries` calls `updateProgramEnquiry(listingId, id, { status?, partner_note? })` |
 
-### 6.12 Financial Hub — `FinancialHub.tsx`
+### 6.13 Financial Hub — `FinancialHub.tsx`
 
 Partially API-integrated: bank account details are fetched from the partner profile.
 
@@ -545,13 +594,44 @@ Partially API-integrated: bank account details are fetched from the partner prof
 | Transaction History | Empty state ("No transactions yet") |
 | UPI ID | Modal UI only, no API |
 
-### 6.13 Screens NOT Yet API-Integrated
+### 6.14 Attendees (`src/screens/attendees/Attendees.tsx`) — Fully API-Integrated
+
+Full booking management screen backed by the 4 partner booking endpoints.
+
+| API Call | Purpose |
+|----------|---------|
+| `getBookings({ status: 'confirmed' })` × 4 parallel calls | Populate KPI count badges on mount (all / confirmed / attended / cancelled) |
+| `getBookings({ status?, page? })` | Paginated list load on filter-tab change / page navigation |
+| `getBookingDetail(id)` | Load full booking into right-side drawer on "View" click |
+| `markBookingAttended(id)` | "Mark Attended" action in drawer (only for `confirmed` bookings) |
+| `cancelBooking(id, reason)` | "Confirm Cancel" action in drawer (only for `confirmed` bookings) |
+
+**UI structure:**
+
+| Element | Detail |
+|---------|--------|
+| KPI row | Total Bookings, Confirmed, Attended, Cancelled — counts from 4 parallel `getBookings` calls |
+| Filter tabs | All / Confirmed / Attended / Cancelled — each triggers `getBookings({ status })` |
+| Search bar | Client-side filter across customer name, email, booking reference |
+| Table | Booking Ref (monospace), Customer, Type badge, Status badge, Payment badge, Amount, Date, View button |
+| Detail drawer | Slide-in right panel with backdrop; shows full booking detail: status/type/payment badges, customer info (name/email/phone/notes), line items, attendees list, transactions |
+| Mark Attended | Emerald button — visible only for `confirmed` status; calls `markBookingAttended` + refreshes drawer + list |
+| Cancel flow | Red outline button → inline textarea for reason → "Confirm Cancel"; calls `cancelBooking` + refreshes |
+| Pagination | Previous / Next from API `next` / `previous` fields |
+
+**Color maps:**
+
+| Map | Values |
+|-----|--------|
+| `STATUS_COLORS` | `confirmed` → amber, `attended` → emerald, `cancelled` → red |
+| `PAYMENT_COLORS` | `paid` → emerald, `pending` → amber, `refunded` → blue |
+| `TYPE_COLORS` | `event` → blue, `class` → purple, `program` → emerald, `venue` → amber |
+
+### 6.15 Screens NOT Yet API-Integrated
 
 | Screen Group | Status | Notes |
 |-------------|--------|-------|
-| **Create Class** steps 4–5 (Policies, Preview) | Local state only | Steps 1–3 are integrated; submit endpoint not wired |
-| **Create Program** (5 steps) | ✅ Fully integrated | Identity → Batch → Media → Policies+FAQs → Preview+Submit; all 5 steps wired to API |
-| **Attendees** | Empty state UI | No attendees API — mock data removed, starts with `[]` |
+| **Attendees** | ✅ Fully integrated | Booking list + detail drawer + mark-attended + cancel (see §6.14) |
 | **Packages** | Placeholder UI | No packages API |
 | **FinancialHub** (transactions) | Empty state, no mock data | Bank details fetched; financial API pending |
 
@@ -645,7 +725,8 @@ classDiagram
 | IDENTITY_VERIFICATION | ❌ | — | IdentityVerification | Local state |
 | BANK_SETUP | ❌ | — | BankSetup | Local state |
 | ONBOARDING_COMPLETE | ❌ | — | OnboardingComplete | Static |
-| HOME | ✅ | — | Dashboard | ✅ getCurrentPartner, getPartnerDashboard |
+| HOME | ✅ | — | Dashboard | ✅ getCurrentPartner, getPartnerDashboard, getPartnerFollowerCount — lean layout: Profile Performance at top, analytics in Statistics |
+| STATISTICS | ✅ | — | Statistics | ✅ getPartnerDashboard — all analytics/charts (weekly activity, funnels, event/venue analytics, 6-month trend, top listings, recent activity) |
 | BRAND_PROFILE | ✅ | — | BrandProfile | ✅ Full profile CRUD |
 | PREVIEW_PROFILE | ✅ | — | PreviewProfile | ✅ Profile read |
 | SERVICE_LISTINGS | ✅ | — | ServiceListings | ✅ Parallel fetch: events + venues + classes + programs (tagged at fetch time) |
@@ -670,7 +751,7 @@ classDiagram
 | CREATE_PROGRAM_PREVIEW | ✅/❌ | Programs | CreateProgramPreview | ✅ Full detail + submit; success/under_review/error modals |
 | ENQUIRIES | ✅ | Classes | Enquiries | ✅ getClassEnquiries, unlock, status/notes PUT |
 | PROGRAM_ENQUIRIES | ✅ | Programs | ProgramEnquiries | ✅ getProgramListings → getProgramEnquiries per-listing, updateProgramEnquiry |
-| ATTENDEES | ✅ | — | Attendees | ❌ Placeholder |
+| ATTENDEES | ✅ | — | Attendees | ✅ getBookings (list+KPI counts), getBookingDetail (drawer), markBookingAttended, cancelBooking |
 | PACKAGES | ✅ | — | Packages | ❌ Placeholder |
 | FINANCIAL_HUB | ✅ | — | FinancialHub | ⚡ Partial — bank details from `getCurrentPartner` |
 
@@ -703,6 +784,11 @@ classDiagram
 - **ProgramEnquiries** — Fully integrated with per-listing pattern: loads all programs, shows dropdown for multi-program partners, fetches enquiries per selected program, supports status update and partner notes via `updateProgramEnquiry`.
 - **`booking_type` field — Classes & Programs** — `CreateClassIdentity` and `CreateProgramIdentity` both expose a card-style Enquiry / Booking selector. Value sent in both the initial draft `POST` and every `PATCH`. Loaded back from draft on resume/edit. Default: `enquiry`.
 
+- **Attendees / Booking Management** — Full booking management screen: KPI counts (4 parallel `getBookings` calls on mount), paginated list with filter tabs (All/Confirmed/Attended/Cancelled) + search, right-side detail drawer, Mark Attended + Cancel Booking actions with inline cancel-reason textarea.
+- **Statistics Screen** — New dedicated analytics screen (`src/screens/statistics/`) accessible from sidebar ("Statistics" nav item, BarChart3 icon) and Dashboard Quick Links. All chart/analytics sections moved here from Dashboard. Fetches `getPartnerDashboard()` independently with manual refresh button. Entity-conditional sections: Weekly Activity, Enquiry Insights, Event Analytics, Venue Analytics, 6-month Universal Trend, Top Listings, Recent Activity.
+- **Dashboard restructured (lean layout)** — Analytics sections removed; Profile Performance moved to top (after Welcome Banner); follower count displayed in both profile popup and Profile Performance card via `getPartnerFollowerCount(partnerId)`.
+- **Shared chart primitives** — `src/components/ui/DashboardCharts.tsx` extracted and re-exported via `components/ui/index.ts`. Both Dashboard and Statistics import from this shared file. SVG gradient IDs prefixed `st-` in Statistics to prevent conflicts.
+
 ### ⚡ Partially Integrated
 
 - **FinancialHub** — bank account details (name, masked number, IFSC, verified status) fetched from `getCurrentPartner()`. Stat cards and transaction history show empty state pending financial API.
@@ -713,7 +799,6 @@ classDiagram
 
 ### ⚠️ Needs Both UI and Backend
 
-- `GET /api/v1/partners/attendees/` — Attendee tracking
 - `GET /api/v1/partners/packages/` — Package management
 
 ### 🧹 Cleanup Done
@@ -733,7 +818,11 @@ classDiagram
 - ❌ Dashboard as simple 4-card grid — replaced with full analytics dashboard (charts, funnels, trends, activity feed)
 - ❌ Status badge in top-left badge group on listing cards — moved to right side of card header
 - ❌ Non-functional filter button on ServiceListings — replaced with full bottom sheet filter dialog
-- ❌ Hardcoded `MOCK_ATTENDEES` array in Attendees — removed; screen initializes with empty state
+- ❌ Hardcoded `MOCK_ATTENDEES` array in Attendees — replaced; screen now fully API-driven (bookings API)
+- ❌ Dashboard analytics sections (Weekly Activity, Enquiry Insights, Event/Venue Analytics, 6-month Trend, Top Listings, Recent Activity) — moved to Statistics screen; Dashboard is now a lean overview with Profile Performance + KPI Cards + Quick Links
+- ❌ Profile Performance at bottom of Dashboard — moved to top (right after Welcome Banner)
+- ❌ Follower count missing from Dashboard — now fetched via `getPartnerFollowerCount()` and shown in profile popup + Profile Performance card
+- ❌ Statistics not accessible from sidebar — added "Statistics" nav item (BarChart3 icon, second position after Home) and Quick Links entry on Dashboard
 - ❌ Wrong event metadata endpoint URLs (`/api/v1/listings/metadata/` → `/api/v1/listings/events/metadata/`)
 - ❌ Event wizard theme `purple` → `blue` across all 4 screens
 - ❌ Age group chips rendering empty (API `StaticRange` has no `label`) → now renders `{min_age}–{max_age} yrs`
@@ -875,4 +964,4 @@ npm run test:report   # run tests → generate test-report.html + test-report.pd
 
 ---
 
-*Last updated: 2026-05-19 — Phase 12 (`booking_type` field (Enquiry/Booking) added to Class and Program creation wizards; test suite grown to 358 tests; OTPVerify/AgreementSubmit timer + slowness fixes; `submitVerification` URL corrected; PDF test report tooling fixed for Windows)*
+*Last updated: 2026-05-21 — Phase 13 (Bookings API integrated into Attendees screen with full booking management UI; Statistics screen created as dedicated analytics hub; Dashboard restructured to lean layout with Profile Performance at top; follower count wired via `getPartnerFollowerCount`; shared DashboardCharts.tsx primitives extracted; Statistics added to sidebar and Dashboard Quick Links)*

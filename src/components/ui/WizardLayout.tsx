@@ -56,7 +56,7 @@ export const WizardLayout: React.FC<WizardLayoutProps> = ({
     return (
         <div className="min-h-screen bg-gray-50 pb-8">
             {/* Header */}
-            <header className="bg-white p-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
+            <header className="bg-white p-4 sm:p-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
                 <button onClick={onBack} className="p-2 -ml-2 hover:bg-gray-50 rounded-full transition-colors">
                     <ArrowLeft size={24} className="text-gray-600" />
                 </button>
@@ -81,7 +81,7 @@ export const WizardLayout: React.FC<WizardLayoutProps> = ({
             </div>
 
             {/* Main Content */}
-            <main className="p-6">
+            <main className="p-4 sm:p-6">
                 <div className="tlb-content space-y-8">
                     {children}
                 </div>

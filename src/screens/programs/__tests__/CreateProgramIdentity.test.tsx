@@ -175,13 +175,14 @@ describe('CreateProgramIdentity — booking type', () => {
             patchBody = await request.json();
             return HttpResponse.json({ success: true, data: mockProgramDraft });
         }));
-        sessionStorage.setItem('current_program_draft_id', PROGRAM_DRAFT_ID);
+        // No pre-existing draft: component creates via POST on Next, then PATCHes
         renderComponent();
         const user = userEvent.setup();
-        await waitFor(() => screen.getByPlaceholderText('e.g. Advanced Robotics Program'));
+        // Wait for metadata to fully load before interacting
+        await waitFor(() => expect(screen.queryByText('Dance')).toBeInTheDocument(), { timeout: 3000 });
         await user.type(screen.getByPlaceholderText('e.g. Advanced Robotics Program'), 'My Program');
         await user.click(screen.getByText('Direct Booking'));
         await user.click(screen.getByRole('button', { name: /next|continue/i }));
-        await waitFor(() => expect(patchBody?.booking_type).toBe('direct_booking'));
+        await waitFor(() => expect(patchBody?.booking_type).toBe('direct_booking'), { timeout: 3000 });
     });
 });

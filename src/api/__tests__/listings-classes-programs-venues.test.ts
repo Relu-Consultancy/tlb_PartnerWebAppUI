@@ -72,7 +72,6 @@ import {
     updateProgramFaq,
     deleteProgramFaq,
     // Program media
-    getProgramMedia,
     uploadProgramMedia,
     deleteProgramMedia,
     // Program draft helpers

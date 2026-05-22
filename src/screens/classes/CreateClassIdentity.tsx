@@ -32,6 +32,7 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
     const [address, setAddress] = useState('');
     const [meetingLink, setMeetingLink] = useState('');
     const [tag, setTag] = useState('');
+    const [price, setPrice] = useState('');
 
     const [categories, setCategories] = useState<ApiCategory[]>([]);
     const [modes, setModes] = useState<ApiMode[]>([]);
@@ -86,6 +87,8 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
                 setArea(srv.area || d.area || '');
                 setAddress(srv.address || d.address || '');
                 setMeetingLink(srv.meeting_link || d.meeting_link || '');
+                const loadedPrice = srv.price ?? d.price;
+                if (loadedPrice != null) setPrice(String(loadedPrice));
                 const loadedMode = srv.mode || d.mode;
                 if (loadedMode) setMode(loadedMode);
                 const loadedBookingType = d.booking_type;
@@ -152,6 +155,7 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
             if ((mode === 'online' || mode === 'hybrid') && meetingLink.trim()) {
                 payload.meeting_link = meetingLink.trim();
             }
+            if (price.trim()) payload.price = price.trim();
             if (tag) payload.tags = [tag];
             if (selectedCategoryId != null) {
                 payload.category_id = selectedCategoryId;
@@ -312,13 +316,26 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
                 </div>
             </div>
 
+            {/* Fees */}
+            <div>
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Fees (₹)</label>
+                <input
+                    type="number"
+                    className="tlb-input w-full"
+                    placeholder="e.g. 1500"
+                    min={0}
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                />
+            </div>
+
             {/* Location (offline / hybrid only) */}
             {needsAddress && (
                 <div className="space-y-3">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block">
                         <MapPin size={12} className="inline mr-1" /> Location
                     </label>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <input
                             className="tlb-input w-full"
                             placeholder="City"

@@ -339,6 +339,13 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
                   >
                     Preview Profile
                   </button>
+                  <div className="my-1 border-t border-gray-100" />
+                  <button
+                    onClick={() => { setShowProfilePopup(false); onNavigate('LANDING'); }}
+                    className="w-full text-left px-4 py-2.5 rounded-xl text-sm font-bold text-red-500 hover:bg-red-50 transition-colors"
+                  >
+                    Sign Out
+                  </button>
                 </div>
               </div>
             )}
@@ -391,7 +398,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
                   <div className={`pt-0.5 ${!verificationSubmitted ? 'opacity-40' : ''}`}>
                     <p className="font-bold text-gray-900">Admin Review</p>
                     {verificationSubmitted
-                      ? <p className="text-[10px] text-tlb-yellow font-bold uppercase tracking-widest mt-0.5">In Progress â€” typically 24â€“48 hrs</p>
+                      ? <p className="text-[10px] text-tlb-yellow font-bold uppercase tracking-widest mt-0.5">In Progress — typically 24–48 hrs</p>
                       : <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">Unlocks after Step 2</p>}
                   </div>
                 </div>
@@ -404,7 +411,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
             <div className="absolute -right-6 -top-6 w-32 h-32 bg-tlb-yellow/10 rounded-full blur-2xl" />
             <div className="absolute -left-4 -bottom-4 w-24 h-24 bg-tlb-yellow/5 rounded-full blur-xl" />
             <div className="relative z-10">
-              <h2 className="text-2xl font-black leading-tight">Welcome back, {businessName}! ðŸ‘‹</h2>
+              <h2 className="text-2xl font-black leading-tight">Welcome back, {businessName}! 👋</h2>
               <p className="text-sm text-gray-400 mt-2 leading-relaxed max-w-lg">
                 Your profile is <span className="text-tlb-yellow font-black">{profileCompletion}% complete</span>.
                 {profileCompletion < 100 && (
@@ -434,7 +441,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
                 Edit Profile
               </button>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-3 gap-2 sm:gap-4">
               {[
                 { label: 'Profile Views', value: d.profile_views ?? 0, icon: Eye, color: 'text-purple-500', bg: 'bg-purple-50' },
                 { label: 'Followers', value: followerCount === null ? 'â€”' : followerCount.toLocaleString('en-IN'), icon: Users, color: 'text-blue-500', bg: 'bg-blue-50' },
@@ -475,7 +482,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
           </section>
 
           {/* â”€â”€ KPI Cards â”€â”€ */}
-          <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {kpiMetrics.map((m) => {
               const sparkHasData = m.spark.some(v => v > 0);
               const trend = trendPct(m.spark);

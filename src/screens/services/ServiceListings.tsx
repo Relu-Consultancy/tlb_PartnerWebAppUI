@@ -40,15 +40,6 @@ const statusBadge: Record<ListingStatus, { label: string; bg: string; color: str
     archived:  { label: 'Archived',  bg: 'bg-gray-200',    color: 'text-gray-600' },
 };
 
-const listingTypeToEntity = (lt: string): EntityType => {
-    switch ((lt || '').toLowerCase()) {
-        case 'event': return 'Events';
-        case 'class': return 'Classes';
-        case 'program': return 'Programs';
-        case 'venue': return 'Venues';
-        default: return 'Events';
-    }
-};
 
 const fmtStart = (iso?: string) => {
     if (!iso) return '';
@@ -267,7 +258,7 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
 
     return (
         <div className="min-h-screen bg-gray-50 pb-24">
-            <header className="bg-white p-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
+            <header className="bg-white p-4 sm:p-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
                 <button onClick={onOpenSidebar} className="p-2 -ml-2"><Menu size={24} /></button>
                 <h1 className="font-black text-lg">My Listings</h1>
                 <button onClick={handleAddListing} className="bg-tlb-yellow text-tlb-dark p-2.5 rounded-xl shadow-sm hover:brightness-105 active:scale-95 transition-all">
@@ -275,7 +266,7 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                 </button>
             </header>
 
-            <main className="p-6">
+            <main className="p-4 sm:p-6">
                 <div className="tlb-content space-y-6">
                     {error && (
                         <div className="bg-red-50 border border-red-200 rounded-2xl p-3 text-xs font-bold text-red-600">

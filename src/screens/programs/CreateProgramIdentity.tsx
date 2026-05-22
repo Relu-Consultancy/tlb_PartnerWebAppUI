@@ -291,12 +291,12 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                         <Loader2 size={14} className="animate-spin" /> Loading modes…
                     </div>
                 ) : (
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-3 gap-2 sm:gap-3">
                         {deliveryModes.map((m) => (
                             <button
                                 key={m.value}
                                 onClick={() => setDeliveryMode(m.value)}
-                                className={`p-4 rounded-2xl border-2 text-center transition-all ${deliveryMode === m.value
+                                className={`p-3 sm:p-4 rounded-2xl border-2 text-center transition-all ${deliveryMode === m.value
                                     ? 'border-emerald-400 bg-emerald-50'
                                     : 'border-gray-100 bg-white hover:border-gray-200'
                                 }`}
@@ -370,7 +370,7 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
             </div>
 
             {/* Capacity, Hours, Modules */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Max Capacity</label>
                     <input className="tlb-input w-full" type="number" placeholder="e.g. 30" min={1} value={maxCapacity} onChange={(e) => setMaxCapacity(e.target.value)} />
@@ -391,7 +391,7 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block">
                         <MapPin size={12} className="inline mr-1" /> Program Location
                     </label>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <input className="tlb-input w-full" placeholder="City" maxLength={100} value={city} onChange={(e) => setCity(e.target.value)} />
                         <input className="tlb-input w-full" placeholder="Area / Neighborhood" maxLength={100} value={area} onChange={(e) => setArea(e.target.value)} />
                     </div>

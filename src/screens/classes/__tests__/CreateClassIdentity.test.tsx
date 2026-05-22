@@ -4,7 +4,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../../test/msw/server';
-import { CLASS_DRAFT_ID, mockClassDraft, mockCategories, mockFormats } from '../../../test/msw/handlers';
+import { CLASS_DRAFT_ID, mockClassDraft } from '../../../test/msw/handlers';
 import { CreateClassIdentity } from '../CreateClassIdentity';
 import { getCurrentClassDraftId } from '../../../api/listings';
 

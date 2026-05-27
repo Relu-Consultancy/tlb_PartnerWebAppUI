@@ -4,7 +4,7 @@ import { Loader } from '../../components/ui';
 import { Screen, EntityType } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
 import { EntityPickerSheet } from '../../components/EntityPickerSheet';
-import { getEventListings, getVenueListings, getClassListings, getProgramListings, setCurrentDraftId, clearCurrentDraftId, setCurrentVenueDraftId, clearCurrentVenueDraftId, setCurrentClassDraftId, clearCurrentClassDraftId, setCurrentProgramDraftId, clearCurrentProgramDraftId, setClassListingLive, archiveProgramListing, unarchiveProgramListing } from '../../api/listings';
+import { getEventListings, getVenueListings, getClassListings, getProgramListings, setCurrentDraftId, clearCurrentDraftId, setCurrentVenueDraftId, clearCurrentVenueDraftId, setCurrentClassDraftId, clearCurrentClassDraftId, setCurrentProgramDraftId, clearCurrentProgramDraftId, setClassListingLive, archiveProgramListing, unarchiveProgramListing, pauseListing, resumeListing, archiveListing, unarchiveListing } from '../../api/listings';
 
 interface Props {
     onNavigate: (screen: Screen) => void;
@@ -202,23 +202,32 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
         }
     };
 
-    const handleToggleLive = async (listing: Listing) => {
+    const handleTogglePause = async (listing: Listing) => {
         try {
-            const newState = !listing.isLive;
-            await setClassListingLive(listing.id, newState);
-            setListings(prev => prev.map(l => l.id === listing.id ? { ...l, isLive: newState } : l));
+            const isPaused = listing.isLive === false;
+            if (listing.entityType === 'Classes') {
+                // Classes use their own endpoint
+                await setClassListingLive(listing.id, isPaused);
+            } else {
+                // All other entities use the generic endpoint
+                if (isPaused) await resumeListing(listing.id);
+                else await pauseListing(listing.id);
+            }
+            setListings(prev => prev.map(l => l.id === listing.id ? { ...l, isLive: isPaused } : l));
         } catch (err: any) {
-            alert(err.message || 'Failed to update live status');
+            alert(err.message || 'Failed to update listing status');
         }
     };
 
     const handleToggleArchive = async (listing: Listing) => {
         try {
             if (listing.status === 'archived') {
-                await unarchiveProgramListing(listing.id);
+                if (listing.entityType === 'Programs') await unarchiveProgramListing(listing.id);
+                else await unarchiveListing(listing.id);
                 setListings(prev => prev.map(l => l.id === listing.id ? { ...l, status: 'draft' } : l));
             } else {
-                await archiveProgramListing(listing.id);
+                if (listing.entityType === 'Programs') await archiveProgramListing(listing.id);
+                else await archiveListing(listing.id);
                 setListings(prev => prev.map(l => l.id === listing.id ? { ...l, status: 'archived' } : l));
             }
         } catch (err: any) {
@@ -256,199 +265,249 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
         );
     }
 
+    const statusDot = (listing: Listing) => {
+        if (listing.status === 'published') return listing.isLive === false ? 'bg-amber-400' : 'bg-emerald-400';
+        if (listing.status === 'pending') return 'bg-amber-400';
+        if (listing.status === 'rejected') return 'bg-red-400';
+        if (listing.status === 'archived') return 'bg-gray-400';
+        return 'bg-gray-300';
+    };
+
+    const statusLabel = (listing: Listing) => {
+        if (listing.status === 'published') return listing.isLive === false ? 'Paused' : 'Live';
+        return statusBadge[listing.status].label;
+    };
+
     return (
-        <div className="min-h-screen bg-gray-50 pb-24">
-            <header className="bg-white p-4 sm:p-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
-                <button onClick={onOpenSidebar} className="p-2 -ml-2"><Menu size={24} /></button>
-                <h1 className="font-black text-lg">My Listings</h1>
-                <button onClick={handleAddListing} className="bg-tlb-yellow text-tlb-dark p-2.5 rounded-xl shadow-sm hover:brightness-105 active:scale-95 transition-all">
-                    <Plus size={20} />
+        <div className="min-h-screen bg-gray-50">
+            {/* Header */}
+            <header className="bg-white px-6 md:px-8 py-5 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
+                <div className="flex items-center gap-4">
+                    <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors"><Menu size={22} /></button>
+                    <div>
+                        <h1 className="text-xl font-black text-gray-900 tracking-tight">Listings</h1>
+                        <p className="text-xs font-medium text-gray-400 mt-0.5 hidden sm:block">Manage all your services</p>
+                    </div>
+                </div>
+                <button onClick={handleAddListing} className="bg-tlb-yellow text-tlb-dark px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 shadow-sm hover:brightness-105 active:scale-95 transition-all">
+                    <Plus size={16} /> <span className="hidden sm:inline">Add Listing</span>
                 </button>
             </header>
 
-            <main className="p-4 sm:p-6">
-                <div className="tlb-content space-y-6">
-                    {error && (
-                        <div className="bg-red-50 border border-red-200 rounded-2xl p-3 text-xs font-bold text-red-600">
-                            {error}
-                        </div>
-                    )}
+            <main className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
+                {error && (
+                    <div className="bg-red-50 border border-red-200 rounded-2xl p-3 text-xs font-bold text-red-600">{error}</div>
+                )}
 
-                    {/* Search */}
-                    <div className="flex gap-3">
-                        <div className="flex-1 bg-white border border-gray-100 rounded-2xl px-4 py-3 flex items-center gap-3 shadow-sm">
-                            <Search size={18} className="text-gray-400" />
+                {/* Search + Filter + Tabs row */}
+                <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                    <div className="flex-1 flex gap-3">
+                        <div className="flex-1 bg-white border border-gray-200 rounded-xl px-4 py-2.5 flex items-center gap-3">
+                            <Search size={16} className="text-gray-400" />
                             <input
-                                className="bg-transparent flex-1 text-sm outline-none"
+                                className="bg-transparent flex-1 text-sm outline-none placeholder:text-gray-400"
                                 placeholder="Search listings..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                             />
+                            {searchQuery && (
+                                <button onClick={() => setSearchQuery('')} className="text-gray-400 hover:text-gray-600"><X size={14} /></button>
+                            )}
                         </div>
                         <button
                             onClick={openFilter}
-                            className={`relative bg-white border p-3 rounded-2xl shadow-sm transition-colors ${activeFilterCount > 0 ? 'border-tlb-yellow text-tlb-dark' : 'border-gray-100 text-gray-400 hover:border-tlb-yellow/30'}`}
+                            className={`relative bg-white border px-3 rounded-xl transition-colors ${activeFilterCount > 0 ? 'border-tlb-yellow text-tlb-dark' : 'border-gray-200 text-gray-400 hover:border-gray-300'}`}
                         >
-                            <Filter size={18} />
+                            <Filter size={16} />
                             {activeFilterCount > 0 && (
-                                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-tlb-yellow rounded-full text-[9px] font-black text-tlb-dark flex items-center justify-center">
-                                    {activeFilterCount}
-                                </span>
+                                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-tlb-yellow rounded-full text-[9px] font-black text-tlb-dark flex items-center justify-center">{activeFilterCount}</span>
                             )}
                         </button>
                     </div>
-
-                    {/* Tabs */}
-                    <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                    <div className="flex gap-1 overflow-x-auto">
                         {tabs.map((tab) => {
                             const count = tabCounts[tab] ?? 0;
                             return (
                                 <button
                                     key={tab}
                                     onClick={() => setActiveTab(tab)}
-                                    className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold whitespace-nowrap transition-all ${activeTab === tab
-                                        ? 'bg-tlb-dark text-tlb-yellow shadow-md'
-                                        : 'bg-white border border-gray-100 text-gray-500 hover:border-gray-200'
+                                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${activeTab === tab
+                                        ? 'bg-tlb-yellow text-tlb-dark'
+                                        : 'text-gray-500 hover:bg-gray-100'
                                     }`}
                                 >
-                                    {tab === 'All' ? <Layers size={14} /> : React.createElement(entityBadgeConfig[tab].icon, { size: 14 })}
                                     {tab}
-                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === tab ? 'bg-tlb-yellow/20 text-tlb-yellow' : 'bg-gray-100 text-gray-400'}`}>
-                                        {count}
-                                    </span>
+                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${activeTab === tab ? 'bg-black/10' : 'bg-gray-100'}`}>{count}</span>
                                 </button>
                             );
                         })}
                     </div>
+                </div>
 
-                    {/* Stats */}
-                    {listings.length > 0 && (
-                        <div className="flex gap-3">
-                            <div className="flex-1 bg-white rounded-2xl p-4 border border-gray-100 text-center">
-                                <p className="text-2xl font-black text-emerald-500">{filtered.filter(s => s.status === 'published').length}</p>
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Live</p>
-                            </div>
-                            <div className="flex-1 bg-white rounded-2xl p-4 border border-gray-100 text-center">
-                                <p className="text-2xl font-black text-amber-500">{filtered.filter(s => s.status === 'pending').length}</p>
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">In Review</p>
-                            </div>
-                            <div className="flex-1 bg-white rounded-2xl p-4 border border-gray-100 text-center">
-                                <p className="text-2xl font-black text-gray-500">{filtered.filter(s => s.status === 'draft').length}</p>
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Drafts</p>
-                            </div>
+                {/* Table / Cards */}
+                {filtered.length > 0 ? (
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                        {/* Desktop table */}
+                        <div className="hidden md:block overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead>
+                                    <tr className="bg-gray-50/80 border-b border-gray-100">
+                                        {['Listing', 'Type', 'Category', 'Status', 'Actions'].map(h => (
+                                            <th key={h} className={`px-5 py-3.5 text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap ${h === 'Actions' ? 'text-right' : ''}`}>
+                                                {h}
+                                            </th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {filtered.map((listing) => {
+                                        const badge = entityBadgeConfig[listing.entityType];
+                                        const BadgeIcon = badge.icon;
+                                        const editable = listing.status !== 'published' && listing.status !== 'archived';
+                                        return (
+                                            <tr key={listing.id} className="hover:bg-gray-50/40 transition-colors group">
+                                                <td className="px-5 py-4">
+                                                    <div className="flex items-center gap-3">
+                                                        {listing.coverUrl ? (
+                                                            <img src={listing.coverUrl} alt="" className="w-12 h-12 rounded-xl object-cover shrink-0 bg-gray-100" />
+                                                        ) : (
+                                                            <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center shrink-0">
+                                                                <BadgeIcon size={18} className="text-gray-300" />
+                                                            </div>
+                                                        )}
+                                                        <div className="min-w-0">
+                                                            <p className="font-bold text-sm text-gray-900 truncate max-w-[260px]">{listing.title}</p>
+                                                            {listing.startDateTime && (
+                                                                <p className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-1">
+                                                                    <Clock size={10} /> {fmtStart(listing.startDateTime)}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-5 py-4">
+                                                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-black ${badge.bg} ${badge.color}`}>
+                                                        <BadgeIcon size={10} /> {listing.entityType}
+                                                    </span>
+                                                </td>
+                                                <td className="px-5 py-4">
+                                                    <span className="text-xs font-medium text-gray-500">{listing.category || '-'}</span>
+                                                </td>
+                                                <td className="px-5 py-4">
+                                                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-700">
+                                                        <span className={`w-2 h-2 rounded-full ${statusDot(listing)}`} />
+                                                        {statusLabel(listing)}
+                                                    </span>
+                                                </td>
+                                                <td className="px-5 py-4">
+                                                    <div className="flex items-center justify-end gap-1">
+                                                        {listing.status === 'published' && (
+                                                            <button
+                                                                onClick={() => handleTogglePause(listing)}
+                                                                className={`p-2 rounded-lg transition-colors ${listing.isLive !== false ? 'text-amber-500 hover:bg-amber-50' : 'text-emerald-500 hover:bg-emerald-50'}`}
+                                                                title={listing.isLive !== false ? 'Pause' : 'Resume'}
+                                                            >
+                                                                {listing.isLive !== false ? <Pause size={15} /> : <Play size={15} />}
+                                                            </button>
+                                                        )}
+                                                        {(listing.status === 'published' || listing.status === 'archived') && (
+                                                            <button
+                                                                onClick={() => handleToggleArchive(listing)}
+                                                                className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                                                                title={listing.status === 'archived' ? 'Unarchive' : 'Archive'}
+                                                            >
+                                                                {listing.status === 'archived' ? <ArchiveRestore size={15} /> : <Archive size={15} />}
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            onClick={() => handleEdit(listing)}
+                                                            disabled={!editable}
+                                                            className={`p-2 rounded-lg transition-colors ${editable ? 'text-blue-500 hover:bg-blue-50' : 'text-gray-300 cursor-not-allowed'}`}
+                                                            title={editable ? 'Edit' : 'Locked'}
+                                                        >
+                                                            <Edit3 size={15} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
                         </div>
-                    )}
 
-                    {/* Cards */}
-                    {filtered.length > 0 ? (
-                        <div className="space-y-4">
+                        {/* Mobile cards */}
+                        <div className="md:hidden divide-y divide-gray-50">
                             {filtered.map((listing) => {
                                 const badge = entityBadgeConfig[listing.entityType];
                                 const BadgeIcon = badge.icon;
-                                const sb = statusBadge[listing.status];
+                                const editable = listing.status !== 'published' && listing.status !== 'archived';
                                 return (
-                                    <div key={listing.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                                        {listing.coverUrl && (
-                                            <div className="w-full h-32 bg-gray-100 overflow-hidden">
-                                                <img src={listing.coverUrl} alt="" className="w-full h-full object-cover" />
-                                            </div>
-                                        )}
-                                        <div className="p-5">
-                                            <div className="flex items-start justify-between gap-3">
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-2 mb-1">
-                                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold ${badge.bg} ${badge.color}`}>
-                                                            <BadgeIcon size={10} /> {listing.entityType}
-                                                        </span>
-                                                    </div>
-                                                    <h3 className="font-bold text-lg truncate">{listing.title}</h3>
-                                                    {listing.category && (
-                                                        <p className="text-[10px] font-bold text-tlb-yellow uppercase tracking-widest mt-0.5">{listing.category}</p>
-                                                    )}
-                                                    {listing.startDateTime && (
-                                                        <p className="text-[11px] text-gray-400 mt-1 flex items-center gap-1">
-                                                            <Clock size={10} /> {fmtStart(listing.startDateTime)}
-                                                        </p>
-                                                    )}
+                                    <div key={listing.id} className="p-4 space-y-3">
+                                        <div className="flex items-start gap-3">
+                                            {listing.coverUrl ? (
+                                                <img src={listing.coverUrl} alt="" className="w-14 h-14 rounded-xl object-cover shrink-0" />
+                                            ) : (
+                                                <div className="w-14 h-14 rounded-xl bg-gray-100 flex items-center justify-center shrink-0">
+                                                    <BadgeIcon size={20} className="text-gray-300" />
                                                 </div>
-                                                <span className={`shrink-0 mt-0.5 px-3 py-1.5 rounded-xl text-[11px] font-black border ${
-                                                    listing.status === 'published'
-                                                        ? (listing.isLive === false ? 'bg-amber-50 text-amber-600 border-amber-200' : 'bg-emerald-50 text-emerald-600 border-emerald-200')
-                                                        : sb.bg + ' ' + sb.color + ' ' + (
-                                                            listing.status === 'pending' ? 'border-amber-200' :
-                                                            listing.status === 'rejected' ? 'border-red-200' :
-                                                            'border-gray-200'
-                                                        )
-                                                }`}>
-                                                    {listing.status === 'published' ? (listing.isLive === false ? 'Paused' : 'Live') : sb.label}
-                                                </span>
+                                            )}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${badge.bg} ${badge.color}`}>
+                                                        {listing.entityType}
+                                                    </span>
+                                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-500 ml-auto">
+                                                        <span className={`w-1.5 h-1.5 rounded-full ${statusDot(listing)}`} />
+                                                        {statusLabel(listing)}
+                                                    </span>
+                                                </div>
+                                                <p className="font-bold text-sm text-gray-900 truncate">{listing.title}</p>
+                                                {listing.category && (
+                                                    <p className="text-[10px] text-gray-400 font-medium mt-0.5">{listing.category}</p>
+                                                )}
                                             </div>
                                         </div>
-
-                                        <div className="border-t border-gray-100 px-5 py-3 flex justify-end gap-6">
-                                            {listing.entityType === 'Classes' && listing.status === 'published' && (
-                                                <button
-                                                    onClick={() => handleToggleLive(listing)}
-                                                    className={`flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest ${
-                                                        listing.isLive ? 'text-amber-500 hover:text-amber-600' : 'text-emerald-500 hover:text-emerald-600'
-                                                    }`}
-                                                >
-                                                    {listing.isLive ? <Pause size={14} /> : <Play size={14} />}
-                                                    {listing.isLive ? 'Pause Class' : 'Make Live'}
+                                        <div className="flex items-center justify-end gap-1 pt-1">
+                                            {listing.status === 'published' && (
+                                                <button onClick={() => handleTogglePause(listing)} className={`px-3 py-1.5 rounded-lg text-xs font-bold ${listing.isLive !== false ? 'text-amber-500 bg-amber-50' : 'text-emerald-500 bg-emerald-50'}`}>
+                                                    {listing.isLive !== false ? 'Pause' : 'Resume'}
                                                 </button>
                                             )}
-                                            {listing.entityType === 'Programs' && (listing.status === 'published' || listing.status === 'archived') && (
-                                                <button
-                                                    onClick={() => handleToggleArchive(listing)}
-                                                    className={`flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-gray-500 hover:text-gray-700`}
-                                                >
-                                                    {listing.status === 'archived' ? <ArchiveRestore size={14} /> : <Archive size={14} />}
+                                            {(listing.status === 'published' || listing.status === 'archived') && (
+                                                <button onClick={() => handleToggleArchive(listing)} className="px-3 py-1.5 rounded-lg text-xs font-bold text-gray-500 bg-gray-50">
                                                     {listing.status === 'archived' ? 'Unarchive' : 'Archive'}
                                                 </button>
                                             )}
                                             <button
                                                 onClick={() => handleEdit(listing)}
-                                                disabled={listing.status === 'published' || listing.status === 'archived'}
-                                                className={`flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest ${
-                                                    listing.status === 'published' || listing.status === 'archived'
-                                                        ? 'text-gray-300 cursor-not-allowed'
-                                                        : 'text-tlb-yellow hover:underline'
-                                                }`}
+                                                disabled={!editable}
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-bold ${editable ? 'text-blue-600 bg-blue-50' : 'text-gray-300 bg-gray-50 cursor-not-allowed'}`}
                                             >
-                                                <Edit3 size={14} />
-                                                {listing.status === 'published' || listing.status === 'archived' ? 'Locked' : 'Edit Listing'}
+                                                {editable ? 'Edit' : 'Locked'}
                                             </button>
                                         </div>
                                     </div>
                                 );
                             })}
                         </div>
-                    ) : (
-                        <div className="text-center py-16">
-                            <div className="w-20 h-20 bg-gray-100 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                                <Layers size={32} className="text-gray-300" />
-                            </div>
-                            <h3 className="text-xl font-black text-gray-400 mb-2">No listings yet</h3>
-                            <p className="text-sm text-gray-300 mb-6 max-w-xs mx-auto">
-                                {activeTab === 'All'
-                                    ? 'Create your first listing to start attracting customers.'
-                                    : `You don't have any ${activeTab.toLowerCase()} yet.`}
-                            </p>
-                            <button onClick={handleAddListing} className="tlb-button px-8 py-3 shadow-lg shadow-tlb-yellow/20 gap-2">
-                                <Plus size={18} /> Create Listing
-                            </button>
+                    </div>
+                ) : (
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm text-center py-20 px-6">
+                        <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-5">
+                            <Layers size={28} className="text-gray-300" />
                         </div>
-                    )}
-
-                    {filtered.length > 0 && (
-                        <button
-                            onClick={handleAddListing}
-                            className="tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20 text-base gap-2"
-                        >
-                            <Plus size={20} /> Add New Listing
+                        <h3 className="text-lg font-black text-gray-400 mb-1">No listings yet</h3>
+                        <p className="text-sm text-gray-300 mb-6 max-w-xs mx-auto">
+                            {activeTab === 'All'
+                                ? 'Create your first listing to start attracting customers.'
+                                : `You don't have any ${activeTab.toLowerCase()} yet.`}
+                        </p>
+                        <button onClick={handleAddListing} className="tlb-button px-6 py-3 gap-2">
+                            <Plus size={16} /> Create Listing
                         </button>
-                    )}
-                </div>
+                    </div>
+                )}
             </main>
 
             <EntityPickerSheet

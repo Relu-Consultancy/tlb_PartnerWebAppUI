@@ -9,6 +9,7 @@ import { Screen } from '../../types';
 import {
     getBookings, getBookingDetail,
     markBookingAttended, cancelBooking,
+    getListingDetail, getClassListingDetail, getProgramListingDetail, getVenueListingDetail,
 } from '../../api/listings';
 
 interface Props {
@@ -16,13 +17,14 @@ interface Props {
     onOpenSidebar: () => void;
 }
 
-type BookingStatus = 'confirmed' | 'attended' | 'cancelled';
+type BookingStatus = 'confirmed' | 'awaiting_payment' | 'attended' | 'cancelled';
 type PaymentStatus = 'paid' | 'pending' | 'refunded';
 type BookingType = 'event' | 'class' | 'program' | 'venue';
 type TabFilter = 'all' | BookingStatus;
 
 interface BookingSummary {
     id: string;
+    listing_id?: string;
     booking_reference: string;
     booking_type: BookingType;
     status: BookingStatus;
@@ -68,6 +70,7 @@ interface Transaction {
 }
 
 interface BookingDetail extends BookingSummary {
+    listing_title: string;
     customer_phone: string;
     cancellation_reason: string;
     refund_amount: number | null;
@@ -81,6 +84,7 @@ interface BookingDetail extends BookingSummary {
 
 interface StatusCounts {
     total: number;
+    awaiting_payment: number;
     confirmed: number;
     attended: number;
     cancelled: number;
@@ -94,6 +98,7 @@ const TYPE_COLORS: Partial<Record<BookingType, string>> = {
 };
 
 const STATUS_COLORS: Partial<Record<BookingStatus, string>> = {
+    awaiting_payment: 'bg-amber-100 text-amber-700',
     confirmed: 'bg-sky-100 text-sky-700',
     attended: 'bg-emerald-100 text-emerald-700',
     cancelled: 'bg-red-100 text-red-700',
@@ -125,7 +130,7 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
     const [activeTab, setActiveTab] = useState<TabFilter>('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [bookings, setBookings] = useState<BookingSummary[]>([]);
-    const [counts, setCounts] = useState<StatusCounts>({ total: 0, confirmed: 0, attended: 0, cancelled: 0 });
+    const [counts, setCounts] = useState<StatusCounts>({ total: 0, awaiting_payment: 0, confirmed: 0, attended: 0, cancelled: 0 });
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
@@ -165,8 +170,9 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
     // Parallel status-count fetch on mount
     useEffect(() => {
         const loadCounts = async () => {
-            const [allRes, confRes, attRes, canRes] = await Promise.allSettled([
+            const [allRes, awaitRes, confRes, attRes, canRes] = await Promise.allSettled([
                 getBookings({ page: 1 }),
+                getBookings({ status: 'awaiting_payment', page: 1 }),
                 getBookings({ status: 'confirmed', page: 1 }),
                 getBookings({ status: 'attended', page: 1 }),
                 getBookings({ status: 'cancelled', page: 1 }),
@@ -179,6 +185,7 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
             };
             setCounts({
                 total: getCount(allRes),
+                awaiting_payment: getCount(awaitRes),
                 confirmed: getCount(confRes),
                 attended: getCount(attRes),
                 cancelled: getCount(canRes),
@@ -207,7 +214,27 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
         setCancelReason('');
         try {
             const res = await getBookingDetail(id);
-            setDetail(res?.data || res);
+            const d = res?.data || res;
+            // Try to resolve listing title from inline fields first
+            d.listing_title = d.listing_title || d.service_title || d.listing_name || d.listing?.title || '';
+            setDetail(d);
+            // If no title yet, fetch it from the listing endpoint using listing_id
+            const listingId = d.listing_id || d.listing;
+            if (!d.listing_title && listingId && d.booking_type) {
+                try {
+                    const fetcher = d.booking_type === 'event' ? getListingDetail
+                        : d.booking_type === 'class' ? getClassListingDetail
+                        : d.booking_type === 'program' ? getProgramListingDetail
+                        : d.booking_type === 'venue' ? getVenueListingDetail
+                        : null;
+                    if (fetcher) {
+                        const lr = await fetcher(listingId);
+                        const ld = lr?.data || lr;
+                        const title = ld?.title || ld?.service?.title || '';
+                        if (title) setDetail(prev => prev ? { ...prev, listing_title: title } : prev);
+                    }
+                } catch { /* listing fetch is best-effort */ }
+            }
         } catch (e: unknown) {
             setActionError((e as Error)?.message || 'Failed to load booking details');
         } finally {
@@ -246,6 +273,7 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
 
     const handleCancelConfirm = async () => {
         if (!detail) return;
+        const prevStatus = detail.status;
         setCancelling(true);
         setActionError(null);
         try {
@@ -257,7 +285,8 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
             fetchList(activeTab, page);
             setCounts(prev => ({
                 ...prev,
-                confirmed: Math.max(0, prev.confirmed - 1),
+                ...(prevStatus === 'confirmed' ? { confirmed: Math.max(0, prev.confirmed - 1) } : {}),
+                ...(prevStatus === 'awaiting_payment' ? { awaiting_payment: Math.max(0, prev.awaiting_payment - 1) } : {}),
                 cancelled: prev.cancelled + 1,
             }));
         } catch (e: unknown) {
@@ -280,6 +309,7 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
 
     const TABS: { key: TabFilter; label: string; count: number }[] = [
         { key: 'all', label: 'All', count: counts.total },
+        { key: 'awaiting_payment', label: 'Awaiting Payment', count: counts.awaiting_payment },
         { key: 'confirmed', label: 'Confirmed', count: counts.confirmed },
         { key: 'attended', label: 'Attended', count: counts.attended },
         { key: 'cancelled', label: 'Cancelled', count: counts.cancelled },
@@ -302,9 +332,10 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
 
                 <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
                     {/* KPI Cards */}
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
                         {[
                             { label: 'Total Bookings', value: counts.total, color: 'text-gray-900', bg: 'bg-white' },
+                            { label: 'Awaiting Payment', value: counts.awaiting_payment, color: 'text-amber-600', bg: 'bg-amber-50' },
                             { label: 'Confirmed', value: counts.confirmed, color: 'text-sky-600', bg: 'bg-sky-50' },
                             { label: 'Attended', value: counts.attended, color: 'text-emerald-600', bg: 'bg-emerald-50' },
                             { label: 'Cancelled', value: counts.cancelled, color: 'text-red-500', bg: 'bg-red-50' },
@@ -414,7 +445,7 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
                                                 </td>
                                                 <td className="px-5 py-4">
                                                     <span className={`text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${STATUS_COLORS[b.status] || FALLBACK_BADGE}`}>
-                                                        {b.status}
+                                                        {b.status.replace(/_/g, ' ')}
                                                     </span>
                                                 </td>
                                                 <td className="px-5 py-4">
@@ -512,7 +543,7 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
                                     {/* Status badges + amount */}
                                     <div className="px-6 pt-5 pb-4 flex items-center gap-2 flex-wrap">
                                         <span className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest ${STATUS_COLORS[detail.status] || FALLBACK_BADGE}`}>
-                                            {detail.status}
+                                            {detail.status.replace(/_/g, ' ')}
                                         </span>
                                         <span className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest ${TYPE_COLORS[detail.booking_type] || FALLBACK_BADGE}`}>
                                             {detail.booking_type}
@@ -526,6 +557,14 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
                                     </div>
 
                                     <div className="px-6 space-y-5 pb-6">
+                                        {/* Listing name */}
+                                        {detail.listing_title && (
+                                            <div className="bg-gray-50 rounded-xl px-4 py-3">
+                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{detail.booking_type || 'Listing'}</p>
+                                                <p className="text-sm font-bold text-gray-900 mt-0.5">{detail.listing_title}</p>
+                                            </div>
+                                        )}
+
                                         {/* Action error */}
                                         {actionError && (
                                             <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex items-start gap-3">
@@ -575,25 +614,14 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
                                                 <div className="space-y-2">
                                                     {detail.line_items.map(item => (
                                                         <div key={item.id} className="bg-gray-50 rounded-2xl px-4 py-3 flex items-center justify-between">
-                                                            <div>
-                                                                <p className="text-sm font-bold text-gray-900">
-                                                                    {item.ticket_name || item.package_name || item.batch_name || item.item_type}
-                                                                </p>
-                                                                <p className="text-xs text-gray-400 font-medium mt-0.5">
-                                                                    {formatAmount(item.unit_price, detail.currency)} × {item.quantity}
-                                                                </p>
-                                                            </div>
-                                                            <span className="text-sm font-black text-gray-900">
-                                                                {formatAmount(item.subtotal, detail.currency)}
+                                                            <p className="text-sm font-bold text-gray-900">
+                                                                {item.ticket_name || item.package_name || item.batch_name || item.item_type}
+                                                            </p>
+                                                            <span className="text-xs font-bold text-gray-500">
+                                                                Qty {item.quantity}
                                                             </span>
                                                         </div>
                                                     ))}
-                                                    <div className="flex items-center justify-between px-4 pt-1">
-                                                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total</span>
-                                                        <span className="text-base font-black text-gray-900">
-                                                            {formatAmount(detail.total_amount, detail.currency)}
-                                                        </span>
-                                                    </div>
                                                 </div>
                                             </div>
                                         )}
@@ -634,30 +662,28 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
                                             <div>
                                                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
                                                     <CreditCard size={11} />
-                                                    Transactions
+                                                    Payment Activity
                                                 </p>
-                                                <div className="space-y-2">
+                                                <div className="space-y-1.5">
                                                     {detail.transactions.map(txn => (
-                                                        <div key={txn.id} className="bg-gray-50 rounded-2xl px-4 py-3 space-y-1">
-                                                            <div className="flex items-center justify-between">
-                                                                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${
-                                                                    txn.status === 'success' ? 'bg-emerald-100 text-emerald-700' :
-                                                                    txn.status === 'failed' ? 'bg-red-100 text-red-700' :
-                                                                    'bg-gray-100 text-gray-600'
-                                                                }`}>
-                                                                    {txn.status}
-                                                                </span>
-                                                                <span className="text-sm font-black text-gray-900">
-                                                                    {formatAmount(txn.amount, txn.currency)}
-                                                                </span>
+                                                        <div key={txn.id} className="bg-gray-50 rounded-xl px-4 py-2.5 flex items-center gap-3">
+                                                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest shrink-0 ${
+                                                                txn.status === 'success' && detail.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-700' :
+                                                                txn.status === 'success' ? 'bg-amber-100 text-amber-700' :
+                                                                txn.status === 'failed' ? 'bg-red-100 text-red-700' :
+                                                                'bg-gray-100 text-gray-600'
+                                                            }`}>
+                                                                {txn.status === 'success' && detail.payment_status !== 'paid' ? 'Initiated' : txn.status}
+                                                            </span>
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-xs font-bold text-gray-700 capitalize truncate">
+                                                                    {txn.transaction_type.replace(/_/g, ' ')}
+                                                                </p>
+                                                                <p className="text-[10px] text-gray-400">{formatDate(txn.created_at)}</p>
                                                             </div>
-                                                            <p className="text-xs text-gray-500 font-medium capitalize">
-                                                                {txn.transaction_type.replace(/_/g, ' ')}
-                                                            </p>
                                                             {txn.razorpay_payment_id && (
-                                                                <p className="font-mono text-[10px] text-gray-400">{txn.razorpay_payment_id}</p>
+                                                                <p className="font-mono text-[10px] text-gray-400 shrink-0">{txn.razorpay_payment_id.slice(-8)}</p>
                                                             )}
-                                                            <p className="text-[10px] text-gray-400">{formatDate(txn.created_at)}</p>
                                                         </div>
                                                     ))}
                                                 </div>
@@ -665,7 +691,7 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
                                         )}
 
                                         {/* Cancellation info */}
-                                        {detail.status === 'cancelled' && (
+                                        {(detail.status === 'cancelled' || detail.cancelled_at) && (
                                             <div className="bg-red-50 rounded-2xl px-4 py-3 border border-red-100 space-y-1">
                                                 <p className="text-[10px] font-black text-red-400 uppercase tracking-widest">Cancellation</p>
                                                 <p className="text-sm font-bold text-red-700">
@@ -686,22 +712,24 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
                                     </div>
                                 </div>
 
-                                {/* Action bar — only for confirmed bookings */}
-                                {detail.status === 'confirmed' && (
+                                {/* Action bar — for confirmed and awaiting_payment bookings */}
+                                {(detail.status === 'confirmed' || detail.status === 'awaiting_payment') && (
                                     <div className="shrink-0 bg-white border-t border-gray-100 px-6 py-4 space-y-3">
                                         {!cancelOpen ? (
                                             <div className="flex gap-3">
-                                                <button
-                                                    onClick={handleMarkAttended}
-                                                    disabled={markingAttended}
-                                                    className="flex-1 flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-sm py-3 rounded-2xl transition-colors disabled:opacity-50"
-                                                >
-                                                    {markingAttended
-                                                        ? <RefreshCw size={15} className="animate-spin" />
-                                                        : <CheckCircle size={15} />
-                                                    }
-                                                    Mark Attended
-                                                </button>
+                                                {detail.status === 'confirmed' && (
+                                                    <button
+                                                        onClick={handleMarkAttended}
+                                                        disabled={markingAttended}
+                                                        className="flex-1 flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-sm py-3 rounded-2xl transition-colors disabled:opacity-50"
+                                                    >
+                                                        {markingAttended
+                                                            ? <RefreshCw size={15} className="animate-spin" />
+                                                            : <CheckCircle size={15} />
+                                                        }
+                                                        Mark Attended
+                                                    </button>
+                                                )}
                                                 <button
                                                     onClick={() => setCancelOpen(true)}
                                                     className="flex-1 flex items-center justify-center gap-2 border-2 border-red-200 hover:bg-red-50 text-red-600 font-black text-sm py-3 rounded-2xl transition-colors"

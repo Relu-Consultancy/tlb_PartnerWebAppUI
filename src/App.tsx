@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, Suspense, lazy, useCallback } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Screen, EntityType } from './types';
 import { PartnerProvider, usePartner } from './context/PartnerContext';
 import { Loader } from './components/ui';
@@ -157,6 +158,7 @@ function AppInner() {
   const { allowedEntities, setAllowedEntities } = usePartner();
   const [currentScreen, setCurrentScreen] = useState<Screen>('LANDING');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
   const [authData, setAuthData] = useState<{ value: string; type: 'email' | 'phone' } | null>(null);
   const [initializing, setInitializing] = useState(true);
 
@@ -284,24 +286,40 @@ function AppInner() {
 
   return (
     <div className="font-sans text-tlb-dark">
-      <Suspense fallback={
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-          <Loader />
-        </div>
-      }>
-        <Component
+      {route.hasSidebar && (
+        <Sidebar
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+          currentScreen={currentScreen}
           onNavigate={guardedNavigate}
-          authData={authData}
-          setAuthData={setAuthData}
-          {...(route.hasSidebar ? { onOpenSidebar: () => setIsSidebarOpen(true) } : {})}
+          desktopOpen={desktopSidebarOpen}
+          onToggleDesktop={() => setDesktopSidebarOpen(prev => !prev)}
         />
-      </Suspense>
-      <Sidebar
-        isOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
-        currentScreen={currentScreen}
-        onNavigate={guardedNavigate}
-      />
+      )}
+      <div className={route.hasSidebar && desktopSidebarOpen ? 'lg:ml-60' : ''}>
+        <Suspense fallback={
+          <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <Loader />
+          </div>
+        }>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentScreen}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+            >
+              <Component
+                onNavigate={guardedNavigate}
+                authData={authData}
+                setAuthData={setAuthData}
+                {...(route.hasSidebar ? { onOpenSidebar: () => setIsSidebarOpen(true) } : {})}
+              />
+            </motion.div>
+          </AnimatePresence>
+        </Suspense>
+      </div>
     </div>
   );
 }

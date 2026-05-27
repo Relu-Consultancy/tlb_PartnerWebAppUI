@@ -19,7 +19,7 @@ src/
 ├── context/
 │   └── PartnerContext.tsx   # Global context: allowedEntities (synced to sessionStorage)
 ├── components/
-│   ├── Navigation.tsx           # Sidebar component (Home, Statistics, Brand Profile, Listings, Attendees, Enquiries, Finance)
+│   ├── Navigation.tsx           # Sidebar: fixed on desktop (lg+, dark navy #0f1729), animated drawer on mobile; collapsible via toggle
 │   ├── EntityPickerSheet.tsx    # Bottom sheet for entity type selection
 │   └── ui/
 │       └── DashboardCharts.tsx  # Shared SVG chart primitives: AreaSparkline, TrendAreaChart, WeeklyBarChart, DonutChart, fmtCurrency, trendPct, TrendBadge
@@ -209,11 +209,22 @@ Request → 401 Unauthorized?
 | `markBookingAttended` | POST | `/api/v1/partner/bookings/{id}/mark-attended/` | — | Attendees (drawer action) |
 | `cancelBooking` | POST | `/api/v1/partner/bookings/{id}/cancel/` | `{ reason: string }` | Attendees (drawer action) |
 
+**Generic Listing Actions (entity-agnostic):**
+
+| Function | Method | Endpoint | Payload | Used By |
+|----------|--------|----------|---------|---------|
+| `pauseListing` | POST | `/api/v1/partner/listings/{id}/pause/` | — | ServiceListings (all entity types) |
+| `resumeListing` | POST | `/api/v1/partner/listings/{id}/resume/` | — | ServiceListings (all entity types) |
+| `archiveListing` | POST | `/api/v1/partner/listings/{id}/archive/` | — | ServiceListings (Events, Classes, Venues) |
+| `unarchiveListing` | POST | `/api/v1/partner/listings/{id}/unarchive/` | — | ServiceListings (Events, Classes, Venues) |
+
+> **Entity-specific overrides preserved:** Classes use `setClassListingLive` for pause/resume (POST `/classes/{id}/live/`). Programs use `archiveProgramListing`/`unarchiveProgramListing` (POST `/programs/{id}/archive|unarchive/`). All other entities use the generic endpoints above.
+
 **Booking field reference:**
 
 | Field | Values | Notes |
 |-------|--------|-------|
-| `status` | `confirmed` / `attended` / `cancelled` | Filter param + display badge |
+| `status` | `awaiting_payment` / `confirmed` / `attended` / `cancelled` | Filter param + display badge |
 | `payment_status` | `paid` / `pending` / `refunded` | Display badge only |
 | `booking_type` | `event` / `class` / `program` / `venue` | Display badge only |
 
@@ -501,8 +512,17 @@ Dedicated analytics screen. All chart/analytics sections removed from Dashboard 
 
 All four calls run in parallel via `Promise.allSettled`. Items are tagged with `entityType` **at fetch time** (not derived from `listing_type`) — venues always get `'Venues'`, events always get `'Events'`, classes get `'Classes'`, programs get `'Programs'`. Cover URL: events use `cover_url`, venues use `cover` — normalized as `item.cover_url || item.cover`.
 
-**Edit flow:** Clicking Edit on an Event sets `current_event_draft_id` + routes to `CREATE_EVENT_DETAILS`. Clicking Edit on a Venue sets `current_venue_draft_id` + routes to `CREATE_VENUE_DETAILS`. Edit on a Class sets `current_class_draft_id` + routes to `CREATE_CLASS_IDENTITY`. Edit on a Program sets `current_program_draft_id` + routes to `CREATE_PROGRAM_IDENTITY`. Edit is disabled **only** for `published` listings — `pending` (In Review), `draft`, and `rejected` are all editable.  
+**Edit flow:** Clicking Edit on an Event sets `current_event_draft_id` + routes to `CREATE_EVENT_DETAILS`. Clicking Edit on a Venue sets `current_venue_draft_id` + routes to `CREATE_VENUE_DETAILS`. Edit on a Class sets `current_class_draft_id` + routes to `CREATE_CLASS_IDENTITY`. Edit on a Program sets `current_program_draft_id` + routes to `CREATE_PROGRAM_IDENTITY`. Edit is disabled **only** for `published` and `archived` listings — `pending` (In Review), `draft`, and `rejected` are all editable.  
 **New listing:** `clearCurrentDraftId()`, `clearCurrentVenueDraftId()`, `clearCurrentClassDraftId()`, and `clearCurrentProgramDraftId()` are called before navigating to any wizard start screen.
+
+**Pause/Resume & Archive/Unarchive (all entity types):**
+
+| Action | Events & Venues | Classes | Programs |
+|--------|----------------|---------|----------|
+| Pause/Resume | Generic `pauseListing`/`resumeListing` | `setClassListingLive` (existing) | Generic `pauseListing`/`resumeListing` |
+| Archive/Unarchive | Generic `archiveListing`/`unarchiveListing` | Generic `archiveListing`/`unarchiveListing` | `archiveProgramListing`/`unarchiveProgramListing` (existing) |
+
+**Listing card layout (redesigned — Phase 16):** Desktop uses a table layout (Listing thumbnail+title, Type badge, Category, Status dot+label, icon-only action buttons). Mobile uses compact cards with thumbnail, badges, and pill-style action buttons.
 
 **Listing card layout:** Status badge (`Draft` / `In Review` / `Live` / `Rejected`) rendered on the **right side** of each card header row, opposite the entity type badge. Status data is sourced from the `getListings()` API response `status` field.
 
@@ -602,23 +622,23 @@ Full booking management screen backed by the 4 partner booking endpoints.
 
 | API Call | Purpose |
 |----------|---------|
-| `getBookings({ status: 'confirmed' })` × 4 parallel calls | Populate KPI count badges on mount (all / confirmed / attended / cancelled) |
+| `getBookings()` × 5 parallel calls | Populate KPI count badges on mount (all / awaiting_payment / confirmed / attended / cancelled) |
 | `getBookings({ status?, page? })` | Paginated list load on filter-tab change / page navigation |
-| `getBookingDetail(id)` | Load full booking into right-side drawer on "View" click |
+| `getBookingDetail(id)` + listing detail fetch | Load full booking into right-side drawer; best-effort listing title resolution via entity-specific detail endpoint |
 | `markBookingAttended(id)` | "Mark Attended" action in drawer (only for `confirmed` bookings) |
-| `cancelBooking(id, reason)` | "Confirm Cancel" action in drawer (only for `confirmed` bookings) |
+| `cancelBooking(id, reason)` | "Confirm Cancel" action in drawer (for `confirmed` and `awaiting_payment` bookings) |
 
 **UI structure:**
 
 | Element | Detail |
 |---------|--------|
-| KPI row | Total Bookings, Confirmed, Attended, Cancelled — counts from 4 parallel `getBookings` calls |
-| Filter tabs | All / Confirmed / Attended / Cancelled — each triggers `getBookings({ status })` |
+| KPI row | Total Bookings, Awaiting Payment, Confirmed, Attended, Cancelled — counts from 5 parallel `getBookings` calls |
+| Filter tabs | All / Awaiting Payment / Confirmed / Attended / Cancelled — each triggers `getBookings({ status })` |
 | Search bar | Client-side filter across customer name, email, booking reference |
 | Table | Booking Ref (monospace), Customer, Type badge, Status badge, Payment badge, Amount, Date, View button |
-| Detail drawer | Slide-in right panel with backdrop; shows full booking detail: status/type/payment badges, customer info (name/email/phone/notes), line items, attendees list, transactions |
+| Detail drawer | Slide-in right panel with backdrop; shows listing title (best-effort fetched from entity detail endpoint), status/type/payment badges, customer info, order items (name + qty, no repeated amounts), attendees list, payment activity (context-aware: "Initiated" badge when payment pending, "SUCCESS" when paid) |
 | Mark Attended | Emerald button — visible only for `confirmed` status; calls `markBookingAttended` + refreshes drawer + list |
-| Cancel flow | Red outline button → inline textarea for reason → "Confirm Cancel"; calls `cancelBooking` + refreshes |
+| Cancel flow | Red outline button → inline textarea for reason → "Confirm Cancel"; visible for `confirmed` and `awaiting_payment`; calls `cancelBooking` + refreshes |
 | Pagination | Previous / Next from API `next` / `previous` fields |
 
 **Color maps:**
@@ -791,10 +811,19 @@ classDiagram
 - **IdentityVerification** — upgraded from `alert()` to inline error banner; PAN regex (`^[A-Z]{5}[0-9]{4}[A-Z]$`) with real-time green/red field indicator; mobile-responsive padding; "Section A of 2" progress label.
 - **BankSetup** — removed fake hardcoded file upload UI; added confirm account field with match check; IFSC/account regex inline validation with green/red indicators; `submitVerification()` wired up (reads PAN/GST from sessionStorage); navigates to `ONBOARDING_COMPLETE` (was `HOME`).
 
-- **Attendees / Booking Management** — Full booking management screen: KPI counts (4 parallel `getBookings` calls on mount), paginated list with filter tabs (All/Confirmed/Attended/Cancelled) + search, right-side detail drawer, Mark Attended + Cancel Booking actions with inline cancel-reason textarea.
+- **Attendees / Booking Management** — Full booking management screen: KPI counts (5 parallel `getBookings` calls on mount including `awaiting_payment`), paginated list with filter tabs (All/Awaiting Payment/Confirmed/Attended/Cancelled) + search, right-side detail drawer with listing title (best-effort fetched), Mark Attended + Cancel Booking actions. Cancel available for both `confirmed` and `awaiting_payment`. Transaction badges context-aware ("Initiated" when payment pending, "SUCCESS" when paid). Order items show name + qty only (no repeated amounts).
+- **Listing Pause/Resume & Archive/Unarchive (all entities)** — Generic `pauseListing`/`resumeListing`/`archiveListing`/`unarchiveListing` endpoints added to `listings.ts`. All entity types now have Pause/Resume and Archive/Unarchive buttons in ServiceListings. Classes and Programs retain their entity-specific endpoints as overrides.
+- **ProgramEnquiries listing title** — Program name and format now displayed in the enquiry table and detail drawer, sourced from the already-fetched programs list (API enquiry response doesn't include these fields).
 - **Statistics Screen** — New dedicated analytics screen (`src/screens/statistics/`) accessible from sidebar ("Statistics" nav item, BarChart3 icon) and Dashboard Quick Links. All chart/analytics sections moved here from Dashboard. Fetches `getPartnerDashboard()` independently with manual refresh button. Entity-conditional sections: Weekly Activity, Enquiry Insights, Event Analytics, Venue Analytics, 6-month Universal Trend, Top Listings, Recent Activity.
 - **Dashboard restructured (lean layout)** — Analytics sections removed; Profile Performance moved to top (after Welcome Banner); follower count displayed in both profile popup and Profile Performance card via `getPartnerFollowerCount(partnerId)`.
 - **Shared chart primitives** — `src/components/ui/DashboardCharts.tsx` extracted and re-exported via `components/ui/index.ts`. Both Dashboard and Statistics import from this shared file. SVG gradient IDs prefixed `st-` in Statistics to prevent conflicts.
+- **UI Redesign (Phase 16)** — Full visual overhaul matching TLB Admin Portal design language:
+  - **Sidebar** — Dark navy (`#0f1729`) fixed sidebar on desktop (lg+, 240px), animated drawer on mobile (280px). Yellow active state, compact single-line items. Collapsible via `PanelLeftClose` toggle button in header; collapsed state hides sidebar and removes content offset.
+  - **App layout** — Content offset by `lg:ml-60` when sidebar is open on desktop. Screen transitions use `motion/react` `AnimatePresence` with fade + slide (200ms).
+  - **Dashboard** — Redesigned: compact header with time-of-day greeting, 2-column welcome row (dark card + profile stats), 4-column KPI grid with hover shadows, inline CTA + quick links row, compact dark footer.
+  - **Profile popup** — Dark gradient header with avatar + status badge, 3-column stats grid, color-coded entity chips, icon action buttons.
+  - **ServiceListings** — Redesigned: desktop uses table layout (thumbnail, type badge, category, status dot, icon actions), mobile uses compact cards. Search + tabs inline on desktop.
+  - **Loader** — Replaced multi-ring spinner with yellow (`#FACC15`) expanding-corners style (solid circle with 4 corner pieces that expand and rotate 90deg).
 
 ### ⚡ Partially Integrated
 
@@ -866,6 +895,19 @@ classDiagram
 - ❌ Dashboard onboarding tracker "Admin Review" subtitle had mojibake (`â€"`) for em-dash and en-dash characters — Fixed: `In Progress — typically 24–48 hrs`.
 - ❌ Registration city field was a hardcoded `<select>` dropdown (Mumbai/Delhi/Bangalore/New York) — replaced with free-text `<input>` and default cleared to `''`.
 - ❌ Dashboard profile popup had no Sign Out — added "Sign Out" button below a divider (red text, red hover), navigates to `LANDING`.
+- ❌ Sidebar was a mobile-only overlay drawer (white bg, 85vw) — replaced with dark navy fixed sidebar on desktop + animated drawer on mobile; collapsible toggle.
+- ❌ All screens rendered full-width with no sidebar offset — App.tsx now applies `lg:ml-60` for sidebar-aware screens.
+- ❌ No screen transition animation — added `AnimatePresence` with fade+slide (200ms) on screen change.
+- ❌ Attendees only supported `confirmed`/`attended`/`cancelled` statuses — added `awaiting_payment` status with amber badge, KPI card, and filter tab.
+- ❌ Attendees cancel button only for `confirmed` — now also available for `awaiting_payment` bookings.
+- ❌ Attendees drawer showed transaction amount on every row (redundant with header) — removed per-transaction amount; renamed section to "Payment Activity"; transaction status context-aware ("Initiated" vs "SUCCESS").
+- ❌ Attendees drawer showed per-item price+subtotal+total (amount repeated 7-8 times) — simplified to item name + quantity only.
+- ❌ Pause/Resume only available for Classes, Archive only for Programs — now all entity types have both actions via generic endpoints.
+- ❌ ProgramEnquiries showed empty Program name/format columns — now populated from the already-fetched programs list.
+- ❌ Loader was a multi-ring orange spinner — replaced with yellow expanding-corners animation.
+- ❌ ServiceListings used full-height card layout for all screen sizes — redesigned: table on desktop, compact cards on mobile.
+- ❌ Dashboard had centered Welcome Banner + Profile Performance + full footer — redesigned: 2-column layout, compact footer, time-of-day greeting.
+- ❌ Dashboard.tsx had mojibake characters in comments and data strings — cleaned all non-ASCII bytes.
 
 ---
 
@@ -977,4 +1019,4 @@ npm run test:report   # run tests → generate test-report.html + test-report.pd
 
 ---
 
-*Last updated: 2026-05-22 — Phase 15 (IdentityVerification & BankSetup upgraded: inline validation, real regex, confirm account, proper navigation; mobile responsiveness pass across all wizard screens and sidebar; TypeScript unused-import cleanup)*
+*Last updated: 2026-05-27 — Phase 16 (UI redesign: dark fixed sidebar with collapse toggle, screen transition animations, dashboard 2-column layout, ServiceListings table/card redesign, new loader animation; Attendees: awaiting_payment status, cancel for pending bookings, optimized drawer; Generic pause/resume/archive/unarchive for all listing types; ProgramEnquiries listing title resolution)*

@@ -5,7 +5,7 @@ import { getProgramListings, getProgramEnquiries, updateProgramEnquiry } from '.
 
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
 
-interface ProgramOption { id: string; title: string; }
+interface ProgramOption { id: string; title: string; format: string; }
 
 interface ProgramLead {
     id: number;
@@ -64,7 +64,7 @@ export const ProgramEnquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar })
             const res = await getProgramListings();
             const data: any[] = res.data || res || [];
             const opts: ProgramOption[] = Array.isArray(data)
-                ? data.map(p => ({ id: String(p.id), title: p.title || 'Untitled Program' }))
+                ? data.map(p => ({ id: String(p.id), title: p.title || 'Untitled Program', format: p.program_format || p.format || '' }))
                 : [];
             setPrograms(opts);
             if (opts.length > 0) setSelectedProgramId(opts[0].id);
@@ -79,6 +79,7 @@ export const ProgramEnquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar })
         try {
             setLoadingEnquiries(true);
             setLeads([]);
+            const selectedProgram = programs.find(p => p.id === listingId);
             const res = await getProgramEnquiries(listingId);
             const data: any[] = res.data || res || [];
             const formatted: ProgramLead[] = Array.isArray(data) ? data.map((item: any) => ({
@@ -86,8 +87,8 @@ export const ProgramEnquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar })
                 listingId,
                 studentName: item.student_name || 'Unknown Student',
                 parentName: item.parent_name,
-                program: item.program_title || item.listing_title || '',
-                format: item.program_format || item.format || '',
+                program: item.program_title || item.listing_title || selectedProgram?.title || '',
+                format: item.program_format || item.format || selectedProgram?.format || '',
                 age: item.student_age != null ? String(item.student_age) : 'N/A',
                 receivedOn: item.created_at ? new Date(item.created_at).toLocaleDateString() : '',
                 contact: item.contact_number || '',

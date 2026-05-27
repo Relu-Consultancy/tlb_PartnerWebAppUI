@@ -1,8 +1,8 @@
 ﻿import React, { useState, useRef, useEffect } from 'react';
 import {
-  Menu, Bell, UserCircle, CheckCircle2,
+  Menu, Bell, UserCircle, CheckCircle2, X,
   Inbox, Eye, BarChart3, CreditCard, Plus, CalendarDays,
-  Ticket, Users, Award, DollarSign, MapPin, Percent,
+  Ticket, DollarSign, MapPin, Percent, Edit3, LogOut,
 } from 'lucide-react';
 import { Screen } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
@@ -13,12 +13,12 @@ import {
   getExtendedProfile, getPartnerMedia, getPartnerFollowerCount
 } from '../../api/onboarding';
 
-// â”€â”€â”€ Types / Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --------- Types / Constants ------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 const ACTIVE_STATUSES = new Set(['activated_limited', 'under_review', 'approved']);
 const VERIFICATION_SUBMITTED_STATUSES = new Set(['under_review', 'approved']);
 
-// â”€â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --------- Component ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 interface HomeProps { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
 
@@ -152,7 +152,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
     { label: 'Finance', screen: 'FINANCIAL_HUB' as Screen, icon: CreditCard },
   ];
 
-  // â”€â”€ KPI data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ------ KPI data ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
   const d = dashboardData || {};
   const upcomingEvents = d.upcoming_events ?? 0;
@@ -161,7 +161,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
   const occupancyRate = d.occupancy_rate ?? 0;
   const monthlyEarnings = d.monthly_earnings ?? 0;
 
-  // â”€â”€ KPI Metrics â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ------ KPI Metrics ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
   const kpiMetrics = (() => {
     if (hasClassOrProgram) {
@@ -214,138 +214,101 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-
-      {/* â”€â”€ Header â”€â”€ */}
-      <header className="bg-white p-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
-        <button onClick={onOpenSidebar} className="p-2 -ml-2"><Menu size={24} /></button>
-        <h1 className="font-black text-lg">TLB Partner</h1>
-        <div className="flex items-center gap-3">
+      {/* Header */}
+      <header className="bg-white px-6 md:px-8 py-4 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
+        <div className="flex items-center gap-4">
+          <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors"><Menu size={22} /></button>
+          <div>
+            <h1 className="text-xl font-black text-gray-900 tracking-tight">Dashboard</h1>
+            <p className="text-xs font-medium text-gray-400 hidden sm:block">Welcome back, {businessName}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {/* Notifications */}
           <div className="relative" ref={notificationRef}>
-            <button
-              onClick={() => setShowNotifications(!showNotifications)}
-              className={`relative p-2 rounded-xl transition-colors ${showNotifications ? 'bg-gray-100 text-tlb-dark' : 'hover:bg-gray-50 text-gray-600'}`}
-            >
-              <Bell size={22} />
-              {notifications.length > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
-              )}
+            <button onClick={() => setShowNotifications(!showNotifications)} className="relative p-2.5 rounded-xl hover:bg-gray-50 text-gray-500 transition-colors">
+              <Bell size={20} />
+              {notifications.length > 0 && <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full" />}
             </button>
             {showNotifications && (
-              <div className="absolute right-0 mt-3 w-80 sm:w-96 bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden z-50">
-                <div className="p-5 border-b border-gray-100 flex items-center justify-between">
-                  <h3 className="font-black text-lg">Notifications</h3>
-                  <button className="text-[10px] font-black uppercase tracking-widest text-tlb-yellow hover:text-yellow-600">Mark all as read</button>
+              <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-50">
+                <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+                  <h3 className="font-bold text-sm">Notifications</h3>
+                  <button onClick={() => setShowNotifications(false)} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
                 </div>
-                <div className="max-h-[400px] overflow-y-auto">
+                <div className="max-h-[300px] overflow-y-auto">
                   {notifications.length === 0 ? (
-                    <div className="p-8 text-center text-sm text-gray-400">No notifications yet</div>
+                    <div className="p-8 text-center text-sm text-gray-400">No notifications</div>
                   ) : notifications.map((n: any, idx: number) => (
-                    <div key={n.id || idx} className="p-4 flex gap-4 hover:bg-gray-50 transition-colors cursor-pointer border-b border-gray-50 last:border-0">
-                      <div className="w-10 h-10 bg-tlb-yellow/10 text-tlb-yellow rounded-xl flex items-center justify-center shrink-0">
-                        <Bell size={18} />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-1">
-                          <h4 className="font-bold text-sm text-gray-900">{n.title}</h4>
-                          <span className="text-[10px] text-gray-400 font-medium">{n.time || ''}</span>
-                        </div>
-                        <p className="text-xs text-gray-500 leading-relaxed">{n.message}</p>
-                      </div>
+                    <div key={n.id || idx} className="p-3 flex gap-3 hover:bg-gray-50 border-b border-gray-50 last:border-0">
+                      <Bell size={14} className="text-tlb-yellow shrink-0 mt-0.5" />
+                      <div><p className="text-xs font-bold text-gray-900">{n.title}</p><p className="text-[11px] text-gray-500">{n.message}</p></div>
                     </div>
                   ))}
                 </div>
-                <button className="w-full p-4 text-center text-xs font-black uppercase tracking-widest text-gray-400 hover:text-tlb-dark hover:bg-gray-50 transition-colors border-t border-gray-100">
-                  View All Notifications
-                </button>
               </div>
             )}
           </div>
+          {/* Profile */}
           <div className="relative" ref={profilePopupRef}>
-            <button
-              onClick={() => setShowProfilePopup(!showProfilePopup)}
-              className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${showProfilePopup ? 'bg-tlb-yellow/20 text-tlb-yellow' : 'bg-tlb-yellow/10 text-tlb-yellow hover:bg-tlb-yellow/20'}`}
-            >
-              <UserCircle size={24} />
+            <button onClick={() => setShowProfilePopup(!showProfilePopup)} className="w-9 h-9 rounded-full bg-tlb-yellow/10 text-tlb-yellow flex items-center justify-center hover:bg-tlb-yellow/20 transition-colors">
+              {extendedData?.logo ? <img src={extendedData.logo} alt="" className="w-9 h-9 rounded-full object-cover" /> : <UserCircle size={20} />}
             </button>
             {showProfilePopup && (
-              <div className="absolute right-0 mt-3 w-72 bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden z-50">
-                {/* Avatar + name */}
-                <div className="p-5 flex items-center gap-4 border-b border-gray-100">
-                  <div className="w-12 h-12 rounded-2xl bg-tlb-yellow/10 flex items-center justify-center text-tlb-yellow shrink-0">
-                    {extendedData?.logo
-                      ? <img src={extendedData.logo} alt="logo" className="w-12 h-12 rounded-2xl object-cover" />
-                      : <UserCircle size={28} />
-                    }
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-black text-sm text-gray-900 truncate">
-                      {profileData?.business_name || partnerData?.business_name || 'Your Business'}
-                    </p>
-                    <p className="text-xs text-gray-400 truncate">
-                      {partnerData?.email || partnerData?.phone || ''}
-                    </p>
-                  </div>
-                </div>
-                {/* Stats row */}
-                <div className="px-5 py-4 flex items-center justify-between border-b border-gray-100">
-                  <div className="text-center">
-                    <p className="text-base font-black text-gray-900">{profileCompletion}%</p>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Profile</p>
-                  </div>
-                  <div className="w-px h-8 bg-gray-100" />
-                  <div className="text-center">
-                    <p className="text-base font-black text-gray-900">{allowedEntities.length}</p>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Services</p>
-                  </div>
-                  <div className="w-px h-8 bg-gray-100" />
-                  <div className="text-center">
-                    <p className="text-base font-black text-gray-900">
-                      {followerCount === null ? 'â€”' : followerCount.toLocaleString('en-IN')}
-                    </p>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Followers</p>
-                  </div>
-                  <div className="w-px h-8 bg-gray-100" />
-                  <div className="text-center">
-                    <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide ${
-                      isVerified ? 'bg-emerald-50 text-emerald-600' :
-                      verificationSubmitted ? 'bg-blue-50 text-blue-500' :
-                      isActive ? 'bg-amber-50 text-amber-500' :
-                      'bg-gray-100 text-gray-500'
+              <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-50">
+                {/* Dark header */}
+                <div className="bg-gradient-to-br from-gray-900 to-gray-800 px-5 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center text-white shrink-0 ring-2 ring-white/20 overflow-hidden">
+                      {extendedData?.logo
+                        ? <img src={extendedData.logo} alt="logo" className="w-12 h-12 object-cover" />
+                        : <UserCircle size={26} />
+                      }
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-black text-sm text-white truncate">{profileData?.business_name || partnerData?.business_name || 'Your Business'}</p>
+                      <p className="text-[11px] text-gray-400 truncate mt-0.5">{partnerData?.email || partnerData?.phone || ''}</p>
+                    </div>
+                    <span className={`shrink-0 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide ${
+                      isVerified ? 'bg-emerald-500/20 text-emerald-400' :
+                      verificationSubmitted ? 'bg-blue-500/20 text-blue-400' :
+                      isActive ? 'bg-amber-500/20 text-amber-400' :
+                      'bg-white/10 text-gray-400'
                     }`}>
                       {isVerified ? 'Verified' : verificationSubmitted ? 'In Review' : isActive ? 'Active' : 'Pending'}
                     </span>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Status</p>
                   </div>
                 </div>
-                {/* Categories */}
+                {/* Stats */}
+                <div className="grid grid-cols-3 divide-x divide-gray-100 border-b border-gray-100">
+                  <div className="px-3 py-3 text-center">
+                    <p className="text-base font-black text-gray-900">{profileCompletion}%</p>
+                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Profile</p>
+                  </div>
+                  <div className="px-3 py-3 text-center">
+                    <p className="text-base font-black text-gray-900">{allowedEntities.length}</p>
+                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Services</p>
+                  </div>
+                  <div className="px-3 py-3 text-center">
+                    <p className="text-base font-black text-gray-900">{followerCount === null ? '-' : followerCount.toLocaleString('en-IN')}</p>
+                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Followers</p>
+                  </div>
+                </div>
+                {/* Entity chips */}
                 {allowedEntities.length > 0 && (
-                  <div className="px-5 py-3 flex flex-wrap gap-1.5 border-b border-gray-100">
-                    {allowedEntities.map(e => (
-                      <span key={e} className="text-[10px] font-black uppercase tracking-wide bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full">{e}</span>
-                    ))}
+                  <div className="px-4 py-3 flex flex-wrap gap-1.5 border-b border-gray-100">
+                    {allowedEntities.map(e => {
+                      const c = e === 'Events' ? 'bg-blue-50 text-blue-600' : e === 'Classes' ? 'bg-purple-50 text-purple-600' : e === 'Programs' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600';
+                      return <span key={e} className={`text-[9px] font-black uppercase tracking-wide px-2.5 py-1 rounded-md ${c}`}>{e}</span>;
+                    })}
                   </div>
                 )}
                 {/* Actions */}
-                <div className="p-3 flex flex-col gap-1">
-                  <button
-                    onClick={() => { setShowProfilePopup(false); onNavigate('BRAND_PROFILE'); }}
-                    className="w-full text-left px-4 py-2.5 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    Edit Profile
-                  </button>
-                  <button
-                    onClick={() => { setShowProfilePopup(false); onNavigate('PREVIEW_PROFILE'); }}
-                    className="w-full text-left px-4 py-2.5 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    Preview Profile
-                  </button>
+                <div className="p-2">
+                  <button onClick={() => { setShowProfilePopup(false); onNavigate('BRAND_PROFILE'); }} className="w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2.5 transition-colors"><Edit3 size={14} className="text-gray-400" />Edit Profile</button>
+                  <button onClick={() => { setShowProfilePopup(false); onNavigate('PREVIEW_PROFILE'); }} className="w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2.5 transition-colors"><Eye size={14} className="text-gray-400" />Preview Profile</button>
                   <div className="my-1 border-t border-gray-100" />
-                  <button
-                    onClick={() => { setShowProfilePopup(false); onNavigate('LANDING'); }}
-                    className="w-full text-left px-4 py-2.5 rounded-xl text-sm font-bold text-red-500 hover:bg-red-50 transition-colors"
-                  >
-                    Sign Out
-                  </button>
+                  <button onClick={() => { setShowProfilePopup(false); onNavigate('LANDING'); }} className="w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium text-red-500 hover:bg-red-50 flex items-center gap-2.5 transition-colors"><LogOut size={14} />Sign Out</button>
                 </div>
               </div>
             )}
@@ -353,210 +316,151 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
         </div>
       </header>
 
-      <main className="p-6">
-        <div className="tlb-content space-y-6">
+      <main className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
 
-          {/* â”€â”€ Onboarding Tracker â”€â”€ */}
-          {isActive && !isVerified && (
-            <section className="bg-white border border-gray-100 rounded-3xl p-6 sm:p-8 shadow-sm">
-              <div className="mb-6">
-                <h2 className="text-xl font-black">Onboarding Progress</h2>
-                <p className="text-xs text-gray-500 mt-1">Complete all steps to fully activate your partner account.</p>
-              </div>
-              <div className="space-y-0 relative">
-                <div className="absolute left-4 top-5 bottom-5 w-0.5 bg-gray-100 z-0" />
-                <div className="flex items-start gap-4 relative z-10 pb-6">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-emerald-100 text-emerald-600">
-                    <CheckCircle2 size={18} />
+        {/* Onboarding Tracker */}
+        {isActive && !isVerified && (
+          <section className="bg-white border border-gray-200 rounded-2xl p-5 sm:p-6">
+            <h2 className="font-bold text-sm text-gray-900 mb-4">Onboarding Progress</h2>
+            <div className="space-y-0 relative">
+              <div className="absolute left-[15px] top-5 bottom-5 w-px bg-gray-200 z-0" />
+              {[
+                { done: true, label: 'Profile Created' },
+                { done: verificationSubmitted, label: 'Verification Documents', actionLabel: 'Start Verification', action: () => onNavigate('AGREEMENT_SUBMIT') },
+                { done: false, active: verificationSubmitted, label: 'Admin Review', note: verificationSubmitted ? 'In progress' : 'Unlocks after step 2' },
+              ].map((step, i) => (
+                <div key={i} className="flex items-start gap-3 relative z-10 pb-4 last:pb-0">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-black ${step.done ? 'bg-emerald-100 text-emerald-600' : step.active ? 'bg-tlb-yellow text-tlb-dark' : 'bg-gray-100 text-gray-400'}`}>
+                    {step.done ? <CheckCircle2 size={16} /> : i + 1}
                   </div>
-                  <div className="pt-0.5">
-                    <p className="font-bold text-gray-900 opacity-60 line-through">Profile Created</p>
-                    <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest mt-0.5">Completed</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-4 relative z-10 pb-6">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${verificationSubmitted ? 'bg-emerald-100 text-emerald-600' : 'bg-tlb-yellow text-tlb-dark'}`}>
-                    {verificationSubmitted ? <CheckCircle2 size={18} /> : <span className="font-black text-sm">2</span>}
-                  </div>
-                  <div className="flex-1 flex flex-col sm:flex-row sm:items-start justify-between gap-3 pt-0.5">
+                  <div className="flex-1 flex items-center justify-between gap-3 pt-1.5">
                     <div>
-                      <p className={`font-bold ${verificationSubmitted ? 'text-gray-900 opacity-60 line-through' : 'text-gray-900'}`}>Verification Documents</p>
-                      {!verificationSubmitted && <p className="text-xs text-gray-500 mt-1">Submit PAN, bank details &amp; sign the partner agreement.</p>}
-                      {verificationSubmitted && <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest mt-0.5">Submitted</p>}
+                      <p className={`text-sm font-bold ${step.done ? 'text-gray-400 line-through' : 'text-gray-900'}`}>{step.label}</p>
+                      {step.note && <p className="text-[11px] text-gray-400 mt-0.5">{step.note}</p>}
                     </div>
-                    {!verificationSubmitted && (
-                      <button onClick={() => onNavigate('AGREEMENT_SUBMIT')} className="bg-tlb-dark text-tlb-yellow px-5 py-2.5 rounded-xl text-xs font-bold shadow-md hover:bg-black transition-colors whitespace-nowrap self-start">
-                        Start Verification
+                    {!step.done && step.action && (
+                      <button onClick={step.action} className="bg-tlb-yellow text-tlb-dark px-4 py-2 rounded-lg text-xs font-bold shrink-0">
+                        {step.actionLabel}
                       </button>
                     )}
                   </div>
                 </div>
-                <div className="flex items-start gap-4 relative z-10">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${verificationSubmitted ? 'bg-tlb-yellow text-tlb-dark' : 'bg-gray-100 text-gray-300'}`}>
-                    <span className="font-black text-sm">3</span>
-                  </div>
-                  <div className={`pt-0.5 ${!verificationSubmitted ? 'opacity-40' : ''}`}>
-                    <p className="font-bold text-gray-900">Admin Review</p>
-                    {verificationSubmitted
-                      ? <p className="text-[10px] text-tlb-yellow font-bold uppercase tracking-widest mt-0.5">In Progress — typically 24–48 hrs</p>
-                      : <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">Unlocks after Step 2</p>}
-                  </div>
-                </div>
-              </div>
-            </section>
-          )}
+              ))}
+            </div>
+          </section>
+        )}
 
-          {/* â”€â”€ Welcome Banner â”€â”€ */}
-          <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-tlb-dark to-gray-900 p-6 sm:p-8 text-white">
-            <div className="absolute -right-6 -top-6 w-32 h-32 bg-tlb-yellow/10 rounded-full blur-2xl" />
-            <div className="absolute -left-4 -bottom-4 w-24 h-24 bg-tlb-yellow/5 rounded-full blur-xl" />
+        {/* Welcome + Profile row */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Welcome card */}
+          <section className="lg:col-span-2 relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0f1729] to-gray-900 p-6 text-white">
+            <div className="absolute -right-8 -top-8 w-40 h-40 bg-tlb-yellow/10 rounded-full blur-3xl" />
             <div className="relative z-10">
-              <h2 className="text-2xl font-black leading-tight">Welcome back, {businessName}! 👋</h2>
-              <p className="text-sm text-gray-400 mt-2 leading-relaxed max-w-lg">
-                Your profile is <span className="text-tlb-yellow font-black">{profileCompletion}% complete</span>.
+              <p className="text-sm text-gray-400 font-medium">Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'},</p>
+              <h2 className="text-2xl font-black mt-1">{businessName}</h2>
+              <div className="mt-5 flex items-center gap-4">
+                <div className="flex-1">
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className="text-gray-500 font-medium">Profile completion</span>
+                    <span className="text-tlb-yellow font-black">{profileCompletion}%</span>
+                  </div>
+                  <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+                    <div className="h-full bg-tlb-yellow rounded-full transition-all duration-700" style={{ width: `${profileCompletion}%` }} />
+                  </div>
+                </div>
                 {profileCompletion < 100 && (
-                  <button onClick={() => onNavigate('BRAND_PROFILE')} className="text-tlb-yellow underline ml-1 font-bold">Complete your profile</button>
+                  <button onClick={() => onNavigate('BRAND_PROFILE')} className="bg-tlb-yellow text-tlb-dark px-4 py-2 rounded-lg text-xs font-bold shrink-0 hover:brightness-110 transition-all">
+                    Complete
+                  </button>
                 )}
-              </p>
-              <div className="mt-5">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Profile Completion</span>
-                  <span className="text-sm font-black text-tlb-yellow">{profileCompletion}%</span>
-                </div>
-                <div className="w-full h-2.5 bg-white/10 rounded-full overflow-hidden">
-                  <div className="h-full bg-tlb-yellow rounded-full transition-all duration-700" style={{ width: `${profileCompletion}%` }} />
-                </div>
               </div>
             </div>
           </section>
 
-          {/* â”€â”€ Profile Performance â”€â”€ */}
-          <section className="tlb-card p-6">
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <h3 className="font-black text-gray-900">Profile Performance</h3>
-                <p className="text-xs text-gray-400 mt-0.5">Visibility and engagement metrics</p>
-              </div>
-              <button onClick={() => onNavigate('BRAND_PROFILE')} className="text-xs font-bold text-tlb-yellow hover:underline">
-                Edit Profile
-              </button>
+          {/* Profile stats card */}
+          <section className="bg-white rounded-2xl border border-gray-100 p-5 flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Profile</p>
+              <button onClick={() => onNavigate('BRAND_PROFILE')} className="text-[11px] font-bold text-blue-500 hover:underline">Edit</button>
             </div>
-            <div className="grid grid-cols-3 gap-2 sm:gap-4">
+            <div className="grid grid-cols-3 gap-2">
               {[
-                { label: 'Profile Views', value: d.profile_views ?? 0, icon: Eye, color: 'text-purple-500', bg: 'bg-purple-50' },
-                { label: 'Followers', value: followerCount === null ? 'â€”' : followerCount.toLocaleString('en-IN'), icon: Users, color: 'text-blue-500', bg: 'bg-blue-50' },
-                { label: 'Completion', value: `${profileCompletion}%`, icon: Award, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-              ].map(stat => (
-                <div key={stat.label} className="flex flex-col items-center text-center gap-2">
-                  <div className={`w-10 h-10 ${stat.bg} rounded-xl flex items-center justify-center ${stat.color}`}>
-                    <stat.icon size={18} />
-                  </div>
-                  <div>
-                    <p className="text-xl font-black text-gray-900">{stat.value}</p>
-                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{stat.label}</p>
-                  </div>
+                { label: 'Views', value: d.profile_views ?? 0, color: 'text-purple-500' },
+                { label: 'Followers', value: followerCount === null ? '-' : followerCount, color: 'text-blue-500' },
+                { label: 'Complete', value: `${profileCompletion}%`, color: 'text-emerald-500' },
+              ].map(s => (
+                <div key={s.label} className="text-center">
+                  <p className={`text-2xl font-black ${s.color}`}>{s.value}</p>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{s.label}</p>
                 </div>
               ))}
             </div>
-            <div className="mt-5 pt-4 border-t border-gray-100">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Profile Strength</span>
-                <span className="text-[10px] font-black text-gray-700">{profileCompletion}%</span>
+            <div className="mt-4 pt-3 border-t border-gray-100">
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-full rounded-full transition-all duration-700" style={{ width: `${profileCompletion}%`, backgroundColor: profileCompletion >= 80 ? '#10B981' : profileCompletion >= 50 ? '#FACC15' : '#F87171' }} />
+                </div>
+                <span className="text-[10px] font-bold text-gray-500">{profileCompletion}%</span>
               </div>
-              <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-700"
-                  style={{
-                    width: `${profileCompletion}%`,
-                    backgroundColor: profileCompletion >= 80 ? '#10B981' : profileCompletion >= 50 ? '#FACC15' : '#F87171',
-                  }}
-                />
-              </div>
-              <p className="text-[10px] text-gray-400 mt-1.5">
-                {profileCompletion === 100 ? 'Your profile is fully complete!' :
-                 profileCompletion >= 80 ? 'Almost there! Add a few more details.' :
-                 profileCompletion >= 50 ? 'Good progress. Add bio, links & gallery.' :
-                 'Complete your profile to improve discoverability.'}
-              </p>
             </div>
           </section>
-
-          {/* â”€â”€ KPI Cards â”€â”€ */}
-          <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {kpiMetrics.map((m) => {
-              const sparkHasData = m.spark.some(v => v > 0);
-              const trend = trendPct(m.spark);
-              return (
-                <div key={m.label} className="tlb-card p-5 flex flex-col gap-2 overflow-hidden">
-                  <div className="flex items-center justify-between">
-                    <div className={`w-9 h-9 ${m.bg} rounded-xl flex items-center justify-center ${m.color}`}>
-                      <m.icon size={18} />
-                    </div>
-                    <TrendBadge pct={trend} />
-                  </div>
-                  <div>
-                    <p className="text-3xl font-black leading-none mt-1">{m.value}</p>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">{m.label}</p>
-                  </div>
-                  {sparkHasData && (
-                    <div className="h-11 -mx-1 mt-1">
-                      <AreaSparkline data={m.spark} color={m.hex} id={m.sparkId} />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </section>
-
-          {/* â”€â”€ CTA Button â”€â”€ */}
-          <section>
-            <button onClick={handleAddListing} className="tlb-button w-full py-5 shadow-lg shadow-tlb-yellow/20 text-base gap-3">
-              <Plus size={22} /> {ctaLabel}
-            </button>
-          </section>
-
-          {/* â”€â”€ Quick Links â”€â”€ */}
-          <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {quickLinks.map((link) => (
-              <button
-                key={link.label}
-                onClick={() => onNavigate(link.screen)}
-                className="tlb-card p-4 flex flex-col items-center gap-2 hover:border-tlb-yellow transition-colors cursor-pointer"
-              >
-                <div className="bg-tlb-yellow/10 p-3 rounded-xl text-tlb-yellow"><link.icon size={22} /></div>
-                <span className="text-xs font-bold text-gray-600">{link.label}</span>
-              </button>
-            ))}
-          </section>
-
-
         </div>
+
+        {/* KPI Cards */}
+        <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {kpiMetrics.map((m) => {
+            const sparkHasData = m.spark.some(v => v > 0);
+            const trend = trendPct(m.spark);
+            return (
+              <div key={m.label} className="bg-white rounded-2xl border border-gray-100 p-5 flex flex-col gap-3 overflow-hidden hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between">
+                  <div className={`w-9 h-9 ${m.bg} rounded-xl flex items-center justify-center ${m.color}`}>
+                    <m.icon size={16} />
+                  </div>
+                  <TrendBadge pct={trend} />
+                </div>
+                <div>
+                  <p className="text-2xl font-black text-gray-900 leading-none">{m.value}</p>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">{m.label}</p>
+                </div>
+                {sparkHasData && (
+                  <div className="h-10 -mx-1 mt-auto">
+                    <AreaSparkline data={m.spark} color={m.hex} id={m.sparkId} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </section>
+
+        {/* Quick actions row */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+          {/* CTA */}
+          <button onClick={handleAddListing} className="lg:col-span-2 bg-tlb-yellow text-tlb-dark rounded-2xl p-5 flex items-center gap-4 hover:brightness-105 active:scale-[0.99] transition-all">
+            <div className="w-12 h-12 bg-black/10 rounded-xl flex items-center justify-center shrink-0"><Plus size={24} /></div>
+            <div className="text-left"><p className="font-black text-base">{ctaLabel}</p><p className="text-xs font-medium text-black/50 mt-0.5">Start building your next listing</p></div>
+          </button>
+          {/* Quick links */}
+          {quickLinks.slice(0, 3).map((link) => (
+            <button key={link.label} onClick={() => onNavigate(link.screen)} className="bg-white rounded-2xl border border-gray-100 p-5 flex items-center gap-3 hover:border-gray-300 hover:shadow-sm transition-all group">
+              <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400 group-hover:bg-tlb-yellow/10 group-hover:text-tlb-yellow transition-colors">
+                <link.icon size={18} />
+              </div>
+              <span className="text-sm font-bold text-gray-700">{link.label}</span>
+            </button>
+          ))}
+        </div>
+
       </main>
 
-      {/* â”€â”€ Footer â”€â”€ */}
-      <footer className="mt-10 bg-tlb-dark text-white px-6 py-8">
-        <div className="flex flex-col items-center gap-4">
-          <img src="/tlbAppIcon.png" alt="The Little Broadway" className="w-14 h-14 rounded-2xl" />
-          <p className="text-white font-black text-base tracking-tight">The Little Broadway</p>
-          <p className="text-gray-400 text-xs text-center leading-relaxed">
-            Your premier partner portal for Broadway events,<br />classes, and venue management.
-          </p>
-          <div className="w-full border-t border-white/10 my-2" />
-          <div className="w-full grid grid-cols-2 gap-4 text-xs text-gray-400">
-            <div>
-              <p className="text-[10px] font-black text-tlb-yellow uppercase tracking-widest mb-2">Contact</p>
-              <p>support@thelittlebroadway.in</p>
-              <p className="mt-1">+91 98765 43210</p>
-            </div>
-            <div>
-              <p className="text-[10px] font-black text-tlb-yellow uppercase tracking-widest mb-2">Platform</p>
-              <p>Events</p><p className="mt-1">Classes</p><p className="mt-1">Venues</p>
-            </div>
+      {/* Footer */}
+      <footer className="bg-[#0f1729] text-white px-6 py-6 mt-4">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <img src="/tlbAppIcon.png" alt="TLB" className="w-8 h-8 rounded-lg" />
+            <span className="text-sm font-bold text-gray-400">The Little Broadway</span>
           </div>
-          <div className="w-full border-t border-white/10 my-2" />
-          <p className="text-gray-500 text-[10px] text-center">
-            Â© 2026 The Little Broadway. All rights reserved.<br />Partner Portal V3.0
-          </p>
+          <p className="text-[11px] text-gray-600">&copy; 2026 The Little Broadway &middot; Partner Portal V3.0</p>
         </div>
       </footer>
 

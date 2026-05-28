@@ -2,7 +2,19 @@ import React, { useRef, useState, useEffect } from 'react';
 import { ChevronRight, Smartphone, ArrowRight } from 'lucide-react';
 import { Screen } from '../../types';
 import { verifyOtp, requestOtp } from '../../api/auth';
-import { setAuthToken, setRefreshToken } from '../../api/client';
+import { setAuthToken, setRefreshToken, clearTokens } from '../../api/client';
+import { getCurrentPartner } from '../../api/onboarding';
+import { ToastContainer, useToasts } from '../../components/ui';
+
+// Partner statuses that indicate a fully-onboarded account (allowed to log in).
+// Anything earlier means the email exists in the backend but no profile has been
+// completed — Login rejects those so the user must go through Onboarding instead.
+const LOGIN_ALLOWED_STATUSES = new Set([
+    'profile_created',
+    'activated_limited',
+    'under_review',
+    'approved',
+]);
 
 interface AuthProps {
     onNavigate: (screen: Screen) => void;
@@ -15,6 +27,7 @@ export const OTPVerify: React.FC<AuthProps> = ({ onNavigate, authData }) => {
     const [resending, setResending] = useState(false);
     const [countdown, setCountdown] = useState(30);
     const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+    const { toasts, showToast, dismissToast } = useToasts();
 
     useEffect(() => {
         if (countdown <= 0) return;
@@ -30,10 +43,61 @@ export const OTPVerify: React.FC<AuthProps> = ({ onNavigate, authData }) => {
             setOtp(['', '', '', '', '', '']);
             setCountdown(30);
             inputRefs.current[0]?.focus();
+            showToast('A new OTP has been sent.', 'success', 3000);
         } catch {
-            alert('Failed to resend OTP. Please try again.');
+            showToast('Failed to resend OTP. Please try again.', 'error');
         } finally {
             setResending(false);
+        }
+    };
+
+    const handleVerify = async () => {
+        const code = otp.join('');
+        if (code.length !== 6 || !authData) return;
+        setLoading(true);
+        try {
+            const res = await verifyOtp(authData.value, code, 'partner');
+            const data = res.data || res;
+            const access = data.access_token || data.access;
+            const refresh = data.refresh_token || data.refresh;
+
+            if (!access) {
+                throw new Error('No access token received');
+            }
+            setAuthToken(access);
+            if (refresh) setRefreshToken(refresh);
+
+            // Login is reserved for already-onboarded partners. Check status before letting
+            // the user in — if the account exists but onboarding isn't finished, reject the
+            // session and steer them to the Onboarding flow.
+            let status = '';
+            try {
+                const meRes = await getCurrentPartner();
+                const partner = meRes.data || meRes;
+                status = partner?.status || '';
+            } catch {
+                // If /partners/me/ fails for an unknown reason, treat as unregistered to be safe.
+            }
+
+            if (!LOGIN_ALLOWED_STATUSES.has(status)) {
+                clearTokens();
+                sessionStorage.clear();
+                setOtp(['', '', '', '', '', '']);
+                showToast(
+                    'This email is not registered as a partner. Please sign up via onboarding first.',
+                    'warning',
+                    6000,
+                );
+                setTimeout(() => onNavigate('LANDING'), 2000);
+                return;
+            }
+
+            onNavigate('HOME');
+        } catch (error) {
+            console.error('Failed to verify OTP', error);
+            showToast('Invalid OTP. Please try again.', 'error');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -67,6 +131,7 @@ export const OTPVerify: React.FC<AuthProps> = ({ onNavigate, authData }) => {
 
     return (
         <div className="min-h-screen bg-white flex flex-col items-center p-6">
+            <ToastContainer toasts={toasts} onDismiss={dismissToast} />
             <div className="w-full flex items-center justify-between mb-12">
                 <button onClick={() => onNavigate('LOGIN')} className="p-2"><ArrowRight size={24} className="rotate-180" /></button>
                 <h2 className="font-black text-lg uppercase tracking-widest">Verify</h2>
@@ -122,31 +187,8 @@ export const OTPVerify: React.FC<AuthProps> = ({ onNavigate, authData }) => {
                     <button onClick={() => onNavigate('LOGIN')} className="text-xs underline mt-2 opacity-50">Change Number/Email?</button>
                 </p>
 
-                <button 
-                    onClick={async () => {
-                        const code = otp.join('');
-                        if (code.length !== 6 || !authData) return;
-                        setLoading(true);
-                        try {
-                            const res = await verifyOtp(authData.value, code, 'partner');
-                            const data = res.data || res;
-                            const access = data.access_token || data.access;
-                            const refresh = data.refresh_token || data.refresh;
-
-                            if (access) {
-                                setAuthToken(access);
-                                if (refresh) setRefreshToken(refresh);
-                                onNavigate('HOME');
-                            } else {
-                                throw new Error('No access token received');
-                            }
-                        } catch (error) {
-                            console.error('Failed to verify OTP', error);
-                            alert('Invalid OTP. Please try again.');
-                        } finally {
-                            setLoading(false);
-                        }
-                    }} 
+                <button
+                    onClick={handleVerify}
                     disabled={otp.join('').length !== 6 || loading || !authData}
                     className={`tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20 ${(otp.join('').length !== 6 || loading || !authData) ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >

@@ -241,6 +241,11 @@ export const handlers = [
     http.get(`${BASE}/api/v1/partners/me/`, () =>
         HttpResponse.json({ success: true, data: { id: 1, status: 'activated_limited', is_active: true, is_verified: false, business_name: 'Test Studio', bank_account: null } })),
 
+    // The api client actually hits the singular form (/partner/me/) — keep both so tests
+    // that exercise getCurrentPartner via either codepath stay green.
+    http.get(`${BASE}/api/v1/partner/me/`, () =>
+        HttpResponse.json({ success: true, data: { id: 1, status: 'activated_limited', is_active: true, is_verified: false, business_name: 'Test Studio', bank_account: null } })),
+
     http.post(`${BASE}/api/v1/partner/verification/`, () =>
         HttpResponse.json({ success: true, data: { status: 'under_review' } })),
 

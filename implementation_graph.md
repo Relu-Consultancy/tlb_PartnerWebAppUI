@@ -3,7 +3,7 @@
 > **Definitive architectural reference for the TLB Partner Portal.**
 > Base URL: `https://tlb-api.reluconsultancy.in`
 > Framework: React + Vite + TypeScript (SPA)
-> Last Updated: May 21, 2026
+> Last Updated: May 28, 2026
 
 ---
 
@@ -22,7 +22,8 @@ src/
 │   ├── Navigation.tsx           # Sidebar: fixed on desktop (lg+, dark navy #0f1729), animated drawer on mobile; collapsible via toggle
 │   ├── EntityPickerSheet.tsx    # Bottom sheet for entity type selection
 │   └── ui/
-│       └── DashboardCharts.tsx  # Shared SVG chart primitives: AreaSparkline, TrendAreaChart, WeeklyBarChart, DonutChart, fmtCurrency, trendPct, TrendBadge
+│       ├── DashboardCharts.tsx  # Shared SVG chart primitives: AreaSparkline, TrendAreaChart, WeeklyBarChart, DonutChart, fmtCurrency, trendPct, TrendBadge
+│       └── Toast.tsx            # Shared ToastContainer + useToasts() hook (error/warning/success/info, slide-in animation, auto-dismiss)
 ├── screens/
 │   ├── auth/               # Landing, Login, OTPVerify, PartnerAccess, PartnerAccessOTP, PartnerCategory
 │   ├── onboarding/         # Registration, AppSubmitted, AppApproved, AgreementSubmit, IdentityVerification, BankSetup, OnboardingComplete
@@ -267,7 +268,7 @@ Request → 401 Unauthorized?
 | `getPartnerMedia` | GET | `/api/v1/partners/media/` | — | Registration, BrandProfile |
 | `uploadPartnerMedia` | POST | `/api/v1/partners/media/` | FormData (file, media_type) | Registration, BrandProfile |
 | `deletePartnerMedia` | DELETE | `/api/v1/partners/media/{id}/` | — | Registration, BrandProfile |
-| `getCurrentPartner` | GET | `/api/v1/partners/me/` | — | **App.tsx** (session restore), Dashboard, Registration, **FinancialHub** |
+| `getCurrentPartner` | GET | `/api/v1/partner/me/` | — | **App.tsx** (session restore), Dashboard, Registration, **FinancialHub**, **OTPVerify (login gate)** |
 | `getPartnerDashboard` | GET | `/api/v1/partners/dashboard/` | — | Dashboard, Statistics |
 | `getPartnerFollowerCount` | GET | `/api/v1/partner/{partner_id}/followers/count/` | — | Dashboard (profile popup + Profile Performance card) |
 | `activatePartner` | POST | `/api/v1/partners/activate/` | `{ is_active: true }` | (available, not actively used) |
@@ -389,8 +390,8 @@ THEN
 | **Landing** | — | Static landing page with `tlbAppIcon.png` footer + dark strip (Platform / Company links / copyright) |
 | **PartnerAccess** | — | Collects email/phone for OTP |
 | **PartnerAccessOTP** | `requestOtp()` → `verifyOtp()` | Saves tokens to localStorage, navigates to `PARTNER_CATEGORY` (new user) |
-| **OTPVerify** | `verifyOtp()` on submit; `requestOtp()` on resend | 30-second countdown timer. Displays "Resend in 00:XX" while counting. At 0, shows "Resend OTP" button that calls `requestOtp()` with original `authData`, resets OTP inputs, restarts timer. Saves tokens, navigates to `HOME`. |
-| **PartnerCategory** | `getPartnerCategories()` → `selectCategories()` | Fetches available categories, submits selection, navigates to `REGISTRATION` |
+| **OTPVerify** | `verifyOtp()` on submit; `getCurrentPartner()` after verify (login gate); `requestOtp()` on resend | 30-second countdown timer. Displays "Resend in 00:XX" while counting. At 0, shows "Resend OTP" button that calls `requestOtp()` with original `authData`, resets OTP inputs, restarts timer. **Login gate:** after a successful `verifyOtp`, fetches `getCurrentPartner()` and checks `status`. Only `profile_created` / `activated_limited` / `under_review` / `approved` are allowed in — anything earlier (or a fetch failure) is treated as "not registered as a partner": tokens are cleared, a warning toast is shown ("This email is not registered as a partner. Please sign up via onboarding first."), and the user is sent back to `LANDING` after 2 seconds. Invalid OTP and resend success/failure also use toasts (no more `alert()`). |
+| **PartnerCategory** | `getPartnerCategories()` → `selectCategories()` | Fetches available categories, submits selection, navigates to `REGISTRATION`. **Already-registered guard:** when `selectCategories()` returns the `INVALID_PARTNER_STATE` error (`"This action is not allowed in '<status>' status."`), the screen clears tokens + `sessionStorage`, shows a warning toast ("This email is already registered as a partner. Redirecting you to login…"), and routes to `LOGIN` after 1.8 seconds. Other failures show the API error message in an error toast. |
 
 ### 6.2 Onboarding Flow
 
@@ -811,6 +812,8 @@ classDiagram
 - **IdentityVerification** — upgraded from `alert()` to inline error banner; PAN regex (`^[A-Z]{5}[0-9]{4}[A-Z]$`) with real-time green/red field indicator; mobile-responsive padding; "Section A of 2" progress label.
 - **BankSetup** — removed fake hardcoded file upload UI; added confirm account field with match check; IFSC/account regex inline validation with green/red indicators; `submitVerification()` wired up (reads PAN/GST from sessionStorage); navigates to `ONBOARDING_COMPLETE` (was `HOME`).
 
+- **Login / Onboarding flow separation (Phase 17)** — Login is now strictly reserved for partners who have already completed onboarding. After `verifyOtp` succeeds in `OTPVerify`, the screen calls `getCurrentPartner()` and inspects `status`. Allowed statuses: `profile_created`, `activated_limited`, `under_review`, `approved`. Any earlier status (`otp_verified`, `category_selected`) or a `/partner/me/` fetch failure causes the screen to clear tokens, show a warning toast, and route back to `LANDING` instead of `HOME`. Conversely, in `PartnerCategory` the `INVALID_PARTNER_STATE` error from `selectCategories()` (returned when a fully-onboarded partner re-enters the onboarding flow) is intercepted, tokens are cleared, and the user is redirected to `LOGIN`. This eliminates the pre-Phase-17 behaviour where Login silently created new accounts and onboarding silently failed with an `alert()` for already-registered emails.
+- **Shared Toast component** — `src/components/ui/Toast.tsx` exports a `ToastContainer` + `useToasts()` hook used by `OTPVerify` and `PartnerCategory` (and re-exported from `components/ui/index.ts`). Supports `error` / `warning` / `success` / `info` variants, auto-dismiss with configurable duration, slide-in animation. `AgreementSubmit` still has its own inline copy from the earlier toast work (left untouched to avoid disturbing its 8 tests).
 - **Attendees / Booking Management** — Full booking management screen: KPI counts (5 parallel `getBookings` calls on mount including `awaiting_payment`), paginated list with filter tabs (All/Awaiting Payment/Confirmed/Attended/Cancelled) + search, right-side detail drawer with listing title (best-effort fetched), Mark Attended + Cancel Booking actions. Cancel available for both `confirmed` and `awaiting_payment`. Transaction badges context-aware ("Initiated" when payment pending, "SUCCESS" when paid). Order items show name + qty only (no repeated amounts).
 - **Listing Pause/Resume & Archive/Unarchive (all entities)** — Generic `pauseListing`/`resumeListing`/`archiveListing`/`unarchiveListing` endpoints added to `listings.ts`. All entity types now have Pause/Resume and Archive/Unarchive buttons in ServiceListings. Classes and Programs retain their entity-specific endpoints as overrides.
 - **ProgramEnquiries listing title** — Program name and format now displayed in the enquiry table and detail drawer, sourced from the already-fetched programs list (API enquiry response doesn't include these fields).
@@ -851,6 +854,10 @@ classDiagram
 - ❌ Hardcoded `pb-24` on Dashboard wrapper — removed; footer now sits flush at bottom
 - ❌ `main-footer.png` footer image — replaced with `tlbAppIcon.png` on both Landing and Dashboard
 - ❌ Hardcoded "Resend in 00:45" static text in OTPVerify — replaced with live countdown timer
+- ❌ `alert('Invalid OTP. Please try again.')` / `alert('Failed to resend OTP. Please try again.')` in OTPVerify — replaced with toast notifications via the shared `useToasts` hook
+- ❌ `alert('Failed to save categories. Please try again.')` in PartnerCategory — replaced with toast; `INVALID_PARTNER_STATE` error now shows a friendly "already registered" message and routes to LOGIN
+- ❌ Login flow silently created new partner accounts when an unregistered email submitted an OTP — Dashboard would then redirect to `PARTNER_CATEGORY`, putting "login" users into the onboarding flow. OTPVerify now gates on partner status and refuses incomplete accounts at the OTP step itself
+- ❌ MSW handler only mocked `/api/v1/partners/me/` (plural) while the actual api client targets `/api/v1/partner/me/` (singular) — added a handler for the real path so tests exercising the login gate stay green
 - ❌ Dashboard as simple 4-card grid — replaced with full analytics dashboard (charts, funnels, trends, activity feed)
 - ❌ Status badge in top-left badge group on listing cards — moved to right side of card header
 - ❌ Non-functional filter button on ServiceListings — replaced with full bottom sheet filter dialog
@@ -961,13 +968,15 @@ Before declaring a wizard "integrated":
 | `src/test/msw/handlers.ts` | Default handlers for all API endpoints; exports `DRAFT_ID`, `mockDraft`, `mockCategories`, `mockFormats`, `mockAgeGroups`, `mockListing` |
 | `src/test/msw/server.ts` | `setupServer(...handlers)` from msw/node |
 
-### 14.2 Test Files (358 tests — all passing)
+### 14.2 Test Files (359 tests)
+
+> **Note:** 12 ServiceListings tests are currently failing on `dev-vishesh` (pre-existing — unrelated to recent work). All other suites (347 tests) pass.
 
 | File | Tests | Coverage |
 |------|-------|----------|
 | `src/api/__tests__/listings.test.ts` | 28 | `ApiError` class, draft ID helpers, all metadata/CRUD/media/ticket endpoints (success + error codes) |
 | `src/api/__tests__/listings-classes-programs-venues.test.ts` | — | Classes, Programs, Venues API endpoints (formats, batches, enquiries, FAQs, media) |
-| `src/screens/auth/__tests__/OTPVerify.test.tsx` | 15 | Initial render, OTP input/validation, verify → token store + navigate, resend countdown (fake timer loop), phone mode |
+| `src/screens/auth/__tests__/OTPVerify.test.tsx` | 16 | Initial render, OTP input/validation, verify → token store + navigate, **invalid-OTP toast**, **login gate rejects `otp_verified` status (clears tokens, blocks HOME)**, resend countdown (fake timer loop), phone mode |
 | `src/screens/onboarding/__tests__/AgreementSubmit.test.tsx` | 8 | PAN/IFSC/account validation, section navigation, successful `submitVerification` POST |
 | `src/screens/events/__tests__/CreateEventDetails.test.tsx` | 17 | Metadata loading, draft pre-fill, form interactions (category → subcategories, format toggle, mode fields, age group tabs), Next validation |
 | `src/screens/events/__tests__/CreateEventSchedule.test.tsx` | 18 | Draft loading, pricing toggle, ticket add/remove, date validation, Next → updateListing + navigate |
@@ -1019,4 +1028,6 @@ npm run test:report   # run tests → generate test-report.html + test-report.pd
 
 ---
 
-*Last updated: 2026-05-27 — Phase 16 (UI redesign: dark fixed sidebar with collapse toggle, screen transition animations, dashboard 2-column layout, ServiceListings table/card redesign, new loader animation; Attendees: awaiting_payment status, cancel for pending bookings, optimized drawer; Generic pause/resume/archive/unarchive for all listing types; ProgramEnquiries listing title resolution)*
+*Last updated: 2026-05-28 — Phase 17 (Login / Onboarding flow separation: OTPVerify gates HOME on partner status and rejects incomplete accounts; PartnerCategory intercepts `INVALID_PARTNER_STATE` and redirects already-registered emails to LOGIN; shared `Toast` component in `components/ui/` replaces `alert()` calls in both screens; MSW handler added for `/api/v1/partner/me/` singular path).*
+
+*Phase 16 (2026-05-27) — UI redesign: dark fixed sidebar with collapse toggle, screen transition animations, dashboard 2-column layout, ServiceListings table/card redesign, new loader animation; Attendees: awaiting_payment status, cancel for pending bookings, optimized drawer; Generic pause/resume/archive/unarchive for all listing types; ProgramEnquiries listing title resolution.*

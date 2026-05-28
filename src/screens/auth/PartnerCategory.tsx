@@ -3,6 +3,8 @@ import { ArrowRight, CheckCircle2, BarChart3, Users, MapPin, ArrowLeft, Calendar
 import { Screen, EntityType } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
 import { selectCategories } from '../../api/onboarding';
+import { ToastContainer, useToasts } from '../../components/ui';
+import { clearTokens } from '../../api/client';
 
 interface AuthProps {
     onNavigate: (screen: Screen) => void;
@@ -12,6 +14,8 @@ export const PartnerCategory: React.FC<AuthProps> = ({ onNavigate }) => {
     const { allowedEntities, setAllowedEntities } = usePartner();
     const [selectedCategories, setSelectedCategories] = useState<EntityType[]>(allowedEntities.length > 0 ? allowedEntities : []);
     const [loading, setLoading] = useState(false);
+    const { toasts, showToast, dismissToast } = useToasts();
+
     const toggleCategory = (catName: EntityType) => {
         setSelectedCategories(prev =>
             prev.includes(catName)
@@ -29,7 +33,21 @@ export const PartnerCategory: React.FC<AuthProps> = ({ onNavigate }) => {
                 onNavigate('REGISTRATION');
             } catch (err) {
                 console.error('Failed to select categories', err);
-                alert('Failed to save categories. Please try again.');
+                const message = err instanceof Error ? err.message : '';
+                // Backend returns "This action is not allowed in '<status>' status." when the
+                // partner is already onboarded. Treat that as "already registered" — drop the
+                // session so the user can switch to the Login flow cleanly.
+                if (/not allowed in/i.test(message)) {
+                    clearTokens();
+                    sessionStorage.clear();
+                    showToast(
+                        'This email is already registered as a partner. Redirecting you to login…',
+                        'warning'
+                    );
+                    setTimeout(() => onNavigate('LOGIN'), 1800);
+                } else {
+                    showToast(message || 'Failed to save categories. Please try again.', 'error');
+                }
             } finally {
                 setLoading(false);
             }
@@ -45,6 +63,7 @@ export const PartnerCategory: React.FC<AuthProps> = ({ onNavigate }) => {
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col items-center">
+            <ToastContainer toasts={toasts} onDismiss={dismissToast} />
             <header className="w-full bg-white p-4 sm:p-6 flex items-center justify-between border-b border-gray-100">
                 <button onClick={() => onNavigate('PARTNER_ACCESS_OTP')} className="p-2 -ml-2"><ArrowLeft size={24} /></button>
                 <h2 className="font-black text-lg">Business Type</h2>

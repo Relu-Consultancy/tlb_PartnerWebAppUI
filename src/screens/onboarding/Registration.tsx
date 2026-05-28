@@ -26,7 +26,7 @@ export const Registration: React.FC<OnboardingProps> = ({ onNavigate }) => {
         business_type: 'Company',
         contact_person_name: '',
         email: '',
-        base_city: 'Mumbai',
+        base_city: '',
         instagram_url: '',
         is_info_correct: false,
         is_safety_confirmed: false,
@@ -132,13 +132,13 @@ export const Registration: React.FC<OnboardingProps> = ({ onNavigate }) => {
 
     return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-        <header className="bg-white p-6 flex items-center justify-between border-b border-gray-100">
+        <header className="bg-white p-4 sm:p-6 flex items-center justify-between border-b border-gray-100">
             <button type="button" onClick={() => onNavigate('LANDING')}><ArrowLeft size={24} /></button>
             <h2 className="font-black text-lg">Partner Registration</h2>
             <div className="w-6"></div>
         </header>
 
-        <div className="p-6 flex justify-between relative mb-4">
+        <div className="p-4 sm:p-6 flex justify-between relative mb-4">
             <div className="absolute top-1/2 left-0 w-full h-0.5 bg-tlb-yellow/20 -translate-y-1/2 z-0"></div>
             {[
                 { n: 1, label: 'Details' },
@@ -155,7 +155,7 @@ export const Registration: React.FC<OnboardingProps> = ({ onNavigate }) => {
             ))}
         </div>
 
-        <main className="flex-1 p-6 pb-24">
+        <main className="flex-1 p-4 sm:p-6 pb-24">
             <div className="tlb-content space-y-6">
                 <section className="tlb-card space-y-6">
                     <div className="flex items-center gap-3 mb-2">
@@ -213,16 +213,13 @@ export const Registration: React.FC<OnboardingProps> = ({ onNavigate }) => {
                         </div>
                         <div>
                             <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">City</label>
-                            <select 
-                                className="tlb-input appearance-none"
+                            <input
+                                type="text"
+                                className="tlb-input"
+                                placeholder="Enter your city"
                                 value={formData.base_city}
                                 onChange={(e) => setFormData(prev => ({ ...prev, base_city: e.target.value }))}
-                            >
-                                <option value="Mumbai">Mumbai</option>
-                                <option value="Delhi">Delhi</option>
-                                <option value="Bangalore">Bangalore</option>
-                                <option value="New York">New York</option>
-                            </select>
+                            />
                         </div>
                     </div>
                 </section>

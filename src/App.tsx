@@ -4,8 +4,10 @@
  */
 
 import React, { useState, useEffect, Suspense, lazy, useCallback } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Screen, EntityType } from './types';
 import { PartnerProvider, usePartner } from './context/PartnerContext';
+import { Loader } from './components/ui';
 
 // Helper for lazy loading named exports
 const lazyImport = <T extends Record<string, any>>(
@@ -69,6 +71,9 @@ const CreateVenuePreview = lazyImport(() => import('./screens/venues'), 'CreateV
 // Enquiries & Packages
 const Enquiries = lazyImport(() => import('./screens/enquiries'), 'Enquiries');
 const ProgramEnquiries = lazyImport(() => import('./screens/enquiries'), 'ProgramEnquiries');
+
+// Statistics
+const StatisticsScreen = lazyImport(() => import('./screens/statistics'), 'Statistics');
 
 import { Sidebar } from './components/Navigation';
 import { getAuthToken, getRefreshToken, setAuthToken, clearTokens } from './api/client';
@@ -143,6 +148,7 @@ const routes: Record<Screen, RouteConfig> = {
   ATTENDEES: { component: Attendees, hasSidebar: true },
   PACKAGES: { component: Packages, hasSidebar: true },
   FINANCIAL_HUB: { component: FinancialHub, hasSidebar: true },
+  STATISTICS: { component: StatisticsScreen, hasSidebar: true },
 };
 
 // ---------------------------------------------------------------------------
@@ -152,6 +158,7 @@ function AppInner() {
   const { allowedEntities, setAllowedEntities } = usePartner();
   const [currentScreen, setCurrentScreen] = useState<Screen>('LANDING');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
   const [authData, setAuthData] = useState<{ value: string; type: 'email' | 'phone' } | null>(null);
   const [initializing, setInitializing] = useState(true);
 
@@ -268,7 +275,7 @@ function AppInner() {
   if (initializing) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 gap-4">
-        <div className="w-14 h-14 border-4 border-gray-200 border-t-tlb-yellow rounded-full animate-spin"></div>
+        <Loader />
         <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Loading your session…</p>
       </div>
     );
@@ -279,24 +286,40 @@ function AppInner() {
 
   return (
     <div className="font-sans text-tlb-dark">
-      <Suspense fallback={
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-          <div className="w-12 h-12 border-4 border-gray-200 border-t-tlb-yellow rounded-full animate-spin"></div>
-        </div>
-      }>
-        <Component
+      {route.hasSidebar && (
+        <Sidebar
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+          currentScreen={currentScreen}
           onNavigate={guardedNavigate}
-          authData={authData}
-          setAuthData={setAuthData}
-          {...(route.hasSidebar ? { onOpenSidebar: () => setIsSidebarOpen(true) } : {})}
+          desktopOpen={desktopSidebarOpen}
+          onToggleDesktop={() => setDesktopSidebarOpen(prev => !prev)}
         />
-      </Suspense>
-      <Sidebar
-        isOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
-        currentScreen={currentScreen}
-        onNavigate={guardedNavigate}
-      />
+      )}
+      <div className={route.hasSidebar && desktopSidebarOpen ? 'lg:ml-60' : ''}>
+        <Suspense fallback={
+          <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <Loader />
+          </div>
+        }>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentScreen}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+            >
+              <Component
+                onNavigate={guardedNavigate}
+                authData={authData}
+                setAuthData={setAuthData}
+                {...(route.hasSidebar ? { onOpenSidebar: () => setIsSidebarOpen(true) } : {})}
+              />
+            </motion.div>
+          </AnimatePresence>
+        </Suspense>
+      </div>
     </div>
   );
 }

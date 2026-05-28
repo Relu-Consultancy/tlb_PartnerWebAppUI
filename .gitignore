@@ -10,3 +10,7 @@ Frontend_Estimation.csv
 Backend_Estimation.csv
 Final_Frontend_Estimation.csv
 Final_Backend_Estimation.csv
+
+# Generated test reports (never commit)
+test-report.pdf
+test-report.html

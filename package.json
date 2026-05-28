@@ -4,14 +4,15 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --port=3000 --host=0.0.0.0",
+    "dev": "vite --port=8000 --host=0.0.0.0",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "test": "vitest run",
     "test:ui": "vitest --ui",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:report": "node scripts/generate-test-report.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
@@ -31,6 +32,7 @@
     "autoprefixer": "^10.4.21",
     "jsdom": "^29.1.1",
     "msw": "^2.14.3",
+    "puppeteer-core": "^25.0.4",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",

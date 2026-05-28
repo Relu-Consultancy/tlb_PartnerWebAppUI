@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowRight, Plus, Trash2, Clock, Users, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation } from '../../components/ui';
+import { WizardLayout, WizardNavigation, Loader } from '../../components/ui';
 import {
     getCurrentClassDraftId,
     getClassBatches,
@@ -146,7 +146,7 @@ export const CreateClassBatch: React.FC<Props> = ({ onNavigate }) => {
 
             {loading ? (
                 <div className="flex justify-center py-10">
-                    <Loader2 size={28} className="animate-spin text-tlb-yellow" />
+                    <Loader />
                 </div>
             ) : (
                 <>

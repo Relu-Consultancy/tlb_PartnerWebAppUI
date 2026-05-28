@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, MapPin, Tag, Check, ChevronDown, Loader2 } from 'lucide-react';
+import { ArrowRight, MapPin, Tag, Check, ChevronDown, Loader2, MessageCircle, CalendarCheck } from 'lucide-react';
 import { Screen } from '../../types';
 import { WizardLayout, WizardNavigation } from '../../components/ui';
 import {
@@ -28,6 +28,7 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
     const [maxCapacity, setMaxCapacity] = useState('');
     const [totalHours, setTotalHours] = useState('');
     const [moduleCount, setModuleCount] = useState('');
+    const [bookingType, setBookingType] = useState<'enquiry' | 'direct_booking'>('enquiry');
     const [programFormat, setProgramFormat] = useState('');
     const [deliveryMode, setDeliveryMode] = useState('offline');
     const [city, setCity] = useState('');
@@ -53,6 +54,7 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
         let cancelled = false;
         (async () => {
             setMetaLoading(true);
+            let catsData: ApiCategory[] = [];
             try {
                 const [catsRes, fmtsRes, tagsRes] = await Promise.all([
                     getProgramMetaCategories(),
@@ -61,7 +63,8 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                 ]);
                 if (!cancelled) {
                     // Categories: response.data is array
-                    setCategories(catsRes.data || catsRes || []);
+                    catsData = catsRes.data || catsRes || [];
+                    setCategories(catsData);
                     // Formats: response.data has { formats: [...], delivery_modes: [...] }
                     const fmtData = fmtsRes.data || fmtsRes;
                     setFormats(Array.isArray(fmtData.formats) ? fmtData.formats : []);
@@ -92,13 +95,23 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                 if (d.module_count != null) setModuleCount(String(d.module_count));
                 if (d.program_format) setProgramFormat(d.program_format);
                 if (d.delivery_mode) setDeliveryMode(d.delivery_mode);
+                const loadedBookingType = d.booking_type;
+                if (loadedBookingType === 'enquiry' || loadedBookingType === 'direct_booking') setBookingType(loadedBookingType);
                 setCity(d.city || '');
                 setArea(d.area || '');
                 setAddress(d.address || '');
                 setMeetingLink(d.meeting_link || '');
                 // Category & subcategory come as objects { id, name }
-                if (d.category?.id) setSelectedCategoryId(d.category.id);
-                if (d.subcategory?.id) setSelectedSubcategoryId(d.subcategory.id);
+                const catId = d.category?.id;
+                const subId = d.subcategory?.id;
+                if (catId) setSelectedCategoryId(catId);
+                if (subId) {
+                    // Validate the stored subcategory still belongs to the stored category.
+                    // A previous save bug could have left them mismatched — reset if so.
+                    const cat = catsData.find(c => c.id === catId);
+                    const isValid = cat?.subcategories.some(s => s.id === subId) ?? false;
+                    setSelectedSubcategoryId(isValid ? subId : null);
+                }
                 const loadedTags = d.tags || [];
                 if (loadedTags.length > 0) {
                     const firstTag = loadedTags[0];
@@ -116,6 +129,10 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
 
     const handleNext = async () => {
         if (!title.trim()) { setError('Program title is required.'); return; }
+        if (selectedCategoryId != null && selectedSubcategoryId == null) {
+            setError('Please select a subcategory for the chosen category.');
+            return;
+        }
         if (saving) return;
         setError('');
         setSaving(true);
@@ -126,6 +143,7 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                     title: title.trim(),
                     short_description: shortDesc.trim() || undefined,
                     description: description.trim() || undefined,
+                    booking_type: bookingType,
                 });
                 const d = res.data || res;
                 draftId = d.id;
@@ -138,6 +156,7 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                 short_description: shortDesc.trim(),
                 description: description.trim(),
                 delivery_mode: deliveryMode,
+                booking_type: bookingType,
             };
             if (programFormat) payload.program_format = programFormat;
             if (minAge) payload.min_age = Number(minAge);
@@ -154,8 +173,12 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                 payload.meeting_link = meetingLink.trim();
             }
             // Send IDs, not strings
-            if (selectedCategoryId != null) payload.category_id = selectedCategoryId;
-            if (selectedSubcategoryId != null) payload.subcategory_id = selectedSubcategoryId;
+            if (selectedCategoryId != null) {
+                payload.category_id = selectedCategoryId;
+                payload.subcategory_id = selectedSubcategoryId; // always send alongside category to clear any stale subcategory on the backend
+            } else if (selectedSubcategoryId != null) {
+                payload.subcategory_id = selectedSubcategoryId;
+            }
             if (selectedTagId != null) payload.tag_ids = [selectedTagId];
 
             await updateProgramListing(draftId!, payload);
@@ -268,12 +291,12 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                         <Loader2 size={14} className="animate-spin" /> Loading modes…
                     </div>
                 ) : (
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-3 gap-2 sm:gap-3">
                         {deliveryModes.map((m) => (
                             <button
                                 key={m.value}
                                 onClick={() => setDeliveryMode(m.value)}
-                                className={`p-4 rounded-2xl border-2 text-center transition-all ${deliveryMode === m.value
+                                className={`p-3 sm:p-4 rounded-2xl border-2 text-center transition-all ${deliveryMode === m.value
                                     ? 'border-emerald-400 bg-emerald-50'
                                     : 'border-gray-100 bg-white hover:border-gray-200'
                                 }`}
@@ -284,6 +307,51 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                         ))}
                     </div>
                 )}
+            </div>
+
+            {/* Booking Type */}
+            <div>
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">
+                    Listing Type <span className="text-red-400">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                    {([
+                        {
+                            value: 'enquiry',
+                            label: 'Enquiry',
+                            icon: <MessageCircle size={22} />,
+                            desc: 'Parents express interest and you follow up to confirm.',
+                        },
+                        {
+                            value: 'direct_booking',
+                            label: 'Direct Booking',
+                            icon: <CalendarCheck size={22} />,
+                            desc: 'Parents directly book and pay for a seat online.',
+                        },
+                    ] as const).map((opt) => (
+                        <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setBookingType(opt.value)}
+                            className={`relative flex flex-col items-start gap-2 p-4 rounded-2xl border-2 text-left transition-all ${
+                                bookingType === opt.value
+                                    ? 'border-emerald-400 bg-emerald-50'
+                                    : 'border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm'
+                            }`}
+                        >
+                            {bookingType === opt.value && (
+                                <div className="absolute top-2.5 right-2.5 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center">
+                                    <Check size={11} className="text-white" />
+                                </div>
+                            )}
+                            <span className={bookingType === opt.value ? 'text-emerald-600' : 'text-gray-400'}>
+                                {opt.icon}
+                            </span>
+                            <span className="text-sm font-black text-gray-800 pr-6">{opt.label}</span>
+                            <span className="text-[11px] text-gray-400 leading-snug">{opt.desc}</span>
+                        </button>
+                    ))}
+                </div>
             </div>
 
             {/* Target Age Group */}
@@ -302,7 +370,7 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
             </div>
 
             {/* Capacity, Hours, Modules */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Max Capacity</label>
                     <input className="tlb-input w-full" type="number" placeholder="e.g. 30" min={1} value={maxCapacity} onChange={(e) => setMaxCapacity(e.target.value)} />
@@ -323,7 +391,7 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block">
                         <MapPin size={12} className="inline mr-1" /> Program Location
                     </label>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <input className="tlb-input w-full" placeholder="City" maxLength={100} value={city} onChange={(e) => setCity(e.target.value)} />
                         <input className="tlb-input w-full" placeholder="Area / Neighborhood" maxLength={100} value={area} onChange={(e) => setArea(e.target.value)} />
                     </div>

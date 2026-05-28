@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, MapPin, Mail, CheckCircle2, Star, Play, Phone, Globe, Loader2 } from 'lucide-react';
+import { ArrowLeft, MapPin, Mail, CheckCircle2, Star, Play, Phone, Globe } from 'lucide-react';
+import { Loader } from '../../components/ui';
 import { Screen } from '../../types';
 import { getBusinessProfile, getExtendedProfile, getPartnerMedia } from '../../api/onboarding';
 
@@ -72,7 +73,7 @@ export const PreviewProfile: React.FC<ProfileProps> = ({ onNavigate, onOpenSideb
     if (loading) {
         return (
             <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <Loader2 size={32} className="text-tlb-yellow animate-spin" />
+                <Loader />
             </div>
         );
     }

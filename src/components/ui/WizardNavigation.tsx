@@ -49,14 +49,14 @@ export const WizardNavigation: React.FC<WizardNavigationProps> = ({
             {onBack && (
                 <button 
                     onClick={onBack} 
-                    className="flex-1 py-4 border border-gray-200 rounded-2xl font-bold text-gray-500 text-sm hover:bg-gray-50 transition-colors"
+                    className="flex-1 py-3 sm:py-4 border border-gray-200 rounded-2xl font-bold text-gray-500 text-sm hover:bg-gray-50 transition-colors"
                 >
                     {backText}
                 </button>
             )}
             <button
                 onClick={onNext}
-                className={`${onBack ? 'flex-1' : 'w-full'} tlb-button py-4 gap-2 text-base shadow-lg transition-all ${styles.button} ${styles.shadow}`}
+                className={`${onBack ? 'flex-1' : 'w-full'} tlb-button py-3 sm:py-4 gap-2 text-sm sm:text-base shadow-lg transition-all ${styles.button} ${styles.shadow}`}
             >
                 {nextText} {nextIcon}
             </button>

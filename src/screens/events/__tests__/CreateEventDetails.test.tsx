@@ -41,13 +41,13 @@ describe('CreateEventDetails — metadata loading', () => {
 
     it('renders static age group presets from API', async () => {
         render(<CreateEventDetails {...defaultProps} />);
-        await waitFor(() => expect(screen.getByText('6–8 years')).toBeInTheDocument());
-        expect(screen.getByText('0–3 years')).toBeInTheDocument();
+        await waitFor(() => expect(screen.getByText('6–8 yrs')).toBeInTheDocument());
+        expect(screen.getByText('0–3 yrs')).toBeInTheDocument();
     });
 
     it('shows error message when metadata fails', async () => {
         server.use(
-            http.get(`${BASE}/api/v1/listings/metadata/categories/`, () =>
+            http.get(`${BASE}/api/v1/listings/events/metadata/categories/`, () =>
                 HttpResponse.json({ error: { code: 'SERVER_ERROR', message: 'Server down' } }, { status: 500 }))
         );
         render(<CreateEventDetails {...defaultProps} />);
@@ -71,7 +71,7 @@ describe('CreateEventDetails — pre-fill from existing draft', () => {
         // mockDraft has mode: 'offline'
         await waitFor(() => {
             const offlineBtn = screen.getByText('Offline').closest('button');
-            expect(offlineBtn?.className).toContain('border-purple-400');
+            expect(offlineBtn?.className).toContain('border-blue-400');
         });
     });
 });

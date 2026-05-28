@@ -3,6 +3,7 @@
 > **Definitive architectural reference for the TLB Partner Portal.**
 > Base URL: `https://tlb-api.reluconsultancy.in`
 > Framework: React + Vite + TypeScript (SPA)
+> Last Updated: May 21, 2026
 
 ---
 
@@ -18,12 +19,14 @@ src/
 ├── context/
 │   └── PartnerContext.tsx   # Global context: allowedEntities (synced to sessionStorage)
 ├── components/
-│   ├── Navigation.tsx       # Sidebar component
-│   └── EntityPickerSheet.tsx# Bottom sheet for entity type selection
+│   ├── Navigation.tsx           # Sidebar: fixed on desktop (lg+, dark navy #0f1729), animated drawer on mobile; collapsible via toggle
+│   ├── EntityPickerSheet.tsx    # Bottom sheet for entity type selection
+│   └── ui/
+│       └── DashboardCharts.tsx  # Shared SVG chart primitives: AreaSparkline, TrendAreaChart, WeeklyBarChart, DonutChart, fmtCurrency, trendPct, TrendBadge
 ├── screens/
 │   ├── auth/               # Landing, Login, OTPVerify, PartnerAccess, PartnerAccessOTP, PartnerCategory
 │   ├── onboarding/         # Registration, AppSubmitted, AppApproved, AgreementSubmit, IdentityVerification, BankSetup, OnboardingComplete
-│   ├── dashboard/          # Dashboard (Home)
+│   ├── dashboard/          # Dashboard (Home) — lean layout; analytics moved to Statistics
 │   ├── profile/            # BrandProfile (EditProfile), PreviewProfile
 │   ├── services/           # ServiceListings (shared dashboard for all entities)
 │   ├── classes/            # CreateClass* (5 steps)
@@ -31,7 +34,8 @@ src/
 │   ├── programs/           # CreateProgram* (5 steps)
 │   ├── venues/             # CreateVenue* (5 steps)
 │   ├── enquiries/          # Enquiries, ProgramEnquiries
-│   ├── attendees/          # Attendees
+│   ├── attendees/          # Attendees — full booking management (list, detail, mark-attended, cancel)
+│   ├── statistics/         # Statistics — dedicated analytics/charts screen
 │   ├── packages/           # Packages
 │   └── financial/          # FinancialHub
 ├── test/
@@ -136,7 +140,7 @@ Request → 401 Unauthorized?
 | `getClassMetaFormats` | GET | `/api/v1/listings/classes/metadata/formats/` | — | CreateClassIdentity |
 | `getClassListings` | GET | `/api/v1/partner/listings/classes/` | — | ServiceListings |
 | `getClassListingDetail` | GET | `/api/v1/partner/listings/classes/<id>/` | — | All class wizard steps (media embedded here) |
-| `createClassDraft` | POST | `/api/v1/partner/listings/classes/` | `{ title, short_description, description }` | CreateClassIdentity |
+| `createClassDraft` | POST | `/api/v1/partner/listings/classes/` | `{ title, short_description, description, booking_type }` | CreateClassIdentity |
 | `updateClassListing` | PATCH | `/api/v1/partner/listings/classes/<id>/` | Partial class fields | CreateClassIdentity, CreateClassPolicies |
 | `submitClassListing` | POST | `/api/v1/partner/listings/classes/<id>/submit/` | — | CreateClassPreview |
 | `setClassListingLive` | POST | `/api/v1/partner/listings/classes/<id>/live/` | `{ is_live: bool }` | (available, not yet wired in UI) |
@@ -147,10 +151,8 @@ Request → 401 Unauthorized?
 | `uploadClassMedia` | POST | `/api/v1/partner/listings/classes/<id>/media/` | FormData | CreateClassMedia |
 | `deleteClassMedia` | DELETE | `/api/v1/partner/listings/classes/<id>/media/<mid>/` | — | CreateClassMedia |
 
-> **Class has TWO separate delivery/type fields — do not conflate them:**
-> - `mode` → delivery method: `"offline"` / `"online"` / `"hybrid"` (fetched from `formats.modes[]`)
-> - `format` → class type: `"workshop"` / `"camp"` / `"masterclass"` / `"bootcamp"` / `"demo"` / `"meetup"` / `"webinar"` / etc. (fetched from `formats.formats[]`)
-> Both fields are **required by the submit endpoint**. Sending the wrong values (e.g. `"offline"` for `format`, or `"physical"` for either) causes a 400 choice validation error.
+> **Class delivery mode:**
+> - `mode` → delivery method: `"offline"` / `"online"` / `"hybrid"` (fetched from `data.modes[]` at `/api/v1/listings/classes/metadata/formats/`). There is no separate `format` field for classes.
 >
 > **No GET `/media/` endpoint for classes:** `GET /api/v1/partner/listings/classes/<id>/media/` does not exist (returns 405). Media is embedded in the listing detail response under `service.media`. Always use `getClassListingDetail` to load media.
 >
@@ -158,7 +160,7 @@ Request → 401 Unauthorized?
 >
 > **Class FAQs:** Sent inline in the PATCH body as `faqs: [{question, answer}]` — replaces the entire list. No dedicated `/faqs/` sub-endpoint (unlike Programs which has individual FAQ CRUD).
 >
-> **Class submit validation — all fields required before `POST .../submit/`:** `title`, `description`, `format` (class type), `mode`, `category_id`, `subcategory_id`, `address` (for offline/hybrid), cover image, ≥1 batch.
+> **Class submit validation — all fields required before `POST .../submit/`:** `title`, `description`, `mode`, `category_id`, `subcategory_id`, `address` (for offline/hybrid), cover image, ≥1 batch.
 
 **Enquiries (Classes):**
 
@@ -173,9 +175,12 @@ Request → 401 Unauthorized?
 
 | Function | Method | Endpoint | Payload | Used By |
 |----------|--------|----------|---------|---------|
+| `getProgramMetaCategories` | GET | `/api/v1/listings/programs/metadata/categories/` | — | CreateProgramIdentity |
+| `getProgramMetaFormats` | GET | `/api/v1/listings/programs/metadata/formats/` | — | CreateProgramIdentity |
+| `getProgramMetaTags` | GET | `/api/v1/listings/programs/metadata/tags/` | — | CreateProgramIdentity |
 | `getProgramListings` | GET | `/api/v1/partner/listings/programs/` | — | ServiceListings |
 | `getProgramListingDetail` | GET | `/api/v1/partner/listings/programs/<id>/` | — | Program wizard steps |
-| `createProgramDraft` | POST | `/api/v1/partner/listings/programs/` | `{ title, short_description?, description? }` | CreateProgramIdentity |
+| `createProgramDraft` | POST | `/api/v1/partner/listings/programs/` | `{ title, short_description?, description?, booking_type }` | CreateProgramIdentity |
 | `updateProgramListing` | PATCH | `/api/v1/partner/listings/programs/<id>/` | Partial program fields | CreateProgramIdentity |
 | `deleteProgramListing` | DELETE | `/api/v1/partner/listings/programs/<id>/` | — | CreateProgramIdentity |
 | `submitProgramListing` | POST | `/api/v1/partner/listings/programs/<id>/submit/` | — | CreateProgramPreview |
@@ -195,7 +200,37 @@ Request → 401 Unauthorized?
 | `uploadProgramMedia` | POST | `/api/v1/partner/listings/programs/<id>/media/` | FormData | CreateProgramMedia |
 | `deleteProgramMedia` | DELETE | `/api/v1/partner/listings/programs/<id>/media/<mid>/` | — | CreateProgramMedia |
 
+**Bookings (Partner-wide):**
+
+| Function | Method | Endpoint | Payload | Used By |
+|----------|--------|----------|---------|---------|
+| `getBookings` | GET | `/api/v1/partner/bookings/` | Query: `status?`, `listing_id?`, `page?` | Attendees |
+| `getBookingDetail` | GET | `/api/v1/partner/bookings/{id}/` | — | Attendees (drawer) |
+| `markBookingAttended` | POST | `/api/v1/partner/bookings/{id}/mark-attended/` | — | Attendees (drawer action) |
+| `cancelBooking` | POST | `/api/v1/partner/bookings/{id}/cancel/` | `{ reason: string }` | Attendees (drawer action) |
+
+**Generic Listing Actions (entity-agnostic):**
+
+| Function | Method | Endpoint | Payload | Used By |
+|----------|--------|----------|---------|---------|
+| `pauseListing` | POST | `/api/v1/partner/listings/{id}/pause/` | — | ServiceListings (all entity types) |
+| `resumeListing` | POST | `/api/v1/partner/listings/{id}/resume/` | — | ServiceListings (all entity types) |
+| `archiveListing` | POST | `/api/v1/partner/listings/{id}/archive/` | — | ServiceListings (Events, Classes, Venues) |
+| `unarchiveListing` | POST | `/api/v1/partner/listings/{id}/unarchive/` | — | ServiceListings (Events, Classes, Venues) |
+
+> **Entity-specific overrides preserved:** Classes use `setClassListingLive` for pause/resume (POST `/classes/{id}/live/`). Programs use `archiveProgramListing`/`unarchiveProgramListing` (POST `/programs/{id}/archive|unarchive/`). All other entities use the generic endpoints above.
+
+**Booking field reference:**
+
+| Field | Values | Notes |
+|-------|--------|-------|
+| `status` | `awaiting_payment` / `confirmed` / `attended` / `cancelled` | Filter param + display badge |
+| `payment_status` | `paid` / `pending` / `refunded` | Display badge only |
+| `booking_type` | `event` / `class` / `program` / `venue` | Display badge only |
+
 > **Program enquiries are per-listing (not global):** `ProgramEnquiries.tsx` fetches all programs on mount, then loads `GET /api/v1/partner/listings/programs/<id>/enquiries/` for the selected program. A dropdown appears when more than one program exists.
+>
+> **Program Enquiry Schema Differences:** Programs use `enrolled` status instead of `trial_booked` (used by classes). Additionally, contact information (`contact_number`, `email`) is available directly in the response payload (no `/unlock/` endpoint is required for programs).
 
 > **Venue media field:** `url` (not `file_url`) — response shape: `{ id, url, media_type }`  
 > **Venue detail response** includes all sub-resources inline: `media`, `availability`, `packages`, `discovery`, `occasions`, `required_attendee_fields` — Preview uses a single `getVenueListingDetail` call.  
@@ -233,9 +268,10 @@ Request → 401 Unauthorized?
 | `uploadPartnerMedia` | POST | `/api/v1/partners/media/` | FormData (file, media_type) | Registration, BrandProfile |
 | `deletePartnerMedia` | DELETE | `/api/v1/partners/media/{id}/` | — | Registration, BrandProfile |
 | `getCurrentPartner` | GET | `/api/v1/partners/me/` | — | **App.tsx** (session restore), Dashboard, Registration, **FinancialHub** |
-| `getPartnerDashboard` | GET | `/api/v1/partners/dashboard/` | — | Dashboard |
+| `getPartnerDashboard` | GET | `/api/v1/partners/dashboard/` | — | Dashboard, Statistics |
+| `getPartnerFollowerCount` | GET | `/api/v1/partner/{partner_id}/followers/count/` | — | Dashboard (profile popup + Profile Performance card) |
 | `activatePartner` | POST | `/api/v1/partners/activate/` | `{ is_active: true }` | (available, not actively used) |
-| `submitVerification` | POST | `/api/v1/partners/verification/` | PAN, bank, agreement | AgreementSubmit |
+| `submitVerification` | POST | `/api/v1/partner/verification/` | PAN, bank, agreement | AgreementSubmit |
 
 ---
 
@@ -362,6 +398,8 @@ THEN
 |--------|-----------|----------|
 | **Registration** | `getBusinessProfile()`, `getPartnerMedia()` on mount; `uploadPartnerMedia()`, `deletePartnerMedia()` for images; `updateBusinessProfile()` on submit; `getCurrentPartner()` after submit | Validates ≥3 images before submit. After profile save, checks if backend auto-activated partner. |
 | **AgreementSubmit** | `submitVerification()` | Client-side regex validation (PAN: `^[A-Z]{5}[0-9]{4}[A-Z]$`, IFSC: `^[A-Z]{4}0[A-Z0-9]{6}$`, Account: `^\d{9,18}$`). Toast notifications for validation errors. Transitions to `under_review`. |
+| **IdentityVerification** | — (sessionStorage only) | Collects PAN + GST. PAN validated with `^[A-Z]{5}[0-9]{4}[A-Z]$` regex, inline error display, green/red field indicator. Stores to `sessionStorage`. Navigates to `BANK_SETUP`. |
+| **BankSetup** | `submitVerification()` | Collects account name, account number (with confirm + match check), IFSC. Regex: IFSC `^[A-Z]{4}0[A-Z0-9]{6}$`, account `^\d{9,18}$`. Reads PAN/GST from sessionStorage. Navigates to `ONBOARDING_COMPLETE` on success. |
 | **AppSubmitted** | — | Static confirmation page |
 | **AppApproved** | — | Static confirmation page |
 
@@ -370,40 +408,46 @@ THEN
 | API Call | Purpose |
 |----------|---------|
 | `getCurrentPartner()` | Gets partner status, categories, profile data. Derives `isActive`, `isVerified`, `verificationSubmitted` from `status` field. |
-| `getPartnerDashboard()` | Gets dashboard metrics and analytics data. Only succeeds for `activated_limited+`. |
+| `getPartnerDashboard()` | Gets KPI metrics (new_enquiries, active_batches, profile_views, upcoming_events, etc.). Only succeeds for `activated_limited+`. |
 | `getBusinessProfile()` | Used for profile completion calculation (business name, social links) |
 | `getExtendedProfile()` | Used for profile completion calculation (bio, contact, logo, cover, address) |
 | `getPartnerMedia()` | Used for profile completion calculation (gallery images) |
+| `getPartnerFollowerCount(partnerId)` | Fire-and-forget after `getCurrentPartner()` resolves; sets `followerCount` state. Response: `{ partner_id, follower_count }` |
 
-**Dashboard Analytics Sections (entity-conditional):**
+**Dashboard Layout (lean — analytics moved to Statistics screen):**
 
-All chart data reads from `dashboardData` API fields first, then falls back to zeros with empty states.
+| Order | Section | Notes |
+|-------|---------|-------|
+| 1 | Onboarding Tracker | Conditional — only for `isActive && !isVerified` |
+| 2 | Welcome Banner | Dark gradient; shows `profileCompletion%` progress bar |
+| 3 | Profile Performance | Views, Followers (real-time), Completion % + strength bar |
+| 4 | KPI Cards (2–4 cards) | Entity-conditional; each card has `AreaSparkline` + `TrendBadge` |
+| 5 | CTA Button | "Add New Listing" / "Create Event" / etc. — opens EntityPickerSheet for multi-entity |
+| 6 | Quick Links grid | Brand Profile, My Listings, Statistics, Enquiries (if Classes/Programs), Finance |
+| 7 | Footer | Dark footer with `tlbAppIcon.png`, contact, platform links |
 
-| Section | Shown When | API Fields Consumed |
-|---------|------------|---------------------|
-| KPI Cards (4) with sparklines + trend % | Always | `new_enquiries`, `active_batches`, `profile_views`, `credit_balance`, `upcoming_events`, `tickets_sold`, `venue_bookings`, `occupancy_rate`, `weekly_*` arrays |
-| Weekly Activity bar chart | Always | `weekly_activity` (7-element array) |
-| Enquiry Funnel donut + conversion stats | Classes or Programs | `funnel_new`, `funnel_contacted`, `funnel_converted`, `trial_requests`, `avg_response_time`, `retention_rate`, `monthly_enrolments` |
-| Monthly Enquiry Trend area chart | Classes or Programs | `monthly_enquiries` (6-element array) |
-| Event Analytics stats grid | Events | `upcoming_events`, `tickets_sold`, `total_registrations`, `event_reach`, `engagement_rate`, `booking_conversion` |
-| Ticket Sales Trend area chart | Events | `monthly_tickets` (6-element array) |
-| Venue Occupancy donut + booking stats | Venues | `venue_bookings`, `occupancy_rate`, `upcoming_reservations`, `monthly_earnings`, `avg_booking_hours`, `repeat_clients` |
-| Venue Revenue Trend area chart | Venues | `monthly_revenue` (6-element array) |
-| 6-month Trend chart (universal) | Always | Adapts to `monthly_enquiries` / `monthly_tickets` / `monthly_revenue` by entity type |
-| Top Performing Listings | When `top_listings` array is non-empty | `top_listings[].{id, title, listing_type, views}` |
-| Recent Activity feed | When `recent_activity` array is non-empty | `recent_activity[].{title, description, time}` |
-| Profile Performance card | Always | `profile_views`, `credit_balance` + computed `profileCompletion` |
+**KPI Cards by entity type:**
 
-**Chart Primitives (pure SVG, no external library):**
+| Entity | Cards |
+|--------|-------|
+| Classes / Programs | New Enquiries, Active Batches, Profile Views |
+| Events | Upcoming Events, Tickets Sold, Profile Views, Total Revenue |
+| Venues | Venue Bookings, Occupancy Rate, Profile Views, Monthly Earnings |
+| None / fallback | New Enquiries, Active Batches, Profile Views |
+
+**Chart Primitives (pure SVG, no external library) — shared via `src/components/ui/DashboardCharts.tsx`:**
 
 | Component | Type | Used In |
 |-----------|------|---------|
-| `AreaSparkline` | Sparkline with gradient fill | KPI card bottoms |
-| `TrendAreaChart` | Full-width area chart with labeled x-axis | Monthly trend sections |
-| `WeeklyBarChart` | 7-bar activity chart with variable opacity | Weekly activity section |
-| `DonutChart` | Segmented ring with center label | Enquiry funnel, Venue occupancy |
+| `AreaSparkline` | Sparkline with gradient fill | Dashboard KPI card bottoms |
+| `TrendAreaChart` | Full-width area chart with labeled x-axis | Statistics monthly trend sections |
+| `WeeklyBarChart` | 7-bar activity chart with variable opacity | Statistics weekly activity section |
+| `DonutChart` | Segmented ring with center label | Statistics enquiry funnel, venue occupancy |
+| `TrendBadge` | Green/red % change pill | Dashboard KPI cards |
+| `fmtCurrency` | `₹X.XK` / `₹X.XL` formatter | KPI cards, Statistics revenue |
+| `trendPct` | Last-vs-second-to-last % helper | KPI cards, Statistics trends |
 
-**Dashboard Footer:** Dark (`bg-tlb-dark`) full-width footer appended below main content. Contains `tlbAppIcon.png` (w-14 h-14), tagline, contact details (email + phone), Platform section (Events / Classes / Venues), and copyright. The outer wrapper no longer has `pb-24` padding so no white gap appears below the footer.
+**Dashboard Footer:** Dark (`bg-tlb-dark`) full-width footer. Contains `tlbAppIcon.png`, tagline, contact details (email + phone), Platform section (Events / Classes / Venues), copyright.
 
 **Dashboard State Flags (all API-driven):**
 
@@ -416,7 +460,29 @@ All chart data reads from `dashboardData` API fields first, then falls back to z
 
 **Redirect logic:** If status is `otp_verified` → `PARTNER_CATEGORY`. If `category_selected` → `REGISTRATION`.
 
-### 6.4 Brand Profile (`EditProfile.tsx`)
+### 6.4 Statistics Screen (`src/screens/statistics/Statistics.tsx`)
+
+Dedicated analytics screen. All chart/analytics sections removed from Dashboard live here.
+
+| API Call | Purpose |
+|----------|---------|
+| `getPartnerDashboard()` | Single call on mount + on manual refresh |
+
+**Sections (entity-conditional):**
+
+| Section | Shown When | API Fields |
+|---------|------------|------------|
+| Weekly Activity bar chart | Always | `weekly_activity` (7-element array) |
+| Enquiry Insights (funnel donut + stats + trend) | Classes or Programs | `funnel_new/contacted/converted`, `trial_requests`, `avg_response_time`, `retention_rate`, `monthly_enrolments`, `monthly_enquiries[]` |
+| Event Analytics (stats grid + ticket sales trend) | Events | `upcoming_events`, `tickets_sold`, `total_registrations`, `event_reach`, `engagement_rate`, `booking_conversion`, `monthly_tickets[]` |
+| Venue Analytics (occupancy donut + revenue trend) | Venues | `venue_bookings`, `occupancy_rate`, `upcoming_reservations`, `monthly_earnings`, `avg_booking_hours`, `repeat_clients`, `monthly_revenue[]` |
+| 6-month Universal Trend | Always | `monthly_enquiries` / `monthly_tickets` / `monthly_revenue` by entity |
+| Top Performing Listings (up to 5) | `top_listings` non-empty | `top_listings[].{id, title, listing_type, views}` |
+| Recent Activity (up to 8) | `recent_activity` non-empty | `recent_activity[].{title, description, time}` |
+
+> **SVG gradient ID namespace:** All chart gradient IDs are prefixed `st-` (e.g. `st-moenq`, `st-evtkt`) to prevent conflicts if Dashboard and Statistics are mounted simultaneously.
+
+### 6.5 Brand Profile (`EditProfile.tsx`)
 
 | API Call | Purpose |
 |----------|---------|
@@ -427,7 +493,7 @@ All chart data reads from `dashboardData` API fields first, then falls back to z
 | `uploadPartnerMedia(file, type)` | Uploads gallery images (max 5, 5MB) or video (max 1, 100MB) |
 | `deletePartnerMedia(id)` | Removes gallery item |
 
-### 6.5 Preview Profile (`PreviewProfile.tsx`)
+### 6.6 Preview Profile (`PreviewProfile.tsx`)
 
 | API Call | Purpose |
 |----------|---------|
@@ -435,7 +501,7 @@ All chart data reads from `dashboardData` API fields first, then falls back to z
 | `getExtendedProfile()` | Bio, contact, logo, cover |
 | `getPartnerMedia()` | Gallery images/videos |
 
-### 6.6 Service Listings (`ServiceListings.tsx`)
+### 6.7 Service Listings (`ServiceListings.tsx`)
 
 | API Call | Purpose |
 |----------|---------|
@@ -446,8 +512,17 @@ All chart data reads from `dashboardData` API fields first, then falls back to z
 
 All four calls run in parallel via `Promise.allSettled`. Items are tagged with `entityType` **at fetch time** (not derived from `listing_type`) — venues always get `'Venues'`, events always get `'Events'`, classes get `'Classes'`, programs get `'Programs'`. Cover URL: events use `cover_url`, venues use `cover` — normalized as `item.cover_url || item.cover`.
 
-**Edit flow:** Clicking Edit on an Event sets `current_event_draft_id` + routes to `CREATE_EVENT_DETAILS`. Clicking Edit on a Venue sets `current_venue_draft_id` + routes to `CREATE_VENUE_DETAILS`. Edit on a Class sets `current_class_draft_id` + routes to `CREATE_CLASS_IDENTITY`. Edit on a Program sets `current_program_draft_id` + routes to `CREATE_PROGRAM_IDENTITY`. Edit is disabled **only** for `published` listings — `pending` (In Review), `draft`, and `rejected` are all editable.  
+**Edit flow:** Clicking Edit on an Event sets `current_event_draft_id` + routes to `CREATE_EVENT_DETAILS`. Clicking Edit on a Venue sets `current_venue_draft_id` + routes to `CREATE_VENUE_DETAILS`. Edit on a Class sets `current_class_draft_id` + routes to `CREATE_CLASS_IDENTITY`. Edit on a Program sets `current_program_draft_id` + routes to `CREATE_PROGRAM_IDENTITY`. Edit is disabled **only** for `published` and `archived` listings — `pending` (In Review), `draft`, and `rejected` are all editable.  
 **New listing:** `clearCurrentDraftId()`, `clearCurrentVenueDraftId()`, `clearCurrentClassDraftId()`, and `clearCurrentProgramDraftId()` are called before navigating to any wizard start screen.
+
+**Pause/Resume & Archive/Unarchive (all entity types):**
+
+| Action | Events & Venues | Classes | Programs |
+|--------|----------------|---------|----------|
+| Pause/Resume | Generic `pauseListing`/`resumeListing` | `setClassListingLive` (existing) | Generic `pauseListing`/`resumeListing` |
+| Archive/Unarchive | Generic `archiveListing`/`unarchiveListing` | Generic `archiveListing`/`unarchiveListing` | `archiveProgramListing`/`unarchiveProgramListing` (existing) |
+
+**Listing card layout (redesigned — Phase 16):** Desktop uses a table layout (Listing thumbnail+title, Type badge, Category, Status dot+label, icon-only action buttons). Mobile uses compact cards with thumbnail, badges, and pill-style action buttons.
 
 **Listing card layout:** Status badge (`Draft` / `In Review` / `Live` / `Rejected`) rendered on the **right side** of each card header row, opposite the entity type badge. Status data is sourced from the `getListings()` API response `status` field.
 
@@ -462,7 +537,7 @@ All four calls run in parallel via `Promise.allSettled`. Items are tagged with `
 | State pattern | Temp state (`tmpStatuses`, `tmpTypes`, `tmpSort`) initialized from committed state on open; committed only on **Apply**; Reset clears temp without closing |
 | Active count | `filterStatuses.length + filterTypes.length + (sortBy !== 'newest' ? 1 : 0)` |
 
-### 6.7 Event Creation Wizard (`src/screens/events/`) — Fully API-Integrated
+### 6.8 Event Creation Wizard (`src/screens/events/`) — Fully API-Integrated
 
 Theme color: `blue`. All wizard screens use `themeColor="blue"`.
 
@@ -473,7 +548,7 @@ Theme color: `blue`. All wizard screens use `themeColor="blue"`.
 | 3 | **CreateEventMedia** | `getListingMedia` (on mount); `uploadListingMedia`, `deleteListingMedia` (immediate on change) | Cover upload replaces existing (delete-then-upload). Gallery up to 10 images, 5MB each. Video up to 100MB. All media ops are immediate (no batch on Next). Warns if no cover (required for submit). Media items have `file_url` field. |
 | 4 | **CreateEventPreview** | `getListingDetail` (on mount); `submitListing` (on Publish) | Renders full event from API. Client-side readiness check mirrors all backend submit requirements. Submit → `clearCurrentDraftId()` → navigate to `SERVICE_LISTINGS`. Non-draft events show locked state. |
 
-### 6.8 Venue Creation Wizard (`src/screens/venues/`) — Fully API-Integrated
+### 6.9 Venue Creation Wizard (`src/screens/venues/`) — Fully API-Integrated
 
 Theme color: `amber`. All wizard screens use `themeColor="amber"`.
 
@@ -485,19 +560,31 @@ Theme color: `amber`. All wizard screens use `themeColor="amber"`.
 | 4 | **CreateVenuePackages** | `getVenuePackages` (on mount); `createVenuePackage` or `updateVenuePackage` (dirty packages on Next); `deleteVenuePackage` (on Delete) | Package fields: `name` (required), `price`, `description`, `duration_minutes?`, `max_guests?`. Optional fields omitted from payload if blank or < 1. Dirty tracking: only changed packages are saved on Next. |
 | 5 | **CreateVenuePreview** | `getVenueListingDetail` (single call — returns all sub-resources inline) | Venue detail response includes `media`, `availability`, `packages`, `discovery`, `occasions`, `required_attendee_fields` — no extra fetches needed. Cover = `media.find(m => m.media_type === 'cover')`, gallery = `media.filter(m => m.media_type === 'gallery')`. Readiness check: `title`, `city`, `address`, `subcategory`. Submit → `clearCurrentVenueDraftId()` → navigate to `SERVICE_LISTINGS`. |
 
-### 6.9 Class Creation Wizard (`src/screens/classes/`) — Fully API-Integrated
+### 6.10 Class Creation Wizard (`src/screens/classes/`) — Fully API-Integrated
 
 Theme color: `yellow`. All wizard screens use `themeColor="yellow"`.
 
 | Step | Screen | API Calls | Key Behavior |
 |------|--------|-----------|--------------|
-| 1 | **CreateClassIdentity** | `getClassMetaCategories` + `getClassMetaFormats` (on mount, parallel); `getClassListingDetail` (on mount if draft exists); `createClassDraft` + `updateClassListing` (on Next) | Creates draft via `POST /classes/` on first Next; stores ID via `setCurrentClassDraftId()`. Fetches categories (with subcategories) and class formats from API — no hardcoded lists. Sends both `mode` (delivery: offline/online/hybrid) AND `format` (class type: workshop/camp/etc.) as separate fields. Sends `address` for offline/hybrid. Format selection is required — blocks Next with error if unset. |
+| 1 | **CreateClassIdentity** | `getClassMetaCategories` + `getClassMetaFormats` (on mount, parallel); `getClassListingDetail` (on mount if draft exists); `createClassDraft` + `updateClassListing` (on Next) | Creates draft via `POST /classes/` on first Next; stores ID via `setCurrentClassDraftId()`. Fetches categories (with subcategories) and class formats from API — no hardcoded lists. Sends both `mode` (delivery: offline/online/hybrid) AND `format` (class type: workshop/camp/etc.) as separate fields. Sends `address` for offline/hybrid. Format selection is required — blocks Next with error if unset. **`booking_type`** card selector (Enquiry / Booking) — defaults to `enquiry`; sent in both `createClassDraft` POST and `updateClassListing` PATCH. **`price`** number input (Fees ₹) — sent as string in PATCH body (`"price": "1500"`); pre-filled from draft on resume/edit. |
 | 2 | **CreateClassBatch** | `getClassBatches` (on mount); `createClassBatch`, `updateClassBatch` (dirty batches on Next); `deleteClassBatch` (staged on delete, flushed on Next) | Day abbreviations: `mon/tue/wed/thu/fri/sat/sun`. Capacity field: `capacity`. No `start_date`/`end_date`/`fee`. Dirty-only saves on Next. |
 | 3 | **CreateClassMedia** | `getClassListingDetail` (on mount, extracts `service.media`); `uploadClassMedia`, `deleteClassMedia` (immediate) | Cover (1, 5MB), gallery (up to 5, 5MB each), video (1, 100MB). No GET `/media/` endpoint — media embedded in listing detail. Cover required warning shown if missing. Media URL resolved defensively: `item.url \|\| item.file_url`. |
 | 4 | **CreateClassPolicies** | `getClassListingDetail` (on mount); `updateClassListing` (on Next) | Controlled inputs for cancellation policy and refund policy. FAQs sent inline in PATCH body as `faqs: [{question, answer}]` (replaces entire list — no dedicated `/faqs/` endpoint for classes). |
 | 5 | **CreateClassPreview** | `getClassListingDetail` (on mount); `submitClassListing` (on Publish) | Loads real listing data. Readiness check: title, description, `format`, cover image, ≥1 batch — all must be present or Submit is blocked with a missing-fields list. Submit → success/under_review/error modal → `clearCurrentClassDraftId()` → `SERVICE_LISTINGS`. |
 
-### 6.10 Enquiries — `Enquiries.tsx` / `ProgramEnquiries.tsx`
+### 6.11 Program Creation Wizard (`src/screens/programs/`) — Fully API-Integrated
+
+Theme color: `emerald`. All wizard screens use `themeColor="emerald"`.
+
+| Step | Screen | API Calls | Key Behavior |
+|------|--------|-----------|--------------|
+| 1 | **CreateProgramIdentity** | `getProgramMetaCategories` + `getProgramMetaFormats` + `getProgramMetaTags` (on mount, parallel); `getProgramListingDetail` (on mount if draft exists); `createProgramDraft` + `updateProgramListing` (on Next) | Creates draft on first Next; stores ID via `setCurrentProgramDraftId()`. Formats (`program_format`) and delivery modes loaded from `/metadata/formats/` (`{ formats: [], delivery_modes: [] }`). **`booking_type`** card selector (Enquiry / Booking) — defaults to `enquiry`; sent in both `createProgramDraft` POST and `updateProgramListing` PATCH. Tags sent as `tag_ids: number[]`. |
+| 2 | **CreateProgramBatch** | `getProgramBatches` + `getProgramFaqs` (on mount); batch CRUD + FAQ upsert (on Next) | Day abbreviations: `mon/tue/wed/thu/fri/sat/sun`. Capacity field: `capacity`. FAQ CRUD via dedicated `/faqs/` endpoint. |
+| 3 | **CreateProgramMedia** | `getProgramListingDetail` (on mount, extracts media); `uploadProgramMedia`, `deleteProgramMedia` (immediate) | Gallery max 10 images. Cover required for submit. |
+| 4 | **CreateProgramPolicies** | `getProgramListingDetail` (on mount); `updateProgramListing` (on Next) | Cancellation + refund policy via PATCH; FAQs via dedicated `/faqs/` endpoint with dirty tracking + delete staging. |
+| 5 | **CreateProgramPreview** | `getProgramListingDetail` (on mount); `submitProgramListing` (on Publish) | Readiness check mirrors submit requirements. Submit → success / under_review / error modal → `clearCurrentProgramDraftId()` → `SERVICE_LISTINGS`. |
+
+### 6.12 Enquiries — `Enquiries.tsx` / `ProgramEnquiries.tsx`
 
 Both screens have **no mock data**. Both are fully API-integrated.
 
@@ -509,7 +596,7 @@ Both screens have **no mock data**. Both are fully API-integrated.
 | Credits banner | Label reads "Credits Remaining" — no hardcoded number |
 | Unlock / Status / Notes | `Enquiries` hits `/unlock/` and `PUT` update endpoints; `ProgramEnquiries` calls `updateProgramEnquiry(listingId, id, { status?, partner_note? })` |
 
-### 6.11 Financial Hub — `FinancialHub.tsx`
+### 6.13 Financial Hub — `FinancialHub.tsx`
 
 Partially API-integrated: bank account details are fetched from the partner profile.
 
@@ -529,13 +616,44 @@ Partially API-integrated: bank account details are fetched from the partner prof
 | Transaction History | Empty state ("No transactions yet") |
 | UPI ID | Modal UI only, no API |
 
-### 6.12 Screens NOT Yet API-Integrated
+### 6.14 Attendees (`src/screens/attendees/Attendees.tsx`) — Fully API-Integrated
+
+Full booking management screen backed by the 4 partner booking endpoints.
+
+| API Call | Purpose |
+|----------|---------|
+| `getBookings()` × 5 parallel calls | Populate KPI count badges on mount (all / awaiting_payment / confirmed / attended / cancelled) |
+| `getBookings({ status?, page? })` | Paginated list load on filter-tab change / page navigation |
+| `getBookingDetail(id)` + listing detail fetch | Load full booking into right-side drawer; best-effort listing title resolution via entity-specific detail endpoint |
+| `markBookingAttended(id)` | "Mark Attended" action in drawer (only for `confirmed` bookings) |
+| `cancelBooking(id, reason)` | "Confirm Cancel" action in drawer (for `confirmed` and `awaiting_payment` bookings) |
+
+**UI structure:**
+
+| Element | Detail |
+|---------|--------|
+| KPI row | Total Bookings, Awaiting Payment, Confirmed, Attended, Cancelled — counts from 5 parallel `getBookings` calls |
+| Filter tabs | All / Awaiting Payment / Confirmed / Attended / Cancelled — each triggers `getBookings({ status })` |
+| Search bar | Client-side filter across customer name, email, booking reference |
+| Table | Booking Ref (monospace), Customer, Type badge, Status badge, Payment badge, Amount, Date, View button |
+| Detail drawer | Slide-in right panel with backdrop; shows listing title (best-effort fetched from entity detail endpoint), status/type/payment badges, customer info, order items (name + qty, no repeated amounts), attendees list, payment activity (context-aware: "Initiated" badge when payment pending, "SUCCESS" when paid) |
+| Mark Attended | Emerald button — visible only for `confirmed` status; calls `markBookingAttended` + refreshes drawer + list |
+| Cancel flow | Red outline button → inline textarea for reason → "Confirm Cancel"; visible for `confirmed` and `awaiting_payment`; calls `cancelBooking` + refreshes |
+| Pagination | Previous / Next from API `next` / `previous` fields |
+
+**Color maps:**
+
+| Map | Values |
+|-----|--------|
+| `STATUS_COLORS` | `confirmed` → amber, `attended` → emerald, `cancelled` → red |
+| `PAYMENT_COLORS` | `paid` → emerald, `pending` → amber, `refunded` → blue |
+| `TYPE_COLORS` | `event` → blue, `class` → purple, `program` → emerald, `venue` → amber |
+
+### 6.15 Screens NOT Yet API-Integrated
 
 | Screen Group | Status | Notes |
 |-------------|--------|-------|
-| **Create Class** steps 4–5 (Policies, Preview) | Local state only | Steps 1–3 are integrated; submit endpoint not wired |
-| **Create Program** (5 steps) | ✅ Fully integrated | Identity → Batch → Media → Policies+FAQs → Preview+Submit; all 5 steps wired to API |
-| **Attendees** | Empty state UI | No attendees API — mock data removed, starts with `[]` |
+| **Attendees** | ✅ Fully integrated | Booking list + detail drawer + mark-attended + cancel (see §6.14) |
 | **Packages** | Placeholder UI | No packages API |
 | **FinancialHub** (transactions) | Empty state, no mock data | Bank details fetched; financial API pending |
 
@@ -626,14 +744,15 @@ classDiagram
 | APP_SUBMITTED | ❌ | — | AppSubmitted | Static |
 | APP_APPROVED | ❌ | — | AppApproved | Static |
 | AGREEMENT_SUBMIT | ❌ | — | AgreementSubmit | ✅ submitVerification |
-| IDENTITY_VERIFICATION | ❌ | — | IdentityVerification | Local state |
-| BANK_SETUP | ❌ | — | BankSetup | Local state |
+| IDENTITY_VERIFICATION | ❌ | — | IdentityVerification | ✅ PAN regex validation, inline errors, stores to sessionStorage |
+| BANK_SETUP | ❌ | — | BankSetup | ✅ IFSC/account regex, confirm account, calls `submitVerification`, navigates to `ONBOARDING_COMPLETE` |
 | ONBOARDING_COMPLETE | ❌ | — | OnboardingComplete | Static |
-| HOME | ✅ | — | Dashboard | ✅ getCurrentPartner, getPartnerDashboard |
+| HOME | ✅ | — | Dashboard | ✅ getCurrentPartner, getPartnerDashboard, getPartnerFollowerCount — lean layout: Profile Performance at top, analytics in Statistics |
+| STATISTICS | ✅ | — | Statistics | ✅ getPartnerDashboard — all analytics/charts (weekly activity, funnels, event/venue analytics, 6-month trend, top listings, recent activity) |
 | BRAND_PROFILE | ✅ | — | BrandProfile | ✅ Full profile CRUD |
 | PREVIEW_PROFILE | ✅ | — | PreviewProfile | ✅ Profile read |
 | SERVICE_LISTINGS | ✅ | — | ServiceListings | ✅ Parallel fetch: events + venues + classes + programs (tagged at fetch time) |
-| CREATE_CLASS_IDENTITY | ✅/❌ | Classes | CreateClassIdentity | ✅ API categories+formats; mode+format fields; address for offline/hybrid (theme: yellow) |
+| CREATE_CLASS_IDENTITY | ✅/❌ | Classes | CreateClassIdentity | ✅ API categories+formats; mode+format fields; address for offline/hybrid; booking_type card (theme: yellow) |
 | CREATE_CLASS_BATCH | ✅/❌ | Classes | CreateClassBatch | ✅ Batch CRUD — days=3-letter abbr, capacity field |
 | CREATE_CLASS_MEDIA | ✅/❌ | Classes | CreateClassMedia | ✅ Cover/gallery/video; media from listing detail (no GET /media/) |
 | CREATE_CLASS_POLICIES | ✅/❌ | Classes | CreateClassPolicies | ✅ PATCH policies + inline faqs[] array |
@@ -647,14 +766,14 @@ classDiagram
 | CREATE_VENUE_AVAILABILITY | ✅/❌ | Venues | CreateVenueAvailability | ✅ Slot CRUD |
 | CREATE_VENUE_PACKAGES | ✅/❌ | Venues | CreateVenuePackages | ✅ Package CRUD |
 | CREATE_VENUE_PREVIEW | ✅/❌ | Venues | CreateVenuePreview | ✅ Single-call detail + submit |
-| CREATE_PROGRAM_IDENTITY | ✅/❌ | Programs | CreateProgramIdentity | ✅ createProgramDraft + updateProgramListing (theme: emerald) |
+| CREATE_PROGRAM_IDENTITY | ✅/❌ | Programs | CreateProgramIdentity | ✅ createProgramDraft + updateProgramListing; booking_type card (theme: emerald) |
 | CREATE_PROGRAM_BATCH | ✅/❌ | Programs | CreateProgramBatch | ✅ Batch CRUD — days=3-letter abbr, capacity field |
 | CREATE_PROGRAM_MEDIA | ✅/❌ | Programs | CreateProgramMedia | ✅ Cover/gallery(max 10)/video upload; getProgramMedia on mount |
 | CREATE_PROGRAM_POLICIES | ✅/❌ | Programs | CreateProgramPolicies | ✅ cancellation/refund via PATCH; FAQ upsert via /faqs/ endpoint |
 | CREATE_PROGRAM_PREVIEW | ✅/❌ | Programs | CreateProgramPreview | ✅ Full detail + submit; success/under_review/error modals |
 | ENQUIRIES | ✅ | Classes | Enquiries | ✅ getClassEnquiries, unlock, status/notes PUT |
 | PROGRAM_ENQUIRIES | ✅ | Programs | ProgramEnquiries | ✅ getProgramListings → getProgramEnquiries per-listing, updateProgramEnquiry |
-| ATTENDEES | ✅ | — | Attendees | ❌ Placeholder |
+| ATTENDEES | ✅ | — | Attendees | ✅ getBookings (list+KPI counts), getBookingDetail (drawer), markBookingAttended, cancelBooking |
 | PACKAGES | ✅ | — | Packages | ❌ Placeholder |
 | FINANCIAL_HUB | ✅ | — | FinancialHub | ⚡ Partial — bank details from `getCurrentPartner` |
 
@@ -685,6 +804,26 @@ classDiagram
 - **Programs API** — Full endpoint set added to `listings.ts`: listings CRUD, batches, enquiries (per-listing), FAQs, media, archive/unarchive, and draft ID helpers (`getCurrentProgramDraftId`, `setCurrentProgramDraftId`, `clearCurrentProgramDraftId`).
 - **Program Creation Wizard (all 5 steps)** — Fully API-integrated: Identity creates/updates draft via `createProgramDraft`+`updateProgramListing`; Batch uses real CRUD with day abbreviations and capacity field; Media fetches on mount and uploads/deletes immediately (gallery max 10, cover required warning); Policies saves cancellation/refund via PATCH and upserts FAQs via dedicated `/faqs/` endpoint with dirty-tracking and delete staging; Preview fetches full listing, shows readiness check, submits via `submitProgramListing`, shows success/under_review/error modals.
 - **ProgramEnquiries** — Fully integrated with per-listing pattern: loads all programs, shows dropdown for multi-program partners, fetches enquiries per selected program, supports status update and partner notes via `updateProgramEnquiry`.
+- **`booking_type` field — Classes & Programs** — `CreateClassIdentity` and `CreateProgramIdentity` both expose a card-style Enquiry / Booking selector. Value sent in both the initial draft `POST` and every `PATCH`. Loaded back from draft on resume/edit. Default: `enquiry`.
+- **`price` field — Classes** — `CreateClassIdentity` exposes a "Fees (₹)" number input. Sent as a string in the `updateClassListing` PATCH body. Pre-filled from `srv.price ?? d.price` on draft resume/edit.
+- **Dashboard profile popup Sign Out** — "Sign Out" button added below a divider in the header profile popup; navigates to `LANDING` (triggers `clearTokens()` + `sessionStorage.clear()`), consistent with sidebar Sign Out.
+- **Registration city field** — replaced hardcoded `<select>` dropdown (Mumbai/Delhi/Bangalore/New York) with a free-text `<input>` so partners can type any city. Default value cleared from `''` (was `'Mumbai'`).
+- **IdentityVerification** — upgraded from `alert()` to inline error banner; PAN regex (`^[A-Z]{5}[0-9]{4}[A-Z]$`) with real-time green/red field indicator; mobile-responsive padding; "Section A of 2" progress label.
+- **BankSetup** — removed fake hardcoded file upload UI; added confirm account field with match check; IFSC/account regex inline validation with green/red indicators; `submitVerification()` wired up (reads PAN/GST from sessionStorage); navigates to `ONBOARDING_COMPLETE` (was `HOME`).
+
+- **Attendees / Booking Management** — Full booking management screen: KPI counts (5 parallel `getBookings` calls on mount including `awaiting_payment`), paginated list with filter tabs (All/Awaiting Payment/Confirmed/Attended/Cancelled) + search, right-side detail drawer with listing title (best-effort fetched), Mark Attended + Cancel Booking actions. Cancel available for both `confirmed` and `awaiting_payment`. Transaction badges context-aware ("Initiated" when payment pending, "SUCCESS" when paid). Order items show name + qty only (no repeated amounts).
+- **Listing Pause/Resume & Archive/Unarchive (all entities)** — Generic `pauseListing`/`resumeListing`/`archiveListing`/`unarchiveListing` endpoints added to `listings.ts`. All entity types now have Pause/Resume and Archive/Unarchive buttons in ServiceListings. Classes and Programs retain their entity-specific endpoints as overrides.
+- **ProgramEnquiries listing title** — Program name and format now displayed in the enquiry table and detail drawer, sourced from the already-fetched programs list (API enquiry response doesn't include these fields).
+- **Statistics Screen** — New dedicated analytics screen (`src/screens/statistics/`) accessible from sidebar ("Statistics" nav item, BarChart3 icon) and Dashboard Quick Links. All chart/analytics sections moved here from Dashboard. Fetches `getPartnerDashboard()` independently with manual refresh button. Entity-conditional sections: Weekly Activity, Enquiry Insights, Event Analytics, Venue Analytics, 6-month Universal Trend, Top Listings, Recent Activity.
+- **Dashboard restructured (lean layout)** — Analytics sections removed; Profile Performance moved to top (after Welcome Banner); follower count displayed in both profile popup and Profile Performance card via `getPartnerFollowerCount(partnerId)`.
+- **Shared chart primitives** — `src/components/ui/DashboardCharts.tsx` extracted and re-exported via `components/ui/index.ts`. Both Dashboard and Statistics import from this shared file. SVG gradient IDs prefixed `st-` in Statistics to prevent conflicts.
+- **UI Redesign (Phase 16)** — Full visual overhaul matching TLB Admin Portal design language:
+  - **Sidebar** — Dark navy (`#0f1729`) fixed sidebar on desktop (lg+, 240px), animated drawer on mobile (280px). Yellow active state, compact single-line items. Collapsible via `PanelLeftClose` toggle button in header; collapsed state hides sidebar and removes content offset.
+  - **App layout** — Content offset by `lg:ml-60` when sidebar is open on desktop. Screen transitions use `motion/react` `AnimatePresence` with fade + slide (200ms).
+  - **Dashboard** — Redesigned: compact header with time-of-day greeting, 2-column welcome row (dark card + profile stats), 4-column KPI grid with hover shadows, inline CTA + quick links row, compact dark footer.
+  - **Profile popup** — Dark gradient header with avatar + status badge, 3-column stats grid, color-coded entity chips, icon action buttons.
+  - **ServiceListings** — Redesigned: desktop uses table layout (thumbnail, type badge, category, status dot, icon actions), mobile uses compact cards. Search + tabs inline on desktop.
+  - **Loader** — Replaced multi-ring spinner with yellow (`#FACC15`) expanding-corners style (solid circle with 4 corner pieces that expand and rotate 90deg).
 
 ### ⚡ Partially Integrated
 
@@ -696,7 +835,6 @@ classDiagram
 
 ### ⚠️ Needs Both UI and Backend
 
-- `GET /api/v1/partners/attendees/` — Attendee tracking
 - `GET /api/v1/partners/packages/` — Package management
 
 ### 🧹 Cleanup Done
@@ -716,7 +854,11 @@ classDiagram
 - ❌ Dashboard as simple 4-card grid — replaced with full analytics dashboard (charts, funnels, trends, activity feed)
 - ❌ Status badge in top-left badge group on listing cards — moved to right side of card header
 - ❌ Non-functional filter button on ServiceListings — replaced with full bottom sheet filter dialog
-- ❌ Hardcoded `MOCK_ATTENDEES` array in Attendees — removed; screen initializes with empty state
+- ❌ Hardcoded `MOCK_ATTENDEES` array in Attendees — replaced; screen now fully API-driven (bookings API)
+- ❌ Dashboard analytics sections (Weekly Activity, Enquiry Insights, Event/Venue Analytics, 6-month Trend, Top Listings, Recent Activity) — moved to Statistics screen; Dashboard is now a lean overview with Profile Performance + KPI Cards + Quick Links
+- ❌ Profile Performance at bottom of Dashboard — moved to top (right after Welcome Banner)
+- ❌ Follower count missing from Dashboard — now fetched via `getPartnerFollowerCount()` and shown in profile popup + Profile Performance card
+- ❌ Statistics not accessible from sidebar — added "Statistics" nav item (BarChart3 icon, second position after Home) and Quick Links entry on Dashboard
 - ❌ Wrong event metadata endpoint URLs (`/api/v1/listings/metadata/` → `/api/v1/listings/events/metadata/`)
 - ❌ Event wizard theme `purple` → `blue` across all 4 screens
 - ❌ Age group chips rendering empty (API `StaticRange` has no `label`) → now renders `{min_age}–{max_age} yrs`
@@ -743,6 +885,29 @@ classDiagram
 - ❌ `CreateClassPolicies` had uncontrolled textarea inputs (no value/onChange) and zero API calls → nothing was saved on Next. Fixed: controlled state + `updateClassListing` PATCH with inline `faqs` array.
 - ❌ `CreateClassPreview` called `onNext={() => onNavigate('SERVICE_LISTINGS')}` — no submit API call. Draft sat as incomplete forever. Fixed: now calls `submitClassListing(draftId)` with result modals.
 - ❌ `CreateClassPreview` readiness check did not include `format` → submit button was enabled even when format was not set on the draft. Fixed: `format` now in missing-items list; Submit blocked until format is present.
+- ❌ `submitVerification` URL was documented (and MSW-mocked) as `/api/v1/partners/verification/` (plural) — actual endpoint is `/api/v1/partner/verification/` (singular). Fixed in `handlers.ts` default handler and in `implementation_graph.md` section 2.4.
+- ❌ `OTPVerify` resend-OTP test used `await act(async () => vi.runAllTimersAsync())` — only fires one countdown tick because React's scheduler uses `setImmediate` which fake timers also intercept, causing `act(async)` to deadlock. Fixed: synchronous `act(() => vi.advanceTimersByTime(1000))` loop (31 iterations) + `vi.useRealTimers()` restored before click.
+- ❌ `AgreementSubmit` tests timed out because `userEvent.type()` was used for multi-character inputs (dispatches one event per character). Fixed: replaced with `fireEvent.change()` throughout the file and in `navigateToSectionB()` helper.
+- ❌ `generate-test-report.mjs` used `2>/dev/null` shell redirect (Unix only) — fails on Windows cmd.exe. Fixed: detects `platform() === 'win32'` and uses `2>nul` instead.
+- ❌ `IdentityVerification` used `alert()` for validation and had no real-time field feedback — replaced with inline error banner and PAN regex indicator.
+- ❌ `BankSetup` had a fake hardcoded file upload tile (`bank_statement_2024.pdf`) with no real upload logic, no confirm-account field, no IFSC/account validation, and navigated to `HOME` instead of `ONBOARDING_COMPLETE` — fully rewritten.
+- ❌ Dashboard welcome banner emoji `ðŸ'‹` rendered as mojibake — file encoding issue. Fixed: replaced with literal `👋`.
+- ❌ Dashboard onboarding tracker "Admin Review" subtitle had mojibake (`â€"`) for em-dash and en-dash characters — Fixed: `In Progress — typically 24–48 hrs`.
+- ❌ Registration city field was a hardcoded `<select>` dropdown (Mumbai/Delhi/Bangalore/New York) — replaced with free-text `<input>` and default cleared to `''`.
+- ❌ Dashboard profile popup had no Sign Out — added "Sign Out" button below a divider (red text, red hover), navigates to `LANDING`.
+- ❌ Sidebar was a mobile-only overlay drawer (white bg, 85vw) — replaced with dark navy fixed sidebar on desktop + animated drawer on mobile; collapsible toggle.
+- ❌ All screens rendered full-width with no sidebar offset — App.tsx now applies `lg:ml-60` for sidebar-aware screens.
+- ❌ No screen transition animation — added `AnimatePresence` with fade+slide (200ms) on screen change.
+- ❌ Attendees only supported `confirmed`/`attended`/`cancelled` statuses — added `awaiting_payment` status with amber badge, KPI card, and filter tab.
+- ❌ Attendees cancel button only for `confirmed` — now also available for `awaiting_payment` bookings.
+- ❌ Attendees drawer showed transaction amount on every row (redundant with header) — removed per-transaction amount; renamed section to "Payment Activity"; transaction status context-aware ("Initiated" vs "SUCCESS").
+- ❌ Attendees drawer showed per-item price+subtotal+total (amount repeated 7-8 times) — simplified to item name + quantity only.
+- ❌ Pause/Resume only available for Classes, Archive only for Programs — now all entity types have both actions via generic endpoints.
+- ❌ ProgramEnquiries showed empty Program name/format columns — now populated from the already-fetched programs list.
+- ❌ Loader was a multi-ring orange spinner — replaced with yellow expanding-corners animation.
+- ❌ ServiceListings used full-height card layout for all screen sizes — redesigned: table on desktop, compact cards on mobile.
+- ❌ Dashboard had centered Welcome Banner + Profile Performance + full footer — redesigned: 2-column layout, compact footer, time-of-day greeting.
+- ❌ Dashboard.tsx had mojibake characters in comments and data strings — cleaned all non-ASCII bytes.
 
 ---
 
@@ -776,12 +941,12 @@ Before declaring a wizard "integrated":
 
 ### Field Name Gotchas by Entity Type
 
-| Entity | Delivery field | Type/format field | Category fields | Address requirement |
-|--------|---------------|-------------------|-----------------|---------------------|
-| Events | `mode` (online/offline/hybrid) | `format` (from API formats list) | `category_id`, `subcategory_id` | `address` for offline/hybrid |
-| Classes | `mode` (online/offline/hybrid) | `format` (workshop/camp/etc. — from `/metadata/formats/`) | `category_id`, `subcategory_id` | `address` for offline/hybrid |
-| Programs | `mode` (online/offline/hybrid) | — | `category_id`, `subcategory_id` | city/address for offline/hybrid |
-| Venues | `location_type` | — | `category_id`, `subcategory_id` | `address`, `city`, `area` always |
+| Entity | Delivery field | Type/format field | Category fields | Address requirement | Booking type field |
+|--------|---------------|-------------------|-----------------|---------------------|--------------------|
+| Events | `mode` (online/offline/hybrid) | `format` (from API formats list) | `category_id`, `subcategory_id` | `address` for offline/hybrid | — |
+| Classes | `mode` (online/offline/hybrid) | `format` (workshop/camp/etc. — from `/metadata/formats/`) | `category_id`, `subcategory_id` | `address` for offline/hybrid | `booking_type` (`enquiry` / `booking`) |
+| Programs | `delivery_mode` (online/offline/hybrid) | `program_format` (from `/metadata/formats/`) | `category_id`, `subcategory_id` | city/address for offline/hybrid | `booking_type` (`enquiry` / `booking`) |
+| Venues | `location_type` | — | `category_id`, `subcategory_id` | `address`, `city`, `area` always | — |
 
 ---
 
@@ -796,16 +961,26 @@ Before declaring a wizard "integrated":
 | `src/test/msw/handlers.ts` | Default handlers for all API endpoints; exports `DRAFT_ID`, `mockDraft`, `mockCategories`, `mockFormats`, `mockAgeGroups`, `mockListing` |
 | `src/test/msw/server.ts` | `setupServer(...handlers)` from msw/node |
 
-### 14.2 Test Files (122 tests — all passing)
+### 14.2 Test Files (358 tests — all passing)
 
 | File | Tests | Coverage |
 |------|-------|----------|
 | `src/api/__tests__/listings.test.ts` | 28 | `ApiError` class, draft ID helpers, all metadata/CRUD/media/ticket endpoints (success + error codes) |
+| `src/api/__tests__/listings-classes-programs-venues.test.ts` | — | Classes, Programs, Venues API endpoints (formats, batches, enquiries, FAQs, media) |
+| `src/screens/auth/__tests__/OTPVerify.test.tsx` | 15 | Initial render, OTP input/validation, verify → token store + navigate, resend countdown (fake timer loop), phone mode |
+| `src/screens/onboarding/__tests__/AgreementSubmit.test.tsx` | 8 | PAN/IFSC/account validation, section navigation, successful `submitVerification` POST |
 | `src/screens/events/__tests__/CreateEventDetails.test.tsx` | 17 | Metadata loading, draft pre-fill, form interactions (category → subcategories, format toggle, mode fields, age group tabs), Next validation |
 | `src/screens/events/__tests__/CreateEventSchedule.test.tsx` | 18 | Draft loading, pricing toggle, ticket add/remove, date validation, Next → updateListing + navigate |
 | `src/screens/events/__tests__/CreateEventMedia.test.tsx` | 11 | Media loading, cover display/delete, empty-cover warning, gallery Add button, Next navigation |
 | `src/screens/events/__tests__/CreateEventPreview.test.tsx` | 19 | Event detail display, missing fields list, all 3 modal variants (success/under_review/error), modal close → navigate + clear draft ID |
 | `src/screens/services/__tests__/ServiceListings.test.tsx` | 29 | Loading, tabs, search filter, Edit → sets draft ID + navigates, Locked for pending/published, Add Listing navigation |
+| `src/screens/classes/__tests__/CreateClassIdentity.test.tsx` | 17 | Metadata loading, mode selection, booking_type card (default/select/pre-fill/payload), Next validation |
+| `src/screens/classes/__tests__/CreateClassBatch.test.tsx` | — | Batch fetch/display, add/delete batch, navigation |
+| `src/screens/classes/__tests__/CreateClassPreview.test.tsx` | — | Preview display, submit modals |
+| `src/screens/programs/__tests__/CreateProgramIdentity.test.tsx` | 17 | Metadata loading, delivery mode, booking_type card (default/select/pre-fill/payload), Next validation |
+| `src/screens/programs/__tests__/CreateProgramPreview.test.tsx` | — | Preview display, submit modals |
+| `src/screens/enquiries/__tests__/Enquiries.test.tsx` | — | Loading, search/filter, unlock, status update |
+| `src/screens/enquiries/__tests__/ProgramEnquiries.test.tsx` | — | Loading, status update |
 
 ### 14.3 Modal Variant Routing (Critical Test)
 
@@ -821,10 +996,13 @@ Before declaring a wizard "integrated":
 ### 14.4 Run Commands
 
 ```bash
-npm test           # vitest run (CI mode, single pass)
-npm run test:watch # vitest (watch mode)
-npm run test:ui    # vitest --ui (browser UI)
+npm test              # vitest run (CI mode, single pass)
+npm run test:watch    # vitest (watch mode)
+npm run test:ui       # vitest --ui (browser UI)
+npm run test:report   # run tests → generate test-report.html + test-report.pdf (gitignored)
 ```
+
+> **Report generation (`scripts/generate-test-report.mjs`):** Runs the full suite with `--reporter=json`, builds an HTML report, then renders a PDF via `puppeteer-core` + Microsoft Edge. Uses `2>nul` redirect on Windows. Both `test-report.html` and `test-report.pdf` are in `.gitignore` and must never be committed.
 
 ---
 
@@ -841,4 +1019,4 @@ npm run test:ui    # vitest --ui (browser UI)
 
 ---
 
-*Last updated: 2026-05-15 — Phase 11 (Class wizard all 5 steps fully integrated; class metadata endpoints; format vs mode split; submit-time validation pattern documented)*
+*Last updated: 2026-05-27 — Phase 16 (UI redesign: dark fixed sidebar with collapse toggle, screen transition animations, dashboard 2-column layout, ServiceListings table/card redesign, new loader animation; Attendees: awaiting_payment status, cancel for pending bookings, optimized drawer; Generic pause/resume/archive/unarchive for all listing types; ProgramEnquiries listing title resolution)*

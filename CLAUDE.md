@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-npm run dev       # Start dev server on port 3000 (0.0.0.0)
+npm run dev       # Start dev server on port 8000 (0.0.0.0)
 npm run build     # Production build via Vite
 npm run lint      # Type-check only (tsc --noEmit), no test runner configured
 npm run preview   # Serve the production build locally

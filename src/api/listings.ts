@@ -282,7 +282,7 @@ export const getVenuePackages = async (listingId: string) => {
 
 export const createVenuePackage = async (
     listingId: string,
-    data: { name: string; price: number | string; description?: string; duration_minutes: number; max_guests: number }
+    data: Record<string, any>
 ) => {
     const response = await apiClient(`/api/v1/partner/listings/venues/${listingId}/packages/`, {
         method: 'POST',
@@ -447,9 +447,10 @@ export const updateClassListing = async (listingId: string, data: Record<string,
     return response.json();
 };
 
-export const setClassListingLive = async (listingId: string) => {
+export const setClassListingLive = async (listingId: string, isLive: boolean) => {
     const response = await apiClient(`/api/v1/partner/listings/classes/${listingId}/live/`, {
         method: 'POST',
+        body: JSON.stringify({ is_live: isLive }),
     });
     if (!response.ok) await handleError(response, 'Failed to update class live status');
     return response.json();
@@ -602,7 +603,7 @@ export const getProgramListingDetail = async (listingId: string) => {
     return response.json();
 };
 
-export const createProgramDraft = async (data: { title: string; short_description?: string; description?: string }) => {
+export const createProgramDraft = async (data: { title: string; short_description?: string; description?: string; booking_type?: string }) => {
     const response = await apiClient('/api/v1/partner/listings/programs/', {
         method: 'POST',
         body: JSON.stringify(data),
@@ -783,5 +784,76 @@ export const deleteProgramMedia = async (listingId: string, mediaId: number) => 
     if (!response.ok) await handleError(response, 'Failed to delete program media');
     if (response.status === 204) return {};
     return response.json().catch(() => ({}));
+};
+
+// ─── Bookings ──────────────────────────────────────────────────────────────
+
+export const getBookings = async (params?: { status?: string; listing_id?: string; page?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.status) qs.set('status', params.status);
+    if (params?.listing_id) qs.set('listing_id', params.listing_id);
+    if (params?.page && params.page > 1) qs.set('page', String(params.page));
+    const query = qs.toString();
+    const url = query ? `/api/v1/partner/bookings/?${query}` : '/api/v1/partner/bookings/';
+    const response = await apiClient(url);
+    if (!response.ok) await handleError(response, 'Failed to load bookings');
+    return response.json();
+};
+
+export const getBookingDetail = async (bookingId: string) => {
+    const response = await apiClient(`/api/v1/partner/bookings/${bookingId}/`);
+    if (!response.ok) await handleError(response, 'Failed to load booking detail');
+    return response.json();
+};
+
+export const markBookingAttended = async (bookingId: string) => {
+    const response = await apiClient(`/api/v1/partner/bookings/${bookingId}/mark-attended/`, {
+        method: 'POST',
+    });
+    if (!response.ok) await handleError(response, 'Failed to mark booking as attended');
+    return response.json();
+};
+
+export const cancelBooking = async (bookingId: string, reason?: string) => {
+    const response = await apiClient(`/api/v1/partner/bookings/${bookingId}/cancel/`, {
+        method: 'POST',
+        body: JSON.stringify({ reason: reason || 'partner_cancellation' }),
+    });
+    if (!response.ok) await handleError(response, 'Failed to cancel booking');
+    return response.json();
+};
+
+// ─── Generic Listing Actions (entity-agnostic) ──────────────────────────────
+
+export const pauseListing = async (listingId: string) => {
+    const response = await apiClient(`/api/v1/partner/listings/${listingId}/pause/`, {
+        method: 'POST',
+    });
+    if (!response.ok) await handleError(response, 'Failed to pause listing');
+    return response.json();
+};
+
+export const resumeListing = async (listingId: string) => {
+    const response = await apiClient(`/api/v1/partner/listings/${listingId}/resume/`, {
+        method: 'POST',
+    });
+    if (!response.ok) await handleError(response, 'Failed to resume listing');
+    return response.json();
+};
+
+export const archiveListing = async (listingId: string) => {
+    const response = await apiClient(`/api/v1/partner/listings/${listingId}/archive/`, {
+        method: 'POST',
+    });
+    if (!response.ok) await handleError(response, 'Failed to archive listing');
+    return response.json();
+};
+
+export const unarchiveListing = async (listingId: string) => {
+    const response = await apiClient(`/api/v1/partner/listings/${listingId}/unarchive/`, {
+        method: 'POST',
+    });
+    if (!response.ok) await handleError(response, 'Failed to unarchive listing');
+    return response.json();
 };
 

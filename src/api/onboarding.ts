@@ -143,3 +143,12 @@ export const submitVerification = async (data: any) => {
     }
     return response.json();
 };
+
+export const getPartnerFollowerCount = async (partnerId: string) => {
+    const response = await apiClient(`/api/v1/partner/${partnerId}/followers/count/`);
+    if (!response.ok) {
+        const err = await response.json().catch(() => null);
+        throw new Error(err?.error?.message || err?.message || 'Failed to load follower count');
+    }
+    return response.json();
+};

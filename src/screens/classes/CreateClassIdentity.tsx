@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, MapPin, Tag, Check, Loader2 } from 'lucide-react';
+import { ArrowRight, MapPin, Tag, Check, Loader2, MessageCircle, CalendarCheck } from 'lucide-react';
 import { Screen } from '../../types';
 import { WizardLayout, WizardNavigation } from '../../components/ui';
 import {
@@ -26,11 +26,13 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
     const [minAge, setMinAge] = useState('');
     const [maxAge, setMaxAge] = useState('');
     const [mode, setMode] = useState('offline');
+    const [bookingType, setBookingType] = useState<'enquiry' | 'direct_booking'>('enquiry');
     const [city, setCity] = useState('');
     const [area, setArea] = useState('');
     const [address, setAddress] = useState('');
     const [meetingLink, setMeetingLink] = useState('');
     const [tag, setTag] = useState('');
+    const [price, setPrice] = useState('');
 
     const [categories, setCategories] = useState<ApiCategory[]>([]);
     const [modes, setModes] = useState<ApiMode[]>([]);
@@ -46,13 +48,15 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
         let cancelled = false;
         (async () => {
             setMetaLoading(true);
+            let catsData: ApiCategory[] = [];
             try {
                 const [catsRes, fmtsRes] = await Promise.all([
                     getClassMetaCategories(),
                     getClassMetaFormats(),
                 ]);
                 if (!cancelled) {
-                    setCategories(catsRes.data || catsRes || []);
+                    catsData = catsRes.data || catsRes || [];
+                    setCategories(catsData);
                     const fmtData = fmtsRes.data || fmtsRes;
                     // API returns { modes: [...] } — delivery modes, not formats
                     setModes(Array.isArray(fmtData.modes) ? fmtData.modes : []);
@@ -83,14 +87,24 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
                 setArea(srv.area || d.area || '');
                 setAddress(srv.address || d.address || '');
                 setMeetingLink(srv.meeting_link || d.meeting_link || '');
+                const loadedPrice = srv.price ?? d.price;
+                if (loadedPrice != null) setPrice(String(loadedPrice));
                 const loadedMode = srv.mode || d.mode;
                 if (loadedMode) setMode(loadedMode);
+                const loadedBookingType = d.booking_type;
+                if (loadedBookingType === 'enquiry' || loadedBookingType === 'direct_booking') setBookingType(loadedBookingType);
                 const loadedTag = srv.tags?.[0] || d.tags?.[0];
                 if (loadedTag) setTag(loadedTag);
                 const catId = srv.category?.id ?? d.category?.id;
                 const subId = srv.subcategory?.id ?? d.subcategory?.id;
                 if (catId) setSelectedCategoryId(catId);
-                if (subId) setSelectedSubcategoryId(subId);
+                if (subId) {
+                    // Validate the stored subcategory still belongs to the stored category.
+                    // A previous save bug could have left them mismatched — reset if so.
+                    const cat = catsData.find(c => c.id === catId);
+                    const isValid = cat?.subcategories.some(s => s.id === subId) ?? false;
+                    setSelectedSubcategoryId(isValid ? subId : null);
+                }
             } catch (e) {
                 console.warn('Failed to load class draft', e);
             }
@@ -103,6 +117,10 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
 
     const handleNext = async () => {
         if (!title.trim()) { setSaveError('Class title is required.'); return; }
+        if (selectedCategoryId != null && selectedSubcategoryId == null) {
+            setSaveError('Please select a subcategory for the chosen category.');
+            return;
+        }
         if (saving) return;
         setSaveError('');
         setSaving(true);
@@ -113,6 +131,7 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
                     title: title.trim(),
                     short_description: shortDesc.trim(),
                     description: description.trim(),
+                    booking_type: bookingType,
                 });
                 const d = res.data || res;
                 draftId = d.id;
@@ -123,6 +142,7 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
                 short_description: shortDesc.trim(),
                 description: description.trim(),
                 mode,
+                booking_type: bookingType,
             };
 
             if (minAge) payload.min_age = Number(minAge);
@@ -135,9 +155,14 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
             if ((mode === 'online' || mode === 'hybrid') && meetingLink.trim()) {
                 payload.meeting_link = meetingLink.trim();
             }
+            if (price.trim()) payload.price = price.trim();
             if (tag) payload.tags = [tag];
-            if (selectedCategoryId != null) payload.category_id = selectedCategoryId;
-            if (selectedSubcategoryId != null) payload.subcategory_id = selectedSubcategoryId;
+            if (selectedCategoryId != null) {
+                payload.category_id = selectedCategoryId;
+                payload.subcategory_id = selectedSubcategoryId; // always send alongside category to clear any stale subcategory on the backend
+            } else if (selectedSubcategoryId != null) {
+                payload.subcategory_id = selectedSubcategoryId;
+            }
 
             await updateClassListing(draftId!, payload);
             onNavigate('CREATE_CLASS_BATCH');
@@ -246,13 +271,71 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
                 )}
             </div>
 
+            {/* Booking Type */}
+            <div>
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">
+                    Listing Type <span className="text-red-400">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                    {([
+                        {
+                            value: 'enquiry',
+                            label: 'Enquiry',
+                            icon: <MessageCircle size={22} />,
+                            desc: 'Parents express interest and you follow up to confirm.',
+                        },
+                        {
+                            value: 'direct_booking',
+                            label: 'Direct Booking',
+                            icon: <CalendarCheck size={22} />,
+                            desc: 'Parents directly book and pay for a seat online.',
+                        },
+                    ] as const).map((opt) => (
+                        <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setBookingType(opt.value)}
+                            className={`relative flex flex-col items-start gap-2 p-4 rounded-2xl border-2 text-left transition-all ${
+                                bookingType === opt.value
+                                    ? 'border-tlb-yellow bg-tlb-yellow/10'
+                                    : 'border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm'
+                            }`}
+                        >
+                            {bookingType === opt.value && (
+                                <div className="absolute top-2.5 right-2.5 w-5 h-5 bg-tlb-yellow rounded-full flex items-center justify-center">
+                                    <Check size={11} className="text-tlb-dark" />
+                                </div>
+                            )}
+                            <span className={bookingType === opt.value ? 'text-tlb-dark' : 'text-gray-400'}>
+                                {opt.icon}
+                            </span>
+                            <span className="text-sm font-black text-gray-800 pr-6">{opt.label}</span>
+                            <span className="text-[11px] text-gray-400 leading-snug">{opt.desc}</span>
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* Fees */}
+            <div>
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Fees (₹)</label>
+                <input
+                    type="number"
+                    className="tlb-input w-full"
+                    placeholder="e.g. 1500"
+                    min={0}
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                />
+            </div>
+
             {/* Location (offline / hybrid only) */}
             {needsAddress && (
                 <div className="space-y-3">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block">
                         <MapPin size={12} className="inline mr-1" /> Location
                     </label>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <input
                             className="tlb-input w-full"
                             placeholder="City"

@@ -1,74 +1,142 @@
 import React from 'react';
-import { CheckCircle2, ChevronRight, ArrowRight, PlusCircle } from 'lucide-react';
+import { motion } from 'motion/react';
+import {
+    ArrowRight,
+    BarChart3,
+    CheckCircle2,
+    ChevronRight,
+    PlusCircle,
+    Sparkles,
+    UserCircle,
+} from 'lucide-react';
 import { Screen } from '../../types';
+import { OnboardingShell, PageHeader } from '../../components/ui';
 
 interface OnboardingProps {
     onNavigate: (screen: Screen) => void;
 }
 
-const X = ({ size }: { size: number }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>;
-const UserCircle = ({ size }: { size: number }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="10" r="3"></circle><path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662"></path></svg>;
-const BarChart3 = ({ size }: { size: number }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"></path><path d="M18 17V9"></path><path d="M13 17V5"></path><path d="M8 17v-3"></path></svg>;
+const NEXT_STEPS: {
+    icon: any;
+    title: string;
+    desc: string;
+    screen: Screen;
+    accent: string;
+}[] = [
+    {
+        icon: PlusCircle,
+        title: 'Create Your First Listing',
+        desc: 'Add a class, event, program, or venue to your storefront.',
+        screen: 'CREATE_CLASS_IDENTITY',
+        accent: 'bg-blue-50 text-blue-600',
+    },
+    {
+        icon: UserCircle,
+        title: 'Complete Your Profile',
+        desc: 'Add photos, bio, and social links to look your best.',
+        screen: 'BRAND_PROFILE',
+        accent: 'bg-purple-50 text-purple-600',
+    },
+    {
+        icon: BarChart3,
+        title: 'Explore Your Dashboard',
+        desc: 'Track performance, bookings, and earnings in real time.',
+        screen: 'HOME',
+        accent: 'bg-emerald-50 text-emerald-600',
+    },
+];
 
 export const OnboardingComplete: React.FC<OnboardingProps> = ({ onNavigate }) => (
-    <div className="min-h-screen bg-white flex flex-col">
-        <header className="p-6 flex justify-between items-center">
-            <button onClick={() => onNavigate('BANK_SETUP')}><X size={24} /></button>
-            <h2 className="font-black text-lg">Onboarding Complete</h2>
-            <div className="w-6"></div>
-        </header>
-
-        <main className="flex-1 p-6">
-            <div className="tlb-content">
-                <div className="bg-tlb-dark rounded-[2.5rem] p-10 text-center text-white relative overflow-hidden mb-12">
-                    <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-tlb-yellow/20 to-transparent opacity-50"></div>
-                    <div className="relative z-10 flex flex-col items-center">
-                        <div className="bg-tlb-yellow text-tlb-dark px-4 py-2 rounded-full flex items-center gap-2 text-[10px] font-black uppercase tracking-widest mb-8 shadow-lg">
-                            <CheckCircle2 size={14} /> Verified Partner
-                        </div>
-
-                        <div className="w-32 h-32 rounded-full border-4 border-tlb-yellow p-1 mb-8 shadow-2xl shadow-tlb-yellow/20">
-                            <div className="w-full h-full rounded-full overflow-hidden relative">
-                                <img loading="lazy" src="https://picsum.photos/seed/spotlight/200/200" alt="Spotlight" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                            </div>
-                        </div>
-
-                        <h1 className="text-4xl font-black mb-4 font-serif italic">Welcome to the Spotlight!</h1>
-                        <p className="text-gray-400 leading-relaxed max-w-xs mx-auto">
-                            Your journey with The Little Broadway officially begins now. Your profile is live and ready to reach your audience.
-                        </p>
-                    </div>
-                </div>
-
-                <h3 className="font-black text-xl mb-6">Next Steps</h3>
-                <div className="space-y-4">
-                    {[
-                        { icon: PlusCircle, title: 'Create Your First Listing', desc: 'Add a class to your storefront', screen: 'CREATE_CLASS_IDENTITY' },
-                        { icon: UserCircle, title: 'Complete Your Profile', desc: 'Add photos and social media links', screen: 'BRAND_PROFILE' },
-                        { icon: BarChart3, title: 'Explore Dashboard', desc: 'View performance and ticket sales', screen: 'HOME' }
-                    ].map((item, i) => (
-                        <button
-                            key={i}
-                            onClick={() => onNavigate(item.screen as Screen)}
-                            className="w-full tlb-card p-4 flex items-center gap-4 text-left hover:border-tlb-yellow transition-colors group"
-                        >
-                            <div className="bg-tlb-yellow/10 p-3 rounded-xl text-tlb-yellow group-hover:bg-tlb-yellow group-hover:text-tlb-dark transition-colors">
-                                <item.icon size={24} />
-                            </div>
-                            <div className="flex-1">
-                                <h4 className="font-bold">{item.title}</h4>
-                                <p className="text-xs text-gray-400 font-medium">{item.desc}</p>
-                            </div>
-                            <ChevronRight size={20} className="text-gray-300" />
-                        </button>
-                    ))}
-                </div>
-
-                <button onClick={() => onNavigate('HOME')} className="tlb-button w-full py-4 mt-12 shadow-lg shadow-tlb-yellow/20">
-                    Go to My Dashboard <ArrowRight size={20} />
-                </button>
+    <OnboardingShell
+        title="Onboarding Complete"
+        eyebrow="You're all set"
+        onBack={() => onNavigate('BANK_SETUP')}
+        rightSlot={
+            <div className="hidden sm:flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-lg">
+                <CheckCircle2 size={12} />
+                <span className="text-[10px] font-black uppercase tracking-widest">Verified</span>
             </div>
-        </main>
-    </div>
+        }
+    >
+        <PageHeader
+            eyebrow="Welcome aboard"
+            title={
+                <>
+                    Welcome to the <span className="text-tlb-yellow">spotlight.</span>
+                </>
+            }
+            subtitle="Your profile is live and ready to reach your audience. Here's what we'd recommend next."
+        />
+
+        {/* Hero celebration */}
+        <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.4 }}
+            className="relative bg-tlb-dark text-white rounded-3xl p-8 sm:p-10 overflow-hidden mb-8 text-center"
+        >
+            <div className="absolute -top-20 -right-20 w-80 h-80 bg-tlb-yellow/30 rounded-full blur-3xl" />
+            <div className="absolute -bottom-24 -left-16 w-80 h-80 bg-tlb-yellow/15 rounded-full blur-3xl" />
+            <div className="absolute inset-0 opacity-[0.04] bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] pointer-events-none" />
+
+            <div className="relative">
+                <motion.div
+                    initial={{ scale: 0, rotate: -180 }}
+                    animate={{ scale: 1, rotate: 0 }}
+                    transition={{ duration: 0.7, delay: 0.2, type: 'spring', stiffness: 120 }}
+                    className="inline-flex w-24 h-24 rounded-full bg-tlb-yellow text-tlb-dark items-center justify-center mb-6 shadow-2xl shadow-tlb-yellow/40"
+                >
+                    <CheckCircle2 size={44} strokeWidth={2.5} />
+                </motion.div>
+
+                <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur border border-white/15 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest mb-4">
+                    <Sparkles size={12} className="text-tlb-yellow" /> Verified Partner
+                </div>
+                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black mb-3">You're officially in.</h2>
+                <p className="text-gray-400 max-w-sm mx-auto text-sm leading-relaxed">
+                    Your journey with The Little Broadway begins now. Let's get your first listing live.
+                </p>
+            </div>
+        </motion.div>
+
+        {/* Next steps */}
+        <div>
+            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 px-1">Next Steps</h3>
+            <div className="space-y-3">
+                {NEXT_STEPS.map((item, i) => (
+                    <motion.button
+                        key={item.title}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.35, delay: 0.15 + i * 0.08 }}
+                        whileHover={{ y: -2 }}
+                        onClick={() => onNavigate(item.screen)}
+                        className="w-full bg-white border border-gray-100 rounded-2xl p-4 sm:p-5 flex items-center gap-4 text-left hover:border-tlb-yellow/60 hover:shadow-xl hover:shadow-tlb-yellow/10 transition-all group"
+                    >
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${item.accent}`}>
+                            <item.icon size={20} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <h4 className="font-black text-sm sm:text-base">{item.title}</h4>
+                            <p className="text-[11px] sm:text-xs text-gray-500 mt-0.5">{item.desc}</p>
+                        </div>
+                        <ChevronRight
+                            size={18}
+                            className="text-gray-300 group-hover:text-tlb-yellow group-hover:translate-x-0.5 transition-all shrink-0"
+                        />
+                    </motion.button>
+                ))}
+            </div>
+        </div>
+
+        <motion.button
+            type="button"
+            onClick={() => onNavigate('HOME')}
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.99 }}
+            className="mt-8 w-full py-4 rounded-2xl font-black flex items-center justify-center gap-2 text-base bg-tlb-yellow text-tlb-dark shadow-xl shadow-tlb-yellow/30"
+        >
+            Go to My Dashboard <ArrowRight size={18} />
+        </motion.button>
+    </OnboardingShell>
 );

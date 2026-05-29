@@ -3,7 +3,7 @@
 > **Definitive architectural reference for the TLB Partner Portal.**
 > Base URL: `https://tlb-api.reluconsultancy.in`
 > Framework: React + Vite + TypeScript (SPA)
-> Last Updated: May 28, 2026
+> Last Updated: May 29, 2026
 
 ---
 
@@ -15,6 +15,7 @@ src/
 │   ├── client.ts           # Centralized fetch wrapper, auth headers, 401 refresh
 │   ├── auth.ts             # requestOtp, verifyOtp, getCurrentUser, logout
 │   ├── onboarding.ts       # All partner CRUD endpoints (profile, media, categories, etc.)
+│   ├── stats.ts            # Partner statistics endpoints (overview, events, venues, enquiries) + trackProfileView
 │   └── listings.ts         # Listings + ticket + media CRUD, draft ID helpers, ApiError class
 ├── context/
 │   └── PartnerContext.tsx   # Global context: allowedEntities (synced to sessionStorage)
@@ -23,7 +24,8 @@ src/
 │   ├── EntityPickerSheet.tsx    # Bottom sheet for entity type selection
 │   └── ui/
 │       ├── DashboardCharts.tsx  # Shared SVG chart primitives: AreaSparkline, TrendAreaChart, WeeklyBarChart, DonutChart, fmtCurrency, trendPct, TrendBadge
-│       └── Toast.tsx            # Shared ToastContainer + useToasts() hook (error/warning/success/info, slide-in animation, auto-dismiss)
+│       ├── Toast.tsx            # Shared ToastContainer + useToasts() hook (error/warning/success/info, slide-in animation, auto-dismiss)
+│       └── OnboardingShell.tsx  # Shared layout for every onboarding screen: sticky branded header + ProgressDots + PageHeader + motion fade-in + decorative blurs
 ├── screens/
 │   ├── auth/               # Landing, Login, OTPVerify, PartnerAccess, PartnerAccessOTP, PartnerCategory
 │   ├── onboarding/         # Registration, AppSubmitted, AppApproved, AgreementSubmit, IdentityVerification, BankSetup, OnboardingComplete
@@ -269,10 +271,41 @@ Request → 401 Unauthorized?
 | `uploadPartnerMedia` | POST | `/api/v1/partners/media/` | FormData (file, media_type) | Registration, BrandProfile |
 | `deletePartnerMedia` | DELETE | `/api/v1/partners/media/{id}/` | — | Registration, BrandProfile |
 | `getCurrentPartner` | GET | `/api/v1/partner/me/` | — | **App.tsx** (session restore), Dashboard, Registration, **FinancialHub**, **OTPVerify (login gate)** |
-| `getPartnerDashboard` | GET | `/api/v1/partners/dashboard/` | — | Dashboard, Statistics |
+| `getPartnerDashboard` | GET | `/api/v1/partners/dashboard/` | — | Dashboard (legacy fallback — `/stats/overview/` is now preferred for `profile_views` / `new_enquiries` / `active_batches` / `followers`) |
 | `getPartnerFollowerCount` | GET | `/api/v1/partner/{partner_id}/followers/count/` | — | Dashboard (profile popup + Profile Performance card) |
 | `activatePartner` | POST | `/api/v1/partners/activate/` | `{ is_active: true }` | (available, not actively used) |
 | `submitVerification` | POST | `/api/v1/partner/verification/` | PAN, bank, agreement | AgreementSubmit |
+
+### 2.5 Partner Statistics API (`src/api/stats.ts`)
+
+All four GET endpoints require `Authorization: Bearer <token>` (partner with `status=approved`). The `Statistics` screen fetches all four in parallel via `Promise.allSettled` so partial failure still renders whatever did come back. The `Dashboard` additionally calls `getStatsOverview` and prefers it over the legacy `/partners/dashboard/` for the four overview fields.
+
+| Function | Method | Endpoint | Returns | Used By |
+|----------|--------|----------|---------|---------|
+| `getStatsOverview` | GET | `/api/v1/partner/stats/overview/` | `{ profile_views, followers, new_enquiries, active_batches }` | Dashboard (KPI cards + profile popup), Statistics (overview strip) |
+| `getStatsEvents` | GET | `/api/v1/partner/stats/events/` | `{ upcoming, tickets_sold, registrations, event_reach, engagement_rate, booking_conv_rate, this_month_tickets, prev_month_tickets, ticket_growth_pct, weekly_ticket_sales[], ticket_sales_trend[], by_category[] }` | Statistics (Events Analytics, Weekly Ticket Sales, Ticket Sales Trend, by-category breakdown) |
+| `getStatsVenues` | GET | `/api/v1/partner/stats/venues/` | `{ total_bookings, upcoming, monthly_earnings (string), occupancy_rate, avg_duration_minutes, repeat_clients, revenue_trend[] }` | Statistics (Venue Analytics, Revenue Trend) |
+| `getStatsEnquiries` | GET | `/api/v1/partner/stats/enquiries/` | `{ conversion_funnel: {new_leads, contacted, converted, conversion_rate}, trial_requests, avg_response_hours, student_retention_pct, monthly_enrolments, monthly_trend[] }` | Statistics (Enquiry Insights funnel + KPIs + Monthly Trend) |
+| `trackProfileView` | POST | `/api/v1/partner/{partner_id}/track-view/` | `{ message }` — **no auth required** | (available — call from public partner profile pages; best-effort silent fail) |
+
+**Field-level gotchas:**
+
+| Field | Source | Notes |
+|-------|--------|-------|
+| `engagement_rate` | events | **Always `null`** until likes/comments/saves tracking is added to the backend. UI shows `—`. |
+| `avg_response_hours` | enquiries | `null` until the partner first updates an enquiry status away from `new`. Backend sets `responded_at = now()` automatically on first status change; the field becomes the mean (h) across all responded enquiries. UI shows `—` when null. |
+| `monthly_earnings` / `revenue_trend[].earnings` | venues | Strings (e.g. `"24500.00"`) — coerced to numbers via `moneyToNumber` helper before charting. |
+| `weekly_ticket_sales` | events | `[{day, date, count}]` — UI extracts the `day` array for chart labels rather than using the hard-coded `WEEK_LABELS` constant. |
+| `ticket_sales_trend` / `monthly_trend` / `revenue_trend` | various | All return `[{month: "Dec 2025", ...}]` — UI extracts the month string for labels rather than hard-coded `MONTH_LABELS_6`. |
+| `by_category` | events | Array of `{category, count}` — Statistics renders this as a horizontal bar list (Bookings by Category card) only when non-empty. |
+| `followers` | overview | Same value the standalone `getPartnerFollowerCount` returns. Dashboard prefers `overview.followers` when available and only falls back to the dedicated endpoint if `/stats/overview/` fails. |
+
+**Removed from Statistics (no equivalent in new API):**
+
+| Old field | What happened |
+|-----------|---------------|
+| `top_listings` | No replacement endpoint — Top Performing Listings section removed from Statistics. |
+| `recent_activity` | No replacement endpoint — Recent Activity feed removed from Statistics. |
 
 ---
 
@@ -827,6 +860,20 @@ classDiagram
   - **Profile popup** — Dark gradient header with avatar + status badge, 3-column stats grid, color-coded entity chips, icon action buttons.
   - **ServiceListings** — Redesigned: desktop uses table layout (thumbnail, type badge, category, status dot, icon actions), mobile uses compact cards. Search + tabs inline on desktop.
   - **Loader** — Replaced multi-ring spinner with yellow (`#FACC15`) expanding-corners style (solid circle with 4 corner pieces that expand and rotate 90deg).
+- **UI Redesign Phase 18 — Marketing + Onboarding overhaul** — All public-entry and onboarding screens redesigned around a shared visual language (cream `#FDFCF8` background, bold black headlines with yellow accent words, `Sparkles` pill eyebrows, dual yellow CTAs with motion hover/tap scale, decorative blurred yellow blobs for depth). No logic changes — same routes, API calls, validation, and sessionStorage keys.
+  - **Landing** — Sticky backdrop-blur header (activates after 12px scroll), 2-column hero with animated floating entity cards (Events / Classes / Venues / Programs) bobbing on staggered loops, **mouse-following yellow spotlight** in the hero (`useMotionTemplate` so the gradient updates without re-renders, hidden on mobile), **3D cursor-tilt** on the HeroCards group (`useMotionValue` → `useTransform` ±8° rotateX/rotateY, smoothed via `useSpring`, `perspective: 1000px + transformStyle: preserve-3d`), **scroll-progress bar** at the very top (`useScroll().scrollYProgress` spring-smoothed), dark stats strip with count-up KPIs (custom `useCountUp` hook, easeOutCubic, fires once on scroll-into-view), 6-card feature grid with hover-lift + appearing arrow, "How it works" 3-step timeline with faint connector line, final CTA band with blurred yellow blobs, 4-column footer with hover-color links.
+  - **Login** — 50/50 split-panel layout (dark brand panel left + form right; brand collapses to compact dark header on mobile). Mouse-following spotlight + decorative blurs + texture on the brand panel. Floating entity badges with color-coded tints. Mini stats row. **Tabbed mode switcher** (Mobile / Email) with `layoutId` pill that slides between tabs. **AnimatePresence form swap** between phone and email modes. `+91` prefix chip + 10-digit numeric input. Global Enter-to-submit. Phone validation tightened from `>=10` to `===10`; email validation tightened to a full regex. `alert()` calls replaced with toasts. `"New to TLB? Become a Partner"` now correctly routes to `PARTNER_ACCESS` (was `REGISTRATION`).
+  - **Onboarding flow (10 screens)** — All entries from `PartnerAccess` through `OnboardingComplete` rebuilt on top of a shared `OnboardingShell` (sticky white header with TLB mark + back + title + eyebrow + animated **ProgressDots** + optional right-slot, cream background, decorative blurred ambience, motion fade-in container). New `PageHeader` helper inside the shell renders the bold black title + yellow-accent word + `Sparkles` eyebrow pill consistently across every screen.
+    - **PartnerAccess** (Step 1 of 4) — smart email/phone auto-detection (icon swaps to green check when valid), helper text adapts to input type, toast errors, "Already a partner? Sign in" link.
+    - **PartnerAccessOTP** (Step 2 of 4) — 6 OTP boxes with yellow fill when a digit is entered, live countdown for resend with toast on success, Enter-to-submit, "Change email" escape hatch, navigates to `PARTNER_CATEGORY` on verify.
+    - **PartnerCategory** (Step 3 of 4) — 2×2 entity grid with hover-lift cards, animated check badge, color-coded tints matching Landing (Events→blue, Classes→purple, Programs→emerald, Venues→amber), live "X selected" counter; `INVALID_PARTNER_STATE` guard from Phase 17 preserved.
+    - **Registration** (Step 4 of 4) — 4 distinct sections with color-coded icons (Business/Digital/Proof/Safety), pill-style business type chips, photo grid with hover-delete overlay, dynamic "X more needed" badge for the 3-photo activation requirement, animated checkboxes via `sr-only` pattern (kept accessible for `getByRole('checkbox')`).
+    - **IdentityVerification** (Section A of 2) — inline valid/invalid status pills next to each label, KYC chip in header, helper text under every input.
+    - **BankSetup** (Section B of 2) — all 4 fields show live valid/invalid pills with green/red rings, AES-256 trust footer, padlock chip in header.
+    - **AgreementSubmit** — tab switcher A/B/C with animated `layoutId` pill, `AnimatePresence` slides between sections, polished submission-summary card before final submit. Tests rely on placeholder strings — `"Enter account number (9–18 digits)"` preserved exactly. All 8 tests still pass.
+    - **AppSubmitted** — dark celebration hero with spinning border ring, pulsing "current" step dot, vertical-connector timeline.
+    - **AppApproved** — spring-bouncing check badge, all-yellow timeline, "Sign Partner Agreement" primary CTA.
+    - **OnboardingComplete** — spring-rotated check badge, dark hero with double yellow glow + cubes texture, 3 "Next Steps" cards with hover lift and animated chevron.
 
 ### ⚡ Partially Integrated
 
@@ -915,6 +962,13 @@ classDiagram
 - ❌ ServiceListings used full-height card layout for all screen sizes — redesigned: table on desktop, compact cards on mobile.
 - ❌ Dashboard had centered Welcome Banner + Profile Performance + full footer — redesigned: 2-column layout, compact footer, time-of-day greeting.
 - ❌ Dashboard.tsx had mojibake characters in comments and data strings — cleaned all non-ASCII bytes.
+- ❌ Landing page was a static single-column scroll with picsum imagery — redesigned (Phase 18) with sticky backdrop-blur header, scroll-progress bar, animated floating entity cards with cursor-driven 3D tilt and mouse-following spotlight in the hero, dark stats strip with count-up KPIs, 6-card feature grid with hover-lift, How-it-works 3-step timeline, blob-decorated final CTA band. Initial root `overflow-x-hidden` trapped the sticky header in a scroll container — fixed by clipping blobs at section level instead.
+- ❌ Hero/Sign-in duplication on Landing — initial redesign showed `Sign In` in both the header CTA row and the hero button group, creating visual repetition. Hero `Sign In` button replaced with a soft `Already a partner? Sign in here` text link below the primary `Become a Partner` CTA; header retains both buttons for sticky access.
+- ❌ Login screen was a small centered card with a popup modal for email mode — redesigned (Phase 18) into a 50/50 split-panel layout (dark brand panel left, form right), modal popup replaced with inline tabbed switcher (Mobile / Email) using a sliding `layoutId` pill; phone validation tightened from `>=10` to `===10`; email validation upgraded from `includes('@')` to a full regex; `alert()` calls replaced with toasts; `"New to TLB? Join as a Partner"` link redirected from `REGISTRATION` to `PARTNER_ACCESS` to honor the Phase 17 Login/Onboarding boundary.
+- ❌ Onboarding flow screens had inconsistent layouts (each one rolled its own header / step indicator / button styles), `alert()`-based error reporting, and used `picsum.photos` placeholder imagery — redesigned (Phase 18) all 10 screens to share a single `OnboardingShell` component with `ProgressDots` and `PageHeader` helpers. All `alert()` replaced with shared `useToasts` toasts. Placeholder imagery removed in favor of decorative blurred yellow blobs and motion entrance animations.
+- ❌ Several onboarding screens used `className="hidden"` on form `<input type="checkbox">` to style the visible checkmark via the surrounding label — broke `screen.getByRole('checkbox')` in tests because `display: none` excludes elements from the accessibility tree. Fixed: switched to `className="sr-only"` (still in DOM, still in accessibility tree, still clickable via the label).
+- ❌ Statistics screen fetched a single legacy `/api/v1/partners/dashboard/` endpoint that returned an ever-expanding monolithic blob and hard-coded `MONTH_LABELS_6` / `WEEK_LABELS` constants for chart labels — replaced with parallel fetch of 4 new partner stats endpoints (`/stats/overview/`, `/stats/events/`, `/stats/venues/`, `/stats/enquiries/`) via `Promise.allSettled`, with chart labels extracted from the API response arrays (`weekly_ticket_sales[].day`, `*_trend[].month`) rather than constants. Engagement-rate handled as nullable; decimal-string money fields coerced via a small `moneyToNumber` helper; Top-Listings and Recent-Activity sections removed (no replacement endpoints in the new API).
+- ❌ Dashboard pulled `profile_views` / `new_enquiries` / `active_batches` from the legacy dashboard endpoint only — added `getStatsOverview()` to the parallel fetch and routed those three fields through `overviewData ?? d.<field> ?? 0` (preferring the new canonical source, falling back to the legacy endpoint). `overviewData.followers` also overrides the standalone `getPartnerFollowerCount()` when present.
 
 ---
 
@@ -1028,6 +1082,8 @@ npm run test:report   # run tests → generate test-report.html + test-report.pd
 
 ---
 
-*Last updated: 2026-05-28 — Phase 17 (Login / Onboarding flow separation: OTPVerify gates HOME on partner status and rejects incomplete accounts; PartnerCategory intercepts `INVALID_PARTNER_STATE` and redirects already-registered emails to LOGIN; shared `Toast` component in `components/ui/` replaces `alert()` calls in both screens; MSW handler added for `/api/v1/partner/me/` singular path).*
+*Last updated: 2026-05-29 — Phase 18 (Marketing + Onboarding overhaul + Stats API migration): all 10 onboarding screens rebuilt on a shared `OnboardingShell` (sticky branded header, animated `ProgressDots`, `PageHeader` helper, motion fade-in, decorative blurs); Landing redesigned with sticky backdrop-blur header, scroll-progress bar, mouse-following spotlight, 3D cursor-tilt floating hero cards, count-up stats, 6-card feature grid, How-it-works timeline; Login redesigned into a 50/50 split-panel with `layoutId` tabbed mode switcher (Mobile/Email) — popup modal removed; `alert()` calls across all redesigned screens replaced with shared `useToasts` toasts; new `src/api/stats.ts` module wires the Statistics screen against 4 new partner stats endpoints (`/stats/overview/`, `/stats/events/`, `/stats/venues/`, `/stats/enquiries/`) via `Promise.allSettled`; Dashboard's `profile_views` / `new_enquiries` / `active_batches` / `followers` now prefer `/stats/overview/` with legacy fallback.*
+
+*Phase 17 (2026-05-28) — Login / Onboarding flow separation: OTPVerify gates HOME on partner status and rejects incomplete accounts; PartnerCategory intercepts `INVALID_PARTNER_STATE` and redirects already-registered emails to LOGIN; shared `Toast` component in `components/ui/` replaces `alert()` calls in both screens; MSW handler added for `/api/v1/partner/me/` singular path.*
 
 *Phase 16 (2026-05-27) — UI redesign: dark fixed sidebar with collapse toggle, screen transition animations, dashboard 2-column layout, ServiceListings table/card redesign, new loader animation; Attendees: awaiting_payment status, cancel for pending bookings, optimized drawer; Generic pause/resume/archive/unarchive for all listing types; ProgramEnquiries listing title resolution.*

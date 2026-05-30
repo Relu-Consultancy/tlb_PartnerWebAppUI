@@ -3,7 +3,7 @@
 > **Definitive architectural reference for the TLB Partner Portal.**
 > Base URL: `https://tlb-api.reluconsultancy.in`
 > Framework: React + Vite + TypeScript (SPA)
-> Last Updated: May 29, 2026
+> Last Updated: May 30, 2026
 
 ---
 
@@ -38,7 +38,7 @@ src/
 │   ├── venues/             # CreateVenue* (5 steps)
 │   ├── enquiries/          # Enquiries, ProgramEnquiries
 │   ├── attendees/          # Attendees — full booking management (list, detail, mark-attended, cancel)
-│   ├── statistics/         # Statistics — dedicated analytics/charts screen
+│   ├── statistics/         # Statistics — tabbed analytics screen (Statistics.tsx + StatCharts.tsx)
 │   ├── packages/           # Packages
 │   └── financial/          # FinancialHub
 ├── test/
@@ -295,9 +295,9 @@ All four GET endpoints require `Authorization: Bearer <token>` (partner with `st
 | `engagement_rate` | events | **Always `null`** until likes/comments/saves tracking is added to the backend. UI shows `—`. |
 | `avg_response_hours` | enquiries | `null` until the partner first updates an enquiry status away from `new`. Backend sets `responded_at = now()` automatically on first status change; the field becomes the mean (h) across all responded enquiries. UI shows `—` when null. |
 | `monthly_earnings` / `revenue_trend[].earnings` | venues | Strings (e.g. `"24500.00"`) — coerced to numbers via `moneyToNumber` helper before charting. |
-| `weekly_ticket_sales` | events | `[{day, date, count}]` — UI extracts the `day` array for chart labels rather than using the hard-coded `WEEK_LABELS` constant. |
-| `ticket_sales_trend` / `monthly_trend` / `revenue_trend` | various | All return `[{month: "Dec 2025", ...}]` — UI extracts the month string for labels rather than hard-coded `MONTH_LABELS_6`. |
-| `by_category` | events | Array of `{category, count}` — Statistics renders this as a horizontal bar list (Bookings by Category card) only when non-empty. |
+| `weekly_ticket_sales` | events | `[{day, date, count}]` — UI extracts the `day` array for chart labels rather than using the hard-coded `WEEK_LABELS` constant. `date` is surfaced as the bar-chart hover note. |
+| `ticket_sales_trend` / `monthly_trend` / `revenue_trend` | various | All return `[{month: "Dec 2025", year, count, earnings}]` — UI extracts the month string for labels. `earnings` (when present) becomes the area-chart hover note; `revenue_trend[].count` becomes the "N bookings" note. |
+| `by_category` | events | Array of `{category, count, amount}` — Statistics renders this as a horizontal bar list (Bookings by Category card) showing both the count and the `amount` (revenue, coerced via `moneyToNumber`) only when non-empty. |
 | `followers` | overview | Same value the standalone `getPartnerFollowerCount` returns. Dashboard prefers `overview.followers` when available and only falls back to the dedicated endpoint if `/stats/overview/` fails. |
 
 **Removed from Statistics (no equivalent in new API):**
@@ -494,27 +494,43 @@ THEN
 
 **Redirect logic:** If status is `otp_verified` → `PARTNER_CATEGORY`. If `category_selected` → `REGISTRATION`.
 
-### 6.4 Statistics Screen (`src/screens/statistics/Statistics.tsx`)
+### 6.4 Statistics Screen (`src/screens/statistics/`)
 
-Dedicated analytics screen. All chart/analytics sections removed from Dashboard live here.
+Tabbed analytics screen, fully redesigned (Phase 19). Two files:
+- `Statistics.tsx` — screen shell, data fetching, tab routing, all section layouts.
+- `StatCharts.tsx` — **Statistics-only** interactive chart toolkit (kept separate so the shared `DashboardCharts.tsx` and the Dashboard stay untouched).
 
 | API Call | Purpose |
 |----------|---------|
-| `getPartnerDashboard()` | Single call on mount + on manual refresh |
+| `getStatsOverview()`, `getStatsEvents()`, `getStatsVenues()`, `getStatsEnquiries()` | All four fetched in parallel via `Promise.allSettled` on mount + manual Refresh button. Partial failure still renders whatever resolved; all-rejected → error state. |
 
-**Sections (entity-conditional):**
+**Layout:**
 
-| Section | Shown When | API Fields |
-|---------|------------|------------|
-| Weekly Activity bar chart | Always | `weekly_activity` (7-element array) |
-| Enquiry Insights (funnel donut + stats + trend) | Classes or Programs | `funnel_new/contacted/converted`, `trial_requests`, `avg_response_time`, `retention_rate`, `monthly_enrolments`, `monthly_enquiries[]` |
-| Event Analytics (stats grid + ticket sales trend) | Events | `upcoming_events`, `tickets_sold`, `total_registrations`, `event_reach`, `engagement_rate`, `booking_conversion`, `monthly_tickets[]` |
-| Venue Analytics (occupancy donut + revenue trend) | Venues | `venue_bookings`, `occupancy_rate`, `upcoming_reservations`, `monthly_earnings`, `avg_booking_hours`, `repeat_clients`, `monthly_revenue[]` |
-| 6-month Universal Trend | Always | `monthly_enquiries` / `monthly_tickets` / `monthly_revenue` by entity |
-| Top Performing Listings (up to 5) | `top_listings` non-empty | `top_listings[].{id, title, listing_type, views}` |
-| Recent Activity (up to 8) | `recent_activity` non-empty | `recent_activity[].{title, description, time}` |
+1. **Hero KPI strip (always):** count-up tiles for `profile_views`, `followers` (Heart icon), `new_enquiries`, `active_batches` — from `getStatsOverview()`.
+2. **Tab switcher** — sliding `layoutId` pill. Tabs are entity-conditional and only shown when >1 exists:
 
-> **SVG gradient ID namespace:** All chart gradient IDs are prefixed `st-` (e.g. `st-moenq`, `st-evtkt`) to prevent conflicts if Dashboard and Statistics are mounted simultaneously.
+| Tab | Shown When | Content |
+|-----|------------|---------|
+| **Overview** | Always | Cross-entity highlight tiles (per available entity) + one primary interactive trend chosen by entity (Events→ticket sales, else Venues→revenue, else Enquiries volume). |
+| **Events** | `Events` in `allowedEntities` | KPI tiles (upcoming/tickets_sold/registrations/event_reach), interactive weekly-sales bar chart, engagement/booking-conv/this-month/prev-month tiles, ticket-sales trend (delta = `ticket_growth_pct`), Bookings-by-Category bars (count + `amount`). |
+| **Venues** | `Venues` in `allowedEntities` | Occupancy donut + Total Bookings/Upcoming/Monthly Earnings legend, KPI tiles (bookings/upcoming/avg_duration/repeat_clients), revenue trend area chart. |
+| **Classes** | `Classes` in `allowedEntities` | Conversion funnel (`FunnelBars` with stage drop-off %), trial-requests/avg-response/retention/enrolments tiles, monthly enquiry trend. "View all class enquiries" → `ENQUIRIES`. |
+| **Programs** | `Programs` in `allowedEntities` | Same enrolment/enquiry analytics as Classes (labels say "Program"). "View all program enquiries" → `PROGRAM_ENQUIRIES`. |
+
+> **Classes & Programs share one data source:** the partner stats API exposes a single class/program analytics endpoint (`/stats/enquiries/`). Both tabs render that same `StatsEnquiries` dataset — differing only in headings, copy, and the "view all" route. If the backend later splits it (e.g. `?type=class`), wire each tab to its own fetch.
+
+**`StatCharts.tsx` toolkit:**
+
+| Export | Type | Notes |
+|--------|------|-------|
+| `InteractiveAreaChart` | Animated area/line | Hover crosshair + dark tooltip (label/value/note), path-draw animation, HTML marker dot. `0..100` viewBox, `preserveAspectRatio="none"`. |
+| `InteractiveBarChart` | Animated bars | Staggered grow-in, per-bar hover tooltip. |
+| `AnimatedDonut` | Segmented ring | Segments animate on mount; center label/sub. |
+| `FunnelBars` | Horizontal funnel | Animated stage bars with stage-to-stage drop-off %. |
+| `CountUp` / `useCountUp` | Count-up hook | easeOutCubic; animates **from the previous value** so it re-animates on refresh. |
+| `fmtCurrency` / `fmtCompact` | Formatters | `fmtCurrency` adds `Cr` tier above the shared version. |
+
+> **Removed (no equivalent in the stats API):** the old `getPartnerDashboard()`-driven sections — Weekly **Activity** (generic), Top Performing Listings, Recent Activity, and the standalone 6-month Universal Trend block — are gone. The screen now sources exclusively from the four `/stats/*` endpoints.
 
 ### 6.5 Brand Profile (`EditProfile.tsx`)
 
@@ -782,7 +798,7 @@ classDiagram
 | BANK_SETUP | ❌ | — | BankSetup | ✅ IFSC/account regex, confirm account, calls `submitVerification`, navigates to `ONBOARDING_COMPLETE` |
 | ONBOARDING_COMPLETE | ❌ | — | OnboardingComplete | Static |
 | HOME | ✅ | — | Dashboard | ✅ getCurrentPartner, getPartnerDashboard, getPartnerFollowerCount — lean layout: Profile Performance at top, analytics in Statistics |
-| STATISTICS | ✅ | — | Statistics | ✅ getPartnerDashboard — all analytics/charts (weekly activity, funnels, event/venue analytics, 6-month trend, top listings, recent activity) |
+| STATISTICS | ✅ | — | Statistics | ✅ Parallel `getStatsOverview` + `getStatsEvents` + `getStatsVenues` + `getStatsEnquiries`; tabbed UI (Overview/Events/Venues/Classes/Programs, entity-conditional) with interactive hover charts (`StatCharts.tsx`) |
 | BRAND_PROFILE | ✅ | — | BrandProfile | ✅ Full profile CRUD |
 | PREVIEW_PROFILE | ✅ | — | PreviewProfile | ✅ Profile read |
 | SERVICE_LISTINGS | ✅ | — | ServiceListings | ✅ Parallel fetch: events + venues + classes + programs (tagged at fetch time) |
@@ -850,7 +866,7 @@ classDiagram
 - **Attendees / Booking Management** — Full booking management screen: KPI counts (5 parallel `getBookings` calls on mount including `awaiting_payment`), paginated list with filter tabs (All/Awaiting Payment/Confirmed/Attended/Cancelled) + search, right-side detail drawer with listing title (best-effort fetched), Mark Attended + Cancel Booking actions. Cancel available for both `confirmed` and `awaiting_payment`. Transaction badges context-aware ("Initiated" when payment pending, "SUCCESS" when paid). Order items show name + qty only (no repeated amounts).
 - **Listing Pause/Resume & Archive/Unarchive (all entities)** — Generic `pauseListing`/`resumeListing`/`archiveListing`/`unarchiveListing` endpoints added to `listings.ts`. All entity types now have Pause/Resume and Archive/Unarchive buttons in ServiceListings. Classes and Programs retain their entity-specific endpoints as overrides.
 - **ProgramEnquiries listing title** — Program name and format now displayed in the enquiry table and detail drawer, sourced from the already-fetched programs list (API enquiry response doesn't include these fields).
-- **Statistics Screen** — New dedicated analytics screen (`src/screens/statistics/`) accessible from sidebar ("Statistics" nav item, BarChart3 icon) and Dashboard Quick Links. All chart/analytics sections moved here from Dashboard. Fetches `getPartnerDashboard()` independently with manual refresh button. Entity-conditional sections: Weekly Activity, Enquiry Insights, Event Analytics, Venue Analytics, 6-month Universal Trend, Top Listings, Recent Activity.
+- **Statistics Screen (redesigned — Phase 19)** — Tabbed analytics screen (`src/screens/statistics/Statistics.tsx` + `StatCharts.tsx`) accessible from sidebar ("Statistics", BarChart3 icon) and Dashboard Quick Links. Always-on count-up KPI hero strip + sliding-pill tab switcher with entity-conditional tabs: Overview, Events, Venues, **Classes**, **Programs**. Fetches the four `/stats/*` endpoints in parallel via `Promise.allSettled` with a manual Refresh button. Interactive hover charts (crosshair tooltips, animated draw-in) live in the Statistics-only `StatCharts.tsx`. Classes & Programs tabs both render the shared `/stats/enquiries/` dataset (per-tab headings + "view all" routes to `ENQUIRIES` / `PROGRAM_ENQUIRIES`). Legacy `getPartnerDashboard()` sections (generic Weekly Activity, Top Listings, Recent Activity, Universal Trend) removed.
 - **Dashboard restructured (lean layout)** — Analytics sections removed; Profile Performance moved to top (after Welcome Banner); follower count displayed in both profile popup and Profile Performance card via `getPartnerFollowerCount(partnerId)`.
 - **Shared chart primitives** — `src/components/ui/DashboardCharts.tsx` extracted and re-exported via `components/ui/index.ts`. Both Dashboard and Statistics import from this shared file. SVG gradient IDs prefixed `st-` in Statistics to prevent conflicts.
 - **UI Redesign (Phase 16)** — Full visual overhaul matching TLB Admin Portal design language:
@@ -1018,18 +1034,21 @@ Before declaring a wizard "integrated":
 | File | Purpose |
 |------|---------|
 | `vitest.config.ts` | Vitest + jsdom + React plugin, `css: false`, globals |
-| `src/test/setup.ts` | Imports `@testing-library/jest-dom`, starts/resets/stops MSW server |
-| `src/test/msw/handlers.ts` | Default handlers for all API endpoints; exports `DRAFT_ID`, `mockDraft`, `mockCategories`, `mockFormats`, `mockAgeGroups`, `mockListing` |
+| `src/test/setup.ts` | Imports `@testing-library/jest-dom`, starts/resets/stops MSW server, runs `cleanup()` + clears `session`/`localStorage` per test, and **stubs `IntersectionObserver` / `ResizeObserver`** (jsdom lacks them; `motion/react` layout & in-view features need them — required by the Statistics tab/`layoutId` animations) |
+| `src/test/msw/handlers.ts` | Default handlers for all API endpoints; exports `DRAFT_ID`, `mockDraft`, `mockCategories`, `mockFormats`, `mockAgeGroups`, `mockListing`, and the **stats fixtures** `mockStatsOverview` / `mockStatsEvents` / `mockStatsVenues` / `mockStatsEnquiries` (with default handlers for all four `/stats/*` endpoints + `track-view/`) |
 | `src/test/msw/server.ts` | `setupServer(...handlers)` from msw/node |
 
-### 14.2 Test Files (359 tests)
+### 14.2 Test Files (392 tests)
 
-> **Note:** 12 ServiceListings tests are currently failing on `dev-vishesh` (pre-existing — unrelated to recent work). All other suites (347 tests) pass.
+> **Status:** All 392 tests pass → **100% pass rate**. The 12 previously-failing `ServiceListings` tests were stale assertions against the pre-Phase-16 UI (old "My Listings" heading + text "Edit Listing" button, single render layout). They were updated to the redesigned UI: `getAllByText`/`getAllByTitle` to tolerate the simultaneous desktop-table + mobile-card render under jsdom, `getByRole('heading', { name: 'Listings' })`, `title="Edit"` icon-button queries, and category-by-text assertions.
 
 | File | Tests | Coverage |
 |------|-------|----------|
 | `src/api/__tests__/listings.test.ts` | 28 | `ApiError` class, draft ID helpers, all metadata/CRUD/media/ticket endpoints (success + error codes) |
 | `src/api/__tests__/listings-classes-programs-venues.test.ts` | — | Classes, Programs, Venues API endpoints (formats, batches, enquiries, FAQs, media) |
+| `src/api/__tests__/stats.test.ts` | 12 | All 4 `/stats/*` getters + `trackProfileView`: `{data}`-envelope unwrap, bare-body fallback, auth header, nullable `engagement_rate`/`avg_response_hours`, error-message propagation, best-effort track-view |
+| `src/screens/statistics/__tests__/StatCharts.test.tsx` | 12 | `fmtCurrency`/`fmtCompact` tiers, `CountUp` final value + suffix, `InteractiveAreaChart` (svg/polyline, <2-pt placeholder, axis labels), `InteractiveBarChart` labels, `AnimatedDonut` center label, `FunnelBars` stages + drop-off % |
+| `src/screens/statistics/__tests__/Statistics.test.tsx` | 9 | Header, overview KPI strip, entity-conditional tabs (show/hide), tab switching (Events→weekly/trend, Venues→occupancy, Classes→funnel), no-entity empty state, all-endpoints-fail error state |
 | `src/screens/auth/__tests__/OTPVerify.test.tsx` | 16 | Initial render, OTP input/validation, verify → token store + navigate, **invalid-OTP toast**, **login gate rejects `otp_verified` status (clears tokens, blocks HOME)**, resend countdown (fake timer loop), phone mode |
 | `src/screens/onboarding/__tests__/AgreementSubmit.test.tsx` | 8 | PAN/IFSC/account validation, section navigation, successful `submitVerification` POST |
 | `src/screens/events/__tests__/CreateEventDetails.test.tsx` | 17 | Metadata loading, draft pre-fill, form interactions (category → subcategories, format toggle, mode fields, age group tabs), Next validation |
@@ -1081,6 +1100,8 @@ npm run test:report   # run tests → generate test-report.html + test-report.pd
 | `docs/venue-listings-db-spec.md` | Venues module — tables (`venues`, `venue_occasions`, `venue_availability`, `venue_packages`, `venue_media`), occasion/time-slot/attendee-field reference, bulk availability pattern, API endpoints |
 
 ---
+
+*Phase 19 (2026-05-30) — Statistics screen redesign: rebuilt `Statistics.tsx` into a tabbed, interactive analytics screen (sliding `layoutId` pill) with an always-on count-up KPI hero strip and entity-conditional tabs — Overview, Events, Venues, **Classes**, **Programs** (Classes/Programs split out from the former single "Enquiries" tab; both render the shared `/stats/enquiries/` dataset with per-tab headings and "view all" routes). New `src/screens/statistics/StatCharts.tsx` houses a Statistics-only interactive chart toolkit (`InteractiveAreaChart` with hover crosshair/tooltip, `InteractiveBarChart`, `AnimatedDonut`, `FunnelBars`, `CountUp`/`useCountUp`, `fmtCurrency`/`fmtCompact`) so the shared `DashboardCharts.tsx` and the Dashboard are untouched. `src/api/stats.ts` interfaces extended to match real payloads: `MonthlyBucket`/`RevenueBucket` gained `year`/`earnings`/`count`, `CategoryBucket` gained `amount` (now shown in Bookings-by-Category). Removed the legacy `getPartnerDashboard()`-driven sections (generic Weekly Activity, Top Listings, Recent Activity, standalone Universal Trend) — screen now sources exclusively from the four `/stats/*` endpoints.*
 
 *Last updated: 2026-05-29 — Phase 18 (Marketing + Onboarding overhaul + Stats API migration): all 10 onboarding screens rebuilt on a shared `OnboardingShell` (sticky branded header, animated `ProgressDots`, `PageHeader` helper, motion fade-in, decorative blurs); Landing redesigned with sticky backdrop-blur header, scroll-progress bar, mouse-following spotlight, 3D cursor-tilt floating hero cards, count-up stats, 6-card feature grid, How-it-works timeline; Login redesigned into a 50/50 split-panel with `layoutId` tabbed mode switcher (Mobile/Email) — popup modal removed; `alert()` calls across all redesigned screens replaced with shared `useToasts` toasts; new `src/api/stats.ts` module wires the Statistics screen against 4 new partner stats endpoints (`/stats/overview/`, `/stats/events/`, `/stats/venues/`, `/stats/enquiries/`) via `Promise.allSettled`; Dashboard's `profile_views` / `new_enquiries` / `active_batches` / `followers` now prefer `/stats/overview/` with legacy fallback.*
 

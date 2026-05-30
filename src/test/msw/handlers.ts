@@ -221,6 +221,72 @@ export const mockVenueDraft = {
     created_at: '2026-05-07T12:00:00Z',
 };
 
+// ─── Statistics fixtures ──────────────────────────────────────────────────────
+
+export const mockStatsOverview = {
+    profile_views: 1240,
+    followers: 87,
+    new_enquiries: 12,
+    active_batches: 6,
+};
+
+export const mockStatsEvents = {
+    upcoming: 3,
+    tickets_sold: 152,
+    registrations: 168,
+    event_reach: 4200,
+    engagement_rate: null,
+    booking_conv_rate: 42.5,
+    this_month_tickets: 60,
+    prev_month_tickets: 45,
+    ticket_growth_pct: 33.3,
+    weekly_ticket_sales: [
+        { day: 'Mon', date: '2026-05-25', count: 5 },
+        { day: 'Tue', date: '2026-05-26', count: 8 },
+        { day: 'Wed', date: '2026-05-27', count: 3 },
+        { day: 'Thu', date: '2026-05-28', count: 12 },
+        { day: 'Fri', date: '2026-05-29', count: 7 },
+        { day: 'Sat', date: '2026-05-30', count: 15 },
+        { day: 'Sun', date: '2026-05-31', count: 10 },
+    ],
+    ticket_sales_trend: [
+        { month: 'Dec 2025', year: 2025, count: 30, earnings: '30000.00' },
+        { month: 'Jan 2026', year: 2026, count: 45, earnings: '45000.00' },
+        { month: 'Feb 2026', year: 2026, count: 60, earnings: '60000.00' },
+    ],
+    by_category: [
+        { category: 'Music', count: 80, amount: '120000.00' },
+        { category: 'Dance', count: 72, amount: '95000.00' },
+    ],
+};
+
+export const mockStatsVenues = {
+    total_bookings: 48,
+    upcoming: 5,
+    monthly_earnings: '200000.00',
+    occupancy_rate: 67,
+    avg_duration_minutes: 90,
+    repeat_clients: 14,
+    revenue_trend: [
+        { month: 'Dec 2025', year: 2025, count: 10, earnings: '100000.00' },
+        { month: 'Jan 2026', year: 2026, count: 15, earnings: '150000.00' },
+        { month: 'Feb 2026', year: 2026, count: 20, earnings: '200000.00' },
+    ],
+};
+
+export const mockStatsEnquiries = {
+    conversion_funnel: { new_leads: 100, contacted: 60, converted: 25, conversion_rate: 25 },
+    trial_requests: 18,
+    avg_response_hours: 4.5,
+    student_retention_pct: 78,
+    monthly_enrolments: 9,
+    monthly_trend: [
+        { month: 'Dec 2025', year: 2025, count: 20, earnings: '0' },
+        { month: 'Jan 2026', year: 2026, count: 28, earnings: '0' },
+        { month: 'Feb 2026', year: 2026, count: 35, earnings: '0' },
+    ],
+};
+
 // ─── Default handlers ─────────────────────────────────────────────────────────
 
 export const handlers = [
@@ -514,4 +580,16 @@ export const handlers = [
 
     http.put(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/discovery/`, () =>
         HttpResponse.json({ success: true, data: { outing_types: ['outdoor'], activity_types: ['sports'], format_types: ['group'] } })),
+
+    // ─── Partner statistics ───
+    http.get(`${BASE}/api/v1/partner/stats/overview/`, () =>
+        HttpResponse.json({ success: true, data: mockStatsOverview })),
+    http.get(`${BASE}/api/v1/partner/stats/events/`, () =>
+        HttpResponse.json({ success: true, data: mockStatsEvents })),
+    http.get(`${BASE}/api/v1/partner/stats/venues/`, () =>
+        HttpResponse.json({ success: true, data: mockStatsVenues })),
+    http.get(`${BASE}/api/v1/partner/stats/enquiries/`, () =>
+        HttpResponse.json({ success: true, data: mockStatsEnquiries })),
+    http.post(`${BASE}/api/v1/partner/:id/track-view/`, () =>
+        HttpResponse.json({ success: true, data: { message: 'tracked' } })),
 ];

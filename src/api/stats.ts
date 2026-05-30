@@ -21,17 +21,22 @@ export interface WeeklyTicketDay {
 
 export interface MonthlyBucket {
     month: string;     // "Dec 2025"
+    year?: number;
     count: number;
+    earnings?: string; // stringified decimal — present on enquiry/event trends
 }
 
 export interface RevenueBucket {
     month: string;
+    year?: number;
+    count?: number;
     earnings: string;  // stringified decimal — "24500.00"
 }
 
 export interface CategoryBucket {
     category: string;
     count: number;
+    amount?: string;   // stringified decimal — revenue attributed to the category
 }
 
 export interface StatsEvents {

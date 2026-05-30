@@ -46,23 +46,25 @@ describe('ServiceListings — loading and error states', () => {
 describe('ServiceListings — listing display', () => {
     it('shows listing title after loading', async () => {
         renderWithPartner();
+        // Component renders both a desktop table and mobile cards, so the title
+        // appears more than once in jsdom (no CSS to hide either layout).
         await waitFor(() =>
-            expect(screen.getByText('Test Event')).toBeInTheDocument()
+            expect(screen.getAllByText('Test Event').length).toBeGreaterThan(0)
         );
     });
 
     it('shows Draft status badge', async () => {
         renderWithPartner();
         await waitFor(() =>
-            expect(screen.getByText('Draft')).toBeInTheDocument()
+            expect(screen.getAllByText('Draft').length).toBeGreaterThan(0)
         );
     });
 
     it('shows category name on the listing card', async () => {
         renderWithPartner();
-        await waitFor(() => screen.getByText('Test Event'));
-        const categoryLabels = document.querySelectorAll('.text-\\[10px\\].font-bold.text-tlb-yellow');
-        expect(categoryLabels.length).toBeGreaterThan(0);
+        await waitFor(() => screen.getAllByText('Test Event'));
+        // mockListing has category { name: 'Dance' } — rendered in the category column
+        expect(screen.getAllByText('Dance').length).toBeGreaterThan(0);
     });
 
     it('shows empty state when no listings returned', async () => {
@@ -74,10 +76,10 @@ describe('ServiceListings — listing display', () => {
         );
     });
 
-    it('shows My Listings heading', async () => {
+    it('shows the Listings heading', async () => {
         renderWithPartner();
         await waitFor(() =>
-            expect(screen.getByText('My Listings')).toBeInTheDocument()
+            expect(screen.getByRole('heading', { name: 'Listings' })).toBeInTheDocument()
         );
     });
 });
@@ -92,7 +94,7 @@ describe('ServiceListings — tabs', () => {
 
     it('shows allowed entity tabs', async () => {
         renderWithPartner(['Events', 'Classes']);
-        await waitFor(() => screen.getByText('Test Event'));
+        await waitFor(() => screen.getAllByText('Test Event'));
         // Both entity tabs should be present
         const tabs = screen.getAllByRole('button', { name: /^(All|Events|Classes)/ });
         expect(tabs.length).toBeGreaterThanOrEqual(3);
@@ -107,22 +109,22 @@ describe('ServiceListings — tabs', () => {
         );
         renderWithPartner(['Events', 'Classes']);
         const user = userEvent.setup();
-        await waitFor(() => screen.getByText('My Event'));
-        await waitFor(() => screen.getByText('My Class'));
-        // Click on Events tab
+        await waitFor(() => screen.getAllByText('My Event'));
+        await waitFor(() => screen.getAllByText('My Class'));
+        // Click on Events tab (tab label is "Events (1)")
         const eventTabBtns = screen.getAllByRole('button').filter(b => b.textContent?.startsWith('Events'));
         if (eventTabBtns.length > 0) await user.click(eventTabBtns[0]);
         await waitFor(() =>
-            expect(screen.queryByText('My Class')).not.toBeInTheDocument()
+            expect(screen.queryAllByText('My Class')).toHaveLength(0)
         );
-        expect(screen.getByText('My Event')).toBeInTheDocument();
+        expect(screen.getAllByText('My Event').length).toBeGreaterThan(0);
     });
 });
 
 describe('ServiceListings — search', () => {
     it('has a search input', async () => {
         renderWithPartner();
-        await waitFor(() => screen.getByText('Test Event'));
+        await waitFor(() => screen.getAllByText('Test Event'));
         expect(screen.getByPlaceholderText(/search listings/i)).toBeInTheDocument();
     });
 
@@ -137,32 +139,33 @@ describe('ServiceListings — search', () => {
             })));
         renderWithPartner();
         const user = userEvent.setup();
-        await waitFor(() => screen.getByText('Summer Art Festival'));
+        await waitFor(() => screen.getAllByText('Summer Art Festival'));
         const searchInput = screen.getByPlaceholderText(/search listings/i);
         await user.type(searchInput, 'Winter');
-        expect(screen.queryByText('Summer Art Festival')).not.toBeInTheDocument();
-        expect(screen.getByText('Winter Dance Camp')).toBeInTheDocument();
+        expect(screen.queryAllByText('Summer Art Festival')).toHaveLength(0);
+        expect(screen.getAllByText('Winter Dance Camp').length).toBeGreaterThan(0);
     });
 });
 
 describe('ServiceListings — edit and create navigation', () => {
-    it('shows Edit Listing button for draft events', async () => {
+    it('shows an Edit action for draft events', async () => {
         renderWithPartner();
+        // Edit is an icon button (title="Edit") on desktop + a text button on mobile.
         await waitFor(() =>
-            expect(screen.getByText('Edit Listing')).toBeInTheDocument()
+            expect(screen.getAllByTitle('Edit').length).toBeGreaterThan(0)
         );
     });
 
     it('sets draft id and navigates to CREATE_EVENT_DETAILS on Edit click', async () => {
         renderWithPartner();
         const user = userEvent.setup();
-        await waitFor(() => screen.getByText('Edit Listing'));
-        await user.click(screen.getByText('Edit Listing'));
+        await waitFor(() => screen.getAllByTitle('Edit'));
+        await user.click(screen.getAllByTitle('Edit')[0]);
         expect(getCurrentDraftId()).toBe(DRAFT_ID);
         expect(mockNavigate).toHaveBeenCalledWith('CREATE_EVENT_DETAILS');
     });
 
-    it('shows Edit Listing button for pending listings (still editable)', async () => {
+    it('shows an Edit action for pending listings (still editable)', async () => {
         server.use(http.get(`${BASE}/api/v1/partner/listings/events/`, () =>
             HttpResponse.json({
                 success: true,
@@ -176,9 +179,9 @@ describe('ServiceListings — edit and create navigation', () => {
             })));
         renderWithPartner();
         await waitFor(() =>
-            expect(screen.getByText('Edit Listing')).toBeInTheDocument()
+            expect(screen.getAllByTitle('Edit').length).toBeGreaterThan(0)
         );
-        expect(screen.queryByText('Locked')).not.toBeInTheDocument();
+        expect(screen.queryAllByTitle('Locked')).toHaveLength(0);
     });
 
     it('shows Locked button for published listings', async () => {
@@ -202,7 +205,7 @@ describe('ServiceListings — edit and create navigation', () => {
     it('navigates to CREATE_EVENT_DETAILS on Add Listing when only Events allowed', async () => {
         renderWithPartner(['Events']);
         const user = userEvent.setup();
-        await waitFor(() => screen.getByText('Test Event'));
+        await waitFor(() => screen.getAllByText('Test Event'));
         const addBtn = document.querySelector('header button[class*="bg-tlb-yellow"]') as HTMLButtonElement;
         await user.click(addBtn);
         expect(mockNavigate).toHaveBeenCalledWith('CREATE_EVENT_DETAILS');

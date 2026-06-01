@@ -3,6 +3,30 @@ import { afterEach, beforeAll, afterAll } from 'vitest';
 import { cleanup } from '@testing-library/react';
 import { server } from './msw/server';
 
+// ── jsdom polyfills for motion/react (framer-motion) ──
+// motion's layout / in-view features touch these browser APIs which jsdom lacks.
+if (typeof globalThis.IntersectionObserver === 'undefined') {
+    class IO {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+        takeRecords() { return []; }
+        root = null;
+        rootMargin = '';
+        thresholds = [];
+    }
+    globalThis.IntersectionObserver = IO as unknown as typeof IntersectionObserver;
+}
+
+if (typeof globalThis.ResizeObserver === 'undefined') {
+    class RO {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+    }
+    globalThis.ResizeObserver = RO as unknown as typeof ResizeObserver;
+}
+
 // Start MSW before all tests
 beforeAll(() => server.listen({ onUnhandledRequest: 'warn' }));
 

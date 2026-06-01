@@ -1,481 +1,516 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-    Menu, ArrowRight, Activity, Users, Target, Star,
-    Clock, BookOpen, CalendarDays, Ticket, Zap,
-    DollarSign, MapPin, Percent, RefreshCw,
+    Menu, ArrowRight, Activity, Users, Target, Star, TrendingUp, TrendingDown,
+    Clock, BookOpen, CalendarDays, Ticket, Zap, Eye, Heart,
+    DollarSign, MapPin, Percent, RefreshCw, LayoutGrid, Award,
+    GraduationCap, Layers,
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Screen } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
-import { getPartnerDashboard } from '../../api/onboarding';
 import {
-    WeeklyBarChart, TrendAreaChart, DonutChart,
-    fmtCurrency, trendPct,
-    MONTH_LABELS_6, WEEK_LABELS,
-} from '../../components/ui/DashboardCharts';
+    getStatsOverview, getStatsEvents, getStatsVenues, getStatsEnquiries,
+    StatsOverview, StatsEvents, StatsVenues, StatsEnquiries,
+} from '../../api/stats';
+import {
+    InteractiveAreaChart, InteractiveBarChart, AnimatedDonut, FunnelBars,
+    CountUp, fmtCurrency, fmtCompact, AreaPoint,
+} from './StatCharts';
 
 interface Props {
     onNavigate: (screen: Screen) => void;
     onOpenSidebar: () => void;
 }
 
+// ── Helpers ──
+const moneyToNumber = (s: string | number | null | undefined): number => {
+    if (s == null) return 0;
+    const n = typeof s === 'string' ? parseFloat(s) : s;
+    return Number.isFinite(n) ? n : 0;
+};
+const monthShort = (full: string): string => full?.split(' ')[0] ?? full ?? '';
+const settledValue = <T,>(r: PromiseSettledResult<T>): T | null =>
+    r.status === 'fulfilled' ? r.value : null;
+
+// ── Accent palette ──
+const ACCENTS = {
+    blue: { bg: '#EFF6FF', fg: '#3B82F6', solid: '#3B82F6' },
+    purple: { bg: '#F5F3FF', fg: '#8B5CF6', solid: '#8B5CF6' },
+    emerald: { bg: '#ECFDF5', fg: '#10B981', solid: '#10B981' },
+    amber: { bg: '#FFFBEB', fg: '#F59E0B', solid: '#F59E0B' },
+    yellow: { bg: '#FEFCE8', fg: '#CA8A04', solid: '#FACC15' },
+    rose: { bg: '#FFF1F2', fg: '#F43F5E', solid: '#F43F5E' },
+} as const;
+type AccentKey = keyof typeof ACCENTS;
+
+// ── Reusable stat tile (count-up + gradient icon + hover lift) ──
+const StatTile: React.FC<{
+    icon: React.ElementType;
+    label: string;
+    value: number | string;
+    accent: AccentKey;
+    format?: (n: number) => string;
+    big?: boolean;
+}> = ({ icon: Icon, label, value, accent, format, big }) => {
+    const a = ACCENTS[accent];
+    return (
+        <motion.div
+            className="tlb-card p-4 sm:p-5 flex flex-col gap-3"
+            whileHover={{ y: -3 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 22 }}
+        >
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: a.bg, color: a.fg }}>
+                <Icon size={17} />
+            </div>
+            <div>
+                <p className={`${big ? 'text-3xl' : 'text-2xl'} font-black leading-none text-gray-900`}>
+                    {typeof value === 'number' ? <CountUp value={value} format={format} /> : value}
+                </p>
+                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1.5">{label}</p>
+            </div>
+        </motion.div>
+    );
+};
+
+// ── Section card wrapper with title ──
+const Panel: React.FC<{
+    title: string; subtitle?: string; right?: React.ReactNode; children: React.ReactNode; className?: string;
+}> = ({ title, subtitle, right, children, className = '' }) => (
+    <div className={`tlb-card p-5 sm:p-6 ${className}`}>
+        <div className="flex items-start justify-between mb-5 gap-3">
+            <div>
+                <h3 className="font-black text-gray-900">{title}</h3>
+                {subtitle && <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>}
+            </div>
+            {right}
+        </div>
+        {children}
+    </div>
+);
+
+// ── Trend delta pill ──
+const DeltaPill: React.FC<{ pct: number }> = ({ pct }) => {
+    if (!pct) return <span className="text-[10px] font-bold text-gray-300">—</span>;
+    const up = pct > 0;
+    return (
+        <span className={`inline-flex items-center gap-1 text-[11px] font-black px-2 py-0.5 rounded-full ${up ? 'text-emerald-600 bg-emerald-50' : 'text-rose-500 bg-rose-50'}`}>
+            {up ? <TrendingUp size={12} /> : <TrendingDown size={12} />}{Math.abs(pct).toFixed(1)}%
+        </span>
+    );
+};
+
+const fadeUp = {
+    initial: { opacity: 0, y: 14 },
+    animate: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: -8 },
+    transition: { duration: 0.25 },
+};
+
+type TabKey = 'overview' | 'events' | 'venues' | 'classes' | 'programs';
+
 export const Statistics: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
     const { allowedEntities } = usePartner();
-    const [dashboardData, setDashboardData] = useState<any>(null);
+
+    const [overview, setOverview] = useState<StatsOverview | null>(null);
+    const [events, setEvents] = useState<StatsEvents | null>(null);
+    const [venues, setVenues] = useState<StatsVenues | null>(null);
+    const [enquiries, setEnquiries] = useState<StatsEnquiries | null>(null);
+
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
+    const [activeTab, setActiveTab] = useState<TabKey>('overview');
 
-    const load = () => {
+    const load = useCallback(async () => {
         setLoading(true);
         setError(false);
-        getPartnerDashboard()
-            .then(res => setDashboardData(res?.data || res))
-            .catch(() => setError(true))
-            .finally(() => setLoading(false));
-    };
+        try {
+            const [oRes, eRes, vRes, enqRes] = await Promise.allSettled([
+                getStatsOverview(), getStatsEvents(), getStatsVenues(), getStatsEnquiries(),
+            ]);
+            setOverview(settledValue(oRes));
+            setEvents(settledValue(eRes));
+            setVenues(settledValue(vRes));
+            setEnquiries(settledValue(enqRes));
+            if ([oRes, eRes, vRes, enqRes].every(r => r.status === 'rejected')) setError(true);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
 
-    useEffect(() => { load(); }, []);
+    useEffect(() => { load(); }, [load]);
 
-    const hasClassOrProgram = allowedEntities.includes('Classes') || allowedEntities.includes('Programs');
     const hasEvents = allowedEntities.includes('Events');
     const hasVenues = allowedEntities.includes('Venues');
+    const hasClasses = allowedEntities.includes('Classes');
+    const hasPrograms = allowedEntities.includes('Programs');
+    const hasClassOrProgram = hasClasses || hasPrograms;
 
-    const d = dashboardData || {};
+    // ── Tabs available to this partner ──
+    const tabs = useMemo(() => {
+        const t: { key: TabKey; label: string; icon: React.ElementType }[] = [
+            { key: 'overview', label: 'Overview', icon: LayoutGrid },
+        ];
+        if (hasEvents) t.push({ key: 'events', label: 'Events', icon: Ticket });
+        if (hasVenues) t.push({ key: 'venues', label: 'Venues', icon: MapPin });
+        if (hasClasses) t.push({ key: 'classes', label: 'Classes', icon: GraduationCap });
+        if (hasPrograms) t.push({ key: 'programs', label: 'Programs', icon: Layers });
+        return t;
+    }, [hasEvents, hasVenues, hasClasses, hasPrograms]);
 
-    const weeklyActivity: number[] = d.weekly_activity || [0, 0, 0, 0, 0, 0, 0];
-    const monthlyEnquiries: number[] = d.monthly_enquiries || [0, 0, 0, 0, 0, 0];
-    const monthlyRevenue: number[] = d.monthly_revenue || [0, 0, 0, 0, 0, 0];
-    const monthlyTickets: number[] = d.monthly_tickets || [0, 0, 0, 0, 0, 0];
+    // keep activeTab valid if entities change
+    useEffect(() => {
+        if (!tabs.some(t => t.key === activeTab)) setActiveTab('overview');
+    }, [tabs, activeTab]);
 
-    const funnelNew = d.funnel_new ?? d.new_enquiries ?? 0;
-    const funnelContacted = d.funnel_contacted ?? 0;
-    const funnelConverted = d.funnel_converted ?? 0;
-    const convRate = funnelNew > 0 ? Math.round((funnelConverted / funnelNew) * 100) : 0;
+    // ── Derived chart series ──
+    const ticketTrend: AreaPoint[] = (events?.ticket_sales_trend ?? []).map(t => ({
+        label: monthShort(t.month), value: t.count,
+        note: t.earnings ? fmtCurrency(moneyToNumber(t.earnings)) : undefined,
+    }));
+    const weeklyBars = (events?.weekly_ticket_sales ?? []).map(d => ({
+        label: d.day, value: d.count, note: d.date,
+    }));
+    const revenueTrend: AreaPoint[] = (venues?.revenue_trend ?? []).map(r => ({
+        label: monthShort(r.month), value: moneyToNumber(r.earnings),
+        note: r.count != null ? `${r.count} bookings` : undefined,
+    }));
+    const enquiryTrend: AreaPoint[] = (enquiries?.monthly_trend ?? []).map(t => ({
+        label: monthShort(t.month), value: t.count,
+        note: t.earnings ? fmtCurrency(moneyToNumber(t.earnings)) : undefined,
+    }));
 
-    const ticketsSold = d.tickets_sold ?? 0;
-    const totalRegistrations = d.total_registrations ?? 0;
-    const upcomingEvents = d.upcoming_events ?? 0;
-    const eventReach = d.event_reach ?? 0;
+    const lastDelta = (arr: AreaPoint[]) => {
+        if (arr.length < 2) return 0;
+        const prev = arr[arr.length - 2].value;
+        const curr = arr[arr.length - 1].value;
+        return prev ? ((curr - prev) / prev) * 100 : 0;
+    };
 
-    const venueBookings = d.venue_bookings ?? 0;
-    const occupancyRate = d.occupancy_rate ?? 0;
-    const upcomingReservations = d.upcoming_reservations ?? 0;
-    const monthlyEarnings = d.monthly_earnings ?? 0;
+    // ── Funnel + occupancy ──
+    const funnel = enquiries?.conversion_funnel;
+    const convRate = Math.round(funnel?.conversion_rate ?? 0);
+    const occupancyRate = Math.round(venues?.occupancy_rate ?? 0);
 
-    const topListings: any[] = d.top_listings || [];
-    const recentActivity: any[] = d.recent_activity || [];
+    const avgDuration = venues?.avg_duration_minutes ?? 0;
+    const avgDurationLabel = avgDuration > 0
+        ? (avgDuration >= 60 ? `${(avgDuration / 60).toFixed(1)}h` : `${Math.round(avgDuration)}m`)
+        : '—';
+    const avgResponseHours = enquiries?.avg_response_hours;
+    const engagementRate = events?.engagement_rate;
 
-    const weeklyLabel = hasEvents ? 'Weekly Ticket Sales' :
-        hasVenues ? 'Weekly Bookings' : 'Weekly Enquiries';
+    const noEntities = !hasEvents && !hasVenues && !hasClassOrProgram;
+    const noData = !overview && !events && !venues && !enquiries;
 
-    const trendLabel = hasEvents ? 'Ticket Sales Trend' :
-        hasVenues ? 'Booking Revenue Trend' : 'Enquiry & Enrolment Trend';
-
-    const trendData = hasEvents ? monthlyTickets :
-        hasVenues ? monthlyRevenue : monthlyEnquiries;
-
-    const trendColor = hasEvents ? '#8B5CF6' : hasVenues ? '#F59E0B' : '#3B82F6';
-    const trendId = hasEvents ? 'st-evtkt' : hasVenues ? 'st-vnrev' : 'st-clsenq';
+    // ── Primary trend for the Overview tab ──
+    const primaryTrend = hasEvents
+        ? { points: ticketTrend, color: ACCENTS.purple.solid, id: 'ov-evt', title: 'Ticket Sales', subtitle: 'Tickets sold over recent months', fmt: (n: number) => fmtCompact(n) }
+        : hasVenues
+        ? { points: revenueTrend, color: ACCENTS.amber.solid, id: 'ov-vnu', title: 'Revenue', subtitle: 'Monthly venue earnings', fmt: (n: number) => fmtCurrency(n) }
+        : { points: enquiryTrend, color: ACCENTS.blue.solid, id: 'ov-enq', title: 'Enquiries', subtitle: 'Monthly enquiry volume', fmt: (n: number) => fmtCompact(n) };
 
     return (
         <div className="min-h-screen bg-gray-50">
-            <header className="bg-white px-6 md:px-10 py-5 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
+            {/* Header */}
+            <header className="bg-white/90 backdrop-blur-sm px-6 md:px-10 py-5 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
                 <div className="flex items-center gap-4">
                     <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors">
                         <Menu size={24} />
                     </button>
                     <div>
                         <h1 className="text-2xl font-black text-gray-900 tracking-tight">Statistics</h1>
-                        <p className="text-sm font-bold text-gray-400 mt-0.5">Analytics, trends, and performance</p>
+                        <p className="text-sm font-bold text-gray-400 mt-0.5">Analytics, trends & performance</p>
                     </div>
                 </div>
                 <button
                     onClick={load}
                     disabled={loading}
-                    className="p-2 hover:bg-gray-50 rounded-xl transition-colors text-gray-400 hover:text-gray-700 disabled:opacity-40"
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-800 disabled:opacity-40 text-xs font-bold"
                     title="Refresh"
                 >
-                    <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+                    <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+                    <span className="hidden sm:inline">Refresh</span>
                 </button>
             </header>
 
-            <main className="p-6">
-                <div className="tlb-content space-y-8">
+            <main className="p-5 sm:p-6">
+                <div className="max-w-6xl mx-auto space-y-6">
 
-                    {loading && !dashboardData ? (
-                        <div className="flex items-center justify-center py-24">
+                    {loading && noData ? (
+                        <div className="flex items-center justify-center py-28">
                             <RefreshCw size={28} className="text-gray-300 animate-spin" />
                         </div>
                     ) : error ? (
-                        <div className="flex flex-col items-center gap-4 py-24 text-center">
+                        <div className="flex flex-col items-center gap-4 py-28 text-center">
                             <p className="text-sm font-bold text-gray-400">Could not load analytics data.</p>
-                            <button onClick={load} className="text-xs font-black text-blue-500 hover:underline">Try again</button>
+                            <button onClick={load} className="tlb-button text-sm">Try again</button>
+                        </div>
+                    ) : noEntities ? (
+                        <div className="flex flex-col items-center gap-3 py-20 text-center">
+                            <div className="w-14 h-14 rounded-2xl bg-yellow-50 flex items-center justify-center text-tlb-yellow">
+                                <Activity size={26} />
+                            </div>
+                            <p className="text-sm font-bold text-gray-500">No analytics yet</p>
+                            <p className="text-xs text-gray-400 max-w-xs">Create your first listing to start tracking views, bookings, and revenue.</p>
+                            <button onClick={() => onNavigate('SERVICE_LISTINGS')} className="mt-2 tlb-button text-sm">
+                                Go to My Listings <ArrowRight size={15} />
+                            </button>
                         </div>
                     ) : (
                         <>
-                            {/* ── Weekly Activity ── */}
-                            <section className="tlb-card p-6">
-                                <div className="flex items-center justify-between mb-5">
-                                    <div>
-                                        <h3 className="font-black text-gray-900">{weeklyLabel}</h3>
-                                        <p className="text-xs text-gray-400 mt-0.5">Last 7 days</p>
-                                    </div>
-                                    <div className="bg-gray-50 rounded-xl px-3 py-1.5 flex items-center gap-1.5">
-                                        <Activity size={13} className="text-gray-400" />
-                                        <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
-                                            Total: {weeklyActivity.reduce((a, b) => a + b, 0)}
-                                        </span>
-                                    </div>
+                            {/* ── Overview KPI hero strip (always) ── */}
+                            {overview && (
+                                <motion.section
+                                    className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4"
+                                    initial="initial" animate="animate"
+                                    variants={{ animate: { transition: { staggerChildren: 0.06 } } }}
+                                >
+                                    {[
+                                        { label: 'Profile Views', value: overview.profile_views, icon: Eye, accent: 'blue' as AccentKey },
+                                        { label: 'Followers', value: overview.followers, icon: Heart, accent: 'rose' as AccentKey },
+                                        { label: 'New Enquiries', value: overview.new_enquiries, icon: BookOpen, accent: 'purple' as AccentKey },
+                                        { label: 'Active Batches', value: overview.active_batches, icon: Target, accent: 'emerald' as AccentKey },
+                                    ].map(s => (
+                                        <motion.div key={s.label} variants={{ initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } }}>
+                                            <StatTile icon={s.icon} label={s.label} value={s.value} accent={s.accent} format={fmtCompact} big />
+                                        </motion.div>
+                                    ))}
+                                </motion.section>
+                            )}
+
+                            {/* ── Tab switcher (sliding pill) ── */}
+                            {tabs.length > 1 && (
+                                <div className="flex gap-1 p-1 bg-gray-100 rounded-2xl w-full sm:w-fit overflow-x-auto">
+                                    {tabs.map(t => {
+                                        const active = activeTab === t.key;
+                                        return (
+                                            <button
+                                                key={t.key}
+                                                onClick={() => setActiveTab(t.key)}
+                                                className={`relative flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors ${active ? 'text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
+                                            >
+                                                {active && (
+                                                    <motion.div layoutId="stat-tab-pill" className="absolute inset-0 bg-white rounded-xl shadow-sm" transition={{ type: 'spring', stiffness: 400, damping: 32 }} />
+                                                )}
+                                                <t.icon size={15} className="relative z-10" />
+                                                <span className="relative z-10">{t.label}</span>
+                                            </button>
+                                        );
+                                    })}
                                 </div>
-                                <WeeklyBarChart
-                                    data={weeklyActivity}
-                                    labels={WEEK_LABELS}
-                                    color={hasEvents ? '#8B5CF6' : hasVenues ? '#F59E0B' : '#3B82F6'}
-                                />
-                            </section>
+                            )}
 
-                            {/* ── Classes / Programs: Enquiry Insights ── */}
-                            {hasClassOrProgram && (
-                                <section className="space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <h3 className="font-black text-gray-900">Enquiry Insights</h3>
-                                        <button onClick={() => onNavigate('ENQUIRIES')} className="text-xs font-bold text-tlb-yellow flex items-center gap-1 hover:underline">
-                                            View All <ArrowRight size={12} />
-                                        </button>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        {/* Funnel Donut */}
-                                        <div className="tlb-card p-5">
-                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Conversion Funnel</p>
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-28 h-28 shrink-0">
-                                                    <DonutChart
-                                                        segments={[
-                                                            { value: funnelNew, color: '#3B82F6', label: 'New' },
-                                                            { value: funnelContacted, color: '#FACC15', label: 'Contacted' },
-                                                            { value: funnelConverted, color: '#10B981', label: 'Converted' },
-                                                        ]}
-                                                        centerLabel={`${convRate}%`}
-                                                        centerSub="CONV. RATE"
-                                                    />
-                                                </div>
-                                                <div className="flex-1 space-y-2.5">
-                                                    {[
-                                                        { label: 'New Leads', value: funnelNew, color: 'bg-blue-500' },
-                                                        { label: 'Contacted', value: funnelContacted, color: 'bg-tlb-yellow' },
-                                                        { label: 'Converted', value: funnelConverted, color: 'bg-emerald-500' },
-                                                    ].map(item => (
-                                                        <div key={item.label} className="flex items-center gap-2">
-                                                            <div className={`w-2 h-2 rounded-full ${item.color} shrink-0`} />
-                                                            <span className="text-xs text-gray-500 flex-1">{item.label}</span>
-                                                            <span className="text-xs font-black text-gray-900">{item.value}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                            {funnelNew === 0 && (
-                                                <p className="text-center text-[10px] font-bold text-gray-300 mt-3 uppercase tracking-widest">No enquiries yet</p>
+                            {/* ── Tab content ── */}
+                            <AnimatePresence mode="wait">
+                                {/* ════════ OVERVIEW ════════ */}
+                                {activeTab === 'overview' && (
+                                    <motion.div key="overview" {...fadeUp} className="space-y-6">
+                                        {/* Highlight cards across entities */}
+                                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                                            {hasEvents && events && (
+                                                <>
+                                                    <StatTile icon={Ticket} label="Tickets Sold" value={events.tickets_sold} accent="purple" format={fmtCompact} />
+                                                    <StatTile icon={Target} label="Booking Conv." value={`${(events.booking_conv_rate ?? 0).toFixed(1)}%`} accent="emerald" />
+                                                </>
+                                            )}
+                                            {hasVenues && venues && (
+                                                <>
+                                                    <StatTile icon={DollarSign} label="Monthly Earnings" value={moneyToNumber(venues.monthly_earnings)} accent="amber" format={fmtCurrency} />
+                                                    <StatTile icon={Percent} label="Occupancy" value={`${occupancyRate}%`} accent="blue" />
+                                                </>
+                                            )}
+                                            {hasClassOrProgram && enquiries && (
+                                                <>
+                                                    <StatTile icon={Award} label="Conversion" value={`${convRate}%`} accent="emerald" />
+                                                    <StatTile icon={Users} label="Retention" value={`${Math.round(enquiries.student_retention_pct ?? 0)}%`} accent="blue" />
+                                                </>
                                             )}
                                         </div>
 
-                                        {/* Stats Grid */}
-                                        <div className="grid grid-cols-2 gap-3">
-                                            {[
-                                                { label: 'Trial Requests', value: d.trial_requests ?? 0, icon: BookOpen, color: 'text-purple-500', bg: 'bg-purple-50' },
-                                                { label: 'Avg. Response', value: d.avg_response_time ? `${d.avg_response_time}h` : '—', icon: Clock, color: 'text-blue-500', bg: 'bg-blue-50' },
-                                                { label: 'Student Retention', value: d.retention_rate ? `${d.retention_rate}%` : '—', icon: Users, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-                                                { label: 'Monthly Enrolments', value: d.monthly_enrolments?.toString() ?? '0', icon: Target, color: 'text-amber-500', bg: 'bg-amber-50' },
-                                            ].map(stat => (
-                                                <div key={stat.label} className="tlb-card p-4 flex flex-col gap-2">
-                                                    <div className={`w-8 h-8 ${stat.bg} rounded-xl flex items-center justify-center ${stat.color}`}>
-                                                        <stat.icon size={16} />
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-xl font-black leading-none">{stat.value}</p>
-                                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">{stat.label}</p>
-                                                    </div>
-                                                </div>
-                                            ))}
+                                        {/* Primary interactive trend */}
+                                        <Panel
+                                            title={`${primaryTrend.title} Trend`}
+                                            subtitle={primaryTrend.subtitle}
+                                            right={<DeltaPill pct={lastDelta(primaryTrend.points)} />}
+                                        >
+                                            <InteractiveAreaChart
+                                                points={primaryTrend.points}
+                                                color={primaryTrend.color}
+                                                id={primaryTrend.id}
+                                                formatValue={primaryTrend.fmt}
+                                            />
+                                        </Panel>
+                                    </motion.div>
+                                )}
+
+                                {/* ════════ EVENTS ════════ */}
+                                {activeTab === 'events' && events && (
+                                    <motion.div key="events" {...fadeUp} className="space-y-6">
+                                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                                            <StatTile icon={CalendarDays} label="Upcoming" value={events.upcoming} accent="blue" format={fmtCompact} />
+                                            <StatTile icon={Ticket} label="Tickets Sold" value={events.tickets_sold} accent="purple" format={fmtCompact} />
+                                            <StatTile icon={Users} label="Registrations" value={events.registrations} accent="emerald" format={fmtCompact} />
+                                            <StatTile icon={Zap} label="Event Reach" value={events.event_reach} accent="amber" format={fmtCompact} />
                                         </div>
-                                    </div>
 
-                                    {/* Monthly Enquiry Trend */}
-                                    <div className="tlb-card p-5">
-                                        <div className="flex items-center justify-between mb-4">
-                                            <div>
-                                                <p className="font-black text-gray-900">Monthly Trend</p>
-                                                <p className="text-xs text-gray-400 mt-0.5">Enquiries over last 6 months</p>
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                            <Panel title="Weekly Ticket Sales" subtitle="Last 7 days"
+                                                right={<span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total {weeklyBars.reduce((a, b) => a + b.value, 0)}</span>}>
+                                                {weeklyBars.length ? (
+                                                    <InteractiveBarChart points={weeklyBars} color={ACCENTS.purple.solid} formatValue={(n) => `${Math.round(n)} sold`} />
+                                                ) : <EmptyMini text="No sales this week" />}
+                                            </Panel>
+
+                                            <div className="grid grid-cols-2 gap-3 sm:gap-4 content-start">
+                                                <StatTile icon={Activity} label="Engagement Rate" value={engagementRate != null ? `${engagementRate}%` : '—'} accent="blue" />
+                                                <StatTile icon={Target} label="Booking Conv." value={`${(events.booking_conv_rate ?? 0).toFixed(1)}%`} accent="emerald" />
+                                                <StatTile icon={TrendingUp} label="This Month" value={events.this_month_tickets} accent="amber" format={fmtCompact} />
+                                                <StatTile icon={Clock} label="Prev Month" value={events.prev_month_tickets} accent="purple" format={fmtCompact} />
                                             </div>
-                                            <span className="text-lg font-black text-blue-500">
-                                                {monthlyEnquiries[monthlyEnquiries.length - 1]}
-                                            </span>
                                         </div>
-                                        <TrendAreaChart data={monthlyEnquiries} labels={MONTH_LABELS_6} color="#3B82F6" id="st-moenq" />
-                                    </div>
-                                </section>
-                            )}
 
-                            {/* ── Events Analytics ── */}
-                            {hasEvents && (
-                                <section className="space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <h3 className="font-black text-gray-900">Event Analytics</h3>
-                                        <button onClick={() => onNavigate('SERVICE_LISTINGS')} className="text-xs font-bold text-tlb-yellow flex items-center gap-1 hover:underline">
-                                            My Events <ArrowRight size={12} />
-                                        </button>
-                                    </div>
+                                        <Panel title="Ticket Sales Trend" subtitle="Monthly performance"
+                                            right={<DeltaPill pct={events.ticket_growth_pct ?? lastDelta(ticketTrend)} />}>
+                                            <InteractiveAreaChart points={ticketTrend} color={ACCENTS.purple.solid} id="evt-trend" formatValue={(n) => `${Math.round(n)} tickets`} />
+                                        </Panel>
 
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                        {[
-                                            { label: 'Upcoming', value: upcomingEvents, icon: CalendarDays, color: 'text-blue-500', bg: 'bg-blue-50' },
-                                            { label: 'Tickets Sold', value: ticketsSold, icon: Ticket, color: 'text-purple-500', bg: 'bg-purple-50' },
-                                            { label: 'Registrations', value: totalRegistrations, icon: Users, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-                                            { label: 'Event Reach', value: eventReach, icon: Zap, color: 'text-amber-500', bg: 'bg-amber-50' },
-                                        ].map(stat => (
-                                            <div key={stat.label} className="tlb-card p-4 flex flex-col gap-2">
-                                                <div className={`w-8 h-8 ${stat.bg} rounded-xl flex items-center justify-center ${stat.color}`}>
-                                                    <stat.icon size={16} />
-                                                </div>
-                                                <div>
-                                                    <p className="text-2xl font-black leading-none">{stat.value}</p>
-                                                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">{stat.label}</p>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
+                                        {!!events.by_category?.length && (
+                                            <Panel title="Bookings by Category" subtitle="Where your audience is converting">
+                                                <CategoryBars
+                                                    items={events.by_category.map(c => ({ label: c.category, count: c.count, amount: moneyToNumber(c.amount) }))}
+                                                    color={ACCENTS.purple.solid}
+                                                />
+                                            </Panel>
+                                        )}
+                                    </motion.div>
+                                )}
 
-                                    <div className="tlb-card p-5">
-                                        <div className="flex items-center justify-between mb-4">
-                                            <div>
-                                                <p className="font-black text-gray-900">Ticket Sales Trend</p>
-                                                <p className="text-xs text-gray-400 mt-0.5">Monthly over last 6 months</p>
-                                            </div>
-                                            <span className="text-lg font-black text-purple-500">
-                                                {monthlyTickets[monthlyTickets.length - 1]}
-                                            </span>
-                                        </div>
-                                        <TrendAreaChart data={monthlyTickets} labels={MONTH_LABELS_6} color="#8B5CF6" id="st-evtkt" />
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="tlb-card p-5">
-                                            <div className="w-8 h-8 bg-blue-50 rounded-xl flex items-center justify-center text-blue-500 mb-3">
-                                                <Activity size={16} />
-                                            </div>
-                                            <p className="text-2xl font-black">{d.engagement_rate ? `${d.engagement_rate}%` : '—'}</p>
-                                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">Engagement Rate</p>
-                                        </div>
-                                        <div className="tlb-card p-5">
-                                            <div className="w-8 h-8 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-500 mb-3">
-                                                <Target size={16} />
-                                            </div>
-                                            <p className="text-2xl font-black">{d.booking_conversion ? `${d.booking_conversion}%` : '—'}</p>
-                                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">Booking Conv. Rate</p>
-                                        </div>
-                                    </div>
-                                </section>
-                            )}
-
-                            {/* ── Venue Analytics ── */}
-                            {hasVenues && (
-                                <section className="space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <h3 className="font-black text-gray-900">Venue Analytics</h3>
-                                        <button onClick={() => onNavigate('SERVICE_LISTINGS')} className="text-xs font-bold text-tlb-yellow flex items-center gap-1 hover:underline">
-                                            My Venues <ArrowRight size={12} />
-                                        </button>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div className="tlb-card p-5">
-                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Occupancy Rate</p>
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-28 h-28 shrink-0">
-                                                    <DonutChart
+                                {/* ════════ VENUES ════════ */}
+                                {activeTab === 'venues' && venues && (
+                                    <motion.div key="venues" {...fadeUp} className="space-y-6">
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                            <Panel title="Occupancy Rate" subtitle="Booked vs available capacity">
+                                                <div className="flex items-center gap-5">
+                                                    <AnimatedDonut
                                                         segments={[
-                                                            { value: occupancyRate, color: '#10B981', label: 'Occupied' },
-                                                            { value: 100 - occupancyRate, color: '#F3F4F6', label: 'Available' },
+                                                            { value: occupancyRate, color: ACCENTS.emerald.solid, label: 'Occupied' },
+                                                            { value: Math.max(0, 100 - occupancyRate), color: '#F3F4F6', label: 'Available' },
                                                         ]}
                                                         centerLabel={`${occupancyRate}%`}
-                                                        centerSub="OCCUPANCY"
+                                                        centerSub="Occupied"
                                                     />
-                                                </div>
-                                                <div className="flex-1 space-y-3">
-                                                    {[
-                                                        { label: 'Total Bookings', value: venueBookings, color: 'bg-blue-500' },
-                                                        { label: 'Upcoming', value: upcomingReservations, color: 'bg-amber-400' },
-                                                        { label: 'Monthly Earnings', value: fmtCurrency(monthlyEarnings), color: 'bg-emerald-500' },
-                                                    ].map(item => (
-                                                        <div key={item.label} className="flex items-center gap-2">
-                                                            <div className={`w-2 h-2 rounded-full ${item.color} shrink-0`} />
-                                                            <span className="text-xs text-gray-500 flex-1">{item.label}</span>
-                                                            <span className="text-xs font-black text-gray-900">{item.value}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-3">
-                                            {[
-                                                { label: 'Bookings', value: venueBookings, icon: MapPin, color: 'text-blue-500', bg: 'bg-blue-50' },
-                                                { label: 'Upcoming', value: upcomingReservations, icon: CalendarDays, color: 'text-amber-500', bg: 'bg-amber-50' },
-                                                { label: 'Avg. Duration', value: d.avg_booking_hours ? `${d.avg_booking_hours}h` : '—', icon: Clock, color: 'text-purple-500', bg: 'bg-purple-50' },
-                                                { label: 'Repeat Clients', value: d.repeat_clients ?? '—', icon: Star, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-                                            ].map(stat => (
-                                                <div key={stat.label} className="tlb-card p-4 flex flex-col gap-2">
-                                                    <div className={`w-8 h-8 ${stat.bg} rounded-xl flex items-center justify-center ${stat.color}`}>
-                                                        <stat.icon size={16} />
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-xl font-black leading-none">{stat.value}</p>
-                                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">{stat.label}</p>
+                                                    <div className="flex-1 space-y-3">
+                                                        {[
+                                                            { label: 'Total Bookings', value: `${venues.total_bookings}`, color: ACCENTS.blue.solid },
+                                                            { label: 'Upcoming', value: `${venues.upcoming}`, color: ACCENTS.amber.solid },
+                                                            { label: 'Monthly Earnings', value: fmtCurrency(moneyToNumber(venues.monthly_earnings)), color: ACCENTS.emerald.solid },
+                                                        ].map(r => (
+                                                            <div key={r.label} className="flex items-center gap-2">
+                                                                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: r.color }} />
+                                                                <span className="text-xs text-gray-500 flex-1">{r.label}</span>
+                                                                <span className="text-sm font-black text-gray-900">{r.value}</span>
+                                                            </div>
+                                                        ))}
                                                     </div>
                                                 </div>
-                                            ))}
-                                        </div>
-                                    </div>
+                                            </Panel>
 
-                                    <div className="tlb-card p-5">
-                                        <div className="flex items-center justify-between mb-4">
-                                            <div>
-                                                <p className="font-black text-gray-900">Revenue Trend</p>
-                                                <p className="text-xs text-gray-400 mt-0.5">Monthly earnings over last 6 months</p>
+                                            <div className="grid grid-cols-2 gap-3 sm:gap-4 content-start">
+                                                <StatTile icon={MapPin} label="Bookings" value={venues.total_bookings} accent="blue" format={fmtCompact} />
+                                                <StatTile icon={CalendarDays} label="Upcoming" value={venues.upcoming} accent="amber" format={fmtCompact} />
+                                                <StatTile icon={Clock} label="Avg. Duration" value={avgDurationLabel} accent="purple" />
+                                                <StatTile icon={Star} label="Repeat Clients" value={venues.repeat_clients} accent="emerald" format={fmtCompact} />
                                             </div>
-                                            <span className="text-lg font-black text-amber-500">
-                                                {fmtCurrency(monthlyRevenue[monthlyRevenue.length - 1])}
-                                            </span>
                                         </div>
-                                        <TrendAreaChart data={monthlyRevenue} labels={MONTH_LABELS_6} color="#F59E0B" id="st-vnrev" />
-                                    </div>
-                                </section>
-                            )}
 
-                            {/* ── Venue / Events extra stats ── */}
-                            {hasVenues && (
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="tlb-card p-5">
-                                        <div className="w-8 h-8 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-500 mb-3">
-                                            <DollarSign size={16} />
-                                        </div>
-                                        <p className="text-2xl font-black">{fmtCurrency(monthlyEarnings)}</p>
-                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">Monthly Earnings</p>
-                                    </div>
-                                    <div className="tlb-card p-5">
-                                        <div className="w-8 h-8 bg-blue-50 rounded-xl flex items-center justify-center text-blue-500 mb-3">
-                                            <Percent size={16} />
-                                        </div>
-                                        <p className="text-2xl font-black">{occupancyRate}%</p>
-                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">Occupancy Rate</p>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* ── Universal 6-Month Trend ── */}
-                            <section className="tlb-card p-6">
-                                <div className="flex items-center justify-between mb-5">
-                                    <div>
-                                        <h3 className="font-black text-gray-900">{trendLabel}</h3>
-                                        <p className="text-xs text-gray-400 mt-0.5">6-month overview</p>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: trendColor }} />
-                                        <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
-                                            {hasEvents ? 'Tickets' : hasVenues ? 'Revenue' : 'Enquiries'}
-                                        </span>
-                                    </div>
-                                </div>
-                                <TrendAreaChart data={trendData} labels={MONTH_LABELS_6} color={trendColor} id={trendId} />
-
-                                {hasClassOrProgram && (
-                                    <div className="mt-5 grid grid-cols-3 gap-3 pt-4 border-t border-gray-100">
-                                        {[
-                                            { label: 'This Month', value: monthlyEnquiries[monthlyEnquiries.length - 1] },
-                                            { label: 'Prev Month', value: monthlyEnquiries[monthlyEnquiries.length - 2] },
-                                            { label: 'Growth', value: `${trendPct(monthlyEnquiries) > 0 ? '+' : ''}${trendPct(monthlyEnquiries)}%` },
-                                        ].map(item => (
-                                            <div key={item.label} className="text-center">
-                                                <p className="text-xl font-black text-gray-900">{item.value}</p>
-                                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{item.label}</p>
-                                            </div>
-                                        ))}
-                                    </div>
+                                        <Panel title="Revenue Trend" subtitle="Monthly venue earnings"
+                                            right={<DeltaPill pct={lastDelta(revenueTrend)} />}>
+                                            <InteractiveAreaChart points={revenueTrend} color={ACCENTS.amber.solid} id="vnu-trend" formatValue={fmtCurrency} />
+                                        </Panel>
+                                    </motion.div>
                                 )}
-                            </section>
 
-                            {/* ── Top Performing Listings ── */}
-                            {topListings.length > 0 && (
-                                <section>
-                                    <div className="flex items-center justify-between mb-4">
-                                        <h3 className="font-black text-gray-900">Top Performing Listings</h3>
-                                        <button onClick={() => onNavigate('SERVICE_LISTINGS')} className="text-xs font-bold text-tlb-yellow flex items-center gap-1 hover:underline">
-                                            All Listings <ArrowRight size={12} />
-                                        </button>
-                                    </div>
-                                    <div className="space-y-3">
-                                        {topListings.slice(0, 5).map((listing: any, i: number) => (
-                                            <div key={listing.id || i} className="tlb-card p-4 flex items-center gap-4">
-                                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 font-black text-sm ${
-                                                    i === 0 ? 'bg-tlb-yellow text-tlb-dark' :
-                                                    i === 1 ? 'bg-gray-200 text-gray-600' :
-                                                    'bg-orange-100 text-orange-600'
-                                                }`}>
-                                                    {i + 1}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="font-bold text-sm truncate">{listing.title || 'Untitled'}</p>
-                                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">{listing.listing_type || ''}</p>
-                                                </div>
-                                                <div className="text-right shrink-0">
-                                                    <p className="text-sm font-black text-gray-900">{listing.views ?? 0}</p>
-                                                    <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">views</p>
-                                                </div>
+                                {/* ════════ CLASSES / PROGRAMS (enrolment & enquiry analytics) ════════ */}
+                                {(activeTab === 'classes' || activeTab === 'programs') && enquiries && (
+                                    <motion.div key={activeTab} {...fadeUp} className="space-y-6">
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                            <Panel title="Conversion Funnel" subtitle={`${activeTab === 'programs' ? 'Program' : 'Class'} lead journey`}
+                                                right={
+                                                    <div className="text-right">
+                                                        <p className="text-2xl font-black" style={{ color: ACCENTS.emerald.solid }}>
+                                                            <CountUp value={convRate} suffix="%" />
+                                                        </p>
+                                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Conv. Rate</p>
+                                                    </div>
+                                                }>
+                                                <FunnelBars
+                                                    stages={[
+                                                        { label: 'New Leads', value: funnel?.new_leads ?? 0, color: ACCENTS.blue.solid },
+                                                        { label: 'Contacted', value: funnel?.contacted ?? 0, color: ACCENTS.yellow.solid },
+                                                        { label: 'Converted', value: funnel?.converted ?? 0, color: ACCENTS.emerald.solid },
+                                                    ]}
+                                                />
+                                            </Panel>
+
+                                            <div className="grid grid-cols-2 gap-3 sm:gap-4 content-start">
+                                                <StatTile icon={BookOpen} label="Trial Requests" value={enquiries.trial_requests} accent="purple" format={fmtCompact} />
+                                                <StatTile icon={Clock} label="Avg. Response" value={avgResponseHours != null ? `${avgResponseHours.toFixed(1)}h` : '—'} accent="blue" />
+                                                <StatTile icon={Users} label="Retention" value={`${Math.round(enquiries.student_retention_pct ?? 0)}%`} accent="emerald" />
+                                                <StatTile icon={Target} label="Enrolments" value={enquiries.monthly_enrolments} accent="amber" format={fmtCompact} />
                                             </div>
-                                        ))}
-                                    </div>
-                                </section>
-                            )}
+                                        </div>
 
-                            {/* ── Recent Activity ── */}
-                            {recentActivity.length > 0 && (
-                                <section>
-                                    <h3 className="font-black text-gray-900 mb-4">Recent Activity</h3>
-                                    <div className="tlb-card overflow-hidden">
-                                        {recentActivity.slice(0, 8).map((item: any, i: number) => (
-                                            <div key={i} className="flex items-start gap-4 px-5 py-4 border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors">
-                                                <div className="w-8 h-8 bg-tlb-yellow/10 text-tlb-yellow rounded-xl flex items-center justify-center shrink-0">
-                                                    <Activity size={14} />
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-sm font-bold text-gray-900">{item.title || item.text}</p>
-                                                    {item.description && <p className="text-xs text-gray-400 mt-0.5">{item.description}</p>}
-                                                </div>
-                                                <span className="text-[10px] text-gray-400 font-bold shrink-0 mt-0.5">{item.time || item.created_at || ''}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </section>
-                            )}
+                                        <Panel title="Monthly Trend" subtitle={`${activeTab === 'programs' ? 'Program' : 'Class'} enquiries over recent months`}
+                                            right={<DeltaPill pct={lastDelta(enquiryTrend)} />}>
+                                            <InteractiveAreaChart points={enquiryTrend} color={ACCENTS.blue.solid} id="enq-trend" formatValue={(n) => `${Math.round(n)} enquiries`} />
+                                        </Panel>
 
-                            {/* Empty state when there's no analytics data at all */}
-                            {!hasClassOrProgram && !hasEvents && !hasVenues &&
-                                topListings.length === 0 && recentActivity.length === 0 && (
-                                    <div className="flex flex-col items-center gap-3 py-16 text-center">
-                                        <p className="text-sm font-bold text-gray-400">No analytics data yet.</p>
-                                        <p className="text-xs text-gray-300">Create your first listing to start tracking performance.</p>
                                         <button
-                                            onClick={() => onNavigate('SERVICE_LISTINGS')}
-                                            className="mt-2 text-xs font-black text-tlb-yellow hover:underline"
+                                            onClick={() => onNavigate(activeTab === 'programs' ? 'PROGRAM_ENQUIRIES' : 'ENQUIRIES')}
+                                            className="w-full sm:w-auto flex items-center justify-center gap-2 text-sm font-bold text-gray-500 hover:text-gray-900 transition-colors"
                                         >
-                                            Go to My Listings →
+                                            View all {activeTab === 'programs' ? 'program' : 'class'} enquiries <ArrowRight size={15} />
                                         </button>
-                                    </div>
-                                )
-                            }
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </>
                     )}
                 </div>
             </main>
+        </div>
+    );
+};
+
+// ── Empty mini placeholder ──
+const EmptyMini: React.FC<{ text: string }> = ({ text }) => (
+    <div className="flex items-center justify-center h-32 text-[11px] font-bold text-gray-300 uppercase tracking-widest">{text}</div>
+);
+
+// ── Category bars with count + revenue ──
+const CategoryBars: React.FC<{ items: { label: string; count: number; amount: number }[]; color: string }> = ({ items, color }) => {
+    const max = Math.max(...items.map(i => i.count), 1);
+    return (
+        <div className="space-y-4">
+            {items.map((c, i) => (
+                <div key={c.label}>
+                    <div className="flex justify-between items-baseline text-xs mb-1.5">
+                        <span className="font-bold text-gray-700">{c.label}</span>
+                        <span className="flex items-center gap-2">
+                            {c.amount > 0 && <span className="font-bold text-gray-400">{fmtCurrency(c.amount)}</span>}
+                            <span className="font-black text-gray-900">{c.count}</span>
+                        </span>
+                    </div>
+                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <motion.div
+                            className="h-full rounded-full"
+                            style={{ background: color }}
+                            initial={{ width: 0 }}
+                            animate={{ width: `${(c.count / max) * 100}%` }}
+                            transition={{ duration: 0.7, delay: i * 0.07, ease: 'easeOut' }}
+                        />
+                    </div>
+                </div>
+            ))}
         </div>
     );
 };

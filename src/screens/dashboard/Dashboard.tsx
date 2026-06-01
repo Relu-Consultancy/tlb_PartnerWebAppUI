@@ -12,6 +12,7 @@ import {
   getPartnerDashboard, getCurrentPartner, getBusinessProfile,
   getExtendedProfile, getPartnerMedia, getPartnerFollowerCount
 } from '../../api/onboarding';
+import { getStatsOverview, StatsOverview } from '../../api/stats';
 
 // --------- Types / Constants ------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -32,6 +33,9 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
 
   const [partnerData, setPartnerData] = useState<any>(null);
   const [dashboardData, setDashboardData] = useState<any>(null);
+  // Canonical source for profile_views / followers / new_enquiries / active_batches.
+  // Falls back to legacy `dashboardData` if /stats/overview/ is unavailable.
+  const [overviewData, setOverviewData] = useState<StatsOverview | null>(null);
   const [profileData, setProfileData] = useState<any>(null);
   const [extendedData, setExtendedData] = useState<any>(null);
   const [mediaItems, setMediaItems] = useState<any[]>([]);
@@ -41,8 +45,8 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [partnerRes, dashboardRes, profileRes, extRes, mediaRes] = await Promise.allSettled([
-          getCurrentPartner(), getPartnerDashboard(), getBusinessProfile(),
+        const [partnerRes, dashboardRes, overviewRes, profileRes, extRes, mediaRes] = await Promise.allSettled([
+          getCurrentPartner(), getPartnerDashboard(), getStatsOverview(), getBusinessProfile(),
           getExtendedProfile(), getPartnerMedia(),
         ]);
         if (partnerRes.status === 'fulfilled') {
@@ -57,6 +61,14 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
           }
         }
         if (dashboardRes.status === 'fulfilled') setDashboardData(dashboardRes.value.data || dashboardRes.value);
+        if (overviewRes.status === 'fulfilled') {
+          const o = overviewRes.value;
+          setOverviewData(o);
+          // Prefer /stats/overview/'s follower count when available — it's the canonical
+          // source per the new API. The separate getPartnerFollowerCount() call above
+          // still runs as a fallback in case /stats/overview/ fails.
+          if (typeof o?.followers === 'number') setFollowerCount(o.followers);
+        }
         if (profileRes.status === 'fulfilled') setProfileData(profileRes.value.data || profileRes.value);
         if (extRes.status === 'fulfilled') setExtendedData(extRes.value.data || extRes.value);
         if (mediaRes.status === 'fulfilled') {
@@ -161,6 +173,12 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
   const occupancyRate = d.occupancy_rate ?? 0;
   const monthlyEarnings = d.monthly_earnings ?? 0;
 
+  // /stats/overview/ is the canonical source for these three; fall back to the
+  // legacy dashboard endpoint if the new one hasn't returned (or fails).
+  const profileViews = overviewData?.profile_views ?? d.profile_views ?? 0;
+  const newEnquiries = overviewData?.new_enquiries ?? d.new_enquiries ?? 0;
+  const activeBatches = overviewData?.active_batches ?? d.active_batches ?? 0;
+
   // ------ KPI Metrics ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
   const kpiMetrics = (() => {
@@ -169,9 +187,9 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
       const batchSpark: number[] = d.weekly_batches || [0, 0, 0, 0, 0, 0, 0];
       const viewsSpark: number[] = d.weekly_views || [0, 0, 0, 0, 0, 0, 0];
       return [
-        { label: 'New Enquiries', value: d.new_enquiries?.toString() || '0', icon: Inbox, color: 'text-blue-500', bg: 'bg-blue-50', hex: '#3B82F6', sparkId: 'enq', spark: enqSpark },
-        { label: 'Active Batches', value: d.active_batches?.toString() || '0', icon: BarChart3, color: 'text-emerald-500', bg: 'bg-emerald-50', hex: '#10B981', sparkId: 'bat', spark: batchSpark },
-        { label: 'Profile Views', value: d.profile_views?.toString() || '0', icon: Eye, color: 'text-purple-500', bg: 'bg-purple-50', hex: '#8B5CF6', sparkId: 'vw', spark: viewsSpark },
+        { label: 'New Enquiries', value: newEnquiries.toString(), icon: Inbox, color: 'text-blue-500', bg: 'bg-blue-50', hex: '#3B82F6', sparkId: 'enq', spark: enqSpark },
+        { label: 'Active Batches', value: activeBatches.toString(), icon: BarChart3, color: 'text-emerald-500', bg: 'bg-emerald-50', hex: '#10B981', sparkId: 'bat', spark: batchSpark },
+        { label: 'Profile Views', value: profileViews.toString(), icon: Eye, color: 'text-purple-500', bg: 'bg-purple-50', hex: '#8B5CF6', sparkId: 'vw', spark: viewsSpark },
       ];
     }
     if (hasEvents) {
@@ -182,7 +200,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
       return [
         { label: 'Upcoming Events', value: upcomingEvents.toString(), icon: CalendarDays, color: 'text-blue-500', bg: 'bg-blue-50', hex: '#3B82F6', sparkId: 'upe', spark: tktSpark },
         { label: 'Tickets Sold', value: ticketsSold.toString(), icon: Ticket, color: 'text-purple-500', bg: 'bg-purple-50', hex: '#8B5CF6', sparkId: 'tkt', spark: regSpark },
-        { label: 'Profile Views', value: d.profile_views?.toString() || '0', icon: Eye, color: 'text-emerald-500', bg: 'bg-emerald-50', hex: '#10B981', sparkId: 'evw', spark: viewsSpark },
+        { label: 'Profile Views', value: profileViews.toString(), icon: Eye, color: 'text-emerald-500', bg: 'bg-emerald-50', hex: '#10B981', sparkId: 'evw', spark: viewsSpark },
         { label: 'Total Revenue', value: fmtCurrency(d.total_revenue || 0), icon: DollarSign, color: 'text-amber-500', bg: 'bg-amber-50', hex: '#F59E0B', sparkId: 'rev', spark: rvnSpark },
       ];
     }
@@ -193,14 +211,14 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
       return [
         { label: 'Venue Bookings', value: venueBookings.toString(), icon: MapPin, color: 'text-blue-500', bg: 'bg-blue-50', hex: '#3B82F6', sparkId: 'vbk', spark: bkSpark },
         { label: 'Occupancy Rate', value: `${occupancyRate}%`, icon: Percent, color: 'text-emerald-500', bg: 'bg-emerald-50', hex: '#10B981', sparkId: 'occ', spark: viewsSpark },
-        { label: 'Profile Views', value: d.profile_views?.toString() || '0', icon: Eye, color: 'text-purple-500', bg: 'bg-purple-50', hex: '#8B5CF6', sparkId: 'vvw', spark: viewsSpark },
+        { label: 'Profile Views', value: profileViews.toString(), icon: Eye, color: 'text-purple-500', bg: 'bg-purple-50', hex: '#8B5CF6', sparkId: 'vvw', spark: viewsSpark },
         { label: 'Monthly Earnings', value: fmtCurrency(monthlyEarnings), icon: CreditCard, color: 'text-amber-500', bg: 'bg-amber-50', hex: '#F59E0B', sparkId: 'mea', spark: rvnSpark },
       ];
     }
     return [
-      { label: 'New Enquiries', value: d.new_enquiries?.toString() || '0', icon: Inbox, color: 'text-blue-500', bg: 'bg-blue-50', hex: '#3B82F6', sparkId: 'genq', spark: [0,0,0,0,0,0,0] as number[] },
-      { label: 'Active Batches', value: d.active_batches?.toString() || '0', icon: BarChart3, color: 'text-emerald-500', bg: 'bg-emerald-50', hex: '#10B981', sparkId: 'gbat', spark: [0,0,0,0,0,0,0] as number[] },
-      { label: 'Profile Views', value: d.profile_views?.toString() || '0', icon: Eye, color: 'text-purple-500', bg: 'bg-purple-50', hex: '#8B5CF6', sparkId: 'gvw', spark: [0,0,0,0,0,0,0] as number[] },
+      { label: 'New Enquiries', value: newEnquiries.toString(), icon: Inbox, color: 'text-blue-500', bg: 'bg-blue-50', hex: '#3B82F6', sparkId: 'genq', spark: [0,0,0,0,0,0,0] as number[] },
+      { label: 'Active Batches', value: activeBatches.toString(), icon: BarChart3, color: 'text-emerald-500', bg: 'bg-emerald-50', hex: '#10B981', sparkId: 'gbat', spark: [0,0,0,0,0,0,0] as number[] },
+      { label: 'Profile Views', value: profileViews.toString(), icon: Eye, color: 'text-purple-500', bg: 'bg-purple-50', hex: '#8B5CF6', sparkId: 'gvw', spark: [0,0,0,0,0,0,0] as number[] },
     ];
   })();
 
@@ -385,7 +403,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
             </div>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { label: 'Views', value: d.profile_views ?? 0, color: 'text-purple-500' },
+                { label: 'Views', value: profileViews, color: 'text-purple-500' },
                 { label: 'Followers', value: followerCount === null ? '-' : followerCount, color: 'text-blue-500' },
                 { label: 'Complete', value: `${profileCompletion}%`, color: 'text-emerald-500' },
               ].map(s => (

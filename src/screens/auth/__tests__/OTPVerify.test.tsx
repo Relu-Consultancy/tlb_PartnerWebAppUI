@@ -100,8 +100,7 @@ describe('OTPVerify — verify OTP API', () => {
         await waitFor(() => expect(localStorage.getItem('access_token')).toBe('test-access-token'));
     });
 
-    it('shows alert on invalid OTP', async () => {
-        const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    it('shows a toast on invalid OTP', async () => {
         server.use(http.post(`${BASE}/api/v1/auth/verify-otp/`, () =>
             HttpResponse.json({ error: 'Invalid OTP' }, { status: 400 })));
         renderOTPVerify();
@@ -109,8 +108,22 @@ describe('OTPVerify — verify OTP API', () => {
         const inputs = screen.getAllByRole('textbox');
         for (let i = 0; i < 6; i++) await user.type(inputs[i], '0');
         await user.click(screen.getByRole('button', { name: /verify identity/i }));
-        await waitFor(() => expect(alertSpy).toHaveBeenCalledWith('Invalid OTP. Please try again.'));
-        alertSpy.mockRestore();
+        await waitFor(() => expect(screen.getByText('Invalid OTP. Please try again.')).toBeInTheDocument());
+    });
+
+    it('rejects login when partner status indicates onboarding is incomplete', async () => {
+        // Partner exists but only at otp_verified — login should refuse the session.
+        server.use(http.get(`${BASE}/api/v1/partner/me/`, () =>
+            HttpResponse.json({ success: true, data: { id: 1, status: 'otp_verified' } })));
+        renderOTPVerify();
+        const user = userEvent.setup();
+        const inputs = screen.getAllByRole('textbox');
+        for (let i = 0; i < 6; i++) await user.type(inputs[i], '0');
+        await user.click(screen.getByRole('button', { name: /verify identity/i }));
+        await waitFor(() => expect(screen.getByText(/not registered as a partner/i)).toBeInTheDocument());
+        // Tokens must be cleared, and HOME must NOT be navigated to.
+        expect(localStorage.getItem('access_token')).toBeNull();
+        expect(mockNavigate).not.toHaveBeenCalledWith('HOME');
     });
 });
 

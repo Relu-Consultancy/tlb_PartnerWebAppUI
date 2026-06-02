@@ -122,6 +122,9 @@ export const BrandProfile: React.FC<ProfileProps> = ({ onNavigate, onOpenSidebar
         }
     };
 
+    const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png'];
+    const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/quicktime'];
+
     const handleAddImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files?.length) return;
         setUploadingMedia(true);
@@ -129,24 +132,46 @@ export const BrandProfile: React.FC<ProfileProps> = ({ onNavigate, onOpenSidebar
             const files = e.target.files;
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
-                if (file.size > 5 * 1024 * 1024) { alert(`${file.name} exceeds 5MB`); continue; }
+                if (file.type && !ALLOWED_IMAGE_TYPES.includes(file.type)) {
+                    alert(`${file.name}: unsupported format. Use JPG or PNG.`);
+                    continue;
+                }
+                if (file.size > 5 * 1024 * 1024) {
+                    alert(`${file.name} is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max is 5MB.`);
+                    continue;
+                }
                 const res = await uploadPartnerMedia(file, 'image');
                 const data = res.data || res;
                 setMediaImages(prev => [...prev, data]);
             }
-        } catch { alert('Upload failed.'); }
+        } catch (err: any) {
+            console.error('Image upload failed', err);
+            alert(err?.message || 'Could not upload image. Please try again.');
+        }
         finally { setUploadingMedia(false); e.target.value = ''; }
     };
 
     const handleAddVideo = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files?.length) return;
         const file = e.target.files[0];
-        if (file.size > 100 * 1024 * 1024) { alert('Video exceeds 100MB'); return; }
+        if (file.type && !ALLOWED_VIDEO_TYPES.includes(file.type)) {
+            alert(`${file.name}: unsupported format. Use MP4 or MOV.`);
+            e.target.value = '';
+            return;
+        }
+        if (file.size > 100 * 1024 * 1024) {
+            alert(`${file.name} is too large (${(file.size / 1024 / 1024).toFixed(0)}MB). Max is 100MB.`);
+            e.target.value = '';
+            return;
+        }
         setUploadingMedia(true);
         try {
             const res = await uploadPartnerMedia(file, 'video');
             setMediaVideo(res.data || res);
-        } catch { alert('Upload failed.'); }
+        } catch (err: any) {
+            console.error('Video upload failed', err);
+            alert(err?.message || 'Could not upload video. Please try again.');
+        }
         finally { setUploadingMedia(false); e.target.value = ''; }
     };
 
@@ -175,7 +200,7 @@ export const BrandProfile: React.FC<ProfileProps> = ({ onNavigate, onOpenSidebar
                 >
                     <ArrowLeft size={24} />
                 </button>
-                <h1 className="font-black text-lg">{isEditing ? 'Edit Profile' : 'Brand Profile'}</h1>
+                <h1 className="tlb-page-title">{isEditing ? 'Edit Profile' : 'Brand Profile'}</h1>
                 <button onClick={() => onNavigate('PREVIEW_PROFILE')} className="flex items-center gap-1.5 text-tlb-yellow font-black text-sm uppercase tracking-widest">
                     <Eye size={16} /> Preview
                 </button>

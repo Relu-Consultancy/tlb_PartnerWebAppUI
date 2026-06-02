@@ -170,15 +170,22 @@ export const InteractiveAreaChart: React.FC<{
                 </div>
             </div>
 
-            {/* x-axis labels */}
-            <div className="flex mt-2">
-                {points.map((p, i) => (
-                    <div key={i} className="flex-1 text-center">
-                        {(i % step === 0 || i === n - 1) && (
-                            <span className={`text-[9px] font-bold ${i === active ? 'text-gray-700' : 'text-gray-400'}`}>{p.label}</span>
-                        )}
-                    </div>
-                ))}
+            {/* x-axis labels — absolutely positioned under their data points so
+                they line up with the line vertices (flex-1 cells would offset them). */}
+            <div className="relative mt-2 h-4">
+                {points.map((p, i) => {
+                    if (!(i % step === 0 || i === n - 1)) return null;
+                    const left = Math.min(Math.max(xAt(i), 4), 96);
+                    return (
+                        <span
+                            key={i}
+                            className={`absolute -translate-x-1/2 text-[9px] font-bold whitespace-nowrap ${i === active ? 'text-gray-700' : 'text-gray-400'}`}
+                            style={{ left: `${left}%` }}
+                        >
+                            {p.label}
+                        </span>
+                    );
+                })}
             </div>
         </div>
     );

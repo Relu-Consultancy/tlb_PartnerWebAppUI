@@ -1,5 +1,16 @@
 @layer base {
     body {
         @apply font-sans bg-gray-50 text-tlb-dark;
+        /* Consistent rendering of the Inter webfont across the whole site */
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        text-rendering: optimizeLegibility;
+        line-height: 1.5;
+    }
+
+    /* Default heading rhythm so even unstyled headings stay consistent.
+       Screen-level classes (.tlb-page-title etc.) override these. */
+    h1, h2, h3, h4, h5, h6 {
+        line-height: 1.2;
     }
 }

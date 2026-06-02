@@ -82,7 +82,7 @@ export const PreviewProfile: React.FC<ProfileProps> = ({ onNavigate, onOpenSideb
     <div className="min-h-screen bg-gray-50 pb-24">
         <header className="bg-white p-4 sm:p-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
             <button onClick={() => onNavigate('BRAND_PROFILE')} className="p-2 -ml-2"><ArrowLeft size={24} /></button>
-            <h1 className="font-black text-lg">Public Profile Preview</h1>
+            <h1 className="tlb-page-title">Public Profile Preview</h1>
             <div className="w-10" />
         </header>
 

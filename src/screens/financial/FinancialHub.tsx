@@ -74,8 +74,8 @@ const FinancialHub: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                     <div className="flex items-center gap-4">
                         <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors"><Menu size={24} /></button>
                         <div>
-                            <h1 className="text-2xl font-black text-gray-900 tracking-tight">Pay-outs & Finance</h1>
-                            <p className="text-sm font-bold text-gray-400 mt-1">Manage settlements and bank details</p>
+                            <h1 className="tlb-page-title">Pay-outs & Finance</h1>
+                            <p className="tlb-page-sub">Manage settlements and bank details</p>
                         </div>
                     </div>
                 </header>

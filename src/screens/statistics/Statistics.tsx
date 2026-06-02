@@ -217,8 +217,8 @@ export const Statistics: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                         <Menu size={24} />
                     </button>
                     <div>
-                        <h1 className="text-2xl font-black text-gray-900 tracking-tight">Statistics</h1>
-                        <p className="text-sm font-bold text-gray-400 mt-0.5">Analytics, trends & performance</p>
+                        <h1 className="tlb-page-title">Statistics</h1>
+                        <p className="tlb-page-sub">Analytics, trends &amp; performance</p>
                     </div>
                 </div>
                 <button

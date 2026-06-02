@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, Suspense, lazy, useCallback } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { Screen, EntityType } from './types';
 import { PartnerProvider, usePartner } from './context/PartnerContext';
 import { Loader } from './components/ui';
@@ -74,6 +74,29 @@ const ProgramEnquiries = lazyImport(() => import('./screens/enquiries'), 'Progra
 
 // Statistics
 const StatisticsScreen = lazyImport(() => import('./screens/statistics'), 'Statistics');
+
+// Screen-module chunk factories — prefetched on idle so navigating to a slide
+// for the first time (or reopening it) doesn't flash the Suspense fallback.
+const SCREEN_CHUNKS = [
+  () => import('./screens/auth'),
+  () => import('./screens/onboarding'),
+  () => import('./screens/dashboard'),
+  () => import('./screens/attendees'),
+  () => import('./screens/packages'),
+  () => import('./screens/financial'),
+  () => import('./screens/profile'),
+  () => import('./screens/services'),
+  () => import('./screens/classes'),
+  () => import('./screens/events'),
+  () => import('./screens/programs'),
+  () => import('./screens/venues'),
+  () => import('./screens/enquiries'),
+  () => import('./screens/statistics'),
+];
+
+const prefetchScreens = () => {
+  SCREEN_CHUNKS.forEach((load) => { load().catch(() => { /* best-effort */ }); });
+};
 
 import { Sidebar } from './components/Navigation';
 import { getAuthToken, getRefreshToken, setAuthToken, clearTokens } from './api/client';
@@ -161,6 +184,21 @@ function AppInner() {
   const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
   const [authData, setAuthData] = useState<{ value: string; type: 'email' | 'phone' } | null>(null);
   const [initializing, setInitializing] = useState(true);
+
+  // ── Prefetch all screen chunks once the browser is idle after first paint ──
+  // so reopening / switching slides loads instantly instead of flashing a blank
+  // screen while the lazy chunk downloads.
+  useEffect(() => {
+    const ric = (window as any).requestIdleCallback as
+      | ((cb: () => void) => number)
+      | undefined;
+    if (ric) {
+      const id = ric(prefetchScreens);
+      return () => (window as any).cancelIdleCallback?.(id);
+    }
+    const t = setTimeout(prefetchScreens, 2000);
+    return () => clearTimeout(t);
+  }, []);
 
   // ── Session restore on page load / refresh ──
   useEffect(() => {
@@ -302,22 +340,21 @@ function AppInner() {
             <Loader />
           </div>
         }>
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentScreen}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
-            >
-              <Component
-                onNavigate={guardedNavigate}
-                authData={authData}
-                setAuthData={setAuthData}
-                {...(route.hasSidebar ? { onOpenSidebar: () => setIsSidebarOpen(true) } : {})}
-              />
-            </motion.div>
-          </AnimatePresence>
+          {/* Enter-only fade — no `mode="wait"` exit gap, so the new screen mounts
+              immediately instead of leaving a blank window while the old one exits. */}
+          <motion.div
+            key={currentScreen}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+          >
+            <Component
+              onNavigate={guardedNavigate}
+              authData={authData}
+              setAuthData={setAuthData}
+              {...(route.hasSidebar ? { onOpenSidebar: () => { setDesktopSidebarOpen(true); setIsSidebarOpen(true); } } : {})}
+            />
+          </motion.div>
         </Suspense>
       </div>
     </div>

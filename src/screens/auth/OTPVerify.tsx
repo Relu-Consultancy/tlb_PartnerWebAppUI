@@ -168,23 +168,23 @@ export const OTPVerify: React.FC<AuthProps> = ({ onNavigate, authData }) => {
                     ))}
                 </div>
 
-                <p className="text-center text-gray-400 font-medium mb-12">
+                <p className="text-center text-gray-600 font-medium mb-12">
                     Didn't receive the code?{' '}
                     {countdown > 0 ? (
-                        <span className="text-tlb-yellow font-bold">
+                        <span className="text-gray-800 font-bold">
                             Resend in 00:{String(countdown).padStart(2, '0')}
                         </span>
                     ) : (
                         <button
                             onClick={handleResend}
                             disabled={resending}
-                            className="text-tlb-yellow font-bold underline disabled:opacity-50"
+                            className="text-tlb-dark font-bold underline disabled:opacity-50"
                         >
                             {resending ? 'Sending...' : 'Resend OTP'}
                         </button>
                     )}
                     <br />
-                    <button onClick={() => onNavigate('LOGIN')} className="text-xs underline mt-2 opacity-50">Change Number/Email?</button>
+                    <button onClick={() => onNavigate('LOGIN')} className="text-xs text-gray-500 underline mt-2">Change Number/Email?</button>
                 </p>
 
                 <button

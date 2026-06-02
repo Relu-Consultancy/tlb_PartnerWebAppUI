@@ -324,8 +324,8 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
                             <Menu size={24} />
                         </button>
                         <div>
-                            <h1 className="text-2xl font-black text-gray-900 tracking-tight">Bookings</h1>
-                            <p className="text-sm font-bold text-gray-400 mt-0.5">Track attendees, payments, and attendance</p>
+                            <h1 className="tlb-page-title">Bookings</h1>
+                            <p className="tlb-page-sub">Track attendees, payments, and attendance</p>
                         </div>
                     </div>
                 </header>

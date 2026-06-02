@@ -141,14 +141,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={onClose}
-              className={`fixed inset-0 bg-black/50 z-40 backdrop-blur-sm ${desktopOpen ? 'lg:hidden' : ''}`}
+              className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm lg:hidden"
             />
             <motion.aside
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className={`fixed top-0 left-0 bottom-0 w-[280px] z-50 ${desktopOpen ? 'lg:hidden' : ''}`}
+              className="fixed top-0 left-0 bottom-0 w-[280px] z-50 lg:hidden"
             >
               {sidebarContent}
             </motion.aside>

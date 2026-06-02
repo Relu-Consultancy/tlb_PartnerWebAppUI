@@ -181,8 +181,8 @@ export const ProgramEnquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar })
         <header className="bg-white/90 backdrop-blur-sm px-5 md:px-8 py-5 flex items-center gap-4 sticky top-0 z-30 border-b border-gray-100">
             <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors"><Menu size={24} /></button>
             <div className="flex-1">
-                <h1 className="font-black text-xl text-gray-900 tracking-tight">Program Enquiries</h1>
-                <p className="text-xs font-bold text-gray-400 mt-0.5">Manage leads &amp; enrol students</p>
+                <h1 className="tlb-page-title">Program Enquiries</h1>
+                <p className="tlb-page-sub">Manage leads &amp; enrol students</p>
             </div>
         </header>
 

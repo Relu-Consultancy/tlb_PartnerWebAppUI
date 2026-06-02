@@ -49,23 +49,30 @@ export const Registration: React.FC<OnboardingProps> = ({ onNavigate }) => {
     const update = <K extends keyof typeof formData>(key: K, value: (typeof formData)[K]) =>
         setFormData((prev) => ({ ...prev, [key]: value }));
 
+    const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png'];
+    const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/quicktime'];
+
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files || e.target.files.length === 0) return;
         setUploadingMedia(true);
         try {
             for (let i = 0; i < e.target.files.length; i++) {
                 const file = e.target.files[i];
+                if (file.type && !ALLOWED_IMAGE_TYPES.includes(file.type)) {
+                    showToast(`${file.name}: unsupported format. Use JPG or PNG.`, 'warning');
+                    continue;
+                }
                 if (file.size > 5 * 1024 * 1024) {
-                    showToast(`File ${file.name} is too large (max 5MB)`, 'warning');
+                    showToast(`${file.name} is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max is 5MB.`, 'warning');
                     continue;
                 }
                 const res = await uploadPartnerMedia(file, 'image');
                 const data = res.data || res;
                 setUploadedImages((prev) => [...prev, data]);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Image upload failed', error);
-            showToast('Failed to upload image(s).', 'error');
+            showToast(error?.message || 'Could not upload image. Please try again.', 'error');
         } finally {
             setUploadingMedia(false);
             e.target.value = '';
@@ -75,8 +82,14 @@ export const Registration: React.FC<OnboardingProps> = ({ onNavigate }) => {
     const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files || e.target.files.length === 0) return;
         const file = e.target.files[0];
+        if (file.type && !ALLOWED_VIDEO_TYPES.includes(file.type)) {
+            showToast(`${file.name}: unsupported format. Use MP4 or MOV.`, 'warning');
+            e.target.value = '';
+            return;
+        }
         if (file.size > 100 * 1024 * 1024) {
-            showToast(`Video ${file.name} is too large (max 100MB)`, 'warning');
+            showToast(`${file.name} is too large (${(file.size / 1024 / 1024).toFixed(0)}MB). Max is 100MB.`, 'warning');
+            e.target.value = '';
             return;
         }
         setUploadingMedia(true);
@@ -84,9 +97,9 @@ export const Registration: React.FC<OnboardingProps> = ({ onNavigate }) => {
             const res = await uploadPartnerMedia(file, 'video');
             const data = res.data || res;
             setUploadedVideo(data);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Video upload failed', error);
-            showToast('Failed to upload video.', 'error');
+            showToast(error?.message || 'Could not upload video. Please try again.', 'error');
         } finally {
             setUploadingMedia(false);
             e.target.value = '';

@@ -3,7 +3,7 @@
 > **Definitive architectural reference for the TLB Partner Portal.**
 > Base URL: `https://tlb-api.reluconsultancy.in`
 > Framework: React + Vite + TypeScript (SPA)
-> Last Updated: May 30, 2026
+> Last Updated: May 31, 2026
 
 ---
 
@@ -20,7 +20,7 @@ src/
 ├── context/
 │   └── PartnerContext.tsx   # Global context: allowedEntities (synced to sessionStorage)
 ├── components/
-│   ├── Navigation.tsx           # Sidebar: fixed on desktop (lg+, dark navy #0f1729), animated drawer on mobile; collapsible via toggle
+│   ├── Navigation.tsx           # Sidebar: fixed push-content on desktop (lg+, dark navy #0f1729), always-`lg:hidden` overlay drawer on mobile; collapse via in-sidebar toggle, re-expand via hamburger (App.tsx onOpenSidebar sets both desktop+mobile state)
 │   ├── EntityPickerSheet.tsx    # Bottom sheet for entity type selection
 │   └── ui/
 │       ├── DashboardCharts.tsx  # Shared SVG chart primitives: AreaSparkline, TrendAreaChart, WeeklyBarChart, DonutChart, fmtCurrency, trendPct, TrendBadge
@@ -778,6 +778,22 @@ classDiagram
 | `.tlb-input` | Gray-50 bg, rounded-xl, p-4 | All form inputs |
 | `.tlb-content` | max-w-2xl mx-auto | Content container |
 
+### Typographic scale (Phase 20)
+
+One canonical type scale lives in `src/styles/components.css`; use these instead of ad-hoc `text-xl/2xl/3xl + font-black` combos so headings & spacing match site-wide. Global baseline (Inter font-smoothing, body `line-height: 1.5`, heading `line-height: 1.2`) is in `src/styles/base.css`.
+
+| Class | Value | Usage |
+|-------|-------|-------|
+| `.tlb-page-title` | `text-2xl font-black tracking-tight leading-tight` | The single H1 in a screen's sticky header |
+| `.tlb-page-sub` | `text-sm font-medium text-gray-400 mt-0.5` | Muted subtitle under a page title |
+| `.tlb-h2` | `text-lg font-black tracking-tight` | Major section heading within a screen |
+| `.tlb-h3` | `text-base font-bold` | Card / sub-section heading |
+| `.tlb-label` | `text-[10px] font-bold uppercase tracking-widest text-gray-400` | Micro-label above a value/field |
+| `.tlb-body` | `text-sm text-gray-600 leading-relaxed` | Default body copy |
+| `.tlb-muted` | `text-xs text-gray-400` | Secondary / helper copy |
+
+> Applied to the page-header title+subtitle of 9 portal screens (Attendees, Class/Program Enquiries, FinancialHub, ServiceListings, Statistics, Packages, EditProfile, PreviewProfile). Dashboard keeps its bespoke greeting header.
+
 ---
 
 ## 11. Route Configuration
@@ -1100,6 +1116,16 @@ npm run test:report   # run tests → generate test-report.html + test-report.pd
 | `docs/venue-listings-db-spec.md` | Venues module — tables (`venues`, `venue_occasions`, `venue_availability`, `venue_packages`, `venue_media`), occasion/time-slot/attendee-field reference, bulk availability pattern, API endpoints |
 
 ---
+
+*Phase 20 (2026-05-31) — Bug-fix sweep + Enquiry redesign + typography pass:*
+- *Sidebar overlay bug (High): collapsing then reopening the desktop sidebar leaked the mobile dark overlay drawer over the main content. Root cause — the drawer's `lg:hidden` was conditionally tied to `desktopOpen`, which vanished once collapsed. Fixed: drawer + backdrop are now always `lg:hidden`; the hamburger (`onOpenSidebar`) re-expands the fixed desktop sidebar AND opens the mobile drawer (`App.tsx` + `Navigation.tsx`).*
+- *OTP helper text unreadable (Medium): on the white-background Login OTP screen (`OTPVerify.tsx`) the helper/resend/change-email text used near-invisible light greys (`text-gray-400`, yellow-on-white, `opacity-50`). Darkened to `text-gray-600/700/800` + `text-tlb-dark`.*
+- *Slide load / blank screen (High): `AnimatePresence mode="wait"` forced a ~200ms blank gap between screens, and lazy chunks flashed the Suspense fallback on first open. Fixed: switched to enter-only fade (no exit wait) and added `prefetchScreens()` on `requestIdleCallback` (2s `setTimeout` fallback) to warm all screen chunks after first paint (`App.tsx`).*
+- *Photo upload "unknown error" (Critical): `Registration.tsx` & `EditProfile.tsx` swallowed the real error with hardcoded "Failed to upload" / "Upload failed." and did no file-type validation. Fixed: surface `err?.message`, add JPG/PNG + MP4/MOV type checks and size-with-actual-MB messages; `uploadPartnerMedia` (`api/onboarding.ts`) now reports HTTP status (special-case 413) instead of an opaque fallback.*
+- *Statistics chart layout (High): no dummy data existed (already wired to the four `/stats/*` endpoints) — the real defect was x-axis month labels rendered in `flex-1` cells, offset from their data vertices. Fixed: labels are now absolutely positioned at the same `xAt(i)` coordinate as the line points (`StatCharts.tsx`).*
+- *Enquiry management redesign (Class + Program): KPI quick-filter cards (status counts, click-to-filter), avatar-initial rows, motion spring drawer with gradient header + segmented status control, wired `tel:`/`wa.me`/email actions. Class screen now fetches once + filters client-side to power live counts.*
+- *Typography consistency (Medium): added a global baseline + canonical type scale (see §10) and applied `.tlb-page-title`/`.tlb-page-sub` to 9 screen headers. Font family was already consistent (Inter); the fix standardizes sizes/weights/spacing.*
+- *Tests: added `stats.test.ts` (12), `StatCharts.test.tsx` (12), `Statistics.test.tsx` (9); MSW stats fixtures/handlers; jsdom `IntersectionObserver`/`ResizeObserver` polyfills for `motion/react`. Fixed 12 stale `ServiceListings` tests (pre-Phase-16 assertions) → full suite 392/392 (100%).*
 
 *Phase 19 (2026-05-30) — Statistics screen redesign: rebuilt `Statistics.tsx` into a tabbed, interactive analytics screen (sliding `layoutId` pill) with an always-on count-up KPI hero strip and entity-conditional tabs — Overview, Events, Venues, **Classes**, **Programs** (Classes/Programs split out from the former single "Enquiries" tab; both render the shared `/stats/enquiries/` dataset with per-tab headings and "view all" routes). New `src/screens/statistics/StatCharts.tsx` houses a Statistics-only interactive chart toolkit (`InteractiveAreaChart` with hover crosshair/tooltip, `InteractiveBarChart`, `AnimatedDonut`, `FunnelBars`, `CountUp`/`useCountUp`, `fmtCurrency`/`fmtCompact`) so the shared `DashboardCharts.tsx` and the Dashboard are untouched. `src/api/stats.ts` interfaces extended to match real payloads: `MonthlyBucket`/`RevenueBucket` gained `year`/`earnings`/`count`, `CategoryBucket` gained `amount` (now shown in Bookings-by-Category). Removed the legacy `getPartnerDashboard()`-driven sections (generic Weekly Activity, Top Listings, Recent Activity, standalone Universal Trend) — screen now sources exclusively from the four `/stats/*` endpoints.*
 

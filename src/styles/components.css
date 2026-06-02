@@ -16,6 +16,40 @@
     .tlb-content {
         @apply w-full;
     }
+
+    /* ── Typographic scale ─────────────────────────────────────────────────
+       One consistent scale for the whole portal. Use these instead of ad-hoc
+       text-xl/2xl/3xl + font-black combos so headings/spacing match site-wide.
+
+         .tlb-page-title  — the single H1 in a screen's sticky header
+         .tlb-page-sub    — the muted subtitle under a page title
+         .tlb-h2          — major section heading within a screen
+         .tlb-h3          — card / sub-section heading
+         .tlb-label       — uppercase micro-label above a value or field
+         .tlb-body        — default body copy
+         .tlb-muted       — secondary / helper copy
+    */
+    .tlb-page-title {
+        @apply text-2xl font-black text-gray-900 tracking-tight leading-tight;
+    }
+    .tlb-page-sub {
+        @apply text-sm font-medium text-gray-400 mt-0.5;
+    }
+    .tlb-h2 {
+        @apply text-lg font-black text-gray-900 tracking-tight;
+    }
+    .tlb-h3 {
+        @apply text-base font-bold text-gray-900;
+    }
+    .tlb-label {
+        @apply text-[10px] font-bold text-gray-400 uppercase tracking-widest;
+    }
+    .tlb-body {
+        @apply text-sm text-gray-600 leading-relaxed;
+    }
+    .tlb-muted {
+        @apply text-xs text-gray-400;
+    }
 }
 
 /* Loader spinner */

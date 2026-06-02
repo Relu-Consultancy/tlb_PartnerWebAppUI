@@ -29,7 +29,13 @@ export const uploadPartnerMedia = async (file: File, media_type: 'image' | 'vide
     });
     if (!response.ok) {
         const err = await response.json().catch(() => null);
-        throw new Error(err?.error?.message || err?.message || 'Failed to upload media');
+        const serverMsg = err?.error?.message || err?.message;
+        // 413 / non-JSON bodies (e.g. HTML 500) leave serverMsg undefined — surface
+        // the HTTP status instead of an opaque "unknown error".
+        const statusHint = response.status === 413
+            ? 'File is too large for the server (max 5MB for images).'
+            : `Upload failed (HTTP ${response.status}). Please check the file and try again.`;
+        throw new Error(serverMsg || statusHint);
     }
     return response.json();
 };

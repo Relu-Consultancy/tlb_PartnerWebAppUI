@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Menu, Plus, Search, Filter, Users, Edit3, CalendarDays, BarChart3, MapPin, Layers, Clock, X, Check, SlidersHorizontal, Play, Pause, Archive, ArchiveRestore } from 'lucide-react';
-import { Loader } from '../../components/ui';
+import { Loader, toast } from '../../components/ui';
 import { Screen, EntityType } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
 import { EntityPickerSheet } from '../../components/EntityPickerSheet';
-import { getEventListings, getVenueListings, getClassListings, getProgramListings, setCurrentDraftId, clearCurrentDraftId, setCurrentVenueDraftId, clearCurrentVenueDraftId, setCurrentClassDraftId, clearCurrentClassDraftId, setCurrentProgramDraftId, clearCurrentProgramDraftId, setClassListingLive, archiveProgramListing, unarchiveProgramListing, pauseListing, resumeListing, archiveListing, unarchiveListing } from '../../api/listings';
+import { getEventListings, getVenueListings, getClassListings, getProgramListings, setCurrentDraftId, clearCurrentDraftId, setCurrentVenueDraftId, clearCurrentVenueDraftId, setCurrentClassDraftId, clearCurrentClassDraftId, setCurrentProgramDraftId, clearCurrentProgramDraftId, pauseListing, resumeListing, archiveListing, unarchiveListing } from '../../api/listings';
 
 interface Props {
     onNavigate: (screen: Screen) => void;
@@ -202,36 +202,32 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
         }
     };
 
+    // The backend exposes only the generic, entity-agnostic action routes
+    // (/api/v1/partner/listings/{id}/pause|resume|archive|unarchive/). The old
+    // entity-specific routes (/classes/.../live/, /programs/.../archive/) 404, so
+    // all entity types use the generic endpoints here.
     const handleTogglePause = async (listing: Listing) => {
         try {
             const isPaused = listing.isLive === false;
-            if (listing.entityType === 'Classes') {
-                // Classes use their own endpoint
-                await setClassListingLive(listing.id, isPaused);
-            } else {
-                // All other entities use the generic endpoint
-                if (isPaused) await resumeListing(listing.id);
-                else await pauseListing(listing.id);
-            }
+            if (isPaused) await resumeListing(listing.id);
+            else await pauseListing(listing.id);
             setListings(prev => prev.map(l => l.id === listing.id ? { ...l, isLive: isPaused } : l));
         } catch (err: any) {
-            alert(err.message || 'Failed to update listing status');
+            toast.error(err.message || 'Failed to update listing status');
         }
     };
 
     const handleToggleArchive = async (listing: Listing) => {
         try {
             if (listing.status === 'archived') {
-                if (listing.entityType === 'Programs') await unarchiveProgramListing(listing.id);
-                else await unarchiveListing(listing.id);
+                await unarchiveListing(listing.id);
                 setListings(prev => prev.map(l => l.id === listing.id ? { ...l, status: 'draft' } : l));
             } else {
-                if (listing.entityType === 'Programs') await archiveProgramListing(listing.id);
-                else await archiveListing(listing.id);
+                await archiveListing(listing.id);
                 setListings(prev => prev.map(l => l.id === listing.id ? { ...l, status: 'archived' } : l));
             }
         } catch (err: any) {
-            alert(err.message || 'Failed to update archive status');
+            toast.error(err.message || 'Failed to update archive status');
         }
     };
 

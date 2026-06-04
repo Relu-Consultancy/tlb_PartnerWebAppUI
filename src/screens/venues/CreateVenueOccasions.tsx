@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation } from '../../components/ui';
+import { WizardLayout, WizardNavigation, toast } from '../../components/ui';
 import {
     getVenueMetaOccasions,
     getVenueMetaDiscoveryEnums,
@@ -136,7 +136,7 @@ export const CreateVenueOccasions: React.FC<Props> = ({ onNavigate }) => {
 
             onNavigate('CREATE_VENUE_AVAILABILITY');
         } catch (err: any) {
-            alert(err?.message || 'Failed to save.');
+            toast.error(err?.message || 'Failed to save.');
         } finally {
             setSaving(false);
         }

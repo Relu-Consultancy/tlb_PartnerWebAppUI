@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowRight, MapPin, Check, ChevronDown, Camera, Play, Image as ImageIcon, Trash2, Loader2 } from 'lucide-react';
+import { ArrowRight, MapPin, Check, Camera, Play, Image as ImageIcon, Trash2, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation } from '../../components/ui';
+import { WizardLayout, WizardNavigation, toast, Select } from '../../components/ui';
 import {
     getVenueMetaCategories,
     getVenueListingDetail,
@@ -131,7 +131,7 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
 
     const ensureDraft = async (): Promise<string | null> => {
         if (draftId) return draftId;
-        if (!title.trim()) { alert('Please enter a venue name before uploading media.'); return null; }
+        if (!title.trim()) { toast.warning('Please enter a venue name before uploading media.'); return null; }
         try {
             const res = await createVenueDraft({ title: title.trim() });
             const id: string = (res.data || res).id;
@@ -139,7 +139,7 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
             setDraftId(id);
             return id;
         } catch (err: any) {
-            alert(err?.message || 'Failed to create draft.');
+            toast.error(err?.message || 'Failed to create draft.');
             return null;
         }
     };
@@ -147,7 +147,7 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
     const handleCoverPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files?.[0]) return;
         const file = e.target.files[0];
-        if (file.size > COVER_MAX) { alert('Cover must be under 5 MB.'); e.target.value = ''; return; }
+        if (file.size > COVER_MAX) { toast.warning('Cover must be under 5 MB.'); e.target.value = ''; return; }
         const id = await ensureDraft();
         if (!id) { e.target.value = ''; return; }
         setBusyKind('cover');
@@ -156,7 +156,7 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
             const res = await uploadVenueListingMedia(id, file, 'cover');
             setCover(res.data || res);
         } catch (err: any) {
-            alert(err?.message || 'Failed to upload cover.');
+            toast.error(err?.message || 'Failed to upload cover.');
         } finally {
             setBusyKind(null);
             e.target.value = '';
@@ -170,13 +170,13 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
         setBusyKind('gallery');
         try {
             for (const file of Array.from(e.target.files) as File[]) {
-                if (gallery.length >= GALLERY_LIMIT) { alert(`Gallery limit (${GALLERY_LIMIT}) reached.`); break; }
-                if (file.size > GALLERY_MAX) { alert(`${file.name} is over 5 MB — skipped.`); continue; }
+                if (gallery.length >= GALLERY_LIMIT) { toast.warning(`Gallery limit (${GALLERY_LIMIT}) reached.`); break; }
+                if (file.size > GALLERY_MAX) { toast.warning(`${file.name} is over 5 MB — skipped.`); continue; }
                 const res = await uploadVenueListingMedia(id, file, 'gallery');
                 setGallery(prev => [...prev, res.data || res]);
             }
         } catch (err: any) {
-            alert(err?.message || 'Failed to upload image.');
+            toast.error(err?.message || 'Failed to upload image.');
         } finally {
             setBusyKind(null);
             e.target.value = '';
@@ -186,7 +186,7 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
     const handleVideoPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files?.[0]) return;
         const file = e.target.files[0];
-        if (file.size > VIDEO_MAX) { alert('Video must be under 100 MB.'); e.target.value = ''; return; }
+        if (file.size > VIDEO_MAX) { toast.warning('Video must be under 100 MB.'); e.target.value = ''; return; }
         const id = await ensureDraft();
         if (!id) { e.target.value = ''; return; }
         setBusyKind('video');
@@ -195,7 +195,7 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
             const res = await uploadVenueListingMedia(id, file, 'video');
             setVideo(res.data || res);
         } catch (err: any) {
-            alert(err?.message || 'Failed to upload video.');
+            toast.error(err?.message || 'Failed to upload video.');
         } finally {
             setBusyKind(null);
             e.target.value = '';
@@ -205,23 +205,23 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
     const handleDeleteCover = async () => {
         if (!draftId || !cover) return;
         try { await deleteVenueListingMedia(draftId, cover.id); setCover(null); }
-        catch (err: any) { alert(err?.message || 'Failed to delete cover.'); }
+        catch (err: any) { toast.error(err?.message || 'Failed to delete cover.'); }
     };
 
     const handleDeleteGallery = async (id: number) => {
         if (!draftId) return;
         try { await deleteVenueListingMedia(draftId, id); setGallery(prev => prev.filter(m => m.id !== id)); }
-        catch (err: any) { alert(err?.message || 'Failed to delete image.'); }
+        catch (err: any) { toast.error(err?.message || 'Failed to delete image.'); }
     };
 
     const handleDeleteVideo = async () => {
         if (!draftId || !video) return;
         try { await deleteVenueListingMedia(draftId, video.id); setVideo(null); }
-        catch (err: any) { alert(err?.message || 'Failed to delete video.'); }
+        catch (err: any) { toast.error(err?.message || 'Failed to delete video.'); }
     };
 
     const handleNext = async () => {
-        if (!title.trim()) { alert('Please enter a venue name.'); return; }
+        if (!title.trim()) { toast.warning('Please enter a venue name.'); return; }
         setSaving(true);
         try {
             let id = draftId;
@@ -252,7 +252,7 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
             await updateVenueListing(id!, payload);
             onNavigate('CREATE_VENUE_OCCASIONS');
         } catch (err: any) {
-            alert(err?.message || 'Failed to save venue details.');
+            toast.error(err?.message || 'Failed to save venue details.');
         } finally {
             setSaving(false);
         }
@@ -333,19 +333,13 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
             {selectedCategory && selectedCategory.subcategories.length > 0 && (
                 <div>
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Sub-Category</label>
-                    <div className="relative">
-                        <select
-                            value={selectedSubcategoryId ?? ''}
-                            onChange={e => setSelectedSubcategoryId(e.target.value ? Number(e.target.value) : null)}
-                            className="tlb-input w-full bg-white appearance-none cursor-pointer pr-10"
-                        >
-                            <option value="">Select sub-category...</option>
-                            {selectedCategory.subcategories.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                        </select>
-                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-                            <ChevronDown size={18} />
-                        </div>
-                    </div>
+                    <Select
+                        value={selectedSubcategoryId != null ? String(selectedSubcategoryId) : ''}
+                        onChange={(v) => setSelectedSubcategoryId(v ? Number(v) : null)}
+                        options={selectedCategory.subcategories.map(s => ({ value: String(s.id), label: s.name }))}
+                        placeholder="Select sub-category..."
+                        ariaLabel="Sub-category"
+                    />
                 </div>
             )}
 

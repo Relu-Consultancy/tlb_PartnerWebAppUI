@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowRight, Camera, Play, Trash2, Loader2, Image as ImageIcon } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation } from '../../components/ui';
+import { WizardLayout, WizardNavigation, toast } from '../../components/ui';
 import {
     getCurrentProgramDraftId,
     getProgramListingDetail,
@@ -74,14 +74,14 @@ export const CreateProgramMedia: React.FC<Props> = ({ onNavigate }) => {
     const handleCoverPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!draftId || !e.target.files?.[0]) return;
         const file = e.target.files[0];
-        if (file.size > COVER_MAX) { alert('Cover must be under 5 MB.'); e.target.value = ''; return; }
+        if (file.size > COVER_MAX) { toast.warning('Cover must be under 5 MB.'); e.target.value = ''; return; }
         setBusyKind('cover');
         try {
             if (cover) await deleteProgramMedia(draftId, cover.id);
             const res = await uploadProgramMedia(draftId, file, 'cover');
             setCover(res.data || res);
         } catch (err: any) {
-            alert(err?.message || 'Failed to upload cover.');
+            toast.error(err?.message || 'Failed to upload cover.');
         } finally {
             setBusyKind(null);
             e.target.value = '';
@@ -94,13 +94,13 @@ export const CreateProgramMedia: React.FC<Props> = ({ onNavigate }) => {
         setBusyKind('gallery');
         try {
             for (const file of files) {
-                if (gallery.length >= GALLERY_LIMIT) { alert(`Gallery limit (${GALLERY_LIMIT}) reached.`); break; }
-                if (file.size > GALLERY_MAX) { alert(`${file.name} is over 5 MB — skipped.`); continue; }
+                if (gallery.length >= GALLERY_LIMIT) { toast.warning(`Gallery limit (${GALLERY_LIMIT}) reached.`); break; }
+                if (file.size > GALLERY_MAX) { toast.warning(`${file.name} is over 5 MB — skipped.`); continue; }
                 const res = await uploadProgramMedia(draftId, file, 'gallery');
                 setGallery(prev => [...prev, res.data || res]);
             }
         } catch (err: any) {
-            alert(err?.message || 'Failed to upload gallery image.');
+            toast.error(err?.message || 'Failed to upload gallery image.');
         } finally {
             setBusyKind(null);
             e.target.value = '';
@@ -110,14 +110,14 @@ export const CreateProgramMedia: React.FC<Props> = ({ onNavigate }) => {
     const handleVideoPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!draftId || !e.target.files?.[0]) return;
         const file = e.target.files[0];
-        if (file.size > VIDEO_MAX) { alert('Video must be under 100 MB.'); e.target.value = ''; return; }
+        if (file.size > VIDEO_MAX) { toast.warning('Video must be under 100 MB.'); e.target.value = ''; return; }
         setBusyKind('video');
         try {
             if (video) await deleteProgramMedia(draftId, video.id);
             const res = await uploadProgramMedia(draftId, file, 'video');
             setVideo(res.data || res);
         } catch (err: any) {
-            alert(err?.message || 'Failed to upload video.');
+            toast.error(err?.message || 'Failed to upload video.');
         } finally {
             setBusyKind(null);
             e.target.value = '';
@@ -130,7 +130,7 @@ export const CreateProgramMedia: React.FC<Props> = ({ onNavigate }) => {
             await deleteProgramMedia(draftId, cover.id);
             setCover(null);
         } catch (err: any) {
-            alert(err?.message || 'Failed to delete cover.');
+            toast.error(err?.message || 'Failed to delete cover.');
         }
     };
 
@@ -140,7 +140,7 @@ export const CreateProgramMedia: React.FC<Props> = ({ onNavigate }) => {
             await deleteProgramMedia(draftId, mediaId);
             setGallery(prev => prev.filter(m => m.id !== mediaId));
         } catch (err: any) {
-            alert(err?.message || 'Failed to delete image.');
+            toast.error(err?.message || 'Failed to delete image.');
         }
     };
 
@@ -150,7 +150,7 @@ export const CreateProgramMedia: React.FC<Props> = ({ onNavigate }) => {
             await deleteProgramMedia(draftId, video.id);
             setVideo(null);
         } catch (err: any) {
-            alert(err?.message || 'Failed to delete video.');
+            toast.error(err?.message || 'Failed to delete video.');
         }
     };
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, Calendar, Clock, DollarSign, Users, Plus, Trash2, Tag, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation } from '../../components/ui';
+import { WizardLayout, WizardNavigation, toast } from '../../components/ui';
 import {
     getListingDetail,
     updateListing,
@@ -123,11 +123,11 @@ export const CreateEventSchedule: React.FC<Props> = ({ onNavigate }) => {
         const deadlineIso = toIso(deadlineDate, deadlineTime);
 
         if (startIso && endIso && new Date(endIso) <= new Date(startIso)) {
-            alert('End date/time must be after start date/time.');
+            toast.warning('End date/time must be after start date/time.');
             return;
         }
         if (priceType === 'free' && capacity && parseInt(capacity, 10) < 1) {
-            alert('Capacity must be at least 1.');
+            toast.warning('Capacity must be at least 1.');
             return;
         }
 
@@ -183,7 +183,7 @@ export const CreateEventSchedule: React.FC<Props> = ({ onNavigate }) => {
             onNavigate('CREATE_EVENT_MEDIA');
         } catch (err: any) {
             console.error('Failed to save schedule', err);
-            alert(err?.message || 'Failed to save schedule. Please try again.');
+            toast.error(err?.message || 'Failed to save schedule. Please try again.');
         } finally {
             setSaving(false);
         }

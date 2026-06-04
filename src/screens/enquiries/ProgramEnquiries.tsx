@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-    Menu, Search, Phone, MessageCircle, X, StickyNote, Inbox, Loader2, ChevronDown,
+    Menu, Search, Phone, MessageCircle, X, StickyNote, Inbox, Loader2,
     Users, Sparkles, CheckCircle2, GraduationCap, Mail, Check,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Screen, EnquiryStatus } from '../../types';
 import { getProgramListings, getProgramEnquiries, updateProgramEnquiry } from '../../api/listings';
+import { Select } from '../../components/ui';
 
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
 
@@ -190,18 +191,13 @@ export const ProgramEnquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar })
             <div className="max-w-6xl mx-auto space-y-6">
                 {/* Program selector */}
                 {programs.length > 1 && (
-                    <div className="relative">
-                        <select
-                            value={selectedProgramId || ''}
-                            onChange={e => setSelectedProgramId(e.target.value)}
-                            className="tlb-input w-full appearance-none pr-10 font-bold"
-                        >
-                            {programs.map(p => (
-                                <option key={p.id} value={p.id}>{p.title}</option>
-                            ))}
-                        </select>
-                        <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                    </div>
+                    <Select
+                        value={selectedProgramId || ''}
+                        onChange={(v) => setSelectedProgramId(v)}
+                        options={programs.map(p => ({ value: p.id, label: p.title, icon: GraduationCap }))}
+                        ariaLabel="Select program"
+                        triggerExtra="font-bold"
+                    />
                 )}
 
                 {/* KPI / quick-filter cards */}
@@ -339,15 +335,15 @@ export const ProgramEnquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar })
                                             )}
                                         </td>
                                         <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
-                                            <select
+                                            <Select
                                                 value={lead.status}
-                                                onChange={(e) => updateStatus(lead.id, lead.listingId, e.target.value as EnquiryStatus)}
-                                                className={`text-xs font-bold rounded-xl px-3 py-2 border outline-none cursor-pointer transition-all shadow-sm ${statusStyle(lead.status)}`}
-                                            >
-                                                {STATUS_OPTIONS.map(opt => (
-                                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                                ))}
-                                            </select>
+                                                onChange={(v) => updateStatus(lead.id, lead.listingId, v as EnquiryStatus)}
+                                                options={STATUS_OPTIONS}
+                                                ariaLabel="Lead status"
+                                                align="right"
+                                                className="inline-block"
+                                                buttonClassName={`inline-flex items-center gap-1.5 text-xs font-bold rounded-xl px-3 py-2 border outline-none cursor-pointer transition-all shadow-sm ${statusStyle(lead.status)}`}
+                                            />
                                         </td>
                                     </motion.tr>
                                 ))}

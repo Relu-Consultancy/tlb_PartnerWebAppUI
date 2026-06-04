@@ -6,6 +6,7 @@ import { server } from '../../../test/msw/server';
 import { DRAFT_ID } from '../../../test/msw/handlers';
 import { CreateEventSchedule } from '../CreateEventSchedule';
 import { setCurrentDraftId } from '../../../api/listings';
+import { toast } from '../../../components/ui';
 
 const BASE = 'https://tlb-api.reluconsultancy.in';
 
@@ -132,7 +133,7 @@ describe('CreateEventSchedule — date validation', () => {
     it('shows an alert when end is before start', async () => {
         setCurrentDraftId(DRAFT_ID);
         const user = userEvent.setup();
-        const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+        const toastSpy = vi.spyOn(toast, 'warning').mockImplementation(() => 0);
         render(<CreateEventSchedule {...props} />);
         await waitFor(() => document.querySelectorAll('input[type="date"]').length > 0);
 
@@ -143,8 +144,8 @@ describe('CreateEventSchedule — date validation', () => {
         fireEvent.change(dateInputs[1], { target: { value: '2026-07-01' } }); // end before start
         fireEvent.change(timeInputs[1], { target: { value: '10:00' } });
         await user.click(screen.getByText(/next: media/i));
-        expect(alertSpy).toHaveBeenCalledWith(expect.stringMatching(/end date/i));
-        alertSpy.mockRestore();
+        expect(toastSpy).toHaveBeenCalledWith(expect.stringMatching(/end date/i));
+        toastSpy.mockRestore();
     });
 });
 
@@ -166,15 +167,15 @@ describe('CreateEventSchedule — Next navigation', () => {
 
     it('shows error alert on API failure', async () => {
         setCurrentDraftId(DRAFT_ID);
-        const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+        const toastSpy = vi.spyOn(toast, 'error').mockImplementation(() => 0);
         server.use(http.patch(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, () =>
             HttpResponse.json({ error: { code: 'LISTING_LOCKED', message: 'Listing is locked' } }, { status: 400 })));
         const user = userEvent.setup();
         render(<CreateEventSchedule {...props} />);
         await waitFor(() => screen.getByText(/next: media/i));
         await user.click(screen.getByText(/next: media/i));
-        await waitFor(() => expect(alertSpy).toHaveBeenCalled());
-        alertSpy.mockRestore();
+        await waitFor(() => expect(toastSpy).toHaveBeenCalled());
+        toastSpy.mockRestore();
     });
 });
 

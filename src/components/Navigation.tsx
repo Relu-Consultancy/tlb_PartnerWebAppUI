@@ -11,6 +11,7 @@ import {
   DollarSign,
   Package,
   BarChart3,
+  Ticket,
   ChevronRight,
   PanelLeftClose,
 } from 'lucide-react';
@@ -53,6 +54,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen
     { id: 'ENQUIRIES', label: 'Class Enquiries', icon: Inbox, visible: hasClasses },
     { id: 'PROGRAM_ENQUIRIES', label: 'Program Enquiries', icon: Inbox, visible: hasPrograms },
     { id: 'PACKAGES', label: 'Packages', icon: Package, visible: false },
+    { id: 'ALL_COUPONS', label: 'Coupons', icon: Ticket, visible: true },
     { id: 'FINANCIAL_HUB', label: 'Finance', icon: DollarSign, visible: true },
   ];
 

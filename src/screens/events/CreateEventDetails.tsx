@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, MapPin, Check, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation } from '../../components/ui';
+import { WizardLayout, WizardNavigation, toast } from '../../components/ui';
 import {
     getEventMetaCategories,
     getEventMetaFormats,
@@ -134,7 +134,7 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
 
     const handleNext = async () => {
         if (!title.trim()) {
-            alert('Please enter an event title.');
+            toast.warning('Please enter an event title.');
             return;
         }
         setSaving(true);
@@ -176,7 +176,7 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
             onNavigate('CREATE_EVENT_SCHEDULE');
         } catch (err: any) {
             console.error('Failed to save draft', err);
-            alert(err?.message || 'Failed to save event. Please try again.');
+            toast.error(err?.message || 'Failed to save event. Please try again.');
         } finally {
             setSaving(false);
         }

@@ -3,7 +3,7 @@
 > **Definitive architectural reference for the TLB Partner Portal.**
 > Base URL: `https://tlb-api.reluconsultancy.in`
 > Framework: React + Vite + TypeScript (SPA)
-> Last Updated: May 31, 2026
+> Last Updated: June 4, 2026
 
 ---
 
@@ -16,15 +16,17 @@ src/
 │   ├── auth.ts             # requestOtp, verifyOtp, getCurrentUser, logout
 │   ├── onboarding.ts       # All partner CRUD endpoints (profile, media, categories, etc.)
 │   ├── stats.ts            # Partner statistics endpoints (overview, events, venues, enquiries) + trackProfileView
+│   ├── coupons.ts          # Partner coupons CRUD (NOT live yet — getCoupons/getCoupon/createCoupon/updateCoupon/deleteCoupon)
 │   └── listings.ts         # Listings + ticket + media CRUD, draft ID helpers, ApiError class
 ├── context/
 │   └── PartnerContext.tsx   # Global context: allowedEntities (synced to sessionStorage)
 ├── components/
-│   ├── Navigation.tsx           # Sidebar: fixed push-content on desktop (lg+, dark navy #0f1729), always-`lg:hidden` overlay drawer on mobile; collapse via in-sidebar toggle, re-expand via hamburger (App.tsx onOpenSidebar sets both desktop+mobile state)
+│   ├── Navigation.tsx           # Sidebar: fixed push-content on desktop (lg+, dark navy #0f1729), always-`lg:hidden` overlay drawer on mobile; collapse via in-sidebar toggle, re-expand via hamburger (App.tsx onOpenSidebar sets both desktop+mobile state). Includes "Coupons" → ALL_COUPONS entry.
 │   ├── EntityPickerSheet.tsx    # Bottom sheet for entity type selection
 │   └── ui/
 │       ├── DashboardCharts.tsx  # Shared SVG chart primitives: AreaSparkline, TrendAreaChart, WeeklyBarChart, DonutChart, fmtCurrency, trendPct, TrendBadge
-│       ├── Toast.tsx            # Shared ToastContainer + useToasts() hook (error/warning/success/info, slide-in animation, auto-dismiss)
+│       ├── Toast.tsx            # Global imperative toast: `toast.success/error/warning/info()` singleton + <Toaster/> (mounted once in App.tsx). Card design (coloured top accent bar + bold title + message + dismiss). Legacy `useToasts()` + `<ToastContainer/>` kept as local-state shims rendering the same card.
+│       ├── Select.tsx           # Reusable animated dropdown (drop-in for native <select>). Menu rendered in a portal (fixed position, never clipped by overflow); keyboard nav, flip-up, click-outside, icons/dots/check
 │       └── OnboardingShell.tsx  # Shared layout for every onboarding screen: sticky branded header + ProgressDots + PageHeader + motion fade-in + decorative blurs
 ├── screens/
 │   ├── auth/               # Landing, Login, OTPVerify, PartnerAccess, PartnerAccessOTP, PartnerCategory
@@ -37,7 +39,8 @@ src/
 │   ├── programs/           # CreateProgram* (5 steps)
 │   ├── venues/             # CreateVenue* (5 steps)
 │   ├── enquiries/          # Enquiries, ProgramEnquiries
-│   ├── attendees/          # Attendees — full booking management (list, detail, mark-attended, cancel)
+│   ├── attendees/          # Attendees — two-level: listings card grid (By Listing Type / By Date) → per-group bookings + detail drawer
+│   ├── coupons/            # CreateCoupon (form), AllCoupons (list, mock data)
 │   ├── statistics/         # Statistics — tabbed analytics screen (Statistics.tsx + StatCharts.tsx)
 │   ├── packages/           # Packages
 │   └── financial/          # FinancialHub
@@ -218,10 +221,10 @@ Request → 401 Unauthorized?
 |----------|--------|----------|---------|---------|
 | `pauseListing` | POST | `/api/v1/partner/listings/{id}/pause/` | — | ServiceListings (all entity types) |
 | `resumeListing` | POST | `/api/v1/partner/listings/{id}/resume/` | — | ServiceListings (all entity types) |
-| `archiveListing` | POST | `/api/v1/partner/listings/{id}/archive/` | — | ServiceListings (Events, Classes, Venues) |
-| `unarchiveListing` | POST | `/api/v1/partner/listings/{id}/unarchive/` | — | ServiceListings (Events, Classes, Venues) |
+| `archiveListing` | POST | `/api/v1/partner/listings/{id}/archive/` | — | ServiceListings (all entity types) |
+| `unarchiveListing` | POST | `/api/v1/partner/listings/{id}/unarchive/` | — | ServiceListings (all entity types) |
 
-> **Entity-specific overrides preserved:** Classes use `setClassListingLive` for pause/resume (POST `/classes/{id}/live/`). Programs use `archiveProgramListing`/`unarchiveProgramListing` (POST `/programs/{id}/archive|unarchive/`). All other entities use the generic endpoints above.
+> **Generic endpoints used for ALL entity types (fixed June 2026):** pause/resume/archive/unarchive in `ServiceListings` route through the generic `/api/v1/partner/listings/{id}/{action}/` endpoints for Events, Classes, Programs **and** Venues. The backend URLconf only registers these generic routes — the old entity-specific routes (`/classes/{id}/live/`, `/programs/{id}/archive|unarchive/`) return 404. The entity-specific helpers (`setClassListingLive`, `archiveProgramListing`, `unarchiveProgramListing`) remain defined in `listings.ts` (with passing unit tests) but are **no longer wired into the UI**.
 
 **Booking field reference:**
 
@@ -306,6 +309,20 @@ All four GET endpoints require `Authorization: Bearer <token>` (partner with `st
 |-----------|---------------|
 | `top_listings` | No replacement endpoint — Top Performing Listings section removed from Statistics. |
 | `recent_activity` | No replacement endpoint — Recent Activity feed removed from Statistics. |
+
+### 2.6 Coupons API (`src/api/coupons.ts`) — ⏳ NOT live yet
+
+Written against the expected contract so the screens wire in one line each once the backend ships. Until then `createCoupon` rejects and `CreateCoupon` surfaces a friendly "coupons API is not connected yet" banner; `AllCoupons` renders **mock data**.
+
+| Function | Method | Endpoint | Used By |
+|----------|--------|----------|---------|
+| `getCoupons` | GET | `/api/v1/partner/coupons/` | (AllCoupons — currently mock) |
+| `getCoupon` | GET | `/api/v1/partner/coupons/{id}/` | (available) |
+| `createCoupon` | POST | `/api/v1/partner/coupons/` | CreateCoupon |
+| `updateCoupon` | PATCH | `/api/v1/partner/coupons/{id}/` | (available) |
+| `deleteCoupon` | DELETE | `/api/v1/partner/coupons/{id}/` | (available) |
+
+> **Coupon shape:** `{ code, description, discount_type: 'percentage'|'fixed', discount_value, max_discount, min_order_value, usage_limit, used_count, applies_to: 'all_listings'|'specific_listing'|'category', target_id, starts_at, expires_at, is_active }`. For `applies_to=category`, `target_id` is one of the main offering types (Events / Classes / Programs / Venues).
 
 ---
 
@@ -668,36 +685,41 @@ Partially API-integrated: bank account details are fetched from the partner prof
 
 ### 6.14 Attendees (`src/screens/attendees/Attendees.tsx`) — Fully API-Integrated
 
-Full booking management screen backed by the 4 partner booking endpoints.
+Redesigned (June 2026) into a **two-level flow**: a card grid of listings/dates first, then drill into a group's bookings + per-booking detail drawer.
 
-| API Call | Purpose |
-|----------|---------|
-| `getBookings()` × 5 parallel calls | Populate KPI count badges on mount (all / awaiting_payment / confirmed / attended / cancelled) |
-| `getBookings({ status?, page? })` | Paginated list load on filter-tab change / page navigation |
-| `getBookingDetail(id)` + listing detail fetch | Load full booking into right-side drawer; best-effort listing title resolution via entity-specific detail endpoint |
-| `markBookingAttended(id)` | "Mark Attended" action in drawer (only for `confirmed` bookings) |
-| `cancelBooking(id, reason)` | "Confirm Cancel" action in drawer (for `confirmed` and `awaiting_payment` bookings) |
+**Data load (single `loadAll` on mount):**
 
-**UI structure:**
+| Source | Purpose |
+|--------|---------|
+| `getEventListings/getClassListings/getProgramListings/getVenueListings` (per `allowedEntities`) | Build the listing cards |
+| `getBookings({ page })` looped until no `next` | Fetch every booking once, then group |
+| `getBookingDetail(id)` | Load a booking into the right-side drawer |
+| `markBookingAttended(id)` / `cancelBooking(id, reason)` | Drawer actions; patch both grouping maps in place (live count update, no refetch) |
+
+Bookings are grouped into **two maps**: `bookingsByListing` (key = `listing_id`) and `bookingsByDate` (key = `created_at` → `YYYY-MM-DD`). Bookings whose listing isn't in the catalog get a synthesized card; ones with no `listing_id` bucket under "Other bookings".
+
+**Level 1 — card grid** with a segmented toggle (animated via `AnimatePresence`):
+
+| Mode | Cards |
+|------|-------|
+| **By Listing Type** (default) | One card per listing — muted type-coloured banner (Event=blue-700/800, Class=violet-700/800, Program=teal-700/800, Venue=amber-700/800), title, total bookings, Confirmed/Attended/Awaiting mini-stats |
+| **By Date** | One card per booking date (newest first) — slate banner + weekday, full date title, `N bookings · M listings`, same mini-stats |
+
+A search box adapts ("Search listings…" / "Search dates…") and filters the active grid.
+
+**Level 2 — single group's bookings** (works for a listing OR a date, driven by `selected = { mode, key }`):
 
 | Element | Detail |
 |---------|--------|
-| KPI row | Total Bookings, Awaiting Payment, Confirmed, Attended, Cancelled — counts from 5 parallel `getBookings` calls |
-| Filter tabs | All / Awaiting Payment / Confirmed / Attended / Cancelled — each triggers `getBookings({ status })` |
-| Search bar | Client-side filter across customer name, email, booking reference |
-| Table | Booking Ref (monospace), Customer, Type badge, Status badge, Payment badge, Amount, Date, View button |
-| Detail drawer | Slide-in right panel with backdrop; shows listing title (best-effort fetched from entity detail endpoint), status/type/payment badges, customer info, order items (name + qty, no repeated amounts), attendees list, payment activity (context-aware: "Initiated" badge when payment pending, "SUCCESS" when paid) |
-| Mark Attended | Emerald button — visible only for `confirmed` status; calls `markBookingAttended` + refreshes drawer + list |
-| Cancel flow | Red outline button → inline textarea for reason → "Confirm Cancel"; visible for `confirmed` and `awaiting_payment`; calls `cancelBooking` + refreshes |
-| Pagination | Previous / Next from API `next` / `previous` fields |
+| Header | Back button + group title (listing title or formatted date) + subtitle |
+| KPI row | Total / Awaiting / Confirmed / Attended / Cancelled scoped to the group |
+| Tabs + search | Client-side filter by status, then by customer name / email / booking ref |
+| Table | Booking Ref, Customer, Status, Payment, Amount, Date — whole row opens the drawer |
+| Detail drawer | Status/type/payment badges, customer info, order items, **attendees list**, payment activity (context-aware "Initiated"/"SUCCESS"), cancellation block |
+| Mark Attended | Emerald button — only for `confirmed`; calls `markBookingAttended` |
+| Cancel flow | Red outline → inline reason textarea → "Confirm Cancel"; for `confirmed` and `awaiting_payment` |
 
-**Color maps:**
-
-| Map | Values |
-|-----|--------|
-| `STATUS_COLORS` | `confirmed` → amber, `attended` → emerald, `cancelled` → red |
-| `PAYMENT_COLORS` | `paid` → emerald, `pending` → amber, `refunded` → blue |
-| `TYPE_COLORS` | `event` → blue, `class` → purple, `program` → emerald, `venue` → amber |
+**Color maps:** `TYPE_META` (per-type banner gradient + badge), `STATUS_COLORS` (confirmed→sky, attended→emerald, awaiting→amber, cancelled→red), `PAYMENT_COLORS` (paid→emerald, pending→amber, refunded→purple). Toasts/`alert()` not used here.
 
 ### 6.15 Screens NOT Yet API-Integrated
 
@@ -706,6 +728,21 @@ Full booking management screen backed by the 4 partner booking endpoints.
 | **Attendees** | ✅ Fully integrated | Booking list + detail drawer + mark-attended + cancel (see §6.14) |
 | **Packages** | Placeholder UI | No packages API |
 | **FinancialHub** (transactions) | Empty state, no mock data | Bank details fetched; financial API pending |
+| **Coupons** (CreateCoupon, AllCoupons) | UI ready — ⏳ awaiting backend | `CreateCoupon` posts to `/coupons/` (graceful "not connected" banner on 404/5xx); `AllCoupons` shows mock data (see §6.16) |
+
+### 6.16 Coupons (`src/screens/coupons/`)
+
+| Screen | Detail |
+|--------|--------|
+| **CreateCoupon** (`CreateCoupon.tsx`) | Full form: code, % / fixed discount, max-discount cap, description, min-order, usage limit, start/expiry dates, Apply To. Live ticket-style preview + validation. "Apply To" uses the animated `Select`; choosing **Category** shows a second `Select` of the four main offering types (Events / Classes / Programs / Venues); **Specific Listing** shows a listing-ID text input. Header has a ← Coupons back button (no hamburger); Cancel + back both route to `ALL_COUPONS`. Submits via `createCoupon`. |
+| **AllCoupons** (`AllCoupons.tsx`) | Coupon list (currently **mock data**). Stat cards (Total / Active / Redemptions / From Listings), filter chips (All / Standalone / From Listings / Active / Expired) + search, ticket-style cards with copy-code, status badge (active/scheduled/expired/used-up/paused derived from dates+usage), redemption progress bar, and a **source chip** distinguishing standalone coupons vs. ones created during listing creation. Header + mobile FAB + empty state all link to `CREATE_COUPON`. |
+
+### 6.17 Global UI — Toast & Select
+
+| Component | Detail |
+|-----------|--------|
+| **Toast** (`components/ui/Toast.tsx`) | App-wide imperative API `toast.success/error/warning/info(message, { title?, duration? })` backed by a singleton store; one `<Toaster/>` mounted in `App.tsx`. Card design: coloured top accent bar + bold title + message + dismiss, per-type palette. Default titles by type ("Success!"/"Error"/…). All former `alert()` calls across 13 screens replaced (validation → `toast.warning`, failures → `toast.error`). Legacy `useToasts()`/`<ToastContainer/>` retained as local-state shims (used by auth/onboarding screens) rendering the same card. |
+| **Select** (`components/ui/Select.tsx`) | Reusable animated dropdown replacing every native `<select>` (coupon scope/category, enquiry status pills, program picker, venue sub-category, program format). Menu rendered in a **portal** with fixed positioning so it's never clipped by overflow/scroll containers (e.g. CRM tables); keyboard nav (↑/↓/Home/End/Enter/Esc), flip-up when no room below, click-outside, selected check, optional icons/colour dots, `buttonClassName`/`triggerExtra`/`align`/`size` props. |
 
 ---
 
@@ -839,7 +876,9 @@ One canonical type scale lives in `src/styles/components.css`; use these instead
 | CREATE_PROGRAM_PREVIEW | ✅/❌ | Programs | CreateProgramPreview | ✅ Full detail + submit; success/under_review/error modals |
 | ENQUIRIES | ✅ | Classes | Enquiries | ✅ getClassEnquiries, unlock, status/notes PUT |
 | PROGRAM_ENQUIRIES | ✅ | Programs | ProgramEnquiries | ✅ getProgramListings → getProgramEnquiries per-listing, updateProgramEnquiry |
-| ATTENDEES | ✅ | — | Attendees | ✅ getBookings (list+KPI counts), getBookingDetail (drawer), markBookingAttended, cancelBooking |
+| ATTENDEES | ✅ | — | Attendees | ✅ Two-level (listings/dates grid → group bookings + drawer); getEvent/Class/Program/VenueListings + paginated getBookings, getBookingDetail, markBookingAttended, cancelBooking |
+| ALL_COUPONS | ✅ | — | AllCoupons | ⏳ Mock data — list/filter/search of coupons (standalone + from-listing) |
+| CREATE_COUPON | ✅ | — | CreateCoupon | ⏳ Posts to `/coupons/` (graceful "not connected" banner); Category → main-type Select |
 | PACKAGES | ✅ | — | Packages | ❌ Placeholder |
 | FINANCIAL_HUB | ✅ | — | FinancialHub | ⚡ Partial — bank details from `getCurrentPartner` |
 
@@ -1116,6 +1155,13 @@ npm run test:report   # run tests → generate test-report.html + test-report.pd
 | `docs/venue-listings-db-spec.md` | Venues module — tables (`venues`, `venue_occasions`, `venue_availability`, `venue_packages`, `venue_media`), occasion/time-slot/attendee-field reference, bulk availability pattern, API endpoints |
 
 ---
+
+*Phase 21 (2026-06-04) — Toasts + Coupons + Dropdowns + Attendees redesign:*
+- *Global toast system: rebuilt `components/ui/Toast.tsx` into an imperative singleton (`toast.success/error/warning/info`) + one `<Toaster/>` in `App.tsx`, with a card design (coloured top accent bar + bold title + message + dismiss). Replaced every `alert()` across 13 screens (validation→warning, failures→error). Legacy `useToasts()`/`<ToastContainer/>` kept as same-design local shims for auth/onboarding. Updated 4 event tests to spy on `toast` instead of `window.alert`.*
+- *Archive fix: `ServiceListings` pause/resume/archive/unarchive now use the generic `/listings/{id}/{action}/` endpoints for ALL entity types (the entity-specific `/programs/.../archive/`, `/classes/.../live/` routes 404 on the backend).*
+- *Coupons: new `src/api/coupons.ts` + `src/screens/coupons/` — `CreateCoupon` (form, live preview, "not connected yet" banner) and `AllCoupons` (mock-data list with filters/search, standalone vs from-listing source chips). New `ALL_COUPONS`/`CREATE_COUPON` screens + "Coupons" sidebar entry.*
+- *Reusable `Select` (`components/ui/Select.tsx`): animated, portal-rendered (never clipped by overflow — fixes the Class-CRM dropdown break), keyboard-navigable. Replaced all 6 native `<select>`s. Coupon "Apply To → Category" now offers a dropdown of the four main offering types.*
+- *Attendees redesign: two-level flow — a card grid of listings (with a By Listing Type / By Date animated toggle) → drill into a group's bookings + the existing detail drawer. Single `loadAll` fetches all listings + paginated bookings, grouped into `bookingsByListing` + `bookingsByDate`. Muted banner palette.*
 
 *Phase 20 (2026-05-31) — Bug-fix sweep + Enquiry redesign + typography pass:*
 - *Sidebar overlay bug (High): collapsing then reopening the desktop sidebar leaked the mobile dark overlay drawer over the main content. Root cause — the drawer's `lg:hidden` was conditionally tied to `desktopOpen`, which vanished once collapsed. Fixed: drawer + backdrop are now always `lg:hidden`; the hamburger (`onOpenSidebar`) re-expands the fixed desktop sidebar AND opens the mobile drawer (`App.tsx` + `Navigation.tsx`).*

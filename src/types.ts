@@ -55,7 +55,9 @@ export type Screen =
   | 'PACKAGES'
   | 'ATTENDEES'
   | 'FINANCIAL_HUB'
-  | 'STATISTICS';
+  | 'STATISTICS'
+  | 'ALL_COUPONS'
+  | 'CREATE_COUPON';
 
 // ---------------------------------------------------------------------------
 // Partner

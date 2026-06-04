@@ -6,6 +6,7 @@ import { server } from '../../../test/msw/server';
 import { DRAFT_ID } from '../../../test/msw/handlers';
 import { CreateEventMedia } from '../CreateEventMedia';
 import { setCurrentDraftId } from '../../../api/listings';
+import { toast } from '../../../components/ui';
 
 const BASE = 'https://tlb-api.reluconsultancy.in';
 
@@ -128,15 +129,15 @@ describe('CreateEventMedia — cover deletion', () => {
 
     it('shows alert when cover delete fails', async () => {
         setCurrentDraftId(DRAFT_ID);
-        const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+        const toastSpy = vi.spyOn(toast, 'error').mockImplementation(() => 0);
         server.use(http.delete(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/media/:mediaId`, () =>
             HttpResponse.json({ error: { code: 'SERVER_ERROR', message: 'Delete failed' } }, { status: 500 })));
         const user = userEvent.setup();
         render(<CreateEventMedia {...props} />);
         await waitFor(() => document.querySelector('button[aria-label="Remove cover"]'));
         await user.click(document.querySelector('button[aria-label="Remove cover"]') as HTMLButtonElement);
-        await waitFor(() => expect(alertSpy).toHaveBeenCalled());
-        alertSpy.mockRestore();
+        await waitFor(() => expect(toastSpy).toHaveBeenCalled());
+        toastSpy.mockRestore();
     });
 });
 

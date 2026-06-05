@@ -16,8 +16,9 @@ src/
 │   ├── auth.ts             # requestOtp, verifyOtp, getCurrentUser, logout
 │   ├── onboarding.ts       # All partner CRUD endpoints (profile, media, categories, etc.)
 │   ├── stats.ts            # Partner statistics endpoints (overview, events, venues, enquiries) + trackProfileView
-│   ├── coupons.ts          # Partner coupons CRUD (NOT live yet — getCoupons/getCoupon/createCoupon/updateCoupon/deleteCoupon)
-│   └── listings.ts         # Listings + ticket + media CRUD, draft ID helpers, ApiError class
+│   ├── coupons.ts          # Partner coupons CRUD (live) — get/create/update/deactivate/usages; CreateCouponInput targeting
+│   ├── help.ts             # Help & Support tickets — categories, list, create, detail, messages (poll), send, close
+│   └── listings.ts         # Listings + ticket + media CRUD, bookings (+payment-detail), coupon_code on update, ApiError class
 ├── context/
 │   └── PartnerContext.tsx   # Global context: allowedEntities (synced to sessionStorage)
 ├── components/
@@ -40,7 +41,8 @@ src/
 │   ├── venues/             # CreateVenue* (5 steps)
 │   ├── enquiries/          # Enquiries, ProgramEnquiries
 │   ├── attendees/          # Attendees — two-level: listings card grid (By Listing Type / By Date) → per-group bookings + detail drawer
-│   ├── coupons/            # CreateCoupon (form), AllCoupons (list, mock data)
+│   ├── coupons/            # CreateCoupon (form, live API + targeting), AllCoupons (live list + deactivate, sample fallback)
+│   ├── support/            # Support — Help & Support: ticket list → new ticket → chat thread (poll/refresh/close)
 │   ├── statistics/         # Statistics — tabbed analytics screen (Statistics.tsx + StatCharts.tsx)
 │   ├── packages/           # Packages
 │   └── financial/          # FinancialHub
@@ -210,10 +212,11 @@ Request → 401 Unauthorized?
 
 | Function | Method | Endpoint | Payload | Used By |
 |----------|--------|----------|---------|---------|
-| `getBookings` | GET | `/api/v1/partner/bookings/` | Query: `status?`, `listing_id?`, `page?` | Attendees |
+| `getBookings` | GET | `/api/v1/partner/bookings/` | Query: `status?`, `listing_id?`, `page?` | Attendees — list now also returns `listing_id` + `listing_title` per booking |
 | `getBookingDetail` | GET | `/api/v1/partner/bookings/{id}/` | — | Attendees (drawer) |
 | `markBookingAttended` | POST | `/api/v1/partner/bookings/{id}/mark-attended/` | — | Attendees (drawer action) |
-| `cancelBooking` | POST | `/api/v1/partner/bookings/{id}/cancel/` | `{ reason: string }` | Attendees (drawer action) |
+| `getBookingPaymentDetail` | GET | `/api/v1/partner/bookings/{id}/payment-detail/` | — | Attendees (drawer — Payment Summary: `{ payment_method, amount, status }`, no card/UPI details) |
+| `cancelBooking` | POST | `/api/v1/partner/bookings/{id}/cancel/` | `{ reason }` | ⚠️ **Forbidden for partners** — returns 403 `PARTNER_BOOKING_CANCEL_FORBIDDEN`. Kept in `listings.ts` for tests but **NOT wired into the UI** (only customers can cancel). |
 
 **Generic Listing Actions (entity-agnostic):**
 
@@ -310,19 +313,41 @@ All four GET endpoints require `Authorization: Bearer <token>` (partner with `st
 | `top_listings` | No replacement endpoint — Top Performing Listings section removed from Statistics. |
 | `recent_activity` | No replacement endpoint — Recent Activity feed removed from Statistics. |
 
-### 2.6 Coupons API (`src/api/coupons.ts`) — ⏳ NOT live yet
+### 2.6 Coupons API (`src/api/coupons.ts`) — ✅ live (requires APPROVED partner)
 
-Written against the expected contract so the screens wire in one line each once the backend ships. Until then `createCoupon` rejects and `CreateCoupon` surfaces a friendly "coupons API is not connected yet" banner; `AllCoupons` renders **mock data**.
+Discount rules (server-side): `percent` → `amount − (amount × value/100)`, capped at `max_discount`; `fixed` → `amount − value`. Coupons are blocked on ₹0 (free) bookings.
 
 | Function | Method | Endpoint | Used By |
 |----------|--------|----------|---------|
-| `getCoupons` | GET | `/api/v1/partner/coupons/` | (AllCoupons — currently mock) |
+| `getCoupons({ is_active?, discount_type? })` | GET | `/api/v1/partner/coupons/` | AllCoupons, ServiceListings (coupon picker) |
 | `getCoupon` | GET | `/api/v1/partner/coupons/{id}/` | (available) |
 | `createCoupon` | POST | `/api/v1/partner/coupons/` | CreateCoupon |
 | `updateCoupon` | PATCH | `/api/v1/partner/coupons/{id}/` | (available) |
-| `deleteCoupon` | DELETE | `/api/v1/partner/coupons/{id}/` | (available) |
+| `deactivateCoupon` | DELETE | `/api/v1/partner/coupons/{id}/` | AllCoupons (soft-delete → `is_active=false`, code stays reserved) |
+| `getCouponUsages` | GET | `/api/v1/partner/coupons/{id}/usages/` | (available — `{ coupon_code, customer_email, booking_reference, discount_applied, used_at }`) |
 
-> **Coupon shape:** `{ code, description, discount_type: 'percentage'|'fixed', discount_value, max_discount, min_order_value, usage_limit, used_count, applies_to: 'all_listings'|'specific_listing'|'category', target_id, starts_at, expires_at, is_active }`. For `applies_to=category`, `target_id` is one of the main offering types (Events / Classes / Programs / Venues).
+> **Create payload:** `{ code, discount_type: 'percent'|'fixed', discount_value, max_discount?, description?, min_order_value?, usage_limit?, per_user_limit (default 1), starts_at?, expires_at?, target_listing_ids?, target_event_category_ids?, target_listing_types?: ('event'|'venue'|'program'|'class')[], target_genders?: ('male'|'female'|'other')[], target_min_age?, target_max_age? }`.
+> **List item shape:** `{ id, code, discount_type, discount_value, is_active, usage_count, usage_limit, expires_at }`.
+> `CreateCoupon` maps the "Apply To" UI → targeting arrays: *Specific Listing* → `target_listing_ids`; *Category* → `target_listing_types`. `AllCoupons` falls back to sample data (amber banner) only when the service is unreachable / partner not approved.
+
+> **Listing ↔ coupon link:** partner listing PATCH endpoints accept `coupon_code` (string to attach, `null` to remove; coupon must belong to the same partner). Listing list/detail responses now include `coupon: { code, discount_type, discount_value, max_discount, expires_at } | null`. `ServiceListings` shows a coupon badge per listing and an attach/change/remove modal (Ticket button) that PATCHes `coupon_code` via the entity's update function.
+
+### 2.7 Help & Support API (`src/api/help.ts`) — ✅ live
+
+Support ticket + chat thread. Base `/api/v1/help/`. All endpoints require the partner bearer token.
+
+| Function | Method | Endpoint | Notes |
+|----------|--------|----------|-------|
+| `getTicketCategories` | GET | `/help/tickets/categories/` | Role-restricted `{value,label}[]` — populate the dropdown (don't hardcode); falls back to defaults if empty |
+| `listTickets` | GET | `/help/tickets/list/` | `{ id, category, subject, status, created_at, updated_at, unread_count }[]` |
+| `getTicket` | GET | `/help/tickets/{id}/` | ticket detail |
+| `createTicket` | POST | `/help/tickets/` | `{ subject, category, body, booking_id? }` → first message auto-created. 400 `INVALID_CATEGORY` if category not allowed for role |
+| `getTicketMessages` | GET | `/help/tickets/{id}/messages/?since=` | Returns `{ ticket_status, messages[] }`. Omit `since` for full thread; pass last `created_at` **verbatim (UTC `Z`)** for deltas. Auto-marks unread as read |
+| `sendTicketMessage` | POST | `/help/tickets/{id}/messages/send/` | `{ body }`. 400 `TICKET_CLOSED` once closed |
+| `closeTicket` | POST | `/help/tickets/{id}/close/` | Terminal — cannot reopen. 400 `TICKET_ALREADY_CLOSED` |
+
+> **Statuses:** `open` (no admin reply) → `in_progress` (admin replied) → `resolved` → `closed`. **Sender roles:** `customer` / `partner` / `admin`.
+> **Chat polling contract:** full-load (no `since`) + reset cursor on every open/reopen; send `created_at` unmodified as `since`. Cadence by status: `in_progress` 5s, `open` 30s, `resolved` 60s, `closed` stop.
 
 ---
 
@@ -693,10 +718,10 @@ Redesigned (June 2026) into a **two-level flow**: a card grid of listings/dates 
 |--------|---------|
 | `getEventListings/getClassListings/getProgramListings/getVenueListings` (per `allowedEntities`) | Build the listing cards |
 | `getBookings({ page })` looped until no `next` | Fetch every booking once, then group |
-| `getBookingDetail(id)` | Load a booking into the right-side drawer |
-| `markBookingAttended(id)` / `cancelBooking(id, reason)` | Drawer actions; patch both grouping maps in place (live count update, no refetch) |
+| `getBookingDetail(id)` + `getBookingPaymentDetail(id)` | Load a booking into the right-side drawer (detail + Payment Summary, in parallel) |
+| `markBookingAttended(id)` | Drawer action; patches both grouping maps in place (live count update, no refetch) |
 
-Bookings are grouped into **two maps**: `bookingsByListing` (key = `listing_id`) and `bookingsByDate` (key = `created_at` → `YYYY-MM-DD`). Bookings whose listing isn't in the catalog get a synthesized card; ones with no `listing_id` bucket under "Other bookings".
+Bookings are grouped into **two maps**: `bookingsByListing` (key = `listing_id`) and `bookingsByDate` (key = `created_at` → `YYYY-MM-DD`). Each booking now carries `listing_title` (from the API), so synthesized cards (for listings not in the catalog) and the By-Date table show the real listing name; bookings with no `listing_id` bucket under "Other bookings".
 
 **Level 1 — card grid** with a segmented toggle (animated via `AnimatePresence`):
 
@@ -714,10 +739,9 @@ A search box adapts ("Search listings…" / "Search dates…") and filters the a
 | Header | Back button + group title (listing title or formatted date) + subtitle |
 | KPI row | Total / Awaiting / Confirmed / Attended / Cancelled scoped to the group |
 | Tabs + search | Client-side filter by status, then by customer name / email / booking ref |
-| Table | Booking Ref, Customer, Status, Payment, Amount, Date — whole row opens the drawer |
-| Detail drawer | Status/type/payment badges, customer info, order items, **attendees list**, payment activity (context-aware "Initiated"/"SUCCESS"), cancellation block |
-| Mark Attended | Emerald button — only for `confirmed`; calls `markBookingAttended` |
-| Cancel flow | Red outline → inline reason textarea → "Confirm Cancel"; for `confirmed` and `awaiting_payment` |
+| Table | Booking Ref, Customer, **Listing** (date-mode only — `listing_title` + type icon), Status, Payment, Amount, Date — whole row opens the drawer |
+| Detail drawer | Status/type/payment badges, customer info, order items, **attendees list**, **Payment Summary** (`payment_method`/`amount`/`status` — no card/UPI details), payment activity, cancellation block (read-only, shown when a *customer* cancelled) |
+| Mark Attended | Emerald button — only for `confirmed`; calls `markBookingAttended`. **No partner cancel** — `/cancel/` is 403 for partners, so the cancel flow was removed. |
 
 **Color maps:** `TYPE_META` (per-type banner gradient + badge), `STATUS_COLORS` (confirmed→sky, attended→emerald, awaiting→amber, cancelled→red), `PAYMENT_COLORS` (paid→emerald, pending→amber, refunded→purple). Toasts/`alert()` not used here.
 
@@ -725,24 +749,37 @@ A search box adapts ("Search listings…" / "Search dates…") and filters the a
 
 | Screen Group | Status | Notes |
 |-------------|--------|-------|
-| **Attendees** | ✅ Fully integrated | Booking list + detail drawer + mark-attended + cancel (see §6.14) |
+| **Attendees** | ✅ Fully integrated | Listings/dates grid + booking drawer + mark-attended + payment summary (see §6.14) |
+| **Coupons** (CreateCoupon, AllCoupons) | ✅ Fully integrated | Live `/coupons/` CRUD + targeting; listing↔coupon link (see §6.16) |
+| **Help & Support** (Support) | ✅ Fully integrated | Live `/help/tickets/` — raise, list, chat thread, close (see §6.18) |
 | **Packages** | Placeholder UI | No packages API |
 | **FinancialHub** (transactions) | Empty state, no mock data | Bank details fetched; financial API pending |
-| **Coupons** (CreateCoupon, AllCoupons) | UI ready — ⏳ awaiting backend | `CreateCoupon` posts to `/coupons/` (graceful "not connected" banner on 404/5xx); `AllCoupons` shows mock data (see §6.16) |
 
 ### 6.16 Coupons (`src/screens/coupons/`)
 
 | Screen | Detail |
 |--------|--------|
-| **CreateCoupon** (`CreateCoupon.tsx`) | Full form: code, % / fixed discount, max-discount cap, description, min-order, usage limit, start/expiry dates, Apply To. Live ticket-style preview + validation. "Apply To" uses the animated `Select`; choosing **Category** shows a second `Select` of the four main offering types (Events / Classes / Programs / Venues); **Specific Listing** shows a listing-ID text input. Header has a ← Coupons back button (no hamburger); Cancel + back both route to `ALL_COUPONS`. Submits via `createCoupon`. |
-| **AllCoupons** (`AllCoupons.tsx`) | Coupon list (currently **mock data**). Stat cards (Total / Active / Redemptions / From Listings), filter chips (All / Standalone / From Listings / Active / Expired) + search, ticket-style cards with copy-code, status badge (active/scheduled/expired/used-up/paused derived from dates+usage), redemption progress bar, and a **source chip** distinguishing standalone coupons vs. ones created during listing creation. Header + mobile FAB + empty state all link to `CREATE_COUPON`. |
+| **CreateCoupon** (`CreateCoupon.tsx`) | Full form (live `createCoupon`): code, `percent`/`fixed` discount, max-discount cap, description, min-order, usage limit, **per-user limit**, start/expiry dates, Apply To, and an optional **Audience** section (gender chips + min/max age → `target_genders`/`target_min_age`/`target_max_age`). Live ticket preview + validation. "Apply To" → *Specific Listing* shows a **dropdown of the partner's listings** (fetched live, manual-ID fallback) mapping to `target_listing_ids`; *Category* (Events/Classes/Programs/Venues) → `target_listing_types`. 403 → "account must be approved" banner. |
+| **AllCoupons** (`AllCoupons.tsx`) | Live list via `getCoupons()` (sample-data fallback + amber banner when unreachable). Stat cards (Total / Active / Redemptions / Inactive), status filters (All / Active / Scheduled / Expired / Inactive) + search, ticket cards with copy-code, derived status badge, redemption progress bar, and **Deactivate** per active coupon (`deactivateCoupon`, soft-delete). |
 
 ### 6.17 Global UI — Toast & Select
 
 | Component | Detail |
 |-----------|--------|
 | **Toast** (`components/ui/Toast.tsx`) | App-wide imperative API `toast.success/error/warning/info(message, { title?, duration? })` backed by a singleton store; one `<Toaster/>` mounted in `App.tsx`. Card design: coloured top accent bar + bold title + message + dismiss, per-type palette. Default titles by type ("Success!"/"Error"/…). All former `alert()` calls across 13 screens replaced (validation → `toast.warning`, failures → `toast.error`). Legacy `useToasts()`/`<ToastContainer/>` retained as local-state shims (used by auth/onboarding screens) rendering the same card. |
-| **Select** (`components/ui/Select.tsx`) | Reusable animated dropdown replacing every native `<select>` (coupon scope/category, enquiry status pills, program picker, venue sub-category, program format). Menu rendered in a **portal** with fixed positioning so it's never clipped by overflow/scroll containers (e.g. CRM tables); keyboard nav (↑/↓/Home/End/Enter/Esc), flip-up when no room below, click-outside, selected check, optional icons/colour dots, `buttonClassName`/`triggerExtra`/`align`/`size` props. |
+| **Select** (`components/ui/Select.tsx`) | Reusable animated dropdown replacing every native `<select>` (coupon scope/category/listing, enquiry status pills, program picker, venue sub-category, program format, ticket category/booking). Menu rendered in a **portal** with fixed positioning so it's never clipped by overflow/scroll containers (e.g. CRM tables); keyboard nav (↑/↓/Home/End/Enter/Esc), flip-up when no room below, click-outside, selected check, optional icons/colour dots, `buttonClassName`/`triggerExtra`/`align`/`size` props. |
+
+### 6.18 Help & Support (`src/screens/support/Support.tsx`)
+
+Three views in one screen, backed by the live `/help/tickets/` API (see §2.7):
+
+| View | Detail |
+|------|--------|
+| **Ticket list** | `listTickets()` — cards show subject, category, status badge, last-updated and an **unread badge** (`unread_count`); search + "N open" summary; loading/error/empty states |
+| **Raise a Ticket** | subject, **category dropdown** (live `getTicketCategories()`, role-restricted), optional **Related Booking** dropdown (from `getBookings`), description → `createTicket` |
+| **Conversation** | Chat thread (own messages right/yellow, admin left "TLB Support"); **status-based polling** (in_progress 5s / open 30s / resolved 60s / closed stop) using the verbatim-UTC `since` cursor (full-load + reset on open); a manual **Refresh** button; composer (Enter to send, `sendTicketMessage`) locked when closed; **Close Ticket** action (terminal) |
+
+Sidebar entry "Help & Support" (LifeBuoy). `getTicketMessages` returns `{ ticket_status, messages }` and drives live status updates in the drawer.
 
 ---
 
@@ -876,9 +913,10 @@ One canonical type scale lives in `src/styles/components.css`; use these instead
 | CREATE_PROGRAM_PREVIEW | ✅/❌ | Programs | CreateProgramPreview | ✅ Full detail + submit; success/under_review/error modals |
 | ENQUIRIES | ✅ | Classes | Enquiries | ✅ getClassEnquiries, unlock, status/notes PUT |
 | PROGRAM_ENQUIRIES | ✅ | Programs | ProgramEnquiries | ✅ getProgramListings → getProgramEnquiries per-listing, updateProgramEnquiry |
-| ATTENDEES | ✅ | — | Attendees | ✅ Two-level (listings/dates grid → group bookings + drawer); getEvent/Class/Program/VenueListings + paginated getBookings, getBookingDetail, markBookingAttended, cancelBooking |
-| ALL_COUPONS | ✅ | — | AllCoupons | ⏳ Mock data — list/filter/search of coupons (standalone + from-listing) |
-| CREATE_COUPON | ✅ | — | CreateCoupon | ⏳ Posts to `/coupons/` (graceful "not connected" banner); Category → main-type Select |
+| ATTENDEES | ✅ | — | Attendees | ✅ Two-level (listings/dates grid → group bookings + drawer); paginated getBookings (+listing_title), getBookingDetail, getBookingPaymentDetail, markBookingAttended (no partner cancel — 403) |
+| ALL_COUPONS | ✅ | — | AllCoupons | ✅ Live getCoupons + deactivate; sample fallback; status filters/search |
+| CREATE_COUPON | ✅ | — | CreateCoupon | ✅ Live createCoupon + targeting (listing dropdown / category / audience) |
+| HELP_SUPPORT | ✅ | — | Support | ✅ Live /help/tickets/ — categories, list, create, chat thread (poll/refresh), close |
 | PACKAGES | ✅ | — | Packages | ❌ Placeholder |
 | FINANCIAL_HUB | ✅ | — | FinancialHub | ⚡ Partial — bank details from `getCurrentPartner` |
 
@@ -1155,6 +1193,12 @@ npm run test:report   # run tests → generate test-report.html + test-report.pd
 | `docs/venue-listings-db-spec.md` | Venues module — tables (`venues`, `venue_occasions`, `venue_availability`, `venue_packages`, `venue_media`), occasion/time-slot/attendee-field reference, bulk availability pattern, API endpoints |
 
 ---
+
+*Phase 22 (2026-06-05) — Coupon API integration + Help & Support + Attendees/Bookings API alignment:*
+- *Coupons live: rewrote `src/api/coupons.ts` to the real contract (`percent`/`fixed`, `per_user_limit`, targeting arrays, `usages`, soft-delete). `CreateCoupon` posts real payloads — Specific-Listing now picks from a **live dropdown of the partner's listings**, plus an optional Audience (gender/age) section. `AllCoupons` lists live coupons with Deactivate (sample fallback when unreachable).*
+- *Listing ↔ coupon: listing list/detail now include `coupon`; partner update endpoints accept `coupon_code`. `ServiceListings` shows a coupon badge per listing + an attach/change/remove modal (Ticket button) that PATCHes `coupon_code`.*
+- *Help & Support: new `src/api/help.ts` + `src/screens/support/Support.tsx` (ticket list → raise → chat thread). Live categories/list/create/messages/send/close; status-based polling (5/30/60s, stop on closed) with verbatim-UTC `since` cursor + manual Refresh; `getTicketMessages` returns `{ ticket_status, messages }`. New `HELP_SUPPORT` screen + sidebar entry (LifeBuoy).*
+- *Attendees/Bookings: bookings now carry `listing_id`+`listing_title` (used for cards + a Listing column in By-Date view). **Removed the partner cancel flow** (`/cancel/` → 403 for partners). Added Payment Summary in the drawer via `getBookingPaymentDetail` (method/amount/status only).*
 
 *Phase 21 (2026-06-04) — Toasts + Coupons + Dropdowns + Attendees redesign:*
 - *Global toast system: rebuilt `components/ui/Toast.tsx` into an imperative singleton (`toast.success/error/warning/info`) + one `<Toaster/>` in `App.tsx`, with a card design (coloured top accent bar + bold title + message + dismiss). Replaced every `alert()` across 13 screens (validation→warning, failures→error). Legacy `useToasts()`/`<ToastContainer/>` kept as same-design local shims for auth/onboarding. Updated 4 event tests to spy on `toast` instead of `window.alert`.*

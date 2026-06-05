@@ -3,14 +3,13 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
     Menu, Search, X, ArrowLeft, ChevronRight,
     User, CreditCard, Users, CheckCircle,
-    XCircle, Inbox, RefreshCw, Phone, Mail,
+    Inbox, RefreshCw, Phone, Mail, Wallet,
     FileText, AlertCircle, CalendarDays, GraduationCap, Layers, MapPin,
 } from 'lucide-react';
 import { Screen, EntityType } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
 import {
-    getBookings, getBookingDetail,
-    markBookingAttended, cancelBooking,
+    getBookings, getBookingDetail, markBookingAttended, getBookingPaymentDetail,
     getEventListings, getClassListings, getProgramListings, getVenueListings,
 } from '../../api/listings';
 
@@ -27,6 +26,7 @@ type TabFilter = 'all' | BookingStatus;
 interface BookingSummary {
     id: string;
     listing_id?: string;
+    listing_title?: string;
     booking_reference: string;
     booking_type: BookingType;
     status: BookingStatus;
@@ -82,6 +82,12 @@ interface BookingDetail extends BookingSummary {
     venue_detail: unknown;
     transactions: Transaction[];
     updated_at: string;
+}
+
+interface PaymentSummary {
+    payment_method: string | null;
+    amount: number | null;
+    status: string | null;
 }
 
 interface StatusCounts {
@@ -198,10 +204,8 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
     const [detail, setDetail] = useState<BookingDetail | null>(null);
     const [loadingDetail, setLoadingDetail] = useState(false);
     const [actionError, setActionError] = useState<string | null>(null);
-    const [cancelOpen, setCancelOpen] = useState(false);
-    const [cancelReason, setCancelReason] = useState('');
-    const [cancelling, setCancelling] = useState(false);
     const [markingAttended, setMarkingAttended] = useState(false);
+    const [paymentDetail, setPaymentDetail] = useState<PaymentSummary | null>(null);
 
     const loadAll = useCallback(async () => {
         setLoading(true);
@@ -263,7 +267,7 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
                 const first = list[0];
                 listingCards.push({
                     id: key,
-                    title: (first as any).listing_title || `${TYPE_META[first.booking_type]?.label || 'Listing'}`,
+                    title: first.listing_title || `${TYPE_META[first.booking_type]?.label || 'Listing'}`,
                     type: first.booking_type,
                     synthetic: true,
                 });
@@ -323,10 +327,13 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
     const handleViewDetail = async (id: string) => {
         setSelectedId(id);
         setDetail(null);
+        setPaymentDetail(null);
         setLoadingDetail(true);
         setActionError(null);
-        setCancelOpen(false);
-        setCancelReason('');
+        // Payment summary is best-effort and loads in parallel
+        getBookingPaymentDetail(id)
+            .then((res: any) => setPaymentDetail(res?.data || res))
+            .catch(() => setPaymentDetail(null));
         try {
             const res = await getBookingDetail(id);
             const d = res?.data || res;
@@ -342,9 +349,8 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
     const handleCloseDetail = () => {
         setSelectedId(null);
         setDetail(null);
+        setPaymentDetail(null);
         setActionError(null);
-        setCancelOpen(false);
-        setCancelReason('');
     };
 
     const handleMarkAttended = async () => {
@@ -360,24 +366,6 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
             setActionError((e as Error)?.message || 'Failed to mark as attended');
         } finally {
             setMarkingAttended(false);
-        }
-    };
-
-    const handleCancelConfirm = async () => {
-        if (!detail) return;
-        setCancelling(true);
-        setActionError(null);
-        try {
-            const res = await cancelBooking(detail.id, cancelReason || undefined);
-            const updated = res?.data || res;
-            setDetail(prev => prev ? { ...prev, ...updated, status: 'cancelled' } : prev);
-            patchBooking(detail.id, { status: 'cancelled' });
-            setCancelOpen(false);
-            setCancelReason('');
-        } catch (e: unknown) {
-            setActionError((e as Error)?.message || 'Failed to cancel booking');
-        } finally {
-            setCancelling(false);
         }
     };
 
@@ -722,8 +710,8 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
                                     <table className="w-full text-left">
                                         <thead>
                                             <tr className="bg-gray-50/50 border-b border-gray-100">
-                                                {['Booking Ref', 'Customer', 'Status', 'Payment', 'Amount', 'Date', ''].map(h => (
-                                                    <th key={h} className="px-5 py-3.5 text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">
+                                                {['Booking Ref', 'Customer', ...(selected.mode === 'date' ? ['Listing'] : []), 'Status', 'Payment', 'Amount', 'Date', ''].map(h => (
+                                                    <th key={h || 'actions'} className="px-5 py-3.5 text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">
                                                         {h}
                                                     </th>
                                                 ))}
@@ -741,6 +729,14 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
                                                         <p className="font-bold text-sm text-gray-900 whitespace-nowrap">{b.customer_name}</p>
                                                         <p className="text-xs text-gray-400 font-medium mt-0.5">{b.customer_email}</p>
                                                     </td>
+                                                    {selected.mode === 'date' && (
+                                                        <td className="px-5 py-4">
+                                                            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-700">
+                                                                {React.createElement(TYPE_META[b.booking_type]?.icon || Layers, { size: 13, className: 'text-gray-400 shrink-0' })}
+                                                                <span className="truncate max-w-[180px]">{b.listing_title || '—'}</span>
+                                                            </span>
+                                                        </td>
+                                                    )}
                                                     <td className="px-5 py-4">
                                                         <span className={`text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${STATUS_COLORS[b.status] || FALLBACK_BADGE}`}>
                                                             {b.status.replace(/_/g, ' ')}
@@ -913,6 +909,30 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
                                             </div>
                                         )}
 
+                                        {paymentDetail && (paymentDetail.payment_method || paymentDetail.amount != null || paymentDetail.status) && (
+                                            <div className="bg-gray-50 rounded-2xl p-4 space-y-2.5">
+                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                                                    <Wallet size={11} /> Payment Summary
+                                                </p>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-xs text-gray-500 font-medium">Method</span>
+                                                    <span className="text-sm font-bold text-gray-900 capitalize">{paymentDetail.payment_method?.replace(/_/g, ' ') || '—'}</span>
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-xs text-gray-500 font-medium">Amount</span>
+                                                    <span className="text-sm font-bold text-gray-900">
+                                                        {paymentDetail.amount != null ? formatAmount(paymentDetail.amount, detail.currency) : '—'}
+                                                    </span>
+                                                </div>
+                                                {paymentDetail.status && (
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-xs text-gray-500 font-medium">Status</span>
+                                                        <span className="text-sm font-bold text-gray-900 capitalize">{paymentDetail.status.replace(/_/g, ' ')}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
                                         {detail.transactions.length > 0 && (
                                             <div>
                                                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
@@ -964,58 +984,18 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
                                     </div>
                                 </div>
 
-                                {(detail.status === 'confirmed' || detail.status === 'awaiting_payment') && (
-                                    <div className="shrink-0 bg-white border-t border-gray-100 px-6 py-4 space-y-3">
-                                        {!cancelOpen ? (
-                                            <div className="flex gap-3">
-                                                {detail.status === 'confirmed' && (
-                                                    <button
-                                                        onClick={handleMarkAttended}
-                                                        disabled={markingAttended}
-                                                        className="flex-1 flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-sm py-3 rounded-2xl transition-colors disabled:opacity-50"
-                                                    >
-                                                        {markingAttended
-                                                            ? <RefreshCw size={15} className="animate-spin" />
-                                                            : <CheckCircle size={15} />}
-                                                        Mark Attended
-                                                    </button>
-                                                )}
-                                                <button
-                                                    onClick={() => setCancelOpen(true)}
-                                                    className="flex-1 flex items-center justify-center gap-2 border-2 border-red-200 hover:bg-red-50 text-red-600 font-black text-sm py-3 rounded-2xl transition-colors"
-                                                >
-                                                    <XCircle size={15} />
-                                                    Cancel Booking
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <>
-                                                <p className="text-xs font-black text-gray-700">Reason for cancellation <span className="font-medium text-gray-400">(optional)</span></p>
-                                                <textarea
-                                                    className="w-full bg-gray-50 rounded-xl border border-gray-200 p-3 text-sm font-medium text-gray-700 focus:outline-none focus:border-red-300 resize-none"
-                                                    rows={2}
-                                                    placeholder="e.g. Event rescheduled due to weather"
-                                                    value={cancelReason}
-                                                    onChange={e => setCancelReason(e.target.value)}
-                                                />
-                                                <div className="flex gap-3">
-                                                    <button
-                                                        onClick={() => { setCancelOpen(false); setCancelReason(''); setActionError(null); }}
-                                                        className="flex-1 py-2.5 rounded-2xl border border-gray-200 text-sm font-black text-gray-600 hover:bg-gray-50 transition-colors"
-                                                    >
-                                                        Back
-                                                    </button>
-                                                    <button
-                                                        onClick={handleCancelConfirm}
-                                                        disabled={cancelling}
-                                                        className="flex-1 py-2.5 rounded-2xl bg-red-500 hover:bg-red-600 text-white text-sm font-black transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                                                    >
-                                                        {cancelling && <RefreshCw size={14} className="animate-spin" />}
-                                                        Confirm Cancel
-                                                    </button>
-                                                </div>
-                                            </>
-                                        )}
+                                {detail.status === 'confirmed' && (
+                                    <div className="shrink-0 bg-white border-t border-gray-100 px-6 py-4">
+                                        <button
+                                            onClick={handleMarkAttended}
+                                            disabled={markingAttended}
+                                            className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-sm py-3 rounded-2xl transition-colors disabled:opacity-50"
+                                        >
+                                            {markingAttended
+                                                ? <RefreshCw size={15} className="animate-spin" />
+                                                : <CheckCircle size={15} />}
+                                            Mark Attended
+                                        </button>
                                     </div>
                                 )}
                             </>

@@ -79,6 +79,9 @@ const StatisticsScreen = lazyImport(() => import('./screens/statistics'), 'Stati
 const CreateCoupon = lazyImport(() => import('./screens/coupons'), 'CreateCoupon');
 const AllCoupons = lazyImport(() => import('./screens/coupons'), 'AllCoupons');
 
+// Help & Support
+const Support = lazyImport(() => import('./screens/support'), 'Support');
+
 // Screen-module chunk factories — prefetched on idle so navigating to a slide
 // for the first time (or reopening it) doesn't flash the Suspense fallback.
 const SCREEN_CHUNKS = [
@@ -97,6 +100,7 @@ const SCREEN_CHUNKS = [
   () => import('./screens/enquiries'),
   () => import('./screens/statistics'),
   () => import('./screens/coupons'),
+  () => import('./screens/support'),
 ];
 
 const prefetchScreens = () => {
@@ -179,6 +183,7 @@ const routes: Record<Screen, RouteConfig> = {
   STATISTICS: { component: StatisticsScreen, hasSidebar: true },
   ALL_COUPONS: { component: AllCoupons, hasSidebar: true },
   CREATE_COUPON: { component: CreateCoupon, hasSidebar: true },
+  HELP_SUPPORT: { component: Support, hasSidebar: true },
 };
 
 // ---------------------------------------------------------------------------

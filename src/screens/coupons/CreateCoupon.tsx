@@ -1,12 +1,18 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     Ticket, Percent, IndianRupee, Tag, CalendarClock, Users,
     CheckCircle2, AlertCircle, Sparkles, ArrowLeft, Layers, CalendarDays, GraduationCap, MapPin,
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { Screen } from '../../types';
-import { createCoupon, CouponAppliesTo, CouponDiscountType, CreateCouponInput } from '../../api/coupons';
+import { Screen, EntityType } from '../../types';
+import { usePartner } from '../../context/PartnerContext';
+import {
+    createCoupon, CouponDiscountType, CouponGender, CouponListingType, CreateCouponInput,
+} from '../../api/coupons';
+import { getEventListings, getClassListings, getProgramListings, getVenueListings } from '../../api/listings';
 import { Select, SelectOption } from '../../components/ui';
+
+type AppliesTo = 'all_listings' | 'specific_listing' | 'category';
 
 const APPLIES_TO_OPTIONS: SelectOption[] = [
     { value: 'all_listings', label: 'All Listings', icon: Layers, description: 'Coupon works on everything you offer' },
@@ -14,12 +20,32 @@ const APPLIES_TO_OPTIONS: SelectOption[] = [
     { value: 'category', label: 'Category', icon: GraduationCap, description: 'Limit to one offering type' },
 ];
 
-// Main offering categories a coupon can target
+// Main offering categories → API listing_type
 const CATEGORY_OPTIONS: SelectOption[] = [
     { value: 'Events', label: 'Events', icon: CalendarDays },
     { value: 'Classes', label: 'Classes', icon: GraduationCap },
     { value: 'Programs', label: 'Programs', icon: Layers },
     { value: 'Venues', label: 'Venues', icon: MapPin },
+];
+
+const LISTING_TYPE_BY_CATEGORY: Record<string, CouponListingType> = {
+    Events: 'event', Classes: 'class', Programs: 'program', Venues: 'venue',
+};
+
+const LISTING_ICON: Record<EntityType, React.ElementType> = {
+    Events: CalendarDays, Classes: GraduationCap, Programs: Layers, Venues: MapPin,
+};
+const LISTING_TYPE_LABEL: Record<EntityType, string> = {
+    Events: 'Event', Classes: 'Class', Programs: 'Program', Venues: 'Venue',
+};
+const LISTING_FETCHERS: Record<EntityType, () => Promise<any>> = {
+    Events: getEventListings, Classes: getClassListings, Programs: getProgramListings, Venues: getVenueListings,
+};
+
+const GENDERS: { value: CouponGender; label: string }[] = [
+    { value: 'male', label: 'Male' },
+    { value: 'female', label: 'Female' },
+    { value: 'other', label: 'Other' },
 ];
 
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
@@ -32,33 +58,79 @@ interface FormState {
     maxDiscount: string;
     minOrderValue: string;
     usageLimit: string;
-    appliesTo: CouponAppliesTo;
+    perUserLimit: string;
+    appliesTo: AppliesTo;
     targetId: string;
     startsAt: string;
     expiresAt: string;
+    genders: CouponGender[];
+    minAge: string;
+    maxAge: string;
 }
 
 type FieldErrors = Partial<Record<keyof FormState, string>>;
 
 const INITIAL: FormState = {
-    code: '', description: '', discountType: 'percentage', discountValue: '',
-    maxDiscount: '', minOrderValue: '', usageLimit: '', appliesTo: 'all_listings',
-    targetId: '', startsAt: '', expiresAt: '',
+    code: '', description: '', discountType: 'percent', discountValue: '',
+    maxDiscount: '', minOrderValue: '', usageLimit: '', perUserLimit: '1',
+    appliesTo: 'all_listings', targetId: '', startsAt: '', expiresAt: '',
+    genders: [], minAge: '', maxAge: '',
 };
 
 const labelCls = 'block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2';
 
-export const CreateCoupon: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
+export const CreateCoupon: React.FC<Props> = ({ onNavigate }) => {
+    const { allowedEntities } = usePartner();
     const [form, setForm] = useState<FormState>(INITIAL);
     const [errors, setErrors] = useState<FieldErrors>({});
     const [submitting, setSubmitting] = useState(false);
     const [banner, setBanner] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const [listingOptions, setListingOptions] = useState<SelectOption[]>([]);
+    const [listingsLoading, setListingsLoading] = useState(true);
+
+    // Load the partner's listings to populate the "Specific Listing" dropdown
+    useEffect(() => {
+        const fetchListings = async () => {
+            setListingsLoading(true);
+            const wanted: EntityType[] = allowedEntities.length > 0
+                ? allowedEntities
+                : ['Events', 'Classes', 'Programs', 'Venues'];
+            const results = await Promise.allSettled(
+                wanted.map(ent => LISTING_FETCHERS[ent]().then((res: any) => {
+                    const data = res?.data || res;
+                    return Array.isArray(data)
+                        ? data.map((item: any) => ({
+                            value: String(item.id || ''),
+                            label: item.title || 'Untitled',
+                            icon: LISTING_ICON[ent],
+                            description: LISTING_TYPE_LABEL[ent],
+                        } as SelectOption))
+                        : [];
+                }).catch(() => [] as SelectOption[])),
+            );
+            const opts: SelectOption[] = [];
+            results.forEach(r => { if (r.status === 'fulfilled') opts.push(...r.value); });
+            setListingOptions(opts.filter(o => o.value));
+            setListingsLoading(false);
+        };
+        fetchListings();
+    }, [allowedEntities]);
 
     const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
         setForm(prev => ({ ...prev, [key]: value }));
         if (errors[key]) setErrors(prev => ({ ...prev, [key]: undefined }));
         if (banner) setBanner(null);
     };
+
+    const toggleGender = (g: CouponGender) => {
+        setForm(prev => ({
+            ...prev,
+            genders: prev.genders.includes(g) ? prev.genders.filter(x => x !== g) : [...prev.genders, g],
+        }));
+        if (banner) setBanner(null);
+    };
+
+    const isPercent = form.discountType === 'percent';
 
     const validate = (): boolean => {
         const e: FieldErrors = {};
@@ -69,34 +141,53 @@ export const CreateCoupon: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => 
         const val = Number(form.discountValue);
         if (!form.discountValue.trim()) e.discountValue = 'Discount value is required.';
         else if (Number.isNaN(val) || val <= 0) e.discountValue = 'Enter a value greater than 0.';
-        else if (form.discountType === 'percentage' && val > 100) e.discountValue = 'Percentage cannot exceed 100.';
+        else if (isPercent && val > 100) e.discountValue = 'Percentage cannot exceed 100.';
 
         if (form.maxDiscount && Number(form.maxDiscount) <= 0) e.maxDiscount = 'Must be greater than 0.';
         if (form.minOrderValue && Number(form.minOrderValue) < 0) e.minOrderValue = 'Cannot be negative.';
         if (form.usageLimit && (!Number.isInteger(Number(form.usageLimit)) || Number(form.usageLimit) < 1))
             e.usageLimit = 'Enter a whole number ≥ 1.';
+        if (form.perUserLimit && (!Number.isInteger(Number(form.perUserLimit)) || Number(form.perUserLimit) < 1))
+            e.perUserLimit = 'Enter a whole number ≥ 1.';
         if (form.startsAt && form.expiresAt && form.startsAt > form.expiresAt)
             e.expiresAt = 'Expiry must be after the start date.';
         if (form.appliesTo !== 'all_listings' && !form.targetId.trim())
             e.targetId = form.appliesTo === 'specific_listing' ? 'Listing ID is required.' : 'Category is required.';
+        if (form.minAge && (!Number.isInteger(Number(form.minAge)) || Number(form.minAge) < 0))
+            e.minAge = 'Enter a valid age.';
+        if (form.maxAge && (!Number.isInteger(Number(form.maxAge)) || Number(form.maxAge) < 0))
+            e.maxAge = 'Enter a valid age.';
+        if (form.minAge && form.maxAge && Number(form.minAge) > Number(form.maxAge))
+            e.maxAge = 'Max age must be ≥ min age.';
 
         setErrors(e);
         return Object.keys(e).length === 0;
     };
 
-    const buildPayload = (): CreateCouponInput => ({
-        code: form.code.trim().toUpperCase(),
-        description: form.description.trim() || undefined,
-        discount_type: form.discountType,
-        discount_value: Number(form.discountValue),
-        max_discount: form.discountType === 'percentage' && form.maxDiscount ? Number(form.maxDiscount) : null,
-        min_order_value: form.minOrderValue ? Number(form.minOrderValue) : null,
-        usage_limit: form.usageLimit ? Number(form.usageLimit) : null,
-        applies_to: form.appliesTo,
-        target_id: form.appliesTo === 'all_listings' ? null : form.targetId.trim(),
-        starts_at: form.startsAt || null,
-        expires_at: form.expiresAt || null,
-    });
+    const buildPayload = (): CreateCouponInput => {
+        const payload: CreateCouponInput = {
+            code: form.code.trim().toUpperCase(),
+            discount_type: form.discountType,
+            discount_value: Number(form.discountValue),
+            description: form.description.trim() || undefined,
+            max_discount: isPercent && form.maxDiscount ? Number(form.maxDiscount) : null,
+            min_order_value: form.minOrderValue ? Number(form.minOrderValue) : null,
+            usage_limit: form.usageLimit ? Number(form.usageLimit) : null,
+            per_user_limit: form.perUserLimit ? Number(form.perUserLimit) : 1,
+            starts_at: form.startsAt || null,
+            expires_at: form.expiresAt || null,
+        };
+        if (form.appliesTo === 'specific_listing' && form.targetId.trim()) {
+            payload.target_listing_ids = [form.targetId.trim()];
+        } else if (form.appliesTo === 'category') {
+            const lt = LISTING_TYPE_BY_CATEGORY[form.targetId];
+            if (lt) payload.target_listing_types = [lt];
+        }
+        if (form.genders.length) payload.target_genders = form.genders;
+        if (form.minAge) payload.target_min_age = Number(form.minAge);
+        if (form.maxAge) payload.target_max_age = Number(form.maxAge);
+        return payload;
+    };
 
     const handleSubmit = async (ev: React.FormEvent) => {
         ev.preventDefault();
@@ -109,11 +200,11 @@ export const CreateCoupon: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => 
             setForm(INITIAL);
         } catch (err: any) {
             const raw = err?.message || '';
-            const notConnected = /HTTP (404|5\d\d)|Failed to fetch|NetworkError/i.test(raw);
+            const notApproved = /not approved|approv|permission|forbidden|HTTP 403/i.test(raw);
             setBanner({
                 type: 'error',
-                text: notConnected
-                    ? 'The coupons API is not connected yet. Your coupon could not be saved.'
+                text: notApproved
+                    ? 'Your partner account must be approved before you can create coupons.'
                     : raw || 'Something went wrong while creating the coupon.',
             });
         } finally {
@@ -124,9 +215,9 @@ export const CreateCoupon: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => 
     const previewCode = form.code.trim().toUpperCase() || 'YOURCODE';
     const previewDiscount = useMemo(() => {
         const v = Number(form.discountValue);
-        if (!form.discountValue || Number.isNaN(v)) return form.discountType === 'percentage' ? '0%' : '₹0';
-        return form.discountType === 'percentage' ? `${v}%` : `₹${v}`;
-    }, [form.discountValue, form.discountType]);
+        if (!form.discountValue || Number.isNaN(v)) return isPercent ? '0%' : '₹0';
+        return isPercent ? `${v}%` : `₹${v}`;
+    }, [form.discountValue, isPercent]);
 
     return (
         <div className="min-h-screen bg-gray-50 pb-24">
@@ -184,7 +275,7 @@ export const CreateCoupon: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => 
                                         <label className={labelCls}>Discount Type *</label>
                                         <div className="grid grid-cols-2 gap-2">
                                             {([
-                                                { v: 'percentage' as const, label: 'Percent', icon: Percent },
+                                                { v: 'percent' as const, label: 'Percent', icon: Percent },
                                                 { v: 'fixed' as const, label: 'Fixed ₹', icon: IndianRupee },
                                             ]).map(({ v, label, icon: Icon }) => {
                                                 const active = form.discountType === v;
@@ -216,16 +307,16 @@ export const CreateCoupon: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => 
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
-                                        <label className={labelCls}>{form.discountType === 'percentage' ? 'Discount % *' : 'Discount ₹ *'}</label>
+                                        <label className={labelCls}>{isPercent ? 'Discount % *' : 'Discount ₹ *'}</label>
                                         <input
                                             type="number" min="0" value={form.discountValue}
                                             onChange={(e) => set('discountValue', e.target.value)}
-                                            placeholder={form.discountType === 'percentage' ? '20' : '500'}
+                                            placeholder={isPercent ? '20' : '500'}
                                             className={`tlb-input ${errors.discountValue ? 'border-red-300 ring-1 ring-red-200' : ''}`}
                                         />
                                         {errors.discountValue && <p className="text-xs text-red-500 mt-1.5">{errors.discountValue}</p>}
                                     </div>
-                                    {form.discountType === 'percentage' && (
+                                    {isPercent && (
                                         <div>
                                             <label className={labelCls}>Max Discount ₹</label>
                                             <input
@@ -243,7 +334,7 @@ export const CreateCoupon: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => 
                             <div className="tlb-card space-y-5">
                                 <h3 className="tlb-label">Rules & Limits</h3>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                     <div>
                                         <label className={labelCls}>Min Order Value ₹</label>
                                         <input
@@ -263,6 +354,16 @@ export const CreateCoupon: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => 
                                             className={`tlb-input ${errors.usageLimit ? 'border-red-300 ring-1 ring-red-200' : ''}`}
                                         />
                                         {errors.usageLimit && <p className="text-xs text-red-500 mt-1.5">{errors.usageLimit}</p>}
+                                    </div>
+                                    <div>
+                                        <label className={labelCls}>Per-User Limit</label>
+                                        <input
+                                            type="number" min="1" value={form.perUserLimit}
+                                            onChange={(e) => set('perUserLimit', e.target.value)}
+                                            placeholder="1"
+                                            className={`tlb-input ${errors.perUserLimit ? 'border-red-300 ring-1 ring-red-200' : ''}`}
+                                        />
+                                        {errors.perUserLimit && <p className="text-xs text-red-500 mt-1.5">{errors.perUserLimit}</p>}
                                     </div>
                                 </div>
 
@@ -287,7 +388,7 @@ export const CreateCoupon: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => 
                                     <Select
                                         value={form.appliesTo}
                                         onChange={(v) => {
-                                            set('appliesTo', v as CouponAppliesTo);
+                                            set('appliesTo', v as AppliesTo);
                                             set('targetId', ''); // reset target when scope changes
                                         }}
                                         options={APPLIES_TO_OPTIONS}
@@ -312,16 +413,87 @@ export const CreateCoupon: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => 
 
                                 {form.appliesTo === 'specific_listing' && (
                                     <div>
-                                        <label className={labelCls}>Listing ID *</label>
-                                        <input
-                                            type="text" value={form.targetId}
-                                            onChange={(e) => set('targetId', e.target.value)}
-                                            placeholder="Listing ID"
-                                            className={`tlb-input ${errors.targetId ? 'border-red-300 ring-1 ring-red-200' : ''}`}
-                                        />
+                                        <label className={labelCls}>Listing *</label>
+                                        {listingsLoading ? (
+                                            <div className="tlb-input flex items-center gap-2 text-gray-400">
+                                                <span className="w-4 h-4 border-2 border-gray-200 border-t-gray-400 rounded-full animate-spin" />
+                                                Loading your listings…
+                                            </div>
+                                        ) : listingOptions.length > 0 ? (
+                                            <Select
+                                                value={form.targetId}
+                                                onChange={(v) => set('targetId', v)}
+                                                options={listingOptions}
+                                                placeholder="Select a listing"
+                                                ariaLabel="Coupon listing"
+                                                triggerExtra={errors.targetId ? 'border-red-300 ring-1 ring-red-200' : ''}
+                                            />
+                                        ) : (
+                                            <input
+                                                type="text" value={form.targetId}
+                                                onChange={(e) => set('targetId', e.target.value)}
+                                                placeholder="Listing ID"
+                                                className={`tlb-input ${errors.targetId ? 'border-red-300 ring-1 ring-red-200' : ''}`}
+                                            />
+                                        )}
+                                        {!listingsLoading && listingOptions.length === 0 && (
+                                            <p className="text-[11px] text-gray-400 mt-1.5">No listings found — enter a listing ID manually.</p>
+                                        )}
                                         {errors.targetId && <p className="text-xs text-red-500 mt-1.5">{errors.targetId}</p>}
                                     </div>
                                 )}
+                            </div>
+
+                            {/* Audience targeting (optional) */}
+                            <div className="tlb-card space-y-5">
+                                <div className="flex items-center gap-2">
+                                    <Users size={15} className="text-gray-400" />
+                                    <h3 className="tlb-label !mb-0">Audience <span className="font-medium normal-case tracking-normal text-gray-400">(optional)</span></h3>
+                                </div>
+
+                                <div>
+                                    <label className={labelCls}>Gender</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {GENDERS.map(({ value, label }) => {
+                                            const active = form.genders.includes(value);
+                                            return (
+                                                <button
+                                                    key={value} type="button" onClick={() => toggleGender(value)}
+                                                    className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all ${
+                                                        active ? 'bg-tlb-yellow border-tlb-yellow text-tlb-dark'
+                                                               : 'bg-gray-50 border-gray-200 text-gray-500 hover:text-gray-900'
+                                                    }`}
+                                                >
+                                                    {label}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                    <p className="text-[11px] text-gray-400 mt-1.5">Leave empty to allow all genders.</p>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className={labelCls}>Min Age</label>
+                                        <input
+                                            type="number" min="0" value={form.minAge}
+                                            onChange={(e) => set('minAge', e.target.value)}
+                                            placeholder="Any"
+                                            className={`tlb-input ${errors.minAge ? 'border-red-300 ring-1 ring-red-200' : ''}`}
+                                        />
+                                        {errors.minAge && <p className="text-xs text-red-500 mt-1.5">{errors.minAge}</p>}
+                                    </div>
+                                    <div>
+                                        <label className={labelCls}>Max Age</label>
+                                        <input
+                                            type="number" min="0" value={form.maxAge}
+                                            onChange={(e) => set('maxAge', e.target.value)}
+                                            placeholder="Any"
+                                            className={`tlb-input ${errors.maxAge ? 'border-red-300 ring-1 ring-red-200' : ''}`}
+                                        />
+                                        {errors.maxAge && <p className="text-xs text-red-500 mt-1.5">{errors.maxAge}</p>}
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -338,7 +510,7 @@ export const CreateCoupon: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => 
                                         <div>
                                             <p className="font-mono font-bold tracking-wider">{previewCode}</p>
                                             <p className="text-[10px] text-gray-400 uppercase tracking-widest">
-                                                {form.discountType === 'percentage' ? 'Percentage off' : 'Flat discount'}
+                                                {isPercent ? 'Percentage off' : 'Flat discount'}
                                             </p>
                                         </div>
                                     </div>
@@ -347,7 +519,7 @@ export const CreateCoupon: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => 
                                         <span className="flex items-center gap-1"><CalendarClock size={12} /> {form.expiresAt || 'No expiry'}</span>
                                         <span className="flex items-center gap-1"><Users size={12} /> {form.usageLimit ? `${form.usageLimit} uses` : 'Unlimited'}</span>
                                         <span className="flex items-center gap-1">
-                                            <Tag size={12} /> {form.appliesTo === 'all_listings' ? 'All listings' : form.appliesTo === 'specific_listing' ? 'Listing' : 'Category'}
+                                            <Tag size={12} /> {form.appliesTo === 'all_listings' ? 'All listings' : form.appliesTo === 'specific_listing' ? 'Listing' : (form.targetId || 'Category')}
                                         </span>
                                     </div>
                                 </div>

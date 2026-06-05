@@ -1,101 +1,59 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-    Menu, Ticket, Plus, Search, Sparkles, CalendarClock, Users, Tag,
-    Copy, Check, Layers, Percent, IndianRupee,
+    Menu, Ticket, Plus, Search, Sparkles, CalendarClock, Users,
+    Copy, Check, Percent, IndianRupee, RefreshCw, AlertCircle, Power,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Screen } from '../../types';
-import type { Coupon } from '../../api/coupons';
+import { getCoupons, deactivateCoupon } from '../../api/coupons';
+import { toast } from '../../components/ui';
 
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
 
-// ---------------------------------------------------------------------------
-// Mock data
-// `source` distinguishes coupons created from the standalone Create Coupon
-// screen vs. those generated inline while creating a listing.
-// ---------------------------------------------------------------------------
-type CouponSource = 'standalone' | 'listing';
-
-interface MockCoupon extends Coupon {
-    source: CouponSource;
-    /** Listing this coupon was created alongside (source = 'listing'). */
-    listingTitle?: string;
+// Display model — superset of the list-endpoint fields plus a few optional
+// detail fields used by the demo fallback.
+interface DisplayCoupon {
+    id: string;
+    code: string;
+    discount_type: 'percent' | 'fixed';
+    discount_value: number;
+    is_active: boolean;
+    usage_count: number;
+    usage_limit: number | null;
+    expires_at: string | null;
+    description?: string;
+    starts_at?: string | null;
+    max_discount?: number | null;
 }
 
-const MOCK_COUPONS: MockCoupon[] = [
-    {
-        id: 'c1', code: 'WELCOME20', description: 'New customer welcome offer',
-        discount_type: 'percentage', discount_value: 20, max_discount: 500,
-        min_order_value: 1000, usage_limit: 100, used_count: 37,
-        applies_to: 'all_listings', target_id: null,
-        starts_at: '2026-05-01', expires_at: '2026-12-31', is_active: true,
-        created_at: '2026-05-01T10:00:00Z', source: 'standalone',
-    },
-    {
-        id: 'c2', code: 'FLAT500', description: 'Flat ₹500 off on bookings',
-        discount_type: 'fixed', discount_value: 500, max_discount: null,
-        min_order_value: 2500, usage_limit: null, used_count: 12,
-        applies_to: 'all_listings', target_id: null,
-        starts_at: null, expires_at: null, is_active: true,
-        created_at: '2026-04-18T10:00:00Z', source: 'standalone',
-    },
-    {
-        id: 'c3', code: 'SUMMERCAMP10', description: 'Early-bird discount',
-        discount_type: 'percentage', discount_value: 10, max_discount: null,
-        min_order_value: null, usage_limit: 50, used_count: 50,
-        applies_to: 'specific_listing', target_id: 'Summer Art Camp 2026',
-        starts_at: '2026-03-01', expires_at: '2026-05-31', is_active: true,
-        created_at: '2026-03-01T10:00:00Z', source: 'listing',
-        listingTitle: 'Summer Art Camp 2026',
-    },
-    {
-        id: 'c4', code: 'DANCE15', description: 'Dance classes promo',
-        discount_type: 'percentage', discount_value: 15, max_discount: 300,
-        min_order_value: null, usage_limit: 200, used_count: 84,
-        applies_to: 'category', target_id: 'Dance',
-        starts_at: '2026-06-01', expires_at: '2026-08-31', is_active: true,
-        created_at: '2026-05-20T10:00:00Z', source: 'standalone',
-    },
-    {
-        id: 'c5', code: 'YOGAEARLY', description: 'Pre-launch offer for Morning Yoga batch',
-        discount_type: 'fixed', discount_value: 250, max_discount: null,
-        min_order_value: 1500, usage_limit: 30, used_count: 8,
-        applies_to: 'specific_listing', target_id: 'Morning Yoga Batch',
-        starts_at: '2026-07-01', expires_at: '2026-09-30', is_active: true,
-        created_at: '2026-06-02T10:00:00Z', source: 'listing',
-        listingTitle: 'Morning Yoga Batch',
-    },
-    {
-        id: 'c6', code: 'NEWYEAR25', description: 'New Year flash sale',
-        discount_type: 'percentage', discount_value: 25, max_discount: 750,
-        min_order_value: 2000, usage_limit: 150, used_count: 150,
-        applies_to: 'all_listings', target_id: null,
-        starts_at: '2025-12-25', expires_at: '2026-01-05', is_active: false,
-        created_at: '2025-12-20T10:00:00Z', source: 'standalone',
-    },
-    {
-        id: 'c7', code: 'MUSICFEST', description: 'Music workshop intro offer',
-        discount_type: 'fixed', discount_value: 200, max_discount: null,
-        min_order_value: null, usage_limit: 40, used_count: 5,
-        applies_to: 'specific_listing', target_id: 'Guitar Workshop',
-        starts_at: '2026-02-01', expires_at: '2026-04-01', is_active: false,
-        created_at: '2026-01-15T10:00:00Z', source: 'listing',
-        listingTitle: 'Guitar Workshop',
-    },
+// ---------------------------------------------------------------------------
+// Sample data — shown only when the live coupons service can't be reached
+// (e.g. partner not yet approved / endpoint unavailable).
+// ---------------------------------------------------------------------------
+const MOCK_COUPONS: DisplayCoupon[] = [
+    { id: 'c1', code: 'WELCOME20', description: 'New customer welcome offer', discount_type: 'percent', discount_value: 20, max_discount: 500, usage_limit: 100, usage_count: 37, starts_at: '2026-05-01', expires_at: '2026-12-31', is_active: true },
+    { id: 'c2', code: 'FLAT500', description: 'Flat ₹500 off on bookings', discount_type: 'fixed', discount_value: 500, usage_limit: null, usage_count: 12, starts_at: null, expires_at: null, is_active: true },
+    { id: 'c3', code: 'SUMMERCAMP10', description: 'Early-bird discount', discount_type: 'percent', discount_value: 10, usage_limit: 50, usage_count: 50, starts_at: '2026-03-01', expires_at: '2026-05-31', is_active: true },
+    { id: 'c4', code: 'DANCE15', description: 'Dance classes promo', discount_type: 'percent', discount_value: 15, max_discount: 300, usage_limit: 200, usage_count: 84, starts_at: '2026-06-01', expires_at: '2026-08-31', is_active: true },
+    { id: 'c6', code: 'NEWYEAR25', description: 'New Year flash sale', discount_type: 'percent', discount_value: 25, max_discount: 750, usage_limit: 150, usage_count: 150, starts_at: '2025-12-25', expires_at: '2026-01-05', is_active: false },
 ];
 
 // ---------------------------------------------------------------------------
 // Status derivation
 // ---------------------------------------------------------------------------
-type CouponStatus = 'active' | 'scheduled' | 'expired' | 'exhausted' | 'paused';
+type CouponStatus = 'active' | 'scheduled' | 'expired' | 'exhausted' | 'inactive';
 
-const TODAY = '2026-06-04'; // currentDate
+const TODAY = '2026-06-05'; // currentDate
 
-const deriveStatus = (c: MockCoupon): CouponStatus => {
-    if (!c.is_active) return 'paused';
-    if (c.expires_at && c.expires_at < TODAY) return 'expired';
-    if (c.usage_limit !== null && c.used_count >= c.usage_limit) return 'exhausted';
-    if (c.starts_at && c.starts_at > TODAY) return 'scheduled';
+const dayPart = (iso: string | null | undefined) => (iso ? iso.slice(0, 10) : null);
+
+const deriveStatus = (c: DisplayCoupon): CouponStatus => {
+    if (!c.is_active) return 'inactive';
+    const exp = dayPart(c.expires_at);
+    const start = dayPart(c.starts_at);
+    if (exp && exp < TODAY) return 'expired';
+    if (c.usage_limit !== null && c.usage_count >= c.usage_limit) return 'exhausted';
+    if (start && start > TODAY) return 'scheduled';
     return 'active';
 };
 
@@ -104,34 +62,35 @@ const STATUS_STYLE: Record<CouponStatus, { label: string; cls: string; dot: stri
     scheduled: { label: 'Scheduled', cls: 'bg-blue-50 text-blue-700 border-blue-200',          dot: 'bg-blue-500' },
     expired:   { label: 'Expired',   cls: 'bg-gray-100 text-gray-500 border-gray-200',         dot: 'bg-gray-400' },
     exhausted: { label: 'Used up',   cls: 'bg-amber-50 text-amber-700 border-amber-200',       dot: 'bg-amber-500' },
-    paused:    { label: 'Paused',    cls: 'bg-red-50 text-red-600 border-red-200',             dot: 'bg-red-400' },
+    inactive:  { label: 'Inactive',  cls: 'bg-red-50 text-red-600 border-red-200',             dot: 'bg-red-400' },
 };
 
-const fmtDiscount = (c: MockCoupon) =>
-    c.discount_type === 'percentage' ? `${c.discount_value}%` : `₹${c.discount_value}`;
+const fmtDiscount = (c: DisplayCoupon) =>
+    c.discount_type === 'percent' ? `${c.discount_value}%` : `₹${c.discount_value}`;
 
 const fmtDate = (iso: string | null) => {
-    if (!iso) return null;
-    const [y, m, d] = iso.split('-');
+    const d = dayPart(iso);
+    if (!d) return null;
+    const [y, m, day] = d.split('-');
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return `${d} ${months[Number(m) - 1]} ${y}`;
+    return `${day} ${months[Number(m) - 1]} ${y}`;
 };
-
-const appliesLabel = (c: MockCoupon) =>
-    c.applies_to === 'all_listings' ? 'All listings'
-        : c.applies_to === 'category' ? `${c.target_id} category`
-            : c.target_id || 'Specific listing';
 
 // ---------------------------------------------------------------------------
 // Coupon card
 // ---------------------------------------------------------------------------
-const CouponCard: React.FC<{ coupon: MockCoupon; index: number }> = ({ coupon, index }) => {
+const CouponCard: React.FC<{
+    coupon: DisplayCoupon;
+    index: number;
+    deactivating: boolean;
+    onDeactivate: (id: string) => void;
+}> = ({ coupon, index, deactivating, onDeactivate }) => {
     const [copied, setCopied] = useState(false);
     const status = deriveStatus(coupon);
     const st = STATUS_STYLE[status];
-    const faded = status === 'expired' || status === 'paused';
+    const faded = status === 'expired' || status === 'inactive';
     const usagePct = coupon.usage_limit
-        ? Math.min(100, Math.round((coupon.used_count / coupon.usage_limit) * 100))
+        ? Math.min(100, Math.round((coupon.usage_count / coupon.usage_limit) * 100))
         : null;
 
     const copyCode = () => {
@@ -153,7 +112,7 @@ const CouponCard: React.FC<{ coupon: MockCoupon; index: number }> = ({ coupon, i
                 <div className="flex items-start justify-between relative z-10">
                     <div className="flex items-center gap-3 min-w-0">
                         <div className="w-12 h-12 shrink-0 bg-tlb-yellow/15 border border-tlb-yellow/30 rounded-xl flex items-center justify-center">
-                            {coupon.discount_type === 'percentage'
+                            {coupon.discount_type === 'percent'
                                 ? <Percent size={18} className="text-tlb-yellow" />
                                 : <IndianRupee size={18} className="text-tlb-yellow" />}
                         </div>
@@ -169,7 +128,8 @@ const CouponCard: React.FC<{ coupon: MockCoupon; index: number }> = ({ coupon, i
                                     : <Copy size={13} className="text-gray-400 group-hover:text-tlb-yellow shrink-0" />}
                             </button>
                             <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-0.5">
-                                {fmtDiscount(coupon)} {coupon.discount_type === 'percentage' ? 'off' : 'flat off'}
+                                {fmtDiscount(coupon)} {coupon.discount_type === 'percent' ? 'off' : 'flat off'}
+                                {coupon.discount_type === 'percent' && coupon.max_discount ? ` · up to ₹${coupon.max_discount}` : ''}
                             </p>
                         </div>
                     </div>
@@ -191,9 +151,6 @@ const CouponCard: React.FC<{ coupon: MockCoupon; index: number }> = ({ coupon, i
 
                 <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-gray-500">
                     <span className="flex items-center gap-1.5">
-                        <Tag size={13} className="text-gray-400" /> {appliesLabel(coupon)}
-                    </span>
-                    <span className="flex items-center gap-1.5">
                         <CalendarClock size={13} className="text-gray-400" />
                         {coupon.expires_at ? `Until ${fmtDate(coupon.expires_at)}` : 'No expiry'}
                     </span>
@@ -203,7 +160,7 @@ const CouponCard: React.FC<{ coupon: MockCoupon; index: number }> = ({ coupon, i
                 <div className="mt-auto pt-2">
                     <div className="flex items-center justify-between text-[11px] font-semibold text-gray-500 mb-1.5">
                         <span className="flex items-center gap-1.5"><Users size={12} /> Redemptions</span>
-                        <span>{coupon.used_count}{coupon.usage_limit ? ` / ${coupon.usage_limit}` : ' · unlimited'}</span>
+                        <span>{coupon.usage_count}{coupon.usage_limit ? ` / ${coupon.usage_limit}` : ' · unlimited'}</span>
                     </div>
                     {usagePct !== null && (
                         <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
@@ -215,18 +172,19 @@ const CouponCard: React.FC<{ coupon: MockCoupon; index: number }> = ({ coupon, i
                     )}
                 </div>
 
-                {/* Source chip */}
-                <div className="pt-1">
-                    {coupon.source === 'listing' ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 text-[10px] font-bold border border-purple-100">
-                            <Layers size={11} /> From listing · {coupon.listingTitle}
-                        </span>
-                    ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gray-50 text-gray-500 text-[10px] font-bold border border-gray-200">
-                            <Ticket size={11} /> Standalone coupon
-                        </span>
-                    )}
-                </div>
+                {/* Deactivate */}
+                {coupon.is_active && (
+                    <div className="pt-1">
+                        <button
+                            onClick={() => onDeactivate(coupon.id)}
+                            disabled={deactivating}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-red-600 border border-red-200 hover:bg-red-50 transition-colors disabled:opacity-50"
+                        >
+                            {deactivating ? <RefreshCw size={12} className="animate-spin" /> : <Power size={12} />}
+                            Deactivate
+                        </button>
+                    </div>
+                )}
             </div>
         </motion.div>
     );
@@ -235,44 +193,83 @@ const CouponCard: React.FC<{ coupon: MockCoupon; index: number }> = ({ coupon, i
 // ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
-type FilterKey = 'all' | 'standalone' | 'listing' | 'active' | 'expired';
+type FilterKey = 'all' | 'active' | 'scheduled' | 'expired' | 'inactive';
 
 const FILTERS: { key: FilterKey; label: string }[] = [
     { key: 'all', label: 'All' },
-    { key: 'standalone', label: 'Standalone' },
-    { key: 'listing', label: 'From Listings' },
     { key: 'active', label: 'Active' },
+    { key: 'scheduled', label: 'Scheduled' },
     { key: 'expired', label: 'Expired' },
+    { key: 'inactive', label: 'Inactive' },
 ];
 
 export const AllCoupons: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
+    const [coupons, setCoupons] = useState<DisplayCoupon[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [usingSample, setUsingSample] = useState(false);
     const [filter, setFilter] = useState<FilterKey>('all');
     const [query, setQuery] = useState('');
+    const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
+
+    const load = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const list = await getCoupons();
+            setCoupons(list as DisplayCoupon[]);
+            setUsingSample(false);
+        } catch {
+            // Coupons service unreachable / partner not approved — show sample data
+            setCoupons(MOCK_COUPONS);
+            setUsingSample(true);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => { load(); }, []);
+
+    const handleDeactivate = async (id: string) => {
+        if (usingSample) {
+            // Demo mode — just flip locally
+            setCoupons(prev => prev.map(c => c.id === id ? { ...c, is_active: false } : c));
+            toast.success('Coupon deactivated.');
+            return;
+        }
+        setDeactivatingId(id);
+        try {
+            await deactivateCoupon(id);
+            setCoupons(prev => prev.map(c => c.id === id ? { ...c, is_active: false } : c));
+            toast.success('Coupon deactivated.');
+        } catch (e: any) {
+            toast.error(e?.message || 'Failed to deactivate coupon.');
+        } finally {
+            setDeactivatingId(null);
+        }
+    };
 
     const stats = useMemo(() => {
-        const active = MOCK_COUPONS.filter(c => deriveStatus(c) === 'active').length;
-        const redemptions = MOCK_COUPONS.reduce((sum, c) => sum + c.used_count, 0);
-        const fromListings = MOCK_COUPONS.filter(c => c.source === 'listing').length;
-        return { total: MOCK_COUPONS.length, active, redemptions, fromListings };
-    }, []);
+        const active = coupons.filter(c => deriveStatus(c) === 'active').length;
+        const redemptions = coupons.reduce((sum, c) => sum + (c.usage_count || 0), 0);
+        const inactive = coupons.filter(c => !c.is_active).length;
+        return { total: coupons.length, active, redemptions, inactive };
+    }, [coupons]);
 
     const filtered = useMemo(() => {
         const q = query.trim().toLowerCase();
-        return MOCK_COUPONS.filter((c) => {
-            if (filter === 'standalone' && c.source !== 'standalone') return false;
-            if (filter === 'listing' && c.source !== 'listing') return false;
-            if (filter === 'active' && deriveStatus(c) !== 'active') return false;
-            if (filter === 'expired' && deriveStatus(c) !== 'expired') return false;
+        return coupons.filter((c) => {
+            if (filter !== 'all' && deriveStatus(c) !== filter) return false;
             if (q && !c.code.toLowerCase().includes(q) && !(c.description || '').toLowerCase().includes(q)) return false;
             return true;
         });
-    }, [filter, query]);
+    }, [coupons, filter, query]);
 
     const statCards = [
         { label: 'Total Coupons', value: stats.total, icon: Ticket },
         { label: 'Active Now', value: stats.active, icon: Check },
         { label: 'Total Redemptions', value: stats.redemptions, icon: Users },
-        { label: 'From Listings', value: stats.fromListings, icon: Layers },
+        { label: 'Inactive', value: stats.inactive, icon: Power },
     ];
 
     return (
@@ -281,7 +278,7 @@ export const AllCoupons: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                 <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors"><Menu size={24} /></button>
                 <div className="flex-1">
                     <h1 className="tlb-page-title">Coupons</h1>
-                    <p className="tlb-page-sub">All discount codes created by you and within your listings</p>
+                    <p className="tlb-page-sub">Discount codes for your listings</p>
                 </div>
                 <button onClick={() => onNavigate('CREATE_COUPON')} className="tlb-button hidden sm:inline-flex">
                     <Plus size={18} /> Create Coupon
@@ -290,6 +287,13 @@ export const AllCoupons: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
 
             <main className="p-5 md:p-6">
                 <div className="max-w-6xl mx-auto space-y-6">
+                    {usingSample && !loading && (
+                        <div className="flex items-start gap-3 rounded-2xl px-4 py-3 text-sm font-medium border bg-amber-50 text-amber-700 border-amber-200">
+                            <AlertCircle size={18} className="mt-0.5 shrink-0" />
+                            <span>Showing sample data — the live coupons service is unavailable (your partner account may not be approved yet).</span>
+                        </div>
+                    )}
+
                     {/* Stats */}
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                         {statCards.map(({ label, value, icon: Icon }) => (
@@ -332,10 +336,28 @@ export const AllCoupons: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                         </div>
                     </div>
 
-                    {/* Grid */}
-                    {filtered.length > 0 ? (
+                    {/* Grid / states */}
+                    {loading ? (
+                        <div className="flex items-center justify-center py-24">
+                            <RefreshCw size={26} className="text-gray-300 animate-spin" />
+                        </div>
+                    ) : error ? (
+                        <div className="tlb-card flex flex-col items-center justify-center text-center py-16">
+                            <AlertCircle size={32} className="text-red-300 mb-3" />
+                            <p className="text-sm font-bold text-gray-500">{error}</p>
+                            <button onClick={load} className="text-xs font-black text-blue-500 hover:underline mt-3">Try again</button>
+                        </div>
+                    ) : filtered.length > 0 ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5">
-                            {filtered.map((c, i) => <CouponCard key={c.id} coupon={c} index={i} />)}
+                            {filtered.map((c, i) => (
+                                <CouponCard
+                                    key={c.id}
+                                    coupon={c}
+                                    index={i}
+                                    deactivating={deactivatingId === c.id}
+                                    onDeactivate={handleDeactivate}
+                                />
+                            ))}
                         </div>
                     ) : (
                         <div className="tlb-card flex flex-col items-center justify-center text-center py-16">

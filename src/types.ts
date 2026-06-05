@@ -57,7 +57,8 @@ export type Screen =
   | 'FINANCIAL_HUB'
   | 'STATISTICS'
   | 'ALL_COUPONS'
-  | 'CREATE_COUPON';
+  | 'CREATE_COUPON'
+  | 'HELP_SUPPORT';
 
 // ---------------------------------------------------------------------------
 // Partner

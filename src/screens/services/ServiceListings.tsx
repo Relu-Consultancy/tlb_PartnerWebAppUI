@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, Plus, Search, Filter, Users, Edit3, CalendarDays, BarChart3, MapPin, Layers, Clock, X, Check, SlidersHorizontal, Play, Pause, Archive, ArchiveRestore, Ticket, Tag } from 'lucide-react';
+import { Menu, Plus, Search, Filter, Users, Edit3, CalendarDays, BarChart3, MapPin, Layers, Clock, X, Check, SlidersHorizontal, Play, Pause, Archive, ArchiveRestore, Ticket, Tag, LayoutGrid, Grid3X3, List } from 'lucide-react';
 import { Loader, toast, Select, SelectOption } from '../../components/ui';
 import { Screen, EntityType } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
@@ -68,6 +68,7 @@ const fmtStart = (iso?: string) => {
 };
 
 type SortOption = 'newest' | 'oldest' | 'a-z' | 'z-a';
+type ViewMode = 'comfortable' | 'compact' | 'list';
 
 export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
     const { allowedEntities } = usePartner();
@@ -77,6 +78,13 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
     const [searchQuery, setSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState<EntityType | 'All'>('All');
     const [showEntityPicker, setShowEntityPicker] = useState(false);
+    const [viewMode, setViewModeState] = useState<ViewMode>(() => {
+        try { return (localStorage.getItem('listings_density') as ViewMode) || 'list'; } catch { return 'list'; }
+    });
+    const setViewMode = (v: ViewMode) => {
+        setViewModeState(v);
+        try { localStorage.setItem('listings_density', v); } catch { /* ignore */ }
+    };
 
     // Filter state
     const [showFilter, setShowFilter] = useState(false);
@@ -334,6 +342,74 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
         return statusBadge[listing.status].label;
     };
 
+    const gridClass = viewMode === 'compact'
+        ? 'grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3'
+        : 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4';
+
+    const renderListingCard = (listing: Listing, compact: boolean) => {
+        const badge = entityBadgeConfig[listing.entityType];
+        const BadgeIcon = badge.icon;
+        const editable = listing.status !== 'published' && listing.status !== 'archived';
+        const thumb = compact ? 'w-10 h-10' : 'w-12 h-12';
+        return (
+            <div key={listing.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-gray-200 transition-all p-4 flex flex-col">
+                <div className="flex items-start gap-3">
+                    {listing.coverUrl ? (
+                        <img src={listing.coverUrl} alt="" className={`${thumb} rounded-xl object-cover shrink-0 bg-gray-100`} />
+                    ) : (
+                        <div className={`${thumb} rounded-xl bg-gray-100 flex items-center justify-center shrink-0`}>
+                            <BadgeIcon size={compact ? 16 : 18} className="text-gray-300" />
+                        </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${badge.bg} ${badge.color}`}>{listing.entityType}</span>
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-500 ml-auto">
+                                <span className={`w-1.5 h-1.5 rounded-full ${statusDot(listing)}`} />
+                                {statusLabel(listing)}
+                            </span>
+                        </div>
+                        <p className="font-bold text-sm text-gray-900 truncate">{listing.title}</p>
+                        {!compact && listing.category && (
+                            <p className="text-[10px] text-gray-400 font-medium mt-0.5 truncate">{listing.category}</p>
+                        )}
+                        {listing.coupon && (
+                            <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-md bg-tlb-yellow/15 text-tlb-dark text-[10px] font-black">
+                                <Tag size={9} /> {listing.coupon.code} · {couponDiscountLabel(listing.coupon)}
+                            </span>
+                        )}
+                    </div>
+                </div>
+                <div className="flex items-center justify-end gap-1 mt-3 pt-3 border-t border-gray-50">
+                    {listing.status === 'published' && (
+                        <button onClick={() => handleTogglePause(listing)}
+                            className={`p-2 rounded-lg transition-colors ${listing.isLive !== false ? 'text-amber-500 hover:bg-amber-50' : 'text-emerald-500 hover:bg-emerald-50'}`}
+                            title={listing.isLive !== false ? 'Pause' : 'Resume'}>
+                            {listing.isLive !== false ? <Pause size={15} /> : <Play size={15} />}
+                        </button>
+                    )}
+                    {(listing.status === 'published' || listing.status === 'archived') && (
+                        <button onClick={() => handleToggleArchive(listing)}
+                            className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                            title={listing.status === 'archived' ? 'Unarchive' : 'Archive'}>
+                            {listing.status === 'archived' ? <ArchiveRestore size={15} /> : <Archive size={15} />}
+                        </button>
+                    )}
+                    <button onClick={() => openCouponModal(listing)}
+                        className={`p-2 rounded-lg transition-colors ${listing.coupon ? 'text-tlb-dark bg-tlb-yellow/20 hover:bg-tlb-yellow/30' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'}`}
+                        title={listing.coupon ? 'Change coupon' : 'Attach coupon'}>
+                        <Ticket size={15} />
+                    </button>
+                    <button onClick={() => handleEdit(listing)} disabled={!editable}
+                        className={`p-2 rounded-lg transition-colors ${editable ? 'text-blue-500 hover:bg-blue-50' : 'text-gray-300 cursor-not-allowed'}`}
+                        title={editable ? 'Edit' : 'Locked'}>
+                        <Edit3 size={15} />
+                    </button>
+                </div>
+            </div>
+        );
+    };
+
     return (
         <div className="min-h-screen bg-gray-50">
             {/* Header */}
@@ -379,6 +455,24 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                                 <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-tlb-yellow rounded-full text-[9px] font-black text-tlb-dark flex items-center justify-center">{activeFilterCount}</span>
                             )}
                         </button>
+                        {/* Density / view control */}
+                        <div className="inline-flex bg-white border border-gray-200 rounded-xl p-1 shrink-0">
+                            {([
+                                { v: 'comfortable' as const, icon: LayoutGrid, label: 'Comfortable' },
+                                { v: 'compact' as const, icon: Grid3X3, label: 'Compact' },
+                                { v: 'list' as const, icon: List, label: 'List' },
+                            ]).map(({ v, icon: Icon, label }) => (
+                                <button
+                                    key={v}
+                                    onClick={() => setViewMode(v)}
+                                    title={label}
+                                    aria-label={label}
+                                    className={`p-1.5 rounded-lg transition-all ${viewMode === v ? 'bg-tlb-dark text-white' : 'text-gray-400 hover:text-gray-700'}`}
+                                >
+                                    <Icon size={16} />
+                                </button>
+                            ))}
+                        </div>
                     </div>
                     <div className="flex gap-1 overflow-x-auto">
                         {tabs.map((tab) => {
@@ -402,6 +496,11 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
 
                 {/* Table / Cards */}
                 {filtered.length > 0 ? (
+                    viewMode !== 'list' ? (
+                    <div className={gridClass}>
+                        {filtered.map((listing) => renderListingCard(listing, viewMode === 'compact'))}
+                    </div>
+                    ) : (
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                         {/* Desktop table */}
                         <div className="hidden md:block overflow-x-auto">
@@ -568,6 +667,7 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                             })}
                         </div>
                     </div>
+                    )
                 ) : (
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm text-center py-20 px-6">
                         <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-5">

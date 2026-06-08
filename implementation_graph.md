@@ -18,11 +18,13 @@ src/
 │   ├── stats.ts            # Partner statistics endpoints (overview, events, venues, enquiries) + trackProfileView
 │   ├── coupons.ts          # Partner coupons CRUD (live) — get/create/update/deactivate/usages; CreateCouponInput targeting
 │   ├── help.ts             # Help & Support tickets — categories, list, create, detail, messages (poll), send, close
+│   ├── notifications.ts     # In-app notifications — list, unread-count, mark read/all, get/update preferences
 │   └── listings.ts         # Listings + ticket + media CRUD, bookings (+payment-detail), coupon_code on update, ApiError class
 ├── context/
 │   └── PartnerContext.tsx   # Global context: allowedEntities (synced to sessionStorage)
 ├── components/
-│   ├── Navigation.tsx           # Sidebar: fixed push-content on desktop (lg+, dark navy #0f1729), always-`lg:hidden` overlay drawer on mobile; collapse via in-sidebar toggle, re-expand via hamburger (App.tsx onOpenSidebar sets both desktop+mobile state). Includes "Coupons" → ALL_COUPONS entry.
+│   ├── Navigation.tsx           # Sidebar: fixed push-content on desktop (lg+, dark navy #0f1729), always-`lg:hidden` overlay drawer on mobile; collapse via in-sidebar toggle, re-expand via hamburger (App.tsx onOpenSidebar sets both desktop+mobile state). Includes "Coupons" → ALL_COUPONS and "Help & Support" → HELP_SUPPORT entries.
+│   ├── NotificationCenter.tsx   # Bell + badge (polls unread-count 60s) + slide-in drawer (list, mark read/all, broadcast prefs). `variant` 'light'|'dark'. Mounted in Dashboard header.
 │   ├── EntityPickerSheet.tsx    # Bottom sheet for entity type selection
 │   └── ui/
 │       ├── DashboardCharts.tsx  # Shared SVG chart primitives: AreaSparkline, TrendAreaChart, WeeklyBarChart, DonutChart, fmtCurrency, trendPct, TrendBadge
@@ -40,7 +42,7 @@ src/
 │   ├── programs/           # CreateProgram* (5 steps)
 │   ├── venues/             # CreateVenue* (5 steps)
 │   ├── enquiries/          # Enquiries, ProgramEnquiries
-│   ├── attendees/          # Attendees — two-level: listings card grid (By Listing Type / By Date) → per-group bookings + detail drawer
+│   ├── attendees/          # Attendees — two-level: listings/dates grid (Comfortable/Compact/List density) → per-group bookings + detail drawer
 │   ├── coupons/            # CreateCoupon (form, live API + targeting), AllCoupons (live list + deactivate, sample fallback)
 │   ├── support/            # Support — Help & Support: ticket list → new ticket → chat thread (poll/refresh/close)
 │   ├── statistics/         # Statistics — tabbed analytics screen (Statistics.tsx + StatCharts.tsx)
@@ -349,6 +351,20 @@ Support ticket + chat thread. Base `/api/v1/help/`. All endpoints require the pa
 > **Statuses:** `open` (no admin reply) → `in_progress` (admin replied) → `resolved` → `closed`. **Sender roles:** `customer` / `partner` / `admin`.
 > **Chat polling contract:** full-load (no `since`) + reset cursor on every open/reopen; send `created_at` unmodified as `since`. Cadence by status: `in_progress` 5s, `open` 30s, `resolved` 60s, `closed` stop.
 
+### 2.8 Notifications API (`src/api/notifications.ts`) — ✅ live
+
+In-app notifications (partner JWT). Base `/api/v1/notifications/`. Surfaced by `NotificationCenter` (bell in the Dashboard header).
+
+| Function | Method | Endpoint | Notes |
+|----------|--------|----------|-------|
+| `listNotifications({ unread?, page?, page_size? })` | GET | `/notifications/in-app/` | Paginated `{ count, next, previous, results }`; newest first. Result: `{ id, notification_type, title, body, action_url, metadata, is_read, read_at, created_at }` |
+| `getUnreadCount` | GET | `/notifications/in-app/unread-count/` | Drives the bell badge (polled every 60s) |
+| `markNotificationRead` | POST | `/notifications/in-app/{id}/read/` | Returns the updated notification |
+| `markAllNotificationsRead` | POST | `/notifications/in-app/read-all/` | `{ marked_read }` |
+| `getNotificationPreferences` / `updateNotificationPreferences` | GET / PATCH | `/notifications/preferences/` | Broadcast opt-outs: `broadcast_in_app`, `broadcast_email` (+ per-event flags) |
+
+> `notification_type` is `broadcast` for admin broadcasts (shown with an "Admin" badge via `metadata.broadcast_id`); other values include `booking_confirmed`, `partner_new_booking`, etc. Clicking a notification marks it read and opens its `action_url` (new tab) if present.
+
 ---
 
 ## 3. Session Persistence & Routing (`App.tsx`)
@@ -490,6 +506,8 @@ THEN
 | `getPartnerMedia()` | Used for profile completion calculation (gallery images) |
 | `getPartnerFollowerCount(partnerId)` | Fire-and-forget after `getCurrentPartner()` resolves; sets `followerCount` state. Response: `{ partner_id, follower_count }` |
 
+> **Notifications:** the top-right header bell is the live `<NotificationCenter variant="light" />` (see §2.8) — it replaced the old static `dashboardData.notifications` popup. It's the single notification surface (the sidebar no longer has a bell).
+
 **Dashboard Layout (lean — analytics moved to Statistics screen):**
 
 | Order | Section | Notes |
@@ -607,16 +625,15 @@ All four calls run in parallel via `Promise.allSettled`. Items are tagged with `
 **Edit flow:** Clicking Edit on an Event sets `current_event_draft_id` + routes to `CREATE_EVENT_DETAILS`. Clicking Edit on a Venue sets `current_venue_draft_id` + routes to `CREATE_VENUE_DETAILS`. Edit on a Class sets `current_class_draft_id` + routes to `CREATE_CLASS_IDENTITY`. Edit on a Program sets `current_program_draft_id` + routes to `CREATE_PROGRAM_IDENTITY`. Edit is disabled **only** for `published` and `archived` listings — `pending` (In Review), `draft`, and `rejected` are all editable.  
 **New listing:** `clearCurrentDraftId()`, `clearCurrentVenueDraftId()`, `clearCurrentClassDraftId()`, and `clearCurrentProgramDraftId()` are called before navigating to any wizard start screen.
 
-**Pause/Resume & Archive/Unarchive (all entity types):**
+**Pause/Resume & Archive/Unarchive:** all entity types use the generic `pauseListing`/`resumeListing`/`archiveListing`/`unarchiveListing` endpoints (see §2.3).
 
-| Action | Events & Venues | Classes | Programs |
-|--------|----------------|---------|----------|
-| Pause/Resume | Generic `pauseListing`/`resumeListing` | `setClassListingLive` (existing) | Generic `pauseListing`/`resumeListing` |
-| Archive/Unarchive | Generic `archiveListing`/`unarchiveListing` | Generic `archiveListing`/`unarchiveListing` | `archiveProgramListing`/`unarchiveProgramListing` (existing) |
+**Coupon link:** each listing shows its `coupon` badge (code · discount); a Ticket action opens a modal to attach/change/remove a coupon (`getCoupons` picker → entity update `PATCH { coupon_code }`, `null` to remove). See §2.6.
 
-**Listing card layout (redesigned — Phase 16):** Desktop uses a table layout (Listing thumbnail+title, Type badge, Category, Status dot+label, icon-only action buttons). Mobile uses compact cards with thumbnail, badges, and pill-style action buttons.
+**View density (persisted — `listings_density`):** a Comfortable / Compact / List control in the toolbar.
+- **List** (default) — desktop table (thumbnail+title, Type, Category, Status, icon actions) + mobile cards. Best for hundreds of listings.
+- **Comfortable / Compact** — a responsive card grid (`renderListingCard`, 1–3 / 2–4 cols) with the same actions (pause/archive/coupon/edit) and coupon badge.
 
-**Listing card layout:** Status badge (`Draft` / `In Review` / `Live` / `Rejected`) rendered on the **right side** of each card header row, opposite the entity type badge. Status data is sourced from the `getListings()` API response `status` field.
+Status badge (`Draft` / `In Review` / `Live` / `Rejected`) comes from the API `status` field. Edit is disabled only for `published`/`archived`.
 
 **Filter bottom sheet:**
 
@@ -646,7 +663,7 @@ Theme color: `amber`. All wizard screens use `themeColor="amber"`.
 
 | Step | Screen | API Calls | Key Behavior |
 |------|--------|-----------|--------------|
-| 1 | **CreateVenueDetails** | `getVenueListingDetail` (on mount if draft exists); `createVenueListing` or `updateVenueListing` (on Next); `uploadVenueMedia`, `deleteVenueMedia` (immediate) | Location fields: `location_type` (chip select), `city`, `area`, `address`, `latitude`, `longitude`. Capacity: `min_capacity`, `max_capacity`. Age range: `min_age`, `max_age`. Media items have `url` field (not `file_url`). Optional fields are only included in PATCH if non-empty. |
+| 1 | **CreateVenueDetails** | `getVenueListingDetail` (on mount if draft exists); `createVenueListing` or `updateVenueListing` (on Next); `uploadVenueMedia`, `deleteVenueMedia` (immediate) | **`booking_type`** card (Enquiry / Direct Booking, amber-themed; default `enquiry`, sent in PATCH, prefilled on edit). Location fields: `location_type` (chip select), `city`, `area`, `address`, `latitude`, `longitude`. Capacity: `min_capacity`, `max_capacity`. Age range: `min_age`, `max_age`. Media items have `url` field (not `file_url`). Optional fields are only included in PATCH if non-empty. |
 | 2 | **CreateVenueOccasions** | `getVenueMetaOccasions`, `getVenueMetaDiscoveryEnums`, `getVenueListingDetail`, `getVenueAttendeeFields` (on mount, parallel via `Promise.allSettled`); `updateVenueListing` + `updateVenueDiscovery` + `updateVenueAttendeeFields` (3 calls on Next) | Occasions sent as `occasion_ids: number[]` (integer IDs, not names). Discovery: `outing_types`, `activity_types`, `format_types` chip multi-select. Attendee fields: `child_name`, `child_age`, `contact_number`, `email`, `guest_count`, `special_requirements`. |
 | 3 | **CreateVenueAvailability** | `getVenueAvailability` (on mount); `createVenueAvailabilitySlot` (on Add); `deleteVenueAvailabilitySlot` (on Delete) | Inline add form: `date`, `start_time`, `end_time`, `note?`. Validates end > start. Requires ≥1 slot before proceeding to Step 4. |
 | 4 | **CreateVenuePackages** | `getVenuePackages` (on mount); `createVenuePackage` or `updateVenuePackage` (dirty packages on Next); `deleteVenuePackage` (on Delete) | Package fields: `name` (required), `price`, `description`, `duration_minutes?`, `max_guests?`. Optional fields omitted from payload if blank or < 1. Dirty tracking: only changed packages are saved on Next. |
@@ -723,7 +740,11 @@ Redesigned (June 2026) into a **two-level flow**: a card grid of listings/dates 
 
 Bookings are grouped into **two maps**: `bookingsByListing` (key = `listing_id`) and `bookingsByDate` (key = `created_at` → `YYYY-MM-DD`). Each booking now carries `listing_title` (from the API), so synthesized cards (for listings not in the catalog) and the By-Date table show the real listing name; bookings with no `listing_id` bucket under "Other bookings".
 
-**Level 1 — card grid** with a segmented toggle (animated via `AnimatePresence`):
+**Level 1 — card grid.** Opens with a **summary KPI strip** (Total Bookings / Confirmed / Attended / Awaiting across all listings), a **group toggle** (By Listing Type / By Date, animated via `AnimatePresence`), search, and a **view-density control** (persisted — `attendees_density`):
+- **Comfortable / Compact** — `GroupCard` (banner with big count, attendance progress bar, stat dots); compact fits up to 5 per row.
+- **List** — `GroupRow` one-per-row (icon, title, mini attendance bar, counts, total) for hundreds of listings.
+
+Grouping modes:
 
 | Mode | Cards |
 |------|-------|
@@ -901,7 +922,7 @@ One canonical type scale lives in `src/styles/components.css`; use these instead
 | CREATE_EVENT_SCHEDULE | ✅/❌ | — | CreateEventSchedule | ✅ Schedule + tickets CRUD (theme: blue) |
 | CREATE_EVENT_MEDIA | ✅/❌ | — | CreateEventMedia | ✅ Cover/gallery/video upload (theme: blue) |
 | CREATE_EVENT_PREVIEW | ✅/❌ | — | CreateEventPreview | ✅ Full detail + submit (theme: blue) |
-| CREATE_VENUE_DETAILS | ✅/❌ | Venues | CreateVenueDetails | ✅ Location, capacity, age, media |
+| CREATE_VENUE_DETAILS | ✅/❌ | Venues | CreateVenueDetails | ✅ booking_type (enquiry/direct_booking), location, capacity, age, media |
 | CREATE_VENUE_OCCASIONS | ✅/❌ | Venues | CreateVenueOccasions | ✅ Occasion IDs, discovery tags, attendee fields |
 | CREATE_VENUE_AVAILABILITY | ✅/❌ | Venues | CreateVenueAvailability | ✅ Slot CRUD |
 | CREATE_VENUE_PACKAGES | ✅/❌ | Venues | CreateVenuePackages | ✅ Package CRUD |
@@ -1193,6 +1214,11 @@ npm run test:report   # run tests → generate test-report.html + test-report.pd
 | `docs/venue-listings-db-spec.md` | Venues module — tables (`venues`, `venue_occasions`, `venue_availability`, `venue_packages`, `venue_media`), occasion/time-slot/attendee-field reference, bulk availability pattern, API endpoints |
 
 ---
+
+*Phase 23 (2026-06-08) — Notifications + venue booking_type + listing density controls:*
+- *In-app notifications: new `src/api/notifications.ts` (list / unread-count / mark read / mark-all / preferences) + `src/components/NotificationCenter.tsx` (bell with 60s-polled badge, slide-in drawer with mark-read/all, "Admin" broadcast badge, broadcast email/in-app preference toggles). Mounted as the Dashboard top-right bell (`variant="light"`), replacing the old static popup; the sidebar bell was removed so there's one surface.*
+- *Venue `booking_type`: `CreateVenueDetails` now has an Enquiry / Direct Booking card (like Classes/Programs), sent in the venue PATCH and prefilled on edit.*
+- *View-density controls (Comfortable / Compact / List, persisted to localStorage) added to **Attendees** (`GroupCard`/`GroupRow` + summary KPI strip) and **My Listings** (`renderListingCard` card grid vs. the existing table) — built for catalogs with hundreds of listings.*
 
 *Phase 22 (2026-06-05) — Coupon API integration + Help & Support + Attendees/Bookings API alignment:*
 - *Coupons live: rewrote `src/api/coupons.ts` to the real contract (`percent`/`fixed`, `per_user_limit`, targeting arrays, `usages`, soft-delete). `CreateCoupon` posts real payloads — Specific-Listing now picks from a **live dropdown of the partner's listings**, plus an optional Audience (gender/age) section. `AllCoupons` lists live coupons with Deactivate (sample fallback when unreachable).*

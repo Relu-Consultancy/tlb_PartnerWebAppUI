@@ -5,6 +5,7 @@ import {
     User, CreditCard, Users, CheckCircle,
     Inbox, RefreshCw, Phone, Mail, Wallet,
     FileText, AlertCircle, CalendarDays, GraduationCap, Layers, MapPin,
+    LayoutGrid, Grid3X3, List,
 } from 'lucide-react';
 import { Screen, EntityType } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
@@ -180,6 +181,129 @@ const formatWeekday = (key: string): string => {
     return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-IN', { weekday: 'long' });
 };
 
+type Density = 'comfortable' | 'compact' | 'list';
+
+interface GroupItemProps {
+    title: string;
+    subtitle?: string;
+    counts: StatusCounts;
+    grad: string;
+    icon: React.ElementType;
+    badge?: string;
+    index: number;
+    onClick: () => void;
+    size?: Density;
+}
+
+// Refined, interactive card used in both the By-Listing and By-Date grids.
+// `size === 'compact'` renders a denser variant for large catalogs.
+const GroupCard: React.FC<GroupItemProps> = ({ title, subtitle, counts: c, grad, icon: Icon, badge, index, onClick, size = 'comfortable' }) => {
+    const attendedPct = c.total ? Math.round((c.attended / c.total) * 100) : 0;
+    const compact = size === 'compact';
+    return (
+        <motion.button
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.22, delay: Math.min(index * 0.03, 0.25) }}
+            onClick={onClick}
+            className="group text-left bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-gray-200 transition-all duration-200 overflow-hidden"
+        >
+            {/* Banner */}
+            <div className={`relative ${compact ? 'h-16 px-4 py-3' : 'h-24 px-5 py-4'} bg-gradient-to-br ${grad} flex flex-col justify-between overflow-hidden`}>
+                <div className="absolute -right-8 -top-8 w-28 h-28 rounded-full bg-white/10" />
+                <div className="absolute -right-3 top-9 w-16 h-16 rounded-full bg-white/5" />
+                <div className="relative z-10 flex items-start justify-between">
+                    <div className={`${compact ? 'w-8 h-8 rounded-lg' : 'w-10 h-10 rounded-xl'} bg-white/20 backdrop-blur flex items-center justify-center`}>
+                        <Icon size={compact ? 16 : 20} className="text-white" />
+                    </div>
+                    {badge && (
+                        <span className={`font-black rounded-full bg-white/25 text-white uppercase tracking-widest ${compact ? 'text-[9px] px-2 py-0.5' : 'text-[10px] px-2.5 py-1'}`}>
+                            {badge}
+                        </span>
+                    )}
+                </div>
+                {!compact && (
+                    <div className="relative z-10 flex items-end justify-between">
+                        <div>
+                            <p className="text-2xl font-black text-white leading-none">{c.total}</p>
+                            <p className="text-[10px] text-white/70 font-bold uppercase tracking-wider mt-1">total booking{c.total === 1 ? '' : 's'}</p>
+                        </div>
+                        <ChevronRight size={20} className="text-white/70 group-hover:translate-x-1 transition-transform" />
+                    </div>
+                )}
+            </div>
+
+            {/* Body */}
+            <div className={compact ? 'p-3' : 'p-4'}>
+                <div className="flex items-center justify-between gap-2">
+                    <h3 className={`font-black text-gray-900 leading-snug line-clamp-1 ${compact ? 'text-sm' : ''}`}>{title}</h3>
+                    {compact && <span className="text-sm font-black text-gray-900 shrink-0">{c.total}</span>}
+                </div>
+                {subtitle && !compact && <p className="text-[11px] font-medium text-gray-400 mt-0.5 line-clamp-1">{subtitle}</p>}
+
+                {!compact && (
+                    <div className="mt-3">
+                        <div className="flex items-center justify-between text-[10px] font-bold mb-1">
+                            <span className="text-gray-400 uppercase tracking-wider">Attendance</span>
+                            <span className={attendedPct > 0 ? 'text-emerald-600' : 'text-gray-300'}>{attendedPct}%</span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                            <div className="h-full rounded-full bg-emerald-400 transition-all" style={{ width: `${attendedPct}%` }} />
+                        </div>
+                    </div>
+                )}
+
+                <div className={`flex items-center gap-3 ${compact ? 'mt-2 text-[10px]' : 'mt-3 text-[11px]'} font-bold text-gray-500`}>
+                    <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-sky-400" />{c.confirmed}</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-400" />{c.attended}</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-400" />{c.awaiting_payment}</span>
+                </div>
+            </div>
+        </motion.button>
+    );
+};
+
+// Dense one-per-row layout — best for hundreds of listings.
+const GroupRow: React.FC<GroupItemProps> = ({ title, subtitle, counts: c, grad, icon: Icon, badge, index, onClick }) => {
+    const attendedPct = c.total ? Math.round((c.attended / c.total) * 100) : 0;
+    return (
+        <motion.button
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.18, delay: Math.min(index * 0.015, 0.2) }}
+            onClick={onClick}
+            className="group w-full text-left flex items-center gap-4 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-gray-200 transition-all px-3.5 py-3"
+        >
+            <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${grad} flex items-center justify-center shrink-0`}>
+                <Icon size={18} className="text-white" />
+            </div>
+            <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                    <p className="font-bold text-sm text-gray-900 truncate">{title}</p>
+                    {badge && <span className="hidden sm:inline text-[9px] font-black px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 uppercase tracking-wider shrink-0">{badge}</span>}
+                </div>
+                {subtitle && <p className="text-[11px] text-gray-400 truncate">{subtitle}</p>}
+            </div>
+            {/* mini attendance bar */}
+            <div className="hidden md:flex items-center gap-2 w-28 shrink-0">
+                <div className="h-1.5 flex-1 rounded-full bg-gray-100 overflow-hidden">
+                    <div className="h-full rounded-full bg-emerald-400" style={{ width: `${attendedPct}%` }} />
+                </div>
+                <span className="text-[10px] font-bold text-gray-400 w-8 text-right">{attendedPct}%</span>
+            </div>
+            <div className="hidden sm:flex items-center gap-3 text-[11px] font-bold shrink-0">
+                <span className="flex items-center gap-1 text-sky-600"><span className="w-1.5 h-1.5 rounded-full bg-sky-400" />{c.confirmed}</span>
+                <span className="flex items-center gap-1 text-emerald-600"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />{c.attended}</span>
+                <span className="flex items-center gap-1 text-amber-600"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" />{c.awaiting_payment}</span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+                <span className="text-sm font-black text-gray-900">{c.total}</span>
+                <ChevronRight size={18} className="text-gray-300 group-hover:translate-x-0.5 transition-transform" />
+            </div>
+        </motion.button>
+    );
+};
+
 const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
     const { allowedEntities } = usePartner();
 
@@ -194,6 +318,13 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
     const [groupMode, setGroupMode] = useState<'listing' | 'date'>('listing');
     const [selected, setSelected] = useState<{ mode: 'listing' | 'date'; key: string } | null>(null);
     const [listingSearch, setListingSearch] = useState('');
+    const [density, setDensityState] = useState<Density>(() => {
+        try { return (localStorage.getItem('attendees_density') as Density) || 'comfortable'; } catch { return 'comfortable'; }
+    });
+    const setDensity = (d: Density) => {
+        setDensityState(d);
+        try { localStorage.setItem('attendees_density', d); } catch { /* ignore */ }
+    };
 
     // ── Per-listing booking view ──
     const [activeTab, setActiveTab] = useState<TabFilter>('all');
@@ -407,6 +538,17 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
         l.title.toLowerCase().includes(listingSearch.toLowerCase()),
     );
 
+    const allBookings: BookingSummary[] = [];
+    Object.keys(bookingsByDate).forEach(k => allBookings.push(...bookingsByDate[k]));
+    const globalCounts = computeCounts(allBookings);
+
+    const ItemComp = density === 'list' ? GroupRow : GroupCard;
+    const gridClass = density === 'list'
+        ? 'grid grid-cols-1 gap-2.5'
+        : density === 'compact'
+            ? 'grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3'
+            : 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5';
+
     const visibleDates = (Object.entries(bookingsByDate) as [string, BookingSummary[]][])
         .filter(([key]) => {
             const q = listingSearch.toLowerCase();
@@ -463,6 +605,26 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
                             </div>
                         ) : (
                             <>
+                                {/* Summary KPI strip */}
+                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+                                    {[
+                                        { label: 'Total Bookings', value: globalCounts.total, icon: Users, color: 'text-tlb-dark', bg: 'bg-tlb-yellow/15' },
+                                        { label: 'Confirmed', value: globalCounts.confirmed, icon: CalendarDays, color: 'text-sky-600', bg: 'bg-sky-50' },
+                                        { label: 'Attended', value: globalCounts.attended, icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                                        { label: 'Awaiting Payment', value: globalCounts.awaiting_payment, icon: CreditCard, color: 'text-amber-600', bg: 'bg-amber-50' },
+                                    ].map(({ label, value, icon: Icon, color, bg }) => (
+                                        <div key={label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
+                                            <div className={`w-11 h-11 rounded-xl ${bg} flex items-center justify-center shrink-0`}>
+                                                <Icon size={20} className={color} />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className={`text-2xl font-black leading-none ${color}`}>{value}</p>
+                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1 truncate">{label}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
                                 {/* Toggle + search */}
                                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                                     <div className="inline-flex bg-white border border-gray-100 rounded-2xl p-1 shadow-sm w-fit">
@@ -481,19 +643,39 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
                                             </button>
                                         ))}
                                     </div>
-                                    <div className="flex items-center gap-3 bg-white rounded-2xl px-4 py-3 border border-gray-100 shadow-sm md:w-72">
-                                        <Search size={16} className="text-gray-400 shrink-0" />
-                                        <input
-                                            className="flex-1 bg-transparent border-none focus:outline-none text-sm font-bold placeholder:text-gray-300"
-                                            placeholder={groupMode === 'listing' ? 'Search listings…' : 'Search dates…'}
-                                            value={listingSearch}
-                                            onChange={e => setListingSearch(e.target.value)}
-                                        />
-                                        {listingSearch && (
-                                            <button onClick={() => setListingSearch('')} className="text-gray-400 hover:text-gray-600">
-                                                <X size={16} />
-                                            </button>
-                                        )}
+                                    <div className="flex items-center gap-3">
+                                        {/* Density / view control */}
+                                        <div className="inline-flex bg-white border border-gray-100 rounded-xl p-1 shadow-sm shrink-0">
+                                            {([
+                                                { v: 'comfortable' as const, icon: LayoutGrid, label: 'Comfortable' },
+                                                { v: 'compact' as const, icon: Grid3X3, label: 'Compact' },
+                                                { v: 'list' as const, icon: List, label: 'List' },
+                                            ]).map(({ v, icon: Icon, label }) => (
+                                                <button
+                                                    key={v}
+                                                    onClick={() => setDensity(v)}
+                                                    title={label}
+                                                    aria-label={label}
+                                                    className={`p-2 rounded-lg transition-all ${density === v ? 'bg-tlb-dark text-white' : 'text-gray-400 hover:text-gray-700'}`}
+                                                >
+                                                    <Icon size={16} />
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <div className="flex items-center gap-3 bg-white rounded-2xl px-4 py-3 border border-gray-100 shadow-sm flex-1 md:w-64 md:flex-none">
+                                            <Search size={16} className="text-gray-400 shrink-0" />
+                                            <input
+                                                className="flex-1 bg-transparent border-none focus:outline-none text-sm font-bold placeholder:text-gray-300"
+                                                placeholder={groupMode === 'listing' ? 'Search listings…' : 'Search dates…'}
+                                                value={listingSearch}
+                                                onChange={e => setListingSearch(e.target.value)}
+                                            />
+                                            {listingSearch && (
+                                                <button onClick={() => setListingSearch('')} className="text-gray-400 hover:text-gray-600">
+                                                    <X size={16} />
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
 
@@ -505,52 +687,24 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
                                             animate={{ opacity: 1, y: 0 }}
                                             exit={{ opacity: 0, y: -8 }}
                                             transition={{ duration: 0.18 }}
-                                            className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5"
+                                            className={gridClass}
                                         >
                                             {visibleListings.map((l, i) => {
                                                 const meta = TYPE_META[l.type];
-                                                const Icon = meta.icon;
                                                 const c = computeCounts(bookingsByListing[l.id] || []);
                                                 return (
-                                                    <motion.button
+                                                    <ItemComp
                                                         key={l.id}
-                                                        initial={{ opacity: 0, y: 12 }}
-                                                        animate={{ opacity: 1, y: 0 }}
-                                                        transition={{ duration: 0.25, delay: Math.min(i * 0.04, 0.3) }}
+                                                        index={i}
+                                                        title={l.title}
+                                                        subtitle={meta.label}
+                                                        counts={c}
+                                                        grad={meta.grad}
+                                                        icon={meta.icon}
+                                                        badge={meta.label}
+                                                        size={density}
                                                         onClick={() => openGroup('listing', l.id)}
-                                                        className="group text-left bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-lg hover:border-gray-200 transition-all overflow-hidden"
-                                                    >
-                                                        <div className={`relative h-20 bg-gradient-to-br ${meta.grad} flex items-center px-5`}>
-                                                            <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center">
-                                                                <Icon size={22} className="text-white" />
-                                                            </div>
-                                                            <span className="ml-auto text-[10px] font-black px-2.5 py-1 rounded-full bg-white/25 text-white uppercase tracking-widest">
-                                                                {meta.label}
-                                                            </span>
-                                                            <ChevronRight size={20} className="absolute right-3 bottom-3 text-white/70 group-hover:translate-x-0.5 transition-transform" />
-                                                        </div>
-                                                        <div className="p-5">
-                                                            <h3 className="font-black text-gray-900 leading-snug line-clamp-2 min-h-[2.6rem]">{l.title}</h3>
-                                                            <div className="flex items-baseline gap-2 mt-2">
-                                                                <span className="text-2xl font-black text-gray-900">{c.total}</span>
-                                                                <span className="text-xs font-bold text-gray-400">total booking{c.total === 1 ? '' : 's'}</span>
-                                                            </div>
-                                                            <div className="grid grid-cols-3 gap-2 mt-4">
-                                                                <div className="rounded-xl bg-sky-50 px-2 py-2 text-center">
-                                                                    <p className="text-sm font-black text-sky-600">{c.confirmed}</p>
-                                                                    <p className="text-[9px] font-black text-sky-400 uppercase tracking-wider mt-0.5">Confirmed</p>
-                                                                </div>
-                                                                <div className="rounded-xl bg-emerald-50 px-2 py-2 text-center">
-                                                                    <p className="text-sm font-black text-emerald-600">{c.attended}</p>
-                                                                    <p className="text-[9px] font-black text-emerald-400 uppercase tracking-wider mt-0.5">Attended</p>
-                                                                </div>
-                                                                <div className="rounded-xl bg-amber-50 px-2 py-2 text-center">
-                                                                    <p className="text-sm font-black text-amber-600">{c.awaiting_payment}</p>
-                                                                    <p className="text-[9px] font-black text-amber-400 uppercase tracking-wider mt-0.5">Awaiting</p>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </motion.button>
+                                                    />
                                                 );
                                             })}
                                             {visibleListings.length === 0 && (
@@ -567,55 +721,24 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
                                             animate={{ opacity: 1, y: 0 }}
                                             exit={{ opacity: 0, y: -8 }}
                                             transition={{ duration: 0.18 }}
-                                            className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5"
+                                            className={gridClass}
                                         >
                                             {visibleDates.map(([key, list], i) => {
                                                 const c = computeCounts(list);
                                                 const distinct = new Set(list.map(b => b.listing_id || UNLINKED_KEY)).size;
                                                 return (
-                                                    <motion.button
+                                                    <ItemComp
                                                         key={key}
-                                                        initial={{ opacity: 0, y: 12 }}
-                                                        animate={{ opacity: 1, y: 0 }}
-                                                        transition={{ duration: 0.25, delay: Math.min(i * 0.04, 0.3) }}
+                                                        index={i}
+                                                        title={formatFullDate(key)}
+                                                        subtitle={`${distinct} listing${distinct === 1 ? '' : 's'}`}
+                                                        counts={c}
+                                                        grad="from-slate-600 to-slate-900"
+                                                        icon={CalendarDays}
+                                                        badge={formatWeekday(key) || undefined}
+                                                        size={density}
                                                         onClick={() => openGroup('date', key)}
-                                                        className="group text-left bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-lg hover:border-gray-200 transition-all overflow-hidden"
-                                                    >
-                                                        <div className="relative h-20 bg-gradient-to-br from-slate-600 to-slate-900 flex items-center px-5">
-                                                            <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center">
-                                                                <CalendarDays size={22} className="text-white" />
-                                                            </div>
-                                                            {formatWeekday(key) && (
-                                                                <span className="ml-auto text-[10px] font-black px-2.5 py-1 rounded-full bg-white/25 text-white uppercase tracking-widest">
-                                                                    {formatWeekday(key)}
-                                                                </span>
-                                                            )}
-                                                            <ChevronRight size={20} className="absolute right-3 bottom-3 text-white/70 group-hover:translate-x-0.5 transition-transform" />
-                                                        </div>
-                                                        <div className="p-5">
-                                                            <h3 className="font-black text-gray-900 leading-snug min-h-[2.6rem]">{formatFullDate(key)}</h3>
-                                                            <div className="flex items-baseline gap-2 mt-2">
-                                                                <span className="text-2xl font-black text-gray-900">{c.total}</span>
-                                                                <span className="text-xs font-bold text-gray-400">
-                                                                    booking{c.total === 1 ? '' : 's'} · {distinct} listing{distinct === 1 ? '' : 's'}
-                                                                </span>
-                                                            </div>
-                                                            <div className="grid grid-cols-3 gap-2 mt-4">
-                                                                <div className="rounded-xl bg-sky-50 px-2 py-2 text-center">
-                                                                    <p className="text-sm font-black text-sky-600">{c.confirmed}</p>
-                                                                    <p className="text-[9px] font-black text-sky-400 uppercase tracking-wider mt-0.5">Confirmed</p>
-                                                                </div>
-                                                                <div className="rounded-xl bg-emerald-50 px-2 py-2 text-center">
-                                                                    <p className="text-sm font-black text-emerald-600">{c.attended}</p>
-                                                                    <p className="text-[9px] font-black text-emerald-400 uppercase tracking-wider mt-0.5">Attended</p>
-                                                                </div>
-                                                                <div className="rounded-xl bg-amber-50 px-2 py-2 text-center">
-                                                                    <p className="text-sm font-black text-amber-600">{c.awaiting_payment}</p>
-                                                                    <p className="text-[9px] font-black text-amber-400 uppercase tracking-wider mt-0.5">Awaiting</p>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </motion.button>
+                                                    />
                                                 );
                                             })}
                                             {visibleDates.length === 0 && (

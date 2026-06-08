@@ -3,7 +3,7 @@
 > **Definitive architectural reference for the TLB Partner Portal.**
 > Base URL: `https://tlb-api.reluconsultancy.in`
 > Framework: React + Vite + TypeScript (SPA)
-> Last Updated: May 31, 2026
+> Last Updated: June 4, 2026
 
 ---
 
@@ -16,15 +16,20 @@ src/
 │   ├── auth.ts             # requestOtp, verifyOtp, getCurrentUser, logout
 │   ├── onboarding.ts       # All partner CRUD endpoints (profile, media, categories, etc.)
 │   ├── stats.ts            # Partner statistics endpoints (overview, events, venues, enquiries) + trackProfileView
-│   └── listings.ts         # Listings + ticket + media CRUD, draft ID helpers, ApiError class
+│   ├── coupons.ts          # Partner coupons CRUD (live) — get/create/update/deactivate/usages; CreateCouponInput targeting
+│   ├── help.ts             # Help & Support tickets — categories, list, create, detail, messages (poll), send, close
+│   ├── notifications.ts     # In-app notifications — list, unread-count, mark read/all, get/update preferences
+│   └── listings.ts         # Listings + ticket + media CRUD, bookings (+payment-detail), coupon_code on update, ApiError class
 ├── context/
 │   └── PartnerContext.tsx   # Global context: allowedEntities (synced to sessionStorage)
 ├── components/
-│   ├── Navigation.tsx           # Sidebar: fixed push-content on desktop (lg+, dark navy #0f1729), always-`lg:hidden` overlay drawer on mobile; collapse via in-sidebar toggle, re-expand via hamburger (App.tsx onOpenSidebar sets both desktop+mobile state)
+│   ├── Navigation.tsx           # Sidebar: fixed push-content on desktop (lg+, dark navy #0f1729), always-`lg:hidden` overlay drawer on mobile; collapse via in-sidebar toggle, re-expand via hamburger (App.tsx onOpenSidebar sets both desktop+mobile state). Includes "Coupons" → ALL_COUPONS and "Help & Support" → HELP_SUPPORT entries.
+│   ├── NotificationCenter.tsx   # Bell + badge (polls unread-count 60s) + slide-in drawer (list, mark read/all, broadcast prefs). `variant` 'light'|'dark'. Mounted in Dashboard header.
 │   ├── EntityPickerSheet.tsx    # Bottom sheet for entity type selection
 │   └── ui/
 │       ├── DashboardCharts.tsx  # Shared SVG chart primitives: AreaSparkline, TrendAreaChart, WeeklyBarChart, DonutChart, fmtCurrency, trendPct, TrendBadge
-│       ├── Toast.tsx            # Shared ToastContainer + useToasts() hook (error/warning/success/info, slide-in animation, auto-dismiss)
+│       ├── Toast.tsx            # Global imperative toast: `toast.success/error/warning/info()` singleton + <Toaster/> (mounted once in App.tsx). Card design (coloured top accent bar + bold title + message + dismiss). Legacy `useToasts()` + `<ToastContainer/>` kept as local-state shims rendering the same card.
+│       ├── Select.tsx           # Reusable animated dropdown (drop-in for native <select>). Menu rendered in a portal (fixed position, never clipped by overflow); keyboard nav, flip-up, click-outside, icons/dots/check
 │       └── OnboardingShell.tsx  # Shared layout for every onboarding screen: sticky branded header + ProgressDots + PageHeader + motion fade-in + decorative blurs
 ├── screens/
 │   ├── auth/               # Landing, Login, OTPVerify, PartnerAccess, PartnerAccessOTP, PartnerCategory
@@ -37,7 +42,9 @@ src/
 │   ├── programs/           # CreateProgram* (5 steps)
 │   ├── venues/             # CreateVenue* (5 steps)
 │   ├── enquiries/          # Enquiries, ProgramEnquiries
-│   ├── attendees/          # Attendees — full booking management (list, detail, mark-attended, cancel)
+│   ├── attendees/          # Attendees — two-level: listings/dates grid (Comfortable/Compact/List density) → per-group bookings + detail drawer
+│   ├── coupons/            # CreateCoupon (form, live API + targeting), AllCoupons (live list + deactivate, sample fallback)
+│   ├── support/            # Support — Help & Support: ticket list → new ticket → chat thread (poll/refresh/close)
 │   ├── statistics/         # Statistics — tabbed analytics screen (Statistics.tsx + StatCharts.tsx)
 │   ├── packages/           # Packages
 │   └── financial/          # FinancialHub
@@ -207,10 +214,11 @@ Request → 401 Unauthorized?
 
 | Function | Method | Endpoint | Payload | Used By |
 |----------|--------|----------|---------|---------|
-| `getBookings` | GET | `/api/v1/partner/bookings/` | Query: `status?`, `listing_id?`, `page?` | Attendees |
+| `getBookings` | GET | `/api/v1/partner/bookings/` | Query: `status?`, `listing_id?`, `page?` | Attendees — list now also returns `listing_id` + `listing_title` per booking |
 | `getBookingDetail` | GET | `/api/v1/partner/bookings/{id}/` | — | Attendees (drawer) |
 | `markBookingAttended` | POST | `/api/v1/partner/bookings/{id}/mark-attended/` | — | Attendees (drawer action) |
-| `cancelBooking` | POST | `/api/v1/partner/bookings/{id}/cancel/` | `{ reason: string }` | Attendees (drawer action) |
+| `getBookingPaymentDetail` | GET | `/api/v1/partner/bookings/{id}/payment-detail/` | — | Attendees (drawer — Payment Summary: `{ payment_method, amount, status }`, no card/UPI details) |
+| `cancelBooking` | POST | `/api/v1/partner/bookings/{id}/cancel/` | `{ reason }` | ⚠️ **Forbidden for partners** — returns 403 `PARTNER_BOOKING_CANCEL_FORBIDDEN`. Kept in `listings.ts` for tests but **NOT wired into the UI** (only customers can cancel). |
 
 **Generic Listing Actions (entity-agnostic):**
 
@@ -218,10 +226,10 @@ Request → 401 Unauthorized?
 |----------|--------|----------|---------|---------|
 | `pauseListing` | POST | `/api/v1/partner/listings/{id}/pause/` | — | ServiceListings (all entity types) |
 | `resumeListing` | POST | `/api/v1/partner/listings/{id}/resume/` | — | ServiceListings (all entity types) |
-| `archiveListing` | POST | `/api/v1/partner/listings/{id}/archive/` | — | ServiceListings (Events, Classes, Venues) |
-| `unarchiveListing` | POST | `/api/v1/partner/listings/{id}/unarchive/` | — | ServiceListings (Events, Classes, Venues) |
+| `archiveListing` | POST | `/api/v1/partner/listings/{id}/archive/` | — | ServiceListings (all entity types) |
+| `unarchiveListing` | POST | `/api/v1/partner/listings/{id}/unarchive/` | — | ServiceListings (all entity types) |
 
-> **Entity-specific overrides preserved:** Classes use `setClassListingLive` for pause/resume (POST `/classes/{id}/live/`). Programs use `archiveProgramListing`/`unarchiveProgramListing` (POST `/programs/{id}/archive|unarchive/`). All other entities use the generic endpoints above.
+> **Generic endpoints used for ALL entity types (fixed June 2026):** pause/resume/archive/unarchive in `ServiceListings` route through the generic `/api/v1/partner/listings/{id}/{action}/` endpoints for Events, Classes, Programs **and** Venues. The backend URLconf only registers these generic routes — the old entity-specific routes (`/classes/{id}/live/`, `/programs/{id}/archive|unarchive/`) return 404. The entity-specific helpers (`setClassListingLive`, `archiveProgramListing`, `unarchiveProgramListing`) remain defined in `listings.ts` (with passing unit tests) but are **no longer wired into the UI**.
 
 **Booking field reference:**
 
@@ -306,6 +314,56 @@ All four GET endpoints require `Authorization: Bearer <token>` (partner with `st
 |-----------|---------------|
 | `top_listings` | No replacement endpoint — Top Performing Listings section removed from Statistics. |
 | `recent_activity` | No replacement endpoint — Recent Activity feed removed from Statistics. |
+
+### 2.6 Coupons API (`src/api/coupons.ts`) — ✅ live (requires APPROVED partner)
+
+Discount rules (server-side): `percent` → `amount − (amount × value/100)`, capped at `max_discount`; `fixed` → `amount − value`. Coupons are blocked on ₹0 (free) bookings.
+
+| Function | Method | Endpoint | Used By |
+|----------|--------|----------|---------|
+| `getCoupons({ is_active?, discount_type? })` | GET | `/api/v1/partner/coupons/` | AllCoupons, ServiceListings (coupon picker) |
+| `getCoupon` | GET | `/api/v1/partner/coupons/{id}/` | (available) |
+| `createCoupon` | POST | `/api/v1/partner/coupons/` | CreateCoupon |
+| `updateCoupon` | PATCH | `/api/v1/partner/coupons/{id}/` | (available) |
+| `deactivateCoupon` | DELETE | `/api/v1/partner/coupons/{id}/` | AllCoupons (soft-delete → `is_active=false`, code stays reserved) |
+| `getCouponUsages` | GET | `/api/v1/partner/coupons/{id}/usages/` | (available — `{ coupon_code, customer_email, booking_reference, discount_applied, used_at }`) |
+
+> **Create payload:** `{ code, discount_type: 'percent'|'fixed', discount_value, max_discount?, description?, min_order_value?, usage_limit?, per_user_limit (default 1), starts_at?, expires_at?, target_listing_ids?, target_event_category_ids?, target_listing_types?: ('event'|'venue'|'program'|'class')[], target_genders?: ('male'|'female'|'other')[], target_min_age?, target_max_age? }`.
+> **List item shape:** `{ id, code, discount_type, discount_value, is_active, usage_count, usage_limit, expires_at }`.
+> `CreateCoupon` maps the "Apply To" UI → targeting arrays: *Specific Listing* → `target_listing_ids`; *Category* → `target_listing_types`. `AllCoupons` falls back to sample data (amber banner) only when the service is unreachable / partner not approved.
+
+> **Listing ↔ coupon link:** partner listing PATCH endpoints accept `coupon_code` (string to attach, `null` to remove; coupon must belong to the same partner). Listing list/detail responses now include `coupon: { code, discount_type, discount_value, max_discount, expires_at } | null`. `ServiceListings` shows a coupon badge per listing and an attach/change/remove modal (Ticket button) that PATCHes `coupon_code` via the entity's update function.
+
+### 2.7 Help & Support API (`src/api/help.ts`) — ✅ live
+
+Support ticket + chat thread. Base `/api/v1/help/`. All endpoints require the partner bearer token.
+
+| Function | Method | Endpoint | Notes |
+|----------|--------|----------|-------|
+| `getTicketCategories` | GET | `/help/tickets/categories/` | Role-restricted `{value,label}[]` — populate the dropdown (don't hardcode); falls back to defaults if empty |
+| `listTickets` | GET | `/help/tickets/list/` | `{ id, category, subject, status, created_at, updated_at, unread_count }[]` |
+| `getTicket` | GET | `/help/tickets/{id}/` | ticket detail |
+| `createTicket` | POST | `/help/tickets/` | `{ subject, category, body, booking_id? }` → first message auto-created. 400 `INVALID_CATEGORY` if category not allowed for role |
+| `getTicketMessages` | GET | `/help/tickets/{id}/messages/?since=` | Returns `{ ticket_status, messages[] }`. Omit `since` for full thread; pass last `created_at` **verbatim (UTC `Z`)** for deltas. Auto-marks unread as read |
+| `sendTicketMessage` | POST | `/help/tickets/{id}/messages/send/` | `{ body }`. 400 `TICKET_CLOSED` once closed |
+| `closeTicket` | POST | `/help/tickets/{id}/close/` | Terminal — cannot reopen. 400 `TICKET_ALREADY_CLOSED` |
+
+> **Statuses:** `open` (no admin reply) → `in_progress` (admin replied) → `resolved` → `closed`. **Sender roles:** `customer` / `partner` / `admin`.
+> **Chat polling contract:** full-load (no `since`) + reset cursor on every open/reopen; send `created_at` unmodified as `since`. Cadence by status: `in_progress` 5s, `open` 30s, `resolved` 60s, `closed` stop.
+
+### 2.8 Notifications API (`src/api/notifications.ts`) — ✅ live
+
+In-app notifications (partner JWT). Base `/api/v1/notifications/`. Surfaced by `NotificationCenter` (bell in the Dashboard header).
+
+| Function | Method | Endpoint | Notes |
+|----------|--------|----------|-------|
+| `listNotifications({ unread?, page?, page_size? })` | GET | `/notifications/in-app/` | Paginated `{ count, next, previous, results }`; newest first. Result: `{ id, notification_type, title, body, action_url, metadata, is_read, read_at, created_at }` |
+| `getUnreadCount` | GET | `/notifications/in-app/unread-count/` | Drives the bell badge (polled every 60s) |
+| `markNotificationRead` | POST | `/notifications/in-app/{id}/read/` | Returns the updated notification |
+| `markAllNotificationsRead` | POST | `/notifications/in-app/read-all/` | `{ marked_read }` |
+| `getNotificationPreferences` / `updateNotificationPreferences` | GET / PATCH | `/notifications/preferences/` | Broadcast opt-outs: `broadcast_in_app`, `broadcast_email` (+ per-event flags) |
+
+> `notification_type` is `broadcast` for admin broadcasts (shown with an "Admin" badge via `metadata.broadcast_id`); other values include `booking_confirmed`, `partner_new_booking`, etc. Clicking a notification marks it read and opens its `action_url` (new tab) if present.
 
 ---
 
@@ -448,6 +506,8 @@ THEN
 | `getPartnerMedia()` | Used for profile completion calculation (gallery images) |
 | `getPartnerFollowerCount(partnerId)` | Fire-and-forget after `getCurrentPartner()` resolves; sets `followerCount` state. Response: `{ partner_id, follower_count }` |
 
+> **Notifications:** the top-right header bell is the live `<NotificationCenter variant="light" />` (see §2.8) — it replaced the old static `dashboardData.notifications` popup. It's the single notification surface (the sidebar no longer has a bell).
+
 **Dashboard Layout (lean — analytics moved to Statistics screen):**
 
 | Order | Section | Notes |
@@ -565,16 +625,15 @@ All four calls run in parallel via `Promise.allSettled`. Items are tagged with `
 **Edit flow:** Clicking Edit on an Event sets `current_event_draft_id` + routes to `CREATE_EVENT_DETAILS`. Clicking Edit on a Venue sets `current_venue_draft_id` + routes to `CREATE_VENUE_DETAILS`. Edit on a Class sets `current_class_draft_id` + routes to `CREATE_CLASS_IDENTITY`. Edit on a Program sets `current_program_draft_id` + routes to `CREATE_PROGRAM_IDENTITY`. Edit is disabled **only** for `published` and `archived` listings — `pending` (In Review), `draft`, and `rejected` are all editable.  
 **New listing:** `clearCurrentDraftId()`, `clearCurrentVenueDraftId()`, `clearCurrentClassDraftId()`, and `clearCurrentProgramDraftId()` are called before navigating to any wizard start screen.
 
-**Pause/Resume & Archive/Unarchive (all entity types):**
+**Pause/Resume & Archive/Unarchive:** all entity types use the generic `pauseListing`/`resumeListing`/`archiveListing`/`unarchiveListing` endpoints (see §2.3).
 
-| Action | Events & Venues | Classes | Programs |
-|--------|----------------|---------|----------|
-| Pause/Resume | Generic `pauseListing`/`resumeListing` | `setClassListingLive` (existing) | Generic `pauseListing`/`resumeListing` |
-| Archive/Unarchive | Generic `archiveListing`/`unarchiveListing` | Generic `archiveListing`/`unarchiveListing` | `archiveProgramListing`/`unarchiveProgramListing` (existing) |
+**Coupon link:** each listing shows its `coupon` badge (code · discount); a Ticket action opens a modal to attach/change/remove a coupon (`getCoupons` picker → entity update `PATCH { coupon_code }`, `null` to remove). See §2.6.
 
-**Listing card layout (redesigned — Phase 16):** Desktop uses a table layout (Listing thumbnail+title, Type badge, Category, Status dot+label, icon-only action buttons). Mobile uses compact cards with thumbnail, badges, and pill-style action buttons.
+**View density (persisted — `listings_density`):** a Comfortable / Compact / List control in the toolbar.
+- **List** (default) — desktop table (thumbnail+title, Type, Category, Status, icon actions) + mobile cards. Best for hundreds of listings.
+- **Comfortable / Compact** — a responsive card grid (`renderListingCard`, 1–3 / 2–4 cols) with the same actions (pause/archive/coupon/edit) and coupon badge.
 
-**Listing card layout:** Status badge (`Draft` / `In Review` / `Live` / `Rejected`) rendered on the **right side** of each card header row, opposite the entity type badge. Status data is sourced from the `getListings()` API response `status` field.
+Status badge (`Draft` / `In Review` / `Live` / `Rejected`) comes from the API `status` field. Edit is disabled only for `published`/`archived`.
 
 **Filter bottom sheet:**
 
@@ -604,7 +663,7 @@ Theme color: `amber`. All wizard screens use `themeColor="amber"`.
 
 | Step | Screen | API Calls | Key Behavior |
 |------|--------|-----------|--------------|
-| 1 | **CreateVenueDetails** | `getVenueListingDetail` (on mount if draft exists); `createVenueListing` or `updateVenueListing` (on Next); `uploadVenueMedia`, `deleteVenueMedia` (immediate) | Location fields: `location_type` (chip select), `city`, `area`, `address`, `latitude`, `longitude`. Capacity: `min_capacity`, `max_capacity`. Age range: `min_age`, `max_age`. Media items have `url` field (not `file_url`). Optional fields are only included in PATCH if non-empty. |
+| 1 | **CreateVenueDetails** | `getVenueListingDetail` (on mount if draft exists); `createVenueListing` or `updateVenueListing` (on Next); `uploadVenueMedia`, `deleteVenueMedia` (immediate) | **`booking_type`** card (Enquiry / Direct Booking, amber-themed; default `enquiry`, sent in PATCH, prefilled on edit). Location fields: `location_type` (chip select), `city`, `area`, `address`, `latitude`, `longitude`. Capacity: `min_capacity`, `max_capacity`. Age range: `min_age`, `max_age`. Media items have `url` field (not `file_url`). Optional fields are only included in PATCH if non-empty. |
 | 2 | **CreateVenueOccasions** | `getVenueMetaOccasions`, `getVenueMetaDiscoveryEnums`, `getVenueListingDetail`, `getVenueAttendeeFields` (on mount, parallel via `Promise.allSettled`); `updateVenueListing` + `updateVenueDiscovery` + `updateVenueAttendeeFields` (3 calls on Next) | Occasions sent as `occasion_ids: number[]` (integer IDs, not names). Discovery: `outing_types`, `activity_types`, `format_types` chip multi-select. Attendee fields: `child_name`, `child_age`, `contact_number`, `email`, `guest_count`, `special_requirements`. |
 | 3 | **CreateVenueAvailability** | `getVenueAvailability` (on mount); `createVenueAvailabilitySlot` (on Add); `deleteVenueAvailabilitySlot` (on Delete) | Inline add form: `date`, `start_time`, `end_time`, `note?`. Validates end > start. Requires ≥1 slot before proceeding to Step 4. |
 | 4 | **CreateVenuePackages** | `getVenuePackages` (on mount); `createVenuePackage` or `updateVenuePackage` (dirty packages on Next); `deleteVenuePackage` (on Delete) | Package fields: `name` (required), `price`, `description`, `duration_minutes?`, `max_guests?`. Optional fields omitted from payload if blank or < 1. Dirty tracking: only changed packages are saved on Next. |
@@ -668,44 +727,80 @@ Partially API-integrated: bank account details are fetched from the partner prof
 
 ### 6.14 Attendees (`src/screens/attendees/Attendees.tsx`) — Fully API-Integrated
 
-Full booking management screen backed by the 4 partner booking endpoints.
+Redesigned (June 2026) into a **two-level flow**: a card grid of listings/dates first, then drill into a group's bookings + per-booking detail drawer.
 
-| API Call | Purpose |
-|----------|---------|
-| `getBookings()` × 5 parallel calls | Populate KPI count badges on mount (all / awaiting_payment / confirmed / attended / cancelled) |
-| `getBookings({ status?, page? })` | Paginated list load on filter-tab change / page navigation |
-| `getBookingDetail(id)` + listing detail fetch | Load full booking into right-side drawer; best-effort listing title resolution via entity-specific detail endpoint |
-| `markBookingAttended(id)` | "Mark Attended" action in drawer (only for `confirmed` bookings) |
-| `cancelBooking(id, reason)` | "Confirm Cancel" action in drawer (for `confirmed` and `awaiting_payment` bookings) |
+**Data load (single `loadAll` on mount):**
 
-**UI structure:**
+| Source | Purpose |
+|--------|---------|
+| `getEventListings/getClassListings/getProgramListings/getVenueListings` (per `allowedEntities`) | Build the listing cards |
+| `getBookings({ page })` looped until no `next` | Fetch every booking once, then group |
+| `getBookingDetail(id)` + `getBookingPaymentDetail(id)` | Load a booking into the right-side drawer (detail + Payment Summary, in parallel) |
+| `markBookingAttended(id)` | Drawer action; patches both grouping maps in place (live count update, no refetch) |
+
+Bookings are grouped into **two maps**: `bookingsByListing` (key = `listing_id`) and `bookingsByDate` (key = `created_at` → `YYYY-MM-DD`). Each booking now carries `listing_title` (from the API), so synthesized cards (for listings not in the catalog) and the By-Date table show the real listing name; bookings with no `listing_id` bucket under "Other bookings".
+
+**Level 1 — card grid.** Opens with a **summary KPI strip** (Total Bookings / Confirmed / Attended / Awaiting across all listings), a **group toggle** (By Listing Type / By Date, animated via `AnimatePresence`), search, and a **view-density control** (persisted — `attendees_density`):
+- **Comfortable / Compact** — `GroupCard` (banner with big count, attendance progress bar, stat dots); compact fits up to 5 per row.
+- **List** — `GroupRow` one-per-row (icon, title, mini attendance bar, counts, total) for hundreds of listings.
+
+Grouping modes:
+
+| Mode | Cards |
+|------|-------|
+| **By Listing Type** (default) | One card per listing — muted type-coloured banner (Event=blue-700/800, Class=violet-700/800, Program=teal-700/800, Venue=amber-700/800), title, total bookings, Confirmed/Attended/Awaiting mini-stats |
+| **By Date** | One card per booking date (newest first) — slate banner + weekday, full date title, `N bookings · M listings`, same mini-stats |
+
+A search box adapts ("Search listings…" / "Search dates…") and filters the active grid.
+
+**Level 2 — single group's bookings** (works for a listing OR a date, driven by `selected = { mode, key }`):
 
 | Element | Detail |
 |---------|--------|
-| KPI row | Total Bookings, Awaiting Payment, Confirmed, Attended, Cancelled — counts from 5 parallel `getBookings` calls |
-| Filter tabs | All / Awaiting Payment / Confirmed / Attended / Cancelled — each triggers `getBookings({ status })` |
-| Search bar | Client-side filter across customer name, email, booking reference |
-| Table | Booking Ref (monospace), Customer, Type badge, Status badge, Payment badge, Amount, Date, View button |
-| Detail drawer | Slide-in right panel with backdrop; shows listing title (best-effort fetched from entity detail endpoint), status/type/payment badges, customer info, order items (name + qty, no repeated amounts), attendees list, payment activity (context-aware: "Initiated" badge when payment pending, "SUCCESS" when paid) |
-| Mark Attended | Emerald button — visible only for `confirmed` status; calls `markBookingAttended` + refreshes drawer + list |
-| Cancel flow | Red outline button → inline textarea for reason → "Confirm Cancel"; visible for `confirmed` and `awaiting_payment`; calls `cancelBooking` + refreshes |
-| Pagination | Previous / Next from API `next` / `previous` fields |
+| Header | Back button + group title (listing title or formatted date) + subtitle |
+| KPI row | Total / Awaiting / Confirmed / Attended / Cancelled scoped to the group |
+| Tabs + search | Client-side filter by status, then by customer name / email / booking ref |
+| Table | Booking Ref, Customer, **Listing** (date-mode only — `listing_title` + type icon), Status, Payment, Amount, Date — whole row opens the drawer |
+| Detail drawer | Status/type/payment badges, customer info, order items, **attendees list**, **Payment Summary** (`payment_method`/`amount`/`status` — no card/UPI details), payment activity, cancellation block (read-only, shown when a *customer* cancelled) |
+| Mark Attended | Emerald button — only for `confirmed`; calls `markBookingAttended`. **No partner cancel** — `/cancel/` is 403 for partners, so the cancel flow was removed. |
 
-**Color maps:**
-
-| Map | Values |
-|-----|--------|
-| `STATUS_COLORS` | `confirmed` → amber, `attended` → emerald, `cancelled` → red |
-| `PAYMENT_COLORS` | `paid` → emerald, `pending` → amber, `refunded` → blue |
-| `TYPE_COLORS` | `event` → blue, `class` → purple, `program` → emerald, `venue` → amber |
+**Color maps:** `TYPE_META` (per-type banner gradient + badge), `STATUS_COLORS` (confirmed→sky, attended→emerald, awaiting→amber, cancelled→red), `PAYMENT_COLORS` (paid→emerald, pending→amber, refunded→purple). Toasts/`alert()` not used here.
 
 ### 6.15 Screens NOT Yet API-Integrated
 
 | Screen Group | Status | Notes |
 |-------------|--------|-------|
-| **Attendees** | ✅ Fully integrated | Booking list + detail drawer + mark-attended + cancel (see §6.14) |
+| **Attendees** | ✅ Fully integrated | Listings/dates grid + booking drawer + mark-attended + payment summary (see §6.14) |
+| **Coupons** (CreateCoupon, AllCoupons) | ✅ Fully integrated | Live `/coupons/` CRUD + targeting; listing↔coupon link (see §6.16) |
+| **Help & Support** (Support) | ✅ Fully integrated | Live `/help/tickets/` — raise, list, chat thread, close (see §6.18) |
 | **Packages** | Placeholder UI | No packages API |
 | **FinancialHub** (transactions) | Empty state, no mock data | Bank details fetched; financial API pending |
+
+### 6.16 Coupons (`src/screens/coupons/`)
+
+| Screen | Detail |
+|--------|--------|
+| **CreateCoupon** (`CreateCoupon.tsx`) | Full form (live `createCoupon`): code, `percent`/`fixed` discount, max-discount cap, description, min-order, usage limit, **per-user limit**, start/expiry dates, Apply To, and an optional **Audience** section (gender chips + min/max age → `target_genders`/`target_min_age`/`target_max_age`). Live ticket preview + validation. "Apply To" → *Specific Listing* shows a **dropdown of the partner's listings** (fetched live, manual-ID fallback) mapping to `target_listing_ids`; *Category* (Events/Classes/Programs/Venues) → `target_listing_types`. 403 → "account must be approved" banner. |
+| **AllCoupons** (`AllCoupons.tsx`) | Live list via `getCoupons()` (sample-data fallback + amber banner when unreachable). Stat cards (Total / Active / Redemptions / Inactive), status filters (All / Active / Scheduled / Expired / Inactive) + search, ticket cards with copy-code, derived status badge, redemption progress bar, and **Deactivate** per active coupon (`deactivateCoupon`, soft-delete). |
+
+### 6.17 Global UI — Toast & Select
+
+| Component | Detail |
+|-----------|--------|
+| **Toast** (`components/ui/Toast.tsx`) | App-wide imperative API `toast.success/error/warning/info(message, { title?, duration? })` backed by a singleton store; one `<Toaster/>` mounted in `App.tsx`. Card design: coloured top accent bar + bold title + message + dismiss, per-type palette. Default titles by type ("Success!"/"Error"/…). All former `alert()` calls across 13 screens replaced (validation → `toast.warning`, failures → `toast.error`). Legacy `useToasts()`/`<ToastContainer/>` retained as local-state shims (used by auth/onboarding screens) rendering the same card. |
+| **Select** (`components/ui/Select.tsx`) | Reusable animated dropdown replacing every native `<select>` (coupon scope/category/listing, enquiry status pills, program picker, venue sub-category, program format, ticket category/booking). Menu rendered in a **portal** with fixed positioning so it's never clipped by overflow/scroll containers (e.g. CRM tables); keyboard nav (↑/↓/Home/End/Enter/Esc), flip-up when no room below, click-outside, selected check, optional icons/colour dots, `buttonClassName`/`triggerExtra`/`align`/`size` props. |
+
+### 6.18 Help & Support (`src/screens/support/Support.tsx`)
+
+Three views in one screen, backed by the live `/help/tickets/` API (see §2.7):
+
+| View | Detail |
+|------|--------|
+| **Ticket list** | `listTickets()` — cards show subject, category, status badge, last-updated and an **unread badge** (`unread_count`); search + "N open" summary; loading/error/empty states |
+| **Raise a Ticket** | subject, **category dropdown** (live `getTicketCategories()`, role-restricted), optional **Related Booking** dropdown (from `getBookings`), description → `createTicket` |
+| **Conversation** | Chat thread (own messages right/yellow, admin left "TLB Support"); **status-based polling** (in_progress 5s / open 30s / resolved 60s / closed stop) using the verbatim-UTC `since` cursor (full-load + reset on open); a manual **Refresh** button; composer (Enter to send, `sendTicketMessage`) locked when closed; **Close Ticket** action (terminal) |
+
+Sidebar entry "Help & Support" (LifeBuoy). `getTicketMessages` returns `{ ticket_status, messages }` and drives live status updates in the drawer.
 
 ---
 
@@ -827,7 +922,7 @@ One canonical type scale lives in `src/styles/components.css`; use these instead
 | CREATE_EVENT_SCHEDULE | ✅/❌ | — | CreateEventSchedule | ✅ Schedule + tickets CRUD (theme: blue) |
 | CREATE_EVENT_MEDIA | ✅/❌ | — | CreateEventMedia | ✅ Cover/gallery/video upload (theme: blue) |
 | CREATE_EVENT_PREVIEW | ✅/❌ | — | CreateEventPreview | ✅ Full detail + submit (theme: blue) |
-| CREATE_VENUE_DETAILS | ✅/❌ | Venues | CreateVenueDetails | ✅ Location, capacity, age, media |
+| CREATE_VENUE_DETAILS | ✅/❌ | Venues | CreateVenueDetails | ✅ booking_type (enquiry/direct_booking), location, capacity, age, media |
 | CREATE_VENUE_OCCASIONS | ✅/❌ | Venues | CreateVenueOccasions | ✅ Occasion IDs, discovery tags, attendee fields |
 | CREATE_VENUE_AVAILABILITY | ✅/❌ | Venues | CreateVenueAvailability | ✅ Slot CRUD |
 | CREATE_VENUE_PACKAGES | ✅/❌ | Venues | CreateVenuePackages | ✅ Package CRUD |
@@ -839,7 +934,10 @@ One canonical type scale lives in `src/styles/components.css`; use these instead
 | CREATE_PROGRAM_PREVIEW | ✅/❌ | Programs | CreateProgramPreview | ✅ Full detail + submit; success/under_review/error modals |
 | ENQUIRIES | ✅ | Classes | Enquiries | ✅ getClassEnquiries, unlock, status/notes PUT |
 | PROGRAM_ENQUIRIES | ✅ | Programs | ProgramEnquiries | ✅ getProgramListings → getProgramEnquiries per-listing, updateProgramEnquiry |
-| ATTENDEES | ✅ | — | Attendees | ✅ getBookings (list+KPI counts), getBookingDetail (drawer), markBookingAttended, cancelBooking |
+| ATTENDEES | ✅ | — | Attendees | ✅ Two-level (listings/dates grid → group bookings + drawer); paginated getBookings (+listing_title), getBookingDetail, getBookingPaymentDetail, markBookingAttended (no partner cancel — 403) |
+| ALL_COUPONS | ✅ | — | AllCoupons | ✅ Live getCoupons + deactivate; sample fallback; status filters/search |
+| CREATE_COUPON | ✅ | — | CreateCoupon | ✅ Live createCoupon + targeting (listing dropdown / category / audience) |
+| HELP_SUPPORT | ✅ | — | Support | ✅ Live /help/tickets/ — categories, list, create, chat thread (poll/refresh), close |
 | PACKAGES | ✅ | — | Packages | ❌ Placeholder |
 | FINANCIAL_HUB | ✅ | — | FinancialHub | ⚡ Partial — bank details from `getCurrentPartner` |
 
@@ -1116,6 +1214,24 @@ npm run test:report   # run tests → generate test-report.html + test-report.pd
 | `docs/venue-listings-db-spec.md` | Venues module — tables (`venues`, `venue_occasions`, `venue_availability`, `venue_packages`, `venue_media`), occasion/time-slot/attendee-field reference, bulk availability pattern, API endpoints |
 
 ---
+
+*Phase 23 (2026-06-08) — Notifications + venue booking_type + listing density controls:*
+- *In-app notifications: new `src/api/notifications.ts` (list / unread-count / mark read / mark-all / preferences) + `src/components/NotificationCenter.tsx` (bell with 60s-polled badge, slide-in drawer with mark-read/all, "Admin" broadcast badge, broadcast email/in-app preference toggles). Mounted as the Dashboard top-right bell (`variant="light"`), replacing the old static popup; the sidebar bell was removed so there's one surface.*
+- *Venue `booking_type`: `CreateVenueDetails` now has an Enquiry / Direct Booking card (like Classes/Programs), sent in the venue PATCH and prefilled on edit.*
+- *View-density controls (Comfortable / Compact / List, persisted to localStorage) added to **Attendees** (`GroupCard`/`GroupRow` + summary KPI strip) and **My Listings** (`renderListingCard` card grid vs. the existing table) — built for catalogs with hundreds of listings.*
+
+*Phase 22 (2026-06-05) — Coupon API integration + Help & Support + Attendees/Bookings API alignment:*
+- *Coupons live: rewrote `src/api/coupons.ts` to the real contract (`percent`/`fixed`, `per_user_limit`, targeting arrays, `usages`, soft-delete). `CreateCoupon` posts real payloads — Specific-Listing now picks from a **live dropdown of the partner's listings**, plus an optional Audience (gender/age) section. `AllCoupons` lists live coupons with Deactivate (sample fallback when unreachable).*
+- *Listing ↔ coupon: listing list/detail now include `coupon`; partner update endpoints accept `coupon_code`. `ServiceListings` shows a coupon badge per listing + an attach/change/remove modal (Ticket button) that PATCHes `coupon_code`.*
+- *Help & Support: new `src/api/help.ts` + `src/screens/support/Support.tsx` (ticket list → raise → chat thread). Live categories/list/create/messages/send/close; status-based polling (5/30/60s, stop on closed) with verbatim-UTC `since` cursor + manual Refresh; `getTicketMessages` returns `{ ticket_status, messages }`. New `HELP_SUPPORT` screen + sidebar entry (LifeBuoy).*
+- *Attendees/Bookings: bookings now carry `listing_id`+`listing_title` (used for cards + a Listing column in By-Date view). **Removed the partner cancel flow** (`/cancel/` → 403 for partners). Added Payment Summary in the drawer via `getBookingPaymentDetail` (method/amount/status only).*
+
+*Phase 21 (2026-06-04) — Toasts + Coupons + Dropdowns + Attendees redesign:*
+- *Global toast system: rebuilt `components/ui/Toast.tsx` into an imperative singleton (`toast.success/error/warning/info`) + one `<Toaster/>` in `App.tsx`, with a card design (coloured top accent bar + bold title + message + dismiss). Replaced every `alert()` across 13 screens (validation→warning, failures→error). Legacy `useToasts()`/`<ToastContainer/>` kept as same-design local shims for auth/onboarding. Updated 4 event tests to spy on `toast` instead of `window.alert`.*
+- *Archive fix: `ServiceListings` pause/resume/archive/unarchive now use the generic `/listings/{id}/{action}/` endpoints for ALL entity types (the entity-specific `/programs/.../archive/`, `/classes/.../live/` routes 404 on the backend).*
+- *Coupons: new `src/api/coupons.ts` + `src/screens/coupons/` — `CreateCoupon` (form, live preview, "not connected yet" banner) and `AllCoupons` (mock-data list with filters/search, standalone vs from-listing source chips). New `ALL_COUPONS`/`CREATE_COUPON` screens + "Coupons" sidebar entry.*
+- *Reusable `Select` (`components/ui/Select.tsx`): animated, portal-rendered (never clipped by overflow — fixes the Class-CRM dropdown break), keyboard-navigable. Replaced all 6 native `<select>`s. Coupon "Apply To → Category" now offers a dropdown of the four main offering types.*
+- *Attendees redesign: two-level flow — a card grid of listings (with a By Listing Type / By Date animated toggle) → drill into a group's bookings + the existing detail drawer. Single `loadAll` fetches all listings + paginated bookings, grouped into `bookingsByListing` + `bookingsByDate`. Muted banner palette.*
 
 *Phase 20 (2026-05-31) — Bug-fix sweep + Enquiry redesign + typography pass:*
 - *Sidebar overlay bug (High): collapsing then reopening the desktop sidebar leaked the mobile dark overlay drawer over the main content. Root cause — the drawer's `lg:hidden` was conditionally tied to `desktopOpen`, which vanished once collapsed. Fixed: drawer + backdrop are now always `lg:hidden`; the hamburger (`onOpenSidebar`) re-expands the fixed desktop sidebar AND opens the mobile drawer (`App.tsx` + `Navigation.tsx`).*

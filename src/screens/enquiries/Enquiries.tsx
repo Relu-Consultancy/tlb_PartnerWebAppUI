@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Screen, EnquiryStatus } from '../../types';
+import { toast, Select } from '../../components/ui';
 import { getClassEnquiries, updateClassEnquiry, unlockClassEnquiry } from '../../api/listings';
 
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
@@ -116,7 +117,7 @@ export const Enquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
             }
         } catch (e: any) {
             console.error('Failed to unlock lead', e);
-            alert(e?.message || 'Failed to unlock contact. Please try again.');
+            toast.error(e?.message || 'Failed to unlock contact. Please try again.');
         }
     };
 
@@ -338,15 +339,15 @@ export const Enquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                             )}
                                         </td>
                                         <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                                            <select
+                                            <Select
                                                 value={lead.status}
-                                                onChange={(e) => updateStatus(lead.id, e.target.value as EnquiryStatus)}
-                                                className={`text-xs font-bold rounded-xl px-3 py-2 border outline-none cursor-pointer transition-all shadow-sm ${statusStyle(lead.status)}`}
-                                            >
-                                                {STATUS_OPTIONS.map(opt => (
-                                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                                ))}
-                                            </select>
+                                                onChange={(v) => updateStatus(lead.id, v as EnquiryStatus)}
+                                                options={STATUS_OPTIONS}
+                                                ariaLabel="Lead status"
+                                                align="right"
+                                                className="inline-block"
+                                                buttonClassName={`inline-flex items-center gap-1.5 text-xs font-bold rounded-xl px-3 py-2 border outline-none cursor-pointer transition-all shadow-sm ${statusStyle(lead.status)}`}
+                                            />
                                         </td>
                                     </motion.tr>
                                 ))}

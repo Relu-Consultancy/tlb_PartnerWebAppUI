@@ -6,6 +6,7 @@ import { server } from '../../../test/msw/server';
 import { DRAFT_ID, mockDraft } from '../../../test/msw/handlers';
 import { CreateEventDetails } from '../CreateEventDetails';
 import * as listingsApi from '../../../api/listings';
+import { toast } from '../../../components/ui';
 
 const BASE = 'https://tlb-api.reluconsultancy.in';
 
@@ -141,12 +142,12 @@ describe('CreateEventDetails — form interactions', () => {
 describe('CreateEventDetails — Next button', () => {
     it('shows an alert when title is empty', async () => {
         const user = userEvent.setup();
-        const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+        const toastSpy = vi.spyOn(toast, 'warning').mockImplementation(() => 0);
         render(<CreateEventDetails {...defaultProps} />);
         await waitFor(() => screen.getByText('Workshop'));
         await user.click(screen.getByText(/next: schedule/i));
-        expect(alertSpy).toHaveBeenCalledWith(expect.stringMatching(/title/i));
-        alertSpy.mockRestore();
+        expect(toastSpy).toHaveBeenCalledWith(expect.stringMatching(/title/i));
+        toastSpy.mockRestore();
     });
 
     it('creates a new draft and navigates to schedule on Next', async () => {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle2, Plus, Trash2, Loader2, Star } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation } from '../../components/ui';
+import { WizardLayout, WizardNavigation, toast } from '../../components/ui';
 import {
     getVenuePackages,
     createVenuePackage,
@@ -82,7 +82,7 @@ export const CreateVenuePackages: React.FC<Props> = ({ onNavigate }) => {
             try {
                 await deleteVenuePackage(draftId, pkg.apiId);
             } catch (err: any) {
-                alert(err?.message || 'Failed to delete package.');
+                toast.error(err?.message || 'Failed to delete package.');
                 updateField(pkg.localKey, 'saving', false);
                 return;
             }
@@ -96,7 +96,7 @@ export const CreateVenuePackages: React.FC<Props> = ({ onNavigate }) => {
         try {
             for (const pkg of packages) {
                 if (!pkg.dirty) continue;
-                if (!pkg.name.trim()) { alert('Package name is required for all packages.'); setProceeding(false); return; }
+                if (!pkg.name.trim()) { toast.warning('Package name is required for all packages.'); setProceeding(false); return; }
                 const payload: Record<string, any> = {
                     name: pkg.name.trim(),
                     price: pkg.price ? Number(pkg.price) : 0,
@@ -114,7 +114,7 @@ export const CreateVenuePackages: React.FC<Props> = ({ onNavigate }) => {
             }
             onNavigate('CREATE_VENUE_PREVIEW');
         } catch (err: any) {
-            alert(err?.message || 'Failed to save packages.');
+            toast.error(err?.message || 'Failed to save packages.');
         } finally {
             setProceeding(false);
         }

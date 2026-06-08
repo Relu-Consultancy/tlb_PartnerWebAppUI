@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, Calendar as CalendarIcon, Clock, Plus, Trash2, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation } from '../../components/ui';
+import { WizardLayout, WizardNavigation, toast } from '../../components/ui';
 import {
     getVenueAvailability,
     createVenueAvailabilitySlot,
@@ -55,8 +55,8 @@ export const CreateVenueAvailability: React.FC<Props> = ({ onNavigate }) => {
 
     const handleAdd = async () => {
         if (!draftId) return;
-        if (!newDate || !newStart || !newEnd) { alert('Please fill in date, start time, and end time.'); return; }
-        if (newEnd <= newStart) { alert('End time must be after start time.'); return; }
+        if (!newDate || !newStart || !newEnd) { toast.warning('Please fill in date, start time, and end time.'); return; }
+        if (newEnd <= newStart) { toast.warning('End time must be after start time.'); return; }
         setAdding(true);
         try {
             const res = await createVenueAvailabilitySlot(draftId, {
@@ -69,7 +69,7 @@ export const CreateVenueAvailability: React.FC<Props> = ({ onNavigate }) => {
             setNewDate(''); setNewStart(''); setNewEnd(''); setNewNote('');
             setShowForm(false);
         } catch (err: any) {
-            alert(err?.message || 'Failed to add slot.');
+            toast.error(err?.message || 'Failed to add slot.');
         } finally {
             setAdding(false);
         }
@@ -82,7 +82,7 @@ export const CreateVenueAvailability: React.FC<Props> = ({ onNavigate }) => {
             await deleteVenueAvailabilitySlot(draftId, slotId);
             setSlots(prev => prev.filter(s => s.id !== slotId));
         } catch (err: any) {
-            alert(err?.message || 'Failed to delete slot.');
+            toast.error(err?.message || 'Failed to delete slot.');
         } finally {
             setDeleting(null);
         }
@@ -200,7 +200,7 @@ export const CreateVenueAvailability: React.FC<Props> = ({ onNavigate }) => {
             <WizardNavigation
                 onBack={() => onNavigate('CREATE_VENUE_OCCASIONS')}
                 onNext={() => {
-                    if (slots.length === 0) { alert('Add at least one availability slot before continuing.'); return; }
+                    if (slots.length === 0) { toast.warning('Add at least one availability slot before continuing.'); return; }
                     onNavigate('CREATE_VENUE_PACKAGES');
                 }}
                 nextText="Next: Packages & Pricing"

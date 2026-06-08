@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
-    Menu, Search, X, ChevronLeft, ChevronRight,
+    Menu, Search, X, ArrowLeft, ChevronRight,
     User, CreditCard, Users, CheckCircle,
-    XCircle, Inbox, RefreshCw, Phone, Mail,
-    FileText, AlertCircle,
+    Inbox, RefreshCw, Phone, Mail, Wallet,
+    FileText, AlertCircle, CalendarDays, GraduationCap, Layers, MapPin,
+    LayoutGrid, Grid3X3, List,
 } from 'lucide-react';
-import { Screen } from '../../types';
+import { Screen, EntityType } from '../../types';
+import { usePartner } from '../../context/PartnerContext';
 import {
-    getBookings, getBookingDetail,
-    markBookingAttended, cancelBooking,
-    getListingDetail, getClassListingDetail, getProgramListingDetail, getVenueListingDetail,
+    getBookings, getBookingDetail, markBookingAttended, getBookingPaymentDetail,
+    getEventListings, getClassListings, getProgramListings, getVenueListings,
 } from '../../api/listings';
 
 interface Props {
@@ -25,6 +27,7 @@ type TabFilter = 'all' | BookingStatus;
 interface BookingSummary {
     id: string;
     listing_id?: string;
+    listing_title?: string;
     booking_reference: string;
     booking_type: BookingType;
     status: BookingStatus;
@@ -82,6 +85,12 @@ interface BookingDetail extends BookingSummary {
     updated_at: string;
 }
 
+interface PaymentSummary {
+    payment_method: string | null;
+    amount: number | null;
+    status: string | null;
+}
+
 interface StatusCounts {
     total: number;
     awaiting_payment: number;
@@ -90,11 +99,24 @@ interface StatusCounts {
     cancelled: number;
 }
 
-const TYPE_COLORS: Partial<Record<BookingType, string>> = {
-    event: 'bg-blue-100 text-blue-700',
-    class: 'bg-purple-100 text-purple-700',
-    program: 'bg-emerald-100 text-emerald-700',
-    venue: 'bg-amber-100 text-amber-700',
+interface ListingCard {
+    id: string;
+    title: string;
+    type: BookingType;
+    status?: string;
+    /** True when the card is derived from bookings (listing no longer in catalog). */
+    synthetic?: boolean;
+}
+
+const TYPE_META: Record<BookingType, { label: string; icon: React.ElementType; grad: string; badge: string }> = {
+    event:   { label: 'Event',   icon: CalendarDays,  grad: 'from-blue-700 to-blue-800',     badge: 'bg-blue-100 text-blue-700' },
+    class:   { label: 'Class',   icon: GraduationCap, grad: 'from-violet-700 to-violet-800', badge: 'bg-purple-100 text-purple-700' },
+    program: { label: 'Program', icon: Layers,        grad: 'from-teal-700 to-teal-800',     badge: 'bg-emerald-100 text-emerald-700' },
+    venue:   { label: 'Venue',   icon: MapPin,        grad: 'from-amber-700 to-amber-800',   badge: 'bg-amber-100 text-amber-700' },
+};
+
+const ENTITY_TO_TYPE: Record<EntityType, BookingType> = {
+    Events: 'event', Classes: 'class', Programs: 'program', Venues: 'venue',
 };
 
 const STATUS_COLORS: Partial<Record<BookingStatus, string>> = {
@@ -124,117 +146,330 @@ function formatAmount(amount: number, currency = 'INR') {
     }).format(amount);
 }
 
-const PAGE_SIZE = 20;
+function computeCounts(list: BookingSummary[]): StatusCounts {
+    const c: StatusCounts = { total: list.length, awaiting_payment: 0, confirmed: 0, attended: 0, cancelled: 0 };
+    list.forEach(b => {
+        if (b.status === 'awaiting_payment') c.awaiting_payment++;
+        else if (b.status === 'confirmed') c.confirmed++;
+        else if (b.status === 'attended') c.attended++;
+        else if (b.status === 'cancelled') c.cancelled++;
+    });
+    return c;
+}
+
+const UNLINKED_KEY = '__unlinked__';
+
+// Normalize a created_at timestamp to a YYYY-MM-DD grouping key
+const dateKeyOf = (iso: string): string => {
+    if (!iso) return 'unknown';
+    if (/^\d{4}-\d{2}-\d{2}/.test(iso)) return iso.slice(0, 10);
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? 'unknown' : d.toISOString().slice(0, 10);
+};
+
+const formatFullDate = (key: string): string => {
+    if (key === 'unknown') return 'Unknown date';
+    const d = new Date(key);
+    return Number.isNaN(d.getTime())
+        ? key
+        : d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
+const formatWeekday = (key: string): string => {
+    if (key === 'unknown') return '';
+    const d = new Date(key);
+    return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-IN', { weekday: 'long' });
+};
+
+type Density = 'comfortable' | 'compact' | 'list';
+
+interface GroupItemProps {
+    title: string;
+    subtitle?: string;
+    counts: StatusCounts;
+    grad: string;
+    icon: React.ElementType;
+    badge?: string;
+    index: number;
+    onClick: () => void;
+    size?: Density;
+}
+
+// Refined, interactive card used in both the By-Listing and By-Date grids.
+// `size === 'compact'` renders a denser variant for large catalogs.
+const GroupCard: React.FC<GroupItemProps> = ({ title, subtitle, counts: c, grad, icon: Icon, badge, index, onClick, size = 'comfortable' }) => {
+    const attendedPct = c.total ? Math.round((c.attended / c.total) * 100) : 0;
+    const compact = size === 'compact';
+    return (
+        <motion.button
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.22, delay: Math.min(index * 0.03, 0.25) }}
+            onClick={onClick}
+            className="group text-left bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-gray-200 transition-all duration-200 overflow-hidden"
+        >
+            {/* Banner */}
+            <div className={`relative ${compact ? 'h-16 px-4 py-3' : 'h-24 px-5 py-4'} bg-gradient-to-br ${grad} flex flex-col justify-between overflow-hidden`}>
+                <div className="absolute -right-8 -top-8 w-28 h-28 rounded-full bg-white/10" />
+                <div className="absolute -right-3 top-9 w-16 h-16 rounded-full bg-white/5" />
+                <div className="relative z-10 flex items-start justify-between">
+                    <div className={`${compact ? 'w-8 h-8 rounded-lg' : 'w-10 h-10 rounded-xl'} bg-white/20 backdrop-blur flex items-center justify-center`}>
+                        <Icon size={compact ? 16 : 20} className="text-white" />
+                    </div>
+                    {badge && (
+                        <span className={`font-black rounded-full bg-white/25 text-white uppercase tracking-widest ${compact ? 'text-[9px] px-2 py-0.5' : 'text-[10px] px-2.5 py-1'}`}>
+                            {badge}
+                        </span>
+                    )}
+                </div>
+                {!compact && (
+                    <div className="relative z-10 flex items-end justify-between">
+                        <div>
+                            <p className="text-2xl font-black text-white leading-none">{c.total}</p>
+                            <p className="text-[10px] text-white/70 font-bold uppercase tracking-wider mt-1">total booking{c.total === 1 ? '' : 's'}</p>
+                        </div>
+                        <ChevronRight size={20} className="text-white/70 group-hover:translate-x-1 transition-transform" />
+                    </div>
+                )}
+            </div>
+
+            {/* Body */}
+            <div className={compact ? 'p-3' : 'p-4'}>
+                <div className="flex items-center justify-between gap-2">
+                    <h3 className={`font-black text-gray-900 leading-snug line-clamp-1 ${compact ? 'text-sm' : ''}`}>{title}</h3>
+                    {compact && <span className="text-sm font-black text-gray-900 shrink-0">{c.total}</span>}
+                </div>
+                {subtitle && !compact && <p className="text-[11px] font-medium text-gray-400 mt-0.5 line-clamp-1">{subtitle}</p>}
+
+                {!compact && (
+                    <div className="mt-3">
+                        <div className="flex items-center justify-between text-[10px] font-bold mb-1">
+                            <span className="text-gray-400 uppercase tracking-wider">Attendance</span>
+                            <span className={attendedPct > 0 ? 'text-emerald-600' : 'text-gray-300'}>{attendedPct}%</span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                            <div className="h-full rounded-full bg-emerald-400 transition-all" style={{ width: `${attendedPct}%` }} />
+                        </div>
+                    </div>
+                )}
+
+                <div className={`flex items-center gap-3 ${compact ? 'mt-2 text-[10px]' : 'mt-3 text-[11px]'} font-bold text-gray-500`}>
+                    <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-sky-400" />{c.confirmed}</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-400" />{c.attended}</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-400" />{c.awaiting_payment}</span>
+                </div>
+            </div>
+        </motion.button>
+    );
+};
+
+// Dense one-per-row layout — best for hundreds of listings.
+const GroupRow: React.FC<GroupItemProps> = ({ title, subtitle, counts: c, grad, icon: Icon, badge, index, onClick }) => {
+    const attendedPct = c.total ? Math.round((c.attended / c.total) * 100) : 0;
+    return (
+        <motion.button
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.18, delay: Math.min(index * 0.015, 0.2) }}
+            onClick={onClick}
+            className="group w-full text-left flex items-center gap-4 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-gray-200 transition-all px-3.5 py-3"
+        >
+            <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${grad} flex items-center justify-center shrink-0`}>
+                <Icon size={18} className="text-white" />
+            </div>
+            <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                    <p className="font-bold text-sm text-gray-900 truncate">{title}</p>
+                    {badge && <span className="hidden sm:inline text-[9px] font-black px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 uppercase tracking-wider shrink-0">{badge}</span>}
+                </div>
+                {subtitle && <p className="text-[11px] text-gray-400 truncate">{subtitle}</p>}
+            </div>
+            {/* mini attendance bar */}
+            <div className="hidden md:flex items-center gap-2 w-28 shrink-0">
+                <div className="h-1.5 flex-1 rounded-full bg-gray-100 overflow-hidden">
+                    <div className="h-full rounded-full bg-emerald-400" style={{ width: `${attendedPct}%` }} />
+                </div>
+                <span className="text-[10px] font-bold text-gray-400 w-8 text-right">{attendedPct}%</span>
+            </div>
+            <div className="hidden sm:flex items-center gap-3 text-[11px] font-bold shrink-0">
+                <span className="flex items-center gap-1 text-sky-600"><span className="w-1.5 h-1.5 rounded-full bg-sky-400" />{c.confirmed}</span>
+                <span className="flex items-center gap-1 text-emerald-600"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />{c.attended}</span>
+                <span className="flex items-center gap-1 text-amber-600"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" />{c.awaiting_payment}</span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+                <span className="text-sm font-black text-gray-900">{c.total}</span>
+                <ChevronRight size={18} className="text-gray-300 group-hover:translate-x-0.5 transition-transform" />
+            </div>
+        </motion.button>
+    );
+};
 
 const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
+    const { allowedEntities } = usePartner();
+
+    // ── Data ──
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [listings, setListings] = useState<ListingCard[]>([]);
+    const [bookingsByListing, setBookingsByListing] = useState<Record<string, BookingSummary[]>>({});
+    const [bookingsByDate, setBookingsByDate] = useState<Record<string, BookingSummary[]>>({});
+
+    // ── Navigation between the two levels ──
+    const [groupMode, setGroupMode] = useState<'listing' | 'date'>('listing');
+    const [selected, setSelected] = useState<{ mode: 'listing' | 'date'; key: string } | null>(null);
+    const [listingSearch, setListingSearch] = useState('');
+    const [density, setDensityState] = useState<Density>(() => {
+        try { return (localStorage.getItem('attendees_density') as Density) || 'comfortable'; } catch { return 'comfortable'; }
+    });
+    const setDensity = (d: Density) => {
+        setDensityState(d);
+        try { localStorage.setItem('attendees_density', d); } catch { /* ignore */ }
+    };
+
+    // ── Per-listing booking view ──
     const [activeTab, setActiveTab] = useState<TabFilter>('all');
     const [searchQuery, setSearchQuery] = useState('');
-    const [bookings, setBookings] = useState<BookingSummary[]>([]);
-    const [counts, setCounts] = useState<StatusCounts>({ total: 0, awaiting_payment: 0, confirmed: 0, attended: 0, cancelled: 0 });
-    const [loading, setLoading] = useState(true);
-    const [page, setPage] = useState(1);
-    const [totalCount, setTotalCount] = useState(0);
-    const [hasNext, setHasNext] = useState(false);
-    const [hasPrev, setHasPrev] = useState(false);
-    const [listError, setListError] = useState<string | null>(null);
 
+    // ── Booking detail drawer ──
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [detail, setDetail] = useState<BookingDetail | null>(null);
     const [loadingDetail, setLoadingDetail] = useState(false);
     const [actionError, setActionError] = useState<string | null>(null);
-
-    const [cancelOpen, setCancelOpen] = useState(false);
-    const [cancelReason, setCancelReason] = useState('');
-    const [cancelling, setCancelling] = useState(false);
     const [markingAttended, setMarkingAttended] = useState(false);
+    const [paymentDetail, setPaymentDetail] = useState<PaymentSummary | null>(null);
 
-    const fetchList = useCallback(async (tab: TabFilter, pg: number) => {
+    const loadAll = useCallback(async () => {
         setLoading(true);
-        setListError(null);
+        setError(null);
         try {
-            const params: { status?: string; page?: number } = { page: pg };
-            if (tab !== 'all') params.status = tab;
-            const res = await getBookings(params);
-            const d = res?.data || res;
-            setBookings(d?.results || []);
-            setTotalCount(d?.count || 0);
-            setHasNext(!!d?.next);
-            setHasPrev(!!d?.previous);
+            // 1) Fetch the partner's listings across the entity types they offer
+            const wanted: EntityType[] = allowedEntities.length > 0
+                ? allowedEntities
+                : ['Events', 'Classes', 'Programs', 'Venues'];
+            const fetchers: Record<EntityType, (s?: string) => Promise<any>> = {
+                Events: getEventListings, Classes: getClassListings,
+                Programs: getProgramListings, Venues: getVenueListings,
+            };
+            const listingFetches = wanted.map(ent =>
+                fetchers[ent]().then((res: any) => {
+                    const data = res?.data || res;
+                    return Array.isArray(data)
+                        ? data.map((item: any) => ({
+                            id: String(item.id || ''),
+                            title: item.title || 'Untitled',
+                            type: ENTITY_TO_TYPE[ent],
+                            status: item.status as string | undefined,
+                        } as ListingCard))
+                        : [];
+                }).catch(() => [] as ListingCard[]),
+            );
+
+            // 2) Fetch every booking (paginated), then group by listing
+            const fetchAllBookings = async (): Promise<BookingSummary[]> => {
+                const all: BookingSummary[] = [];
+                let page = 1;
+                for (let guard = 0; guard < 30; guard++) {
+                    const res: any = await getBookings({ page });
+                    const d = res?.data || res;
+                    all.push(...((d?.results || []) as BookingSummary[]));
+                    if (!d?.next) break;
+                    page++;
+                }
+                return all;
+            };
+
+            const [listingResults, allBookings] = await Promise.all([
+                Promise.all(listingFetches),
+                fetchAllBookings().catch((e: any) => { throw e; }),
+            ]);
+
+            const listingCards: ListingCard[] = listingResults.flat();
+            const byId = new Map(listingCards.map(l => [l.id, l]));
+
+            // Group bookings; synthesize cards for listings not in the catalog
+            const grouped: Record<string, BookingSummary[]> = {};
+            allBookings.forEach(b => {
+                const key = b.listing_id || UNLINKED_KEY;
+                (grouped[key] ||= []).push(b);
+            });
+
+            Object.entries(grouped).forEach(([key, list]) => {
+                if (key === UNLINKED_KEY || byId.has(key)) return;
+                const first = list[0];
+                listingCards.push({
+                    id: key,
+                    title: first.listing_title || `${TYPE_META[first.booking_type]?.label || 'Listing'}`,
+                    type: first.booking_type,
+                    synthetic: true,
+                });
+            });
+            if (grouped[UNLINKED_KEY]?.length) {
+                listingCards.push({
+                    id: UNLINKED_KEY,
+                    title: 'Other bookings',
+                    type: grouped[UNLINKED_KEY][0].booking_type,
+                    synthetic: true,
+                });
+            }
+
+            // Group the same bookings by date for the "By Date" view
+            const byDate: Record<string, BookingSummary[]> = {};
+            allBookings.forEach(b => {
+                const key = dateKeyOf(b.created_at);
+                (byDate[key] ||= []).push(b);
+            });
+
+            setListings(listingCards);
+            setBookingsByListing(grouped);
+            setBookingsByDate(byDate);
         } catch (e: unknown) {
-            setListError((e as Error)?.message || 'Failed to load bookings');
+            setError((e as Error)?.message || 'Failed to load attendees');
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [allowedEntities]);
 
-    // Parallel status-count fetch on mount
-    useEffect(() => {
-        const loadCounts = async () => {
-            const [allRes, awaitRes, confRes, attRes, canRes] = await Promise.allSettled([
-                getBookings({ page: 1 }),
-                getBookings({ status: 'awaiting_payment', page: 1 }),
-                getBookings({ status: 'confirmed', page: 1 }),
-                getBookings({ status: 'attended', page: 1 }),
-                getBookings({ status: 'cancelled', page: 1 }),
-            ]);
-            const getCount = (r: PromiseSettledResult<unknown>) => {
-                if (r.status !== 'fulfilled') return 0;
-                const v = r.value as Record<string, unknown>;
-                const d = v?.data as Record<string, unknown> | undefined;
-                return Number(d?.count ?? v?.count ?? 0);
-            };
-            setCounts({
-                total: getCount(allRes),
-                awaiting_payment: getCount(awaitRes),
-                confirmed: getCount(confRes),
-                attended: getCount(attRes),
-                cancelled: getCount(canRes),
-            });
+    useEffect(() => { loadAll(); }, [loadAll]);
+
+    const openGroup = (mode: 'listing' | 'date', key: string) => {
+        setSelected({ mode, key });
+        setActiveTab('all');
+        setSearchQuery('');
+    };
+
+    const backToListings = () => setSelected(null);
+
+    const patchBooking = (id: string, patch: Partial<BookingSummary>) => {
+        const patchMap = (prev: Record<string, BookingSummary[]>) => {
+            const next = { ...prev };
+            for (const k of Object.keys(next)) {
+                const idx = next[k].findIndex(b => b.id === id);
+                if (idx >= 0) {
+                    next[k] = [...next[k]];
+                    next[k][idx] = { ...next[k][idx], ...patch };
+                }
+            }
+            return next;
         };
-        loadCounts();
-    }, []);
-
-    useEffect(() => {
-        fetchList(activeTab, page);
-    }, [activeTab, page, fetchList]);
-
-    const handleTabChange = (tab: TabFilter) => {
-        setActiveTab(tab);
-        setPage(1);
-        setSelectedId(null);
-        setDetail(null);
+        setBookingsByListing(patchMap);
+        setBookingsByDate(patchMap);
     };
 
     const handleViewDetail = async (id: string) => {
         setSelectedId(id);
         setDetail(null);
+        setPaymentDetail(null);
         setLoadingDetail(true);
         setActionError(null);
-        setCancelOpen(false);
-        setCancelReason('');
+        // Payment summary is best-effort and loads in parallel
+        getBookingPaymentDetail(id)
+            .then((res: any) => setPaymentDetail(res?.data || res))
+            .catch(() => setPaymentDetail(null));
         try {
             const res = await getBookingDetail(id);
             const d = res?.data || res;
-            // Try to resolve listing title from inline fields first
             d.listing_title = d.listing_title || d.service_title || d.listing_name || d.listing?.title || '';
             setDetail(d);
-            // If no title yet, fetch it from the listing endpoint using listing_id
-            const listingId = d.listing_id || d.listing;
-            if (!d.listing_title && listingId && d.booking_type) {
-                try {
-                    const fetcher = d.booking_type === 'event' ? getListingDetail
-                        : d.booking_type === 'class' ? getClassListingDetail
-                        : d.booking_type === 'program' ? getProgramListingDetail
-                        : d.booking_type === 'venue' ? getVenueListingDetail
-                        : null;
-                    if (fetcher) {
-                        const lr = await fetcher(listingId);
-                        const ld = lr?.data || lr;
-                        const title = ld?.title || ld?.service?.title || '';
-                        if (title) setDetail(prev => prev ? { ...prev, listing_title: title } : prev);
-                    }
-                } catch { /* listing fetch is best-effort */ }
-            }
         } catch (e: unknown) {
             setActionError((e as Error)?.message || 'Failed to load booking details');
         } finally {
@@ -245,9 +480,8 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
     const handleCloseDetail = () => {
         setSelectedId(null);
         setDetail(null);
+        setPaymentDetail(null);
         setActionError(null);
-        setCancelOpen(false);
-        setCancelReason('');
     };
 
     const handleMarkAttended = async () => {
@@ -257,13 +491,8 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
         try {
             const res = await markBookingAttended(detail.id);
             const updated = res?.data || res;
-            setDetail(prev => prev ? { ...prev, ...updated } : prev);
-            fetchList(activeTab, page);
-            setCounts(prev => ({
-                ...prev,
-                confirmed: Math.max(0, prev.confirmed - 1),
-                attended: prev.attended + 1,
-            }));
+            setDetail(prev => prev ? { ...prev, ...updated, status: 'attended' } : prev);
+            patchBooking(detail.id, { status: 'attended' });
         } catch (e: unknown) {
             setActionError((e as Error)?.message || 'Failed to mark as attended');
         } finally {
@@ -271,32 +500,32 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
         }
     };
 
-    const handleCancelConfirm = async () => {
-        if (!detail) return;
-        const prevStatus = detail.status;
-        setCancelling(true);
-        setActionError(null);
-        try {
-            const res = await cancelBooking(detail.id, cancelReason || undefined);
-            const updated = res?.data || res;
-            setDetail(prev => prev ? { ...prev, ...updated } : prev);
-            setCancelOpen(false);
-            setCancelReason('');
-            fetchList(activeTab, page);
-            setCounts(prev => ({
-                ...prev,
-                ...(prevStatus === 'confirmed' ? { confirmed: Math.max(0, prev.confirmed - 1) } : {}),
-                ...(prevStatus === 'awaiting_payment' ? { awaiting_payment: Math.max(0, prev.awaiting_payment - 1) } : {}),
-                cancelled: prev.cancelled + 1,
-            }));
-        } catch (e: unknown) {
-            setActionError((e as Error)?.message || 'Failed to cancel booking');
-        } finally {
-            setCancelling(false);
-        }
-    };
+    const selectedListing = selected?.mode === 'listing'
+        ? (listings.find(l => l.id === selected.key) || null)
+        : null;
+    const listingBookings: BookingSummary[] = !selected
+        ? []
+        : selected.mode === 'listing'
+            ? (bookingsByListing[selected.key] || [])
+            : (bookingsByDate[selected.key] || []);
+    const listingCounts = computeCounts(listingBookings);
 
-    const filtered = bookings.filter(b => {
+    // Title / subtitle for the drill-down header (works for listing or date)
+    const detailTitle = !selected
+        ? 'Attendees'
+        : selected.mode === 'listing'
+            ? (selectedListing?.title || 'Listing')
+            : formatFullDate(selected.key);
+    const detailSubtitle = !selected
+        ? 'Pick a listing or date to view its attendees & bookings'
+        : selected.mode === 'listing' && selectedListing
+            ? `${TYPE_META[selectedListing.type].label} · ${listingCounts.total} booking${listingCounts.total === 1 ? '' : 's'}`
+            : `${listingCounts.total} booking${listingCounts.total === 1 ? '' : 's'} · ${new Set(listingBookings.map(b => b.listing_id || UNLINKED_KEY)).size} listing${new Set(listingBookings.map(b => b.listing_id || UNLINKED_KEY)).size === 1 ? '' : 's'}`;
+
+    const tabFiltered = activeTab === 'all'
+        ? listingBookings
+        : listingBookings.filter(b => b.status === activeTab);
+    const filtered = tabFiltered.filter(b => {
         const q = searchQuery.toLowerCase();
         return (
             b.customer_name.toLowerCase().includes(q) ||
@@ -305,216 +534,371 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
         );
     });
 
-    const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+    const visibleListings = listings.filter(l =>
+        l.title.toLowerCase().includes(listingSearch.toLowerCase()),
+    );
+
+    const allBookings: BookingSummary[] = [];
+    Object.keys(bookingsByDate).forEach(k => allBookings.push(...bookingsByDate[k]));
+    const globalCounts = computeCounts(allBookings);
+
+    const ItemComp = density === 'list' ? GroupRow : GroupCard;
+    const gridClass = density === 'list'
+        ? 'grid grid-cols-1 gap-2.5'
+        : density === 'compact'
+            ? 'grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3'
+            : 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5';
+
+    const visibleDates = (Object.entries(bookingsByDate) as [string, BookingSummary[]][])
+        .filter(([key]) => {
+            const q = listingSearch.toLowerCase();
+            return !q || formatFullDate(key).toLowerCase().includes(q) || formatWeekday(key).toLowerCase().includes(q);
+        })
+        .sort((a, b) => (a[0] < b[0] ? 1 : -1)); // newest first
 
     const TABS: { key: TabFilter; label: string; count: number }[] = [
-        { key: 'all', label: 'All', count: counts.total },
-        { key: 'awaiting_payment', label: 'Awaiting Payment', count: counts.awaiting_payment },
-        { key: 'confirmed', label: 'Confirmed', count: counts.confirmed },
-        { key: 'attended', label: 'Attended', count: counts.attended },
-        { key: 'cancelled', label: 'Cancelled', count: counts.cancelled },
+        { key: 'all', label: 'All', count: listingCounts.total },
+        { key: 'awaiting_payment', label: 'Awaiting Payment', count: listingCounts.awaiting_payment },
+        { key: 'confirmed', label: 'Confirmed', count: listingCounts.confirmed },
+        { key: 'attended', label: 'Attended', count: listingCounts.attended },
+        { key: 'cancelled', label: 'Cancelled', count: listingCounts.cancelled },
     ];
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col">
             <main className="flex-1 w-full h-screen overflow-y-auto">
-                <header className="bg-white px-6 md:px-10 py-5 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
-                    <div className="flex items-center gap-4">
+                {/* Header */}
+                <header className="bg-white px-6 md:px-10 py-5 flex items-center gap-4 sticky top-0 z-30 border-b border-gray-100">
+                    {selected ? (
+                        <button onClick={backToListings} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors flex items-center gap-1.5 text-gray-500 hover:text-gray-900">
+                            <ArrowLeft size={22} />
+                            <span className="hidden sm:inline text-sm font-bold">Back</span>
+                        </button>
+                    ) : (
                         <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors">
                             <Menu size={24} />
                         </button>
-                        <div>
-                            <h1 className="tlb-page-title">Bookings</h1>
-                            <p className="tlb-page-sub">Track attendees, payments, and attendance</p>
-                        </div>
+                    )}
+                    <div className="min-w-0">
+                        <h1 className="tlb-page-title truncate">{detailTitle}</h1>
+                        <p className="tlb-page-sub">{detailSubtitle}</p>
                     </div>
                 </header>
 
-                <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
-                    {/* KPI Cards */}
-                    <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-                        {[
-                            { label: 'Total Bookings', value: counts.total, color: 'text-gray-900', bg: 'bg-white' },
-                            { label: 'Awaiting Payment', value: counts.awaiting_payment, color: 'text-amber-600', bg: 'bg-amber-50' },
-                            { label: 'Confirmed', value: counts.confirmed, color: 'text-sky-600', bg: 'bg-sky-50' },
-                            { label: 'Attended', value: counts.attended, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                            { label: 'Cancelled', value: counts.cancelled, color: 'text-red-500', bg: 'bg-red-50' },
-                        ].map(card => (
-                            <div key={card.label} className={`${card.bg} rounded-2xl p-5 border border-gray-100 shadow-sm`}>
-                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{card.label}</p>
-                                <p className={`text-3xl font-black ${card.color}`}>{card.value}</p>
+                {/* ─────────────────────────  LISTINGS GRID  ───────────────────────── */}
+                {!selected && (
+                    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
+                        {loading ? (
+                            <div className="flex items-center justify-center py-24">
+                                <RefreshCw size={26} className="text-gray-300 animate-spin" />
                             </div>
-                        ))}
-                    </div>
+                        ) : error ? (
+                            <div className="flex flex-col items-center gap-3 py-24 text-center">
+                                <AlertCircle size={34} className="text-red-300" />
+                                <p className="text-sm font-bold text-gray-500">{error}</p>
+                                <button onClick={loadAll} className="text-xs font-black text-blue-500 hover:underline">Try again</button>
+                            </div>
+                        ) : listings.length === 0 ? (
+                            <div className="flex flex-col items-center gap-2 py-24 text-center">
+                                <Inbox size={34} className="text-gray-200" />
+                                <p className="text-sm font-bold text-gray-400">No listings yet</p>
+                            </div>
+                        ) : (
+                            <>
+                                {/* Summary KPI strip */}
+                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+                                    {[
+                                        { label: 'Total Bookings', value: globalCounts.total, icon: Users, color: 'text-tlb-dark', bg: 'bg-tlb-yellow/15' },
+                                        { label: 'Confirmed', value: globalCounts.confirmed, icon: CalendarDays, color: 'text-sky-600', bg: 'bg-sky-50' },
+                                        { label: 'Attended', value: globalCounts.attended, icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                                        { label: 'Awaiting Payment', value: globalCounts.awaiting_payment, icon: CreditCard, color: 'text-amber-600', bg: 'bg-amber-50' },
+                                    ].map(({ label, value, icon: Icon, color, bg }) => (
+                                        <div key={label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
+                                            <div className={`w-11 h-11 rounded-xl ${bg} flex items-center justify-center shrink-0`}>
+                                                <Icon size={20} className={color} />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className={`text-2xl font-black leading-none ${color}`}>{value}</p>
+                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1 truncate">{label}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
 
-                    {/* Table card */}
-                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                        {/* Tabs */}
-                        <div className="flex gap-1 border-b border-gray-100 px-4 pt-4 overflow-x-auto">
-                            {TABS.map(tab => (
-                                <button
-                                    key={tab.key}
-                                    onClick={() => handleTabChange(tab.key)}
-                                    className={`pb-3 px-4 text-sm font-bold transition-colors border-b-2 whitespace-nowrap flex items-center gap-2 ${
-                                        activeTab === tab.key
-                                            ? 'border-tlb-yellow text-gray-900'
-                                            : 'border-transparent text-gray-400 hover:text-gray-600'
-                                    }`}
-                                >
-                                    {tab.label}
-                                    {tab.count > 0 && (
-                                        <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
-                                            activeTab === tab.key ? 'bg-tlb-yellow text-gray-900' : 'bg-gray-100 text-gray-500'
-                                        }`}>
-                                            {tab.count}
-                                        </span>
+                                {/* Toggle + search */}
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                                    <div className="inline-flex bg-white border border-gray-100 rounded-2xl p-1 shadow-sm w-fit">
+                                        {([
+                                            { mode: 'listing' as const, label: 'By Listing Type', icon: Layers },
+                                            { mode: 'date' as const, label: 'By Date', icon: CalendarDays },
+                                        ]).map(({ mode, label, icon: Icon }) => (
+                                            <button
+                                                key={mode}
+                                                onClick={() => setGroupMode(mode)}
+                                                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+                                                    groupMode === mode ? 'bg-tlb-dark text-white shadow-sm' : 'text-gray-500 hover:text-gray-900'
+                                                }`}
+                                            >
+                                                <Icon size={15} /> {label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        {/* Density / view control */}
+                                        <div className="inline-flex bg-white border border-gray-100 rounded-xl p-1 shadow-sm shrink-0">
+                                            {([
+                                                { v: 'comfortable' as const, icon: LayoutGrid, label: 'Comfortable' },
+                                                { v: 'compact' as const, icon: Grid3X3, label: 'Compact' },
+                                                { v: 'list' as const, icon: List, label: 'List' },
+                                            ]).map(({ v, icon: Icon, label }) => (
+                                                <button
+                                                    key={v}
+                                                    onClick={() => setDensity(v)}
+                                                    title={label}
+                                                    aria-label={label}
+                                                    className={`p-2 rounded-lg transition-all ${density === v ? 'bg-tlb-dark text-white' : 'text-gray-400 hover:text-gray-700'}`}
+                                                >
+                                                    <Icon size={16} />
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <div className="flex items-center gap-3 bg-white rounded-2xl px-4 py-3 border border-gray-100 shadow-sm flex-1 md:w-64 md:flex-none">
+                                            <Search size={16} className="text-gray-400 shrink-0" />
+                                            <input
+                                                className="flex-1 bg-transparent border-none focus:outline-none text-sm font-bold placeholder:text-gray-300"
+                                                placeholder={groupMode === 'listing' ? 'Search listings…' : 'Search dates…'}
+                                                value={listingSearch}
+                                                onChange={e => setListingSearch(e.target.value)}
+                                            />
+                                            {listingSearch && (
+                                                <button onClick={() => setListingSearch('')} className="text-gray-400 hover:text-gray-600">
+                                                    <X size={16} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <AnimatePresence mode="wait">
+                                    {groupMode === 'listing' ? (
+                                        <motion.div
+                                            key="by-listing"
+                                            initial={{ opacity: 0, y: 8 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: -8 }}
+                                            transition={{ duration: 0.18 }}
+                                            className={gridClass}
+                                        >
+                                            {visibleListings.map((l, i) => {
+                                                const meta = TYPE_META[l.type];
+                                                const c = computeCounts(bookingsByListing[l.id] || []);
+                                                return (
+                                                    <ItemComp
+                                                        key={l.id}
+                                                        index={i}
+                                                        title={l.title}
+                                                        subtitle={meta.label}
+                                                        counts={c}
+                                                        grad={meta.grad}
+                                                        icon={meta.icon}
+                                                        badge={meta.label}
+                                                        size={density}
+                                                        onClick={() => openGroup('listing', l.id)}
+                                                    />
+                                                );
+                                            })}
+                                            {visibleListings.length === 0 && (
+                                                <div className="col-span-full flex flex-col items-center gap-2 py-16 text-center">
+                                                    <Inbox size={30} className="text-gray-200" />
+                                                    <p className="text-sm font-bold text-gray-400">No listings match “{listingSearch}”</p>
+                                                </div>
+                                            )}
+                                        </motion.div>
+                                    ) : (
+                                        <motion.div
+                                            key="by-date"
+                                            initial={{ opacity: 0, y: 8 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: -8 }}
+                                            transition={{ duration: 0.18 }}
+                                            className={gridClass}
+                                        >
+                                            {visibleDates.map(([key, list], i) => {
+                                                const c = computeCounts(list);
+                                                const distinct = new Set(list.map(b => b.listing_id || UNLINKED_KEY)).size;
+                                                return (
+                                                    <ItemComp
+                                                        key={key}
+                                                        index={i}
+                                                        title={formatFullDate(key)}
+                                                        subtitle={`${distinct} listing${distinct === 1 ? '' : 's'}`}
+                                                        counts={c}
+                                                        grad="from-slate-600 to-slate-900"
+                                                        icon={CalendarDays}
+                                                        badge={formatWeekday(key) || undefined}
+                                                        size={density}
+                                                        onClick={() => openGroup('date', key)}
+                                                    />
+                                                );
+                                            })}
+                                            {visibleDates.length === 0 && (
+                                                <div className="col-span-full flex flex-col items-center gap-2 py-16 text-center">
+                                                    <Inbox size={30} className="text-gray-200" />
+                                                    <p className="text-sm font-bold text-gray-400">
+                                                        {listingSearch ? `No dates match “${listingSearch}”` : 'No bookings yet'}
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </motion.div>
                                     )}
-                                </button>
+                                </AnimatePresence>
+                            </>
+                        )}
+                    </div>
+                )}
+
+                {/* ─────────────────────  SINGLE GROUP'S BOOKINGS  ───────────────────── */}
+                {selected && (
+                    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
+                        {/* KPI Cards */}
+                        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                            {[
+                                { label: 'Total Bookings', value: listingCounts.total, color: 'text-gray-900', bg: 'bg-white' },
+                                { label: 'Awaiting Payment', value: listingCounts.awaiting_payment, color: 'text-amber-600', bg: 'bg-amber-50' },
+                                { label: 'Confirmed', value: listingCounts.confirmed, color: 'text-sky-600', bg: 'bg-sky-50' },
+                                { label: 'Attended', value: listingCounts.attended, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                                { label: 'Cancelled', value: listingCounts.cancelled, color: 'text-red-500', bg: 'bg-red-50' },
+                            ].map(card => (
+                                <div key={card.label} className={`${card.bg} rounded-2xl p-5 border border-gray-100 shadow-sm`}>
+                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{card.label}</p>
+                                    <p className={`text-3xl font-black ${card.color}`}>{card.value}</p>
+                                </div>
                             ))}
                         </div>
 
-                        {/* Search */}
-                        <div className="p-4 border-b border-gray-50">
-                            <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-2.5">
-                                <Search size={16} className="text-gray-400 shrink-0" />
-                                <input
-                                    className="flex-1 bg-transparent border-none focus:outline-none text-sm font-bold placeholder:text-gray-300"
-                                    placeholder="Search by name, email, or booking ref…"
-                                    value={searchQuery}
-                                    onChange={e => setSearchQuery(e.target.value)}
-                                />
-                                {searchQuery && (
-                                    <button onClick={() => setSearchQuery('')} className="text-gray-400 hover:text-gray-600 transition-colors">
-                                        <X size={16} />
+                        {/* Table card */}
+                        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                            {/* Tabs */}
+                            <div className="flex gap-1 border-b border-gray-100 px-4 pt-4 overflow-x-auto">
+                                {TABS.map(tab => (
+                                    <button
+                                        key={tab.key}
+                                        onClick={() => setActiveTab(tab.key)}
+                                        className={`pb-3 px-4 text-sm font-bold transition-colors border-b-2 whitespace-nowrap flex items-center gap-2 ${
+                                            activeTab === tab.key
+                                                ? 'border-tlb-yellow text-gray-900'
+                                                : 'border-transparent text-gray-400 hover:text-gray-600'
+                                        }`}
+                                    >
+                                        {tab.label}
+                                        {tab.count > 0 && (
+                                            <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${
+                                                activeTab === tab.key ? 'bg-tlb-yellow text-gray-900' : 'bg-gray-100 text-gray-500'
+                                            }`}>
+                                                {tab.count}
+                                            </span>
+                                        )}
                                     </button>
+                                ))}
+                            </div>
+
+                            {/* Search */}
+                            <div className="p-4 border-b border-gray-50">
+                                <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-2.5">
+                                    <Search size={16} className="text-gray-400 shrink-0" />
+                                    <input
+                                        className="flex-1 bg-transparent border-none focus:outline-none text-sm font-bold placeholder:text-gray-300"
+                                        placeholder="Search by name, email, or booking ref…"
+                                        value={searchQuery}
+                                        onChange={e => setSearchQuery(e.target.value)}
+                                    />
+                                    {searchQuery && (
+                                        <button onClick={() => setSearchQuery('')} className="text-gray-400 hover:text-gray-600 transition-colors">
+                                            <X size={16} />
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Table body */}
+                            <div className="overflow-x-auto">
+                                {filtered.length === 0 ? (
+                                    <div className="flex flex-col items-center gap-2 py-20 text-center">
+                                        <Inbox size={32} className="text-gray-200" />
+                                        <p className="text-sm font-bold text-gray-400">
+                                            {searchQuery ? 'No bookings match your search' : 'No bookings in this view'}
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <table className="w-full text-left">
+                                        <thead>
+                                            <tr className="bg-gray-50/50 border-b border-gray-100">
+                                                {['Booking Ref', 'Customer', ...(selected.mode === 'date' ? ['Listing'] : []), 'Status', 'Payment', 'Amount', 'Date', ''].map(h => (
+                                                    <th key={h || 'actions'} className="px-5 py-3.5 text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">
+                                                        {h}
+                                                    </th>
+                                                ))}
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50">
+                                            {filtered.map(b => (
+                                                <tr key={b.id} className="hover:bg-gray-50/40 transition-colors cursor-pointer" onClick={() => handleViewDetail(b.id)}>
+                                                    <td className="px-5 py-4">
+                                                        <span className="font-mono text-xs font-bold text-gray-700 bg-gray-100 px-2 py-1 rounded-lg whitespace-nowrap">
+                                                            {b.booking_reference}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-5 py-4">
+                                                        <p className="font-bold text-sm text-gray-900 whitespace-nowrap">{b.customer_name}</p>
+                                                        <p className="text-xs text-gray-400 font-medium mt-0.5">{b.customer_email}</p>
+                                                    </td>
+                                                    {selected.mode === 'date' && (
+                                                        <td className="px-5 py-4">
+                                                            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-700">
+                                                                {React.createElement(TYPE_META[b.booking_type]?.icon || Layers, { size: 13, className: 'text-gray-400 shrink-0' })}
+                                                                <span className="truncate max-w-[180px]">{b.listing_title || '—'}</span>
+                                                            </span>
+                                                        </td>
+                                                    )}
+                                                    <td className="px-5 py-4">
+                                                        <span className={`text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${STATUS_COLORS[b.status] || FALLBACK_BADGE}`}>
+                                                            {b.status.replace(/_/g, ' ')}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-5 py-4">
+                                                        <span className={`text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${PAYMENT_COLORS[b.payment_status] || FALLBACK_BADGE}`}>
+                                                            {b.payment_status}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-5 py-4">
+                                                        <span className="text-sm font-black text-gray-900 whitespace-nowrap">
+                                                            {b.total_amount === 0 ? 'Free' : formatAmount(b.total_amount, b.currency)}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-5 py-4 text-sm text-gray-500 font-medium whitespace-nowrap">
+                                                        {formatDate(b.created_at)}
+                                                    </td>
+                                                    <td className="px-5 py-4">
+                                                        <span className="text-xs font-black text-blue-600 group-hover:text-blue-700 px-3 py-1.5 rounded-xl whitespace-nowrap">
+                                                            View
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
                                 )}
                             </div>
                         </div>
-
-                        {/* Table body */}
-                        <div className="overflow-x-auto">
-                            {loading ? (
-                                <div className="flex items-center justify-center py-20">
-                                    <RefreshCw size={24} className="text-gray-300 animate-spin" />
-                                </div>
-                            ) : listError ? (
-                                <div className="flex flex-col items-center gap-3 py-20 text-center px-6">
-                                    <AlertCircle size={32} className="text-red-300" />
-                                    <p className="text-sm font-bold text-gray-500">{listError}</p>
-                                    <button
-                                        onClick={() => fetchList(activeTab, page)}
-                                        className="text-xs font-black text-blue-500 hover:underline"
-                                    >
-                                        Try again
-                                    </button>
-                                </div>
-                            ) : filtered.length === 0 ? (
-                                <div className="flex flex-col items-center gap-2 py-20 text-center">
-                                    <Inbox size={32} className="text-gray-200" />
-                                    <p className="text-sm font-bold text-gray-400">
-                                        {searchQuery ? 'No bookings match your search' : 'No bookings yet'}
-                                    </p>
-                                </div>
-                            ) : (
-                                <table className="w-full text-left">
-                                    <thead>
-                                        <tr className="bg-gray-50/50 border-b border-gray-100">
-                                            {['Booking Ref', 'Customer', 'Type', 'Status', 'Payment', 'Amount', 'Date', ''].map(h => (
-                                                <th key={h} className="px-5 py-3.5 text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">
-                                                    {h}
-                                                </th>
-                                            ))}
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-50">
-                                        {filtered.map(b => (
-                                            <tr key={b.id} className="hover:bg-gray-50/40 transition-colors">
-                                                <td className="px-5 py-4">
-                                                    <span className="font-mono text-xs font-bold text-gray-700 bg-gray-100 px-2 py-1 rounded-lg whitespace-nowrap">
-                                                        {b.booking_reference}
-                                                    </span>
-                                                </td>
-                                                <td className="px-5 py-4">
-                                                    <p className="font-bold text-sm text-gray-900 whitespace-nowrap">{b.customer_name}</p>
-                                                    <p className="text-xs text-gray-400 font-medium mt-0.5">{b.customer_email}</p>
-                                                </td>
-                                                <td className="px-5 py-4">
-                                                    <span className={`text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${TYPE_COLORS[b.booking_type] || FALLBACK_BADGE}`}>
-                                                        {b.booking_type}
-                                                    </span>
-                                                </td>
-                                                <td className="px-5 py-4">
-                                                    <span className={`text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${STATUS_COLORS[b.status] || FALLBACK_BADGE}`}>
-                                                        {b.status.replace(/_/g, ' ')}
-                                                    </span>
-                                                </td>
-                                                <td className="px-5 py-4">
-                                                    <span className={`text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${PAYMENT_COLORS[b.payment_status] || FALLBACK_BADGE}`}>
-                                                        {b.payment_status}
-                                                    </span>
-                                                </td>
-                                                <td className="px-5 py-4">
-                                                    <span className="text-sm font-black text-gray-900 whitespace-nowrap">
-                                                        {b.total_amount === 0 ? 'Free' : formatAmount(b.total_amount, b.currency)}
-                                                    </span>
-                                                </td>
-                                                <td className="px-5 py-4 text-sm text-gray-500 font-medium whitespace-nowrap">
-                                                    {formatDate(b.created_at)}
-                                                </td>
-                                                <td className="px-5 py-4">
-                                                    <button
-                                                        onClick={() => handleViewDetail(b.id)}
-                                                        className="text-xs font-black text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-3 py-1.5 rounded-xl transition-colors whitespace-nowrap"
-                                                    >
-                                                        View
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            )}
-                        </div>
-
-                        {/* Pagination */}
-                        {totalPages > 1 && (
-                            <div className="px-5 py-4 border-t border-gray-50 flex items-center justify-between">
-                                <p className="text-xs font-bold text-gray-400">
-                                    Page {page} of {totalPages} &middot; {totalCount} total
-                                </p>
-                                <div className="flex gap-2">
-                                    <button
-                                        disabled={!hasPrev}
-                                        onClick={() => setPage(p => Math.max(1, p - 1))}
-                                        className="p-2 rounded-xl border border-gray-100 hover:border-gray-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                                    >
-                                        <ChevronLeft size={16} />
-                                    </button>
-                                    <button
-                                        disabled={!hasNext}
-                                        onClick={() => setPage(p => p + 1)}
-                                        className="p-2 rounded-xl border border-gray-100 hover:border-gray-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                                    >
-                                        <ChevronRight size={16} />
-                                    </button>
-                                </div>
-                            </div>
-                        )}
                     </div>
-                </div>
+                )}
             </main>
 
             {/* Booking Detail Drawer */}
             {selectedId && (
                 <div className="fixed inset-0 z-50 flex">
-                    {/* Backdrop */}
-                    <div
-                        className="flex-1 bg-black/30 backdrop-blur-sm"
-                        onClick={handleCloseDetail}
-                    />
-                    {/* Drawer panel */}
+                    <div className="flex-1 bg-black/30 backdrop-blur-sm" onClick={handleCloseDetail} />
                     <div className="w-full max-w-lg bg-white h-full overflow-hidden shadow-2xl flex flex-col">
-                        {/* Drawer header */}
                         <div className="shrink-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between">
                             <div>
                                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Booking Details</p>
@@ -538,14 +922,12 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
                             </div>
                         ) : detail ? (
                             <>
-                                {/* Scrollable content */}
                                 <div className="flex-1 overflow-y-auto">
-                                    {/* Status badges + amount */}
                                     <div className="px-6 pt-5 pb-4 flex items-center gap-2 flex-wrap">
                                         <span className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest ${STATUS_COLORS[detail.status] || FALLBACK_BADGE}`}>
                                             {detail.status.replace(/_/g, ' ')}
                                         </span>
-                                        <span className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest ${TYPE_COLORS[detail.booking_type] || FALLBACK_BADGE}`}>
+                                        <span className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest ${TYPE_META[detail.booking_type]?.badge || FALLBACK_BADGE}`}>
                                             {detail.booking_type}
                                         </span>
                                         <span className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest ${PAYMENT_COLORS[detail.payment_status] || FALLBACK_BADGE}`}>
@@ -557,7 +939,6 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
                                     </div>
 
                                     <div className="px-6 space-y-5 pb-6">
-                                        {/* Listing name */}
                                         {detail.listing_title && (
                                             <div className="bg-gray-50 rounded-xl px-4 py-3">
                                                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{detail.booking_type || 'Listing'}</p>
@@ -565,7 +946,6 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
                                             </div>
                                         )}
 
-                                        {/* Action error */}
                                         {actionError && (
                                             <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex items-start gap-3">
                                                 <AlertCircle size={15} className="text-red-500 shrink-0 mt-0.5" />
@@ -573,7 +953,6 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
                                             </div>
                                         )}
 
-                                        {/* Customer info */}
                                         <div className="bg-gray-50 rounded-2xl p-4 space-y-3">
                                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Customer</p>
                                             <div className="flex items-center gap-3">
@@ -607,7 +986,6 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
                                             </div>
                                         </div>
 
-                                        {/* Line items */}
                                         {detail.line_items.length > 0 && (
                                             <div>
                                                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Order Items</p>
@@ -617,16 +995,13 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
                                                             <p className="text-sm font-bold text-gray-900">
                                                                 {item.ticket_name || item.package_name || item.batch_name || item.item_type}
                                                             </p>
-                                                            <span className="text-xs font-bold text-gray-500">
-                                                                Qty {item.quantity}
-                                                            </span>
+                                                            <span className="text-xs font-bold text-gray-500">Qty {item.quantity}</span>
                                                         </div>
                                                     ))}
                                                 </div>
                                             </div>
                                         )}
 
-                                        {/* Attendees list */}
                                         {detail.attendees.length > 0 && (
                                             <div>
                                                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
@@ -657,7 +1032,30 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
                                             </div>
                                         )}
 
-                                        {/* Transactions */}
+                                        {paymentDetail && (paymentDetail.payment_method || paymentDetail.amount != null || paymentDetail.status) && (
+                                            <div className="bg-gray-50 rounded-2xl p-4 space-y-2.5">
+                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                                                    <Wallet size={11} /> Payment Summary
+                                                </p>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-xs text-gray-500 font-medium">Method</span>
+                                                    <span className="text-sm font-bold text-gray-900 capitalize">{paymentDetail.payment_method?.replace(/_/g, ' ') || '—'}</span>
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-xs text-gray-500 font-medium">Amount</span>
+                                                    <span className="text-sm font-bold text-gray-900">
+                                                        {paymentDetail.amount != null ? formatAmount(paymentDetail.amount, detail.currency) : '—'}
+                                                    </span>
+                                                </div>
+                                                {paymentDetail.status && (
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-xs text-gray-500 font-medium">Status</span>
+                                                        <span className="text-sm font-bold text-gray-900 capitalize">{paymentDetail.status.replace(/_/g, ' ')}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
                                         {detail.transactions.length > 0 && (
                                             <div>
                                                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
@@ -690,7 +1088,6 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
                                             </div>
                                         )}
 
-                                        {/* Cancellation info */}
                                         {(detail.status === 'cancelled' || detail.cancelled_at) && (
                                             <div className="bg-red-50 rounded-2xl px-4 py-3 border border-red-100 space-y-1">
                                                 <p className="text-[10px] font-black text-red-400 uppercase tracking-widest">Cancellation</p>
@@ -698,9 +1095,7 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
                                                     {detail.cancellation_reason || 'No reason provided'}
                                                 </p>
                                                 {detail.cancelled_at && (
-                                                    <p className="text-xs text-red-400 font-medium">
-                                                        {formatDate(detail.cancelled_at)}
-                                                    </p>
+                                                    <p className="text-xs text-red-400 font-medium">{formatDate(detail.cancelled_at)}</p>
                                                 )}
                                                 {detail.refund_amount != null && (
                                                     <p className="text-sm font-black text-red-500 pt-0.5">
@@ -712,60 +1107,18 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
                                     </div>
                                 </div>
 
-                                {/* Action bar — for confirmed and awaiting_payment bookings */}
-                                {(detail.status === 'confirmed' || detail.status === 'awaiting_payment') && (
-                                    <div className="shrink-0 bg-white border-t border-gray-100 px-6 py-4 space-y-3">
-                                        {!cancelOpen ? (
-                                            <div className="flex gap-3">
-                                                {detail.status === 'confirmed' && (
-                                                    <button
-                                                        onClick={handleMarkAttended}
-                                                        disabled={markingAttended}
-                                                        className="flex-1 flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-sm py-3 rounded-2xl transition-colors disabled:opacity-50"
-                                                    >
-                                                        {markingAttended
-                                                            ? <RefreshCw size={15} className="animate-spin" />
-                                                            : <CheckCircle size={15} />
-                                                        }
-                                                        Mark Attended
-                                                    </button>
-                                                )}
-                                                <button
-                                                    onClick={() => setCancelOpen(true)}
-                                                    className="flex-1 flex items-center justify-center gap-2 border-2 border-red-200 hover:bg-red-50 text-red-600 font-black text-sm py-3 rounded-2xl transition-colors"
-                                                >
-                                                    <XCircle size={15} />
-                                                    Cancel Booking
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <>
-                                                <p className="text-xs font-black text-gray-700">Reason for cancellation <span className="font-medium text-gray-400">(optional)</span></p>
-                                                <textarea
-                                                    className="w-full bg-gray-50 rounded-xl border border-gray-200 p-3 text-sm font-medium text-gray-700 focus:outline-none focus:border-red-300 resize-none"
-                                                    rows={2}
-                                                    placeholder="e.g. Event rescheduled due to weather"
-                                                    value={cancelReason}
-                                                    onChange={e => setCancelReason(e.target.value)}
-                                                />
-                                                <div className="flex gap-3">
-                                                    <button
-                                                        onClick={() => { setCancelOpen(false); setCancelReason(''); setActionError(null); }}
-                                                        className="flex-1 py-2.5 rounded-2xl border border-gray-200 text-sm font-black text-gray-600 hover:bg-gray-50 transition-colors"
-                                                    >
-                                                        Back
-                                                    </button>
-                                                    <button
-                                                        onClick={handleCancelConfirm}
-                                                        disabled={cancelling}
-                                                        className="flex-1 py-2.5 rounded-2xl bg-red-500 hover:bg-red-600 text-white text-sm font-black transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                                                    >
-                                                        {cancelling && <RefreshCw size={14} className="animate-spin" />}
-                                                        Confirm Cancel
-                                                    </button>
-                                                </div>
-                                            </>
-                                        )}
+                                {detail.status === 'confirmed' && (
+                                    <div className="shrink-0 bg-white border-t border-gray-100 px-6 py-4">
+                                        <button
+                                            onClick={handleMarkAttended}
+                                            disabled={markingAttended}
+                                            className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-sm py-3 rounded-2xl transition-colors disabled:opacity-50"
+                                        >
+                                            {markingAttended
+                                                ? <RefreshCw size={15} className="animate-spin" />
+                                                : <CheckCircle size={15} />}
+                                            Mark Attended
+                                        </button>
                                     </div>
                                 )}
                             </>

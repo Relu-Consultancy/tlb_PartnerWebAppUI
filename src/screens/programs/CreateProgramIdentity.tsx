@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, MapPin, Tag, Check, ChevronDown, Loader2, MessageCircle, CalendarCheck } from 'lucide-react';
+import { ArrowRight, MapPin, Tag, Check, Loader2, MessageCircle, CalendarCheck } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation } from '../../components/ui';
+import { WizardLayout, WizardNavigation, Select } from '../../components/ui';
 import {
     getCurrentProgramDraftId,
     setCurrentProgramDraftId,
@@ -265,21 +265,13 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                         <Loader2 size={14} className="animate-spin" /> Loading formats…
                     </div>
                 ) : (
-                    <div className="relative group">
-                        <select
-                            value={programFormat}
-                            onChange={(e) => setProgramFormat(e.target.value)}
-                            className="tlb-input w-full bg-white appearance-none cursor-pointer pr-10"
-                        >
-                            <option value="">Select format...</option>
-                            {formats.map((f) => (
-                                <option key={f.value} value={f.value}>{f.label}</option>
-                            ))}
-                        </select>
-                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 group-focus-within:text-emerald-500 transition-colors">
-                            <ChevronDown size={18} />
-                        </div>
-                    </div>
+                    <Select
+                        value={programFormat}
+                        onChange={(v) => setProgramFormat(v)}
+                        options={formats.map((f) => ({ value: f.value, label: f.label }))}
+                        placeholder="Select format..."
+                        ariaLabel="Program format"
+                    />
                 )}
             </div>
 

@@ -7,7 +7,7 @@ import React, { useState, useEffect, Suspense, lazy, useCallback } from 'react';
 import { motion } from 'motion/react';
 import { Screen, EntityType } from './types';
 import { PartnerProvider, usePartner } from './context/PartnerContext';
-import { Loader } from './components/ui';
+import { Loader, Toaster } from './components/ui';
 
 // Helper for lazy loading named exports
 const lazyImport = <T extends Record<string, any>>(
@@ -75,6 +75,13 @@ const ProgramEnquiries = lazyImport(() => import('./screens/enquiries'), 'Progra
 // Statistics
 const StatisticsScreen = lazyImport(() => import('./screens/statistics'), 'Statistics');
 
+// Coupons
+const CreateCoupon = lazyImport(() => import('./screens/coupons'), 'CreateCoupon');
+const AllCoupons = lazyImport(() => import('./screens/coupons'), 'AllCoupons');
+
+// Help & Support
+const Support = lazyImport(() => import('./screens/support'), 'Support');
+
 // Screen-module chunk factories — prefetched on idle so navigating to a slide
 // for the first time (or reopening it) doesn't flash the Suspense fallback.
 const SCREEN_CHUNKS = [
@@ -92,6 +99,8 @@ const SCREEN_CHUNKS = [
   () => import('./screens/venues'),
   () => import('./screens/enquiries'),
   () => import('./screens/statistics'),
+  () => import('./screens/coupons'),
+  () => import('./screens/support'),
 ];
 
 const prefetchScreens = () => {
@@ -172,6 +181,9 @@ const routes: Record<Screen, RouteConfig> = {
   PACKAGES: { component: Packages, hasSidebar: true },
   FINANCIAL_HUB: { component: FinancialHub, hasSidebar: true },
   STATISTICS: { component: StatisticsScreen, hasSidebar: true },
+  ALL_COUPONS: { component: AllCoupons, hasSidebar: true },
+  CREATE_COUPON: { component: CreateCoupon, hasSidebar: true },
+  HELP_SUPPORT: { component: Support, hasSidebar: true },
 };
 
 // ---------------------------------------------------------------------------
@@ -368,6 +380,7 @@ export default function App() {
   return (
     <PartnerProvider>
       <AppInner />
+      <Toaster />
     </PartnerProvider>
   );
 }

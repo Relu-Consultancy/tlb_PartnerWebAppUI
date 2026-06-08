@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowRight, MapPin, Check, ChevronDown, Camera, Play, Image as ImageIcon, Trash2, Loader2 } from 'lucide-react';
+import { ArrowRight, MapPin, Check, Camera, Play, Image as ImageIcon, Trash2, Loader2, MessageCircle, CalendarCheck } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation } from '../../components/ui';
+import { WizardLayout, WizardNavigation, toast, Select } from '../../components/ui';
 import {
     getVenueMetaCategories,
     getVenueListingDetail,
@@ -48,6 +48,7 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
     const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
     const [selectedSubcategoryId, setSelectedSubcategoryId] = useState<number | null>(null);
     const [showAllCategories, setShowAllCategories] = useState(false);
+    const [bookingType, setBookingType] = useState<'enquiry' | 'direct_booking'>('enquiry');
 
     // Location
     const [locationType, setLocationType] = useState('');
@@ -106,6 +107,7 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
                     setDescription(d.description || '');
                     if (d.category?.id) setSelectedCategoryId(d.category.id);
                     if (d.subcategory?.id) setSelectedSubcategoryId(d.subcategory.id);
+                    if (d.booking_type === 'enquiry' || d.booking_type === 'direct_booking') setBookingType(d.booking_type);
                     setLocationType(d.location_type || '');
                     setCity(d.city || '');
                     setArea(d.area || '');
@@ -131,7 +133,7 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
 
     const ensureDraft = async (): Promise<string | null> => {
         if (draftId) return draftId;
-        if (!title.trim()) { alert('Please enter a venue name before uploading media.'); return null; }
+        if (!title.trim()) { toast.warning('Please enter a venue name before uploading media.'); return null; }
         try {
             const res = await createVenueDraft({ title: title.trim() });
             const id: string = (res.data || res).id;
@@ -139,7 +141,7 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
             setDraftId(id);
             return id;
         } catch (err: any) {
-            alert(err?.message || 'Failed to create draft.');
+            toast.error(err?.message || 'Failed to create draft.');
             return null;
         }
     };
@@ -147,7 +149,7 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
     const handleCoverPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files?.[0]) return;
         const file = e.target.files[0];
-        if (file.size > COVER_MAX) { alert('Cover must be under 5 MB.'); e.target.value = ''; return; }
+        if (file.size > COVER_MAX) { toast.warning('Cover must be under 5 MB.'); e.target.value = ''; return; }
         const id = await ensureDraft();
         if (!id) { e.target.value = ''; return; }
         setBusyKind('cover');
@@ -156,7 +158,7 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
             const res = await uploadVenueListingMedia(id, file, 'cover');
             setCover(res.data || res);
         } catch (err: any) {
-            alert(err?.message || 'Failed to upload cover.');
+            toast.error(err?.message || 'Failed to upload cover.');
         } finally {
             setBusyKind(null);
             e.target.value = '';
@@ -170,13 +172,13 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
         setBusyKind('gallery');
         try {
             for (const file of Array.from(e.target.files) as File[]) {
-                if (gallery.length >= GALLERY_LIMIT) { alert(`Gallery limit (${GALLERY_LIMIT}) reached.`); break; }
-                if (file.size > GALLERY_MAX) { alert(`${file.name} is over 5 MB — skipped.`); continue; }
+                if (gallery.length >= GALLERY_LIMIT) { toast.warning(`Gallery limit (${GALLERY_LIMIT}) reached.`); break; }
+                if (file.size > GALLERY_MAX) { toast.warning(`${file.name} is over 5 MB — skipped.`); continue; }
                 const res = await uploadVenueListingMedia(id, file, 'gallery');
                 setGallery(prev => [...prev, res.data || res]);
             }
         } catch (err: any) {
-            alert(err?.message || 'Failed to upload image.');
+            toast.error(err?.message || 'Failed to upload image.');
         } finally {
             setBusyKind(null);
             e.target.value = '';
@@ -186,7 +188,7 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
     const handleVideoPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files?.[0]) return;
         const file = e.target.files[0];
-        if (file.size > VIDEO_MAX) { alert('Video must be under 100 MB.'); e.target.value = ''; return; }
+        if (file.size > VIDEO_MAX) { toast.warning('Video must be under 100 MB.'); e.target.value = ''; return; }
         const id = await ensureDraft();
         if (!id) { e.target.value = ''; return; }
         setBusyKind('video');
@@ -195,7 +197,7 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
             const res = await uploadVenueListingMedia(id, file, 'video');
             setVideo(res.data || res);
         } catch (err: any) {
-            alert(err?.message || 'Failed to upload video.');
+            toast.error(err?.message || 'Failed to upload video.');
         } finally {
             setBusyKind(null);
             e.target.value = '';
@@ -205,23 +207,23 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
     const handleDeleteCover = async () => {
         if (!draftId || !cover) return;
         try { await deleteVenueListingMedia(draftId, cover.id); setCover(null); }
-        catch (err: any) { alert(err?.message || 'Failed to delete cover.'); }
+        catch (err: any) { toast.error(err?.message || 'Failed to delete cover.'); }
     };
 
     const handleDeleteGallery = async (id: number) => {
         if (!draftId) return;
         try { await deleteVenueListingMedia(draftId, id); setGallery(prev => prev.filter(m => m.id !== id)); }
-        catch (err: any) { alert(err?.message || 'Failed to delete image.'); }
+        catch (err: any) { toast.error(err?.message || 'Failed to delete image.'); }
     };
 
     const handleDeleteVideo = async () => {
         if (!draftId || !video) return;
         try { await deleteVenueListingMedia(draftId, video.id); setVideo(null); }
-        catch (err: any) { alert(err?.message || 'Failed to delete video.'); }
+        catch (err: any) { toast.error(err?.message || 'Failed to delete video.'); }
     };
 
     const handleNext = async () => {
-        if (!title.trim()) { alert('Please enter a venue name.'); return; }
+        if (!title.trim()) { toast.warning('Please enter a venue name.'); return; }
         setSaving(true);
         try {
             let id = draftId;
@@ -235,6 +237,7 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
             const payload: Record<string, any> = {
                 title: title.trim(),
                 description: description.trim(),
+                booking_type: bookingType,
             };
             if (selectedCategoryId != null) payload.category_id = selectedCategoryId;
             if (selectedSubcategoryId != null) payload.subcategory_id = selectedSubcategoryId;
@@ -252,7 +255,7 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
             await updateVenueListing(id!, payload);
             onNavigate('CREATE_VENUE_OCCASIONS');
         } catch (err: any) {
-            alert(err?.message || 'Failed to save venue details.');
+            toast.error(err?.message || 'Failed to save venue details.');
         } finally {
             setSaving(false);
         }
@@ -300,6 +303,54 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
                 />
             </div>
 
+            {/* Booking Type */}
+            <div>
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">
+                    Booking Type <span className="text-red-400">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                    {([
+                        {
+                            value: 'enquiry',
+                            label: 'Enquiry',
+                            icon: <MessageCircle size={22} />,
+                            desc: 'Customers send an enquiry and you follow up to confirm.',
+                        },
+                        {
+                            value: 'direct_booking',
+                            label: 'Direct Booking',
+                            icon: <CalendarCheck size={22} />,
+                            desc: 'Customers book and pay for a package online.',
+                        },
+                    ] as const).map((opt) => (
+                        <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setBookingType(opt.value)}
+                            className={`relative flex flex-col items-start gap-2 p-4 rounded-2xl border-2 text-left transition-all ${
+                                bookingType === opt.value
+                                    ? 'border-amber-400 bg-amber-50'
+                                    : 'border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm'
+                            }`}
+                        >
+                            {bookingType === opt.value && (
+                                <div className="absolute top-2.5 right-2.5 w-5 h-5 bg-amber-500 rounded-full flex items-center justify-center">
+                                    <Check size={11} className="text-white" />
+                                </div>
+                            )}
+                            <span className={bookingType === opt.value ? 'text-amber-600' : 'text-gray-400'}>
+                                {opt.icon}
+                            </span>
+                            <span className="text-sm font-black text-gray-800 pr-6">{opt.label}</span>
+                            <span className="text-[11px] text-gray-400 leading-snug">{opt.desc}</span>
+                        </button>
+                    ))}
+                </div>
+                <p className="text-[11px] text-gray-400 mt-2">
+                    Direct-booking venues require at least one package before submission.
+                </p>
+            </div>
+
             {/* Category */}
             {categories.length > 0 && (
                 <div>
@@ -333,19 +384,13 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
             {selectedCategory && selectedCategory.subcategories.length > 0 && (
                 <div>
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Sub-Category</label>
-                    <div className="relative">
-                        <select
-                            value={selectedSubcategoryId ?? ''}
-                            onChange={e => setSelectedSubcategoryId(e.target.value ? Number(e.target.value) : null)}
-                            className="tlb-input w-full bg-white appearance-none cursor-pointer pr-10"
-                        >
-                            <option value="">Select sub-category...</option>
-                            {selectedCategory.subcategories.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                        </select>
-                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-                            <ChevronDown size={18} />
-                        </div>
-                    </div>
+                    <Select
+                        value={selectedSubcategoryId != null ? String(selectedSubcategoryId) : ''}
+                        onChange={(v) => setSelectedSubcategoryId(v ? Number(v) : null)}
+                        options={selectedCategory.subcategories.map(s => ({ value: String(s.id), label: s.name }))}
+                        placeholder="Select sub-category..."
+                        ariaLabel="Sub-category"
+                    />
                 </div>
             )}
 

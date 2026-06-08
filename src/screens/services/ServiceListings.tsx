@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, Plus, Search, Filter, Users, Edit3, CalendarDays, BarChart3, MapPin, Layers, Clock, X, Check, SlidersHorizontal, Play, Pause, Archive, ArchiveRestore } from 'lucide-react';
-import { Loader } from '../../components/ui';
+import { Menu, Plus, Search, Filter, Users, Edit3, CalendarDays, BarChart3, MapPin, Layers, Clock, X, Check, SlidersHorizontal, Play, Pause, Archive, ArchiveRestore, Ticket, Tag, LayoutGrid, Grid3X3, List } from 'lucide-react';
+import { Loader, toast, Select, SelectOption } from '../../components/ui';
 import { Screen, EntityType } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
 import { EntityPickerSheet } from '../../components/EntityPickerSheet';
-import { getEventListings, getVenueListings, getClassListings, getProgramListings, setCurrentDraftId, clearCurrentDraftId, setCurrentVenueDraftId, clearCurrentVenueDraftId, setCurrentClassDraftId, clearCurrentClassDraftId, setCurrentProgramDraftId, clearCurrentProgramDraftId, setClassListingLive, archiveProgramListing, unarchiveProgramListing, pauseListing, resumeListing, archiveListing, unarchiveListing } from '../../api/listings';
+import { getEventListings, getVenueListings, getClassListings, getProgramListings, setCurrentDraftId, clearCurrentDraftId, setCurrentVenueDraftId, clearCurrentVenueDraftId, setCurrentClassDraftId, clearCurrentClassDraftId, setCurrentProgramDraftId, clearCurrentProgramDraftId, pauseListing, resumeListing, archiveListing, unarchiveListing, updateListing, updateVenueListing, updateClassListing, updateProgramListing } from '../../api/listings';
+import { getCoupons, CouponListItem } from '../../api/coupons';
 
 interface Props {
     onNavigate: (screen: Screen) => void;
@@ -12,6 +13,14 @@ interface Props {
 }
 
 type ListingStatus = 'draft' | 'pending' | 'published' | 'rejected' | 'archived';
+
+interface ListingCoupon {
+    code: string;
+    discount_type: 'percent' | 'fixed';
+    discount_value: number;
+    max_discount?: number | null;
+    expires_at?: string | null;
+}
 
 interface Listing {
     id: string;
@@ -23,7 +32,17 @@ interface Listing {
     coverUrl?: string;
     startDateTime?: string;
     isLive?: boolean;
+    coupon?: ListingCoupon | null;
 }
+
+const couponDiscountLabel = (c: { discount_type: string; discount_value: number }) =>
+    c.discount_type === 'percent' ? `${c.discount_value}% off` : `₹${c.discount_value} off`;
+
+const updateFnByEntity = (entityType: EntityType) =>
+    entityType === 'Events' ? updateListing
+        : entityType === 'Venues' ? updateVenueListing
+            : entityType === 'Classes' ? updateClassListing
+                : updateProgramListing;
 
 const entityBadgeConfig: Record<EntityType, { color: string; bg: string; icon: any }> = {
     Events: { color: 'text-purple-600', bg: 'bg-purple-50', icon: CalendarDays },
@@ -49,6 +68,7 @@ const fmtStart = (iso?: string) => {
 };
 
 type SortOption = 'newest' | 'oldest' | 'a-z' | 'z-a';
+type ViewMode = 'comfortable' | 'compact' | 'list';
 
 export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
     const { allowedEntities } = usePartner();
@@ -58,6 +78,13 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
     const [searchQuery, setSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState<EntityType | 'All'>('All');
     const [showEntityPicker, setShowEntityPicker] = useState(false);
+    const [viewMode, setViewModeState] = useState<ViewMode>(() => {
+        try { return (localStorage.getItem('listings_density') as ViewMode) || 'list'; } catch { return 'list'; }
+    });
+    const setViewMode = (v: ViewMode) => {
+        setViewModeState(v);
+        try { localStorage.setItem('listings_density', v); } catch { /* ignore */ }
+    };
 
     // Filter state
     const [showFilter, setShowFilter] = useState(false);
@@ -69,6 +96,46 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
     const [tmpStatuses, setTmpStatuses] = useState<ListingStatus[]>([]);
     const [tmpTypes, setTmpTypes] = useState<EntityType[]>([]);
     const [tmpSort, setTmpSort] = useState<SortOption>('newest');
+
+    // Coupon attach/remove
+    const [couponList, setCouponList] = useState<CouponListItem[]>([]);
+    const [couponModalListing, setCouponModalListing] = useState<Listing | null>(null);
+    const [selectedCouponCode, setSelectedCouponCode] = useState('');
+    const [savingCoupon, setSavingCoupon] = useState(false);
+
+    useEffect(() => {
+        getCoupons({ is_active: true }).then(setCouponList).catch(() => setCouponList([]));
+    }, []);
+
+    const couponOptions: SelectOption[] = [
+        { value: '', label: 'No coupon' },
+        ...couponList.map(c => ({ value: c.code, label: `${c.code} · ${couponDiscountLabel(c)}` })),
+    ];
+
+    const openCouponModal = (listing: Listing) => {
+        setSelectedCouponCode(listing.coupon?.code || '');
+        setCouponModalListing(listing);
+    };
+
+    const saveCoupon = async () => {
+        if (!couponModalListing) return;
+        setSavingCoupon(true);
+        try {
+            const code = selectedCouponCode || null;
+            const res = await updateFnByEntity(couponModalListing.entityType)(couponModalListing.id, { coupon_code: code });
+            const updated = res?.data || res;
+            const picked = couponList.find(c => c.code === code);
+            const newCoupon: ListingCoupon | null = updated?.coupon
+                ?? (code && picked ? { code: picked.code, discount_type: picked.discount_type, discount_value: picked.discount_value, expires_at: picked.expires_at } : null);
+            setListings(prev => prev.map(l => l.id === couponModalListing.id ? { ...l, coupon: newCoupon } : l));
+            toast.success(code ? 'Coupon attached to listing.' : 'Coupon removed.');
+            setCouponModalListing(null);
+        } catch (e: any) {
+            toast.error(e?.message || 'Failed to update coupon');
+        } finally {
+            setSavingCoupon(false);
+        }
+    };
 
     const openFilter = () => {
         setTmpStatuses([...filterStatuses]);
@@ -151,6 +218,7 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                         coverUrl: item.cover_url || item.cover,
                         startDateTime: item.start_datetime,
                         isLive: item.is_live,
+                        coupon: item.coupon || null,
                     }));
                     setListings(normalized);
                 }
@@ -202,36 +270,32 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
         }
     };
 
+    // The backend exposes only the generic, entity-agnostic action routes
+    // (/api/v1/partner/listings/{id}/pause|resume|archive|unarchive/). The old
+    // entity-specific routes (/classes/.../live/, /programs/.../archive/) 404, so
+    // all entity types use the generic endpoints here.
     const handleTogglePause = async (listing: Listing) => {
         try {
             const isPaused = listing.isLive === false;
-            if (listing.entityType === 'Classes') {
-                // Classes use their own endpoint
-                await setClassListingLive(listing.id, isPaused);
-            } else {
-                // All other entities use the generic endpoint
-                if (isPaused) await resumeListing(listing.id);
-                else await pauseListing(listing.id);
-            }
+            if (isPaused) await resumeListing(listing.id);
+            else await pauseListing(listing.id);
             setListings(prev => prev.map(l => l.id === listing.id ? { ...l, isLive: isPaused } : l));
         } catch (err: any) {
-            alert(err.message || 'Failed to update listing status');
+            toast.error(err.message || 'Failed to update listing status');
         }
     };
 
     const handleToggleArchive = async (listing: Listing) => {
         try {
             if (listing.status === 'archived') {
-                if (listing.entityType === 'Programs') await unarchiveProgramListing(listing.id);
-                else await unarchiveListing(listing.id);
+                await unarchiveListing(listing.id);
                 setListings(prev => prev.map(l => l.id === listing.id ? { ...l, status: 'draft' } : l));
             } else {
-                if (listing.entityType === 'Programs') await archiveProgramListing(listing.id);
-                else await archiveListing(listing.id);
+                await archiveListing(listing.id);
                 setListings(prev => prev.map(l => l.id === listing.id ? { ...l, status: 'archived' } : l));
             }
         } catch (err: any) {
-            alert(err.message || 'Failed to update archive status');
+            toast.error(err.message || 'Failed to update archive status');
         }
     };
 
@@ -276,6 +340,74 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
     const statusLabel = (listing: Listing) => {
         if (listing.status === 'published') return listing.isLive === false ? 'Paused' : 'Live';
         return statusBadge[listing.status].label;
+    };
+
+    const gridClass = viewMode === 'compact'
+        ? 'grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3'
+        : 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4';
+
+    const renderListingCard = (listing: Listing, compact: boolean) => {
+        const badge = entityBadgeConfig[listing.entityType];
+        const BadgeIcon = badge.icon;
+        const editable = listing.status !== 'published' && listing.status !== 'archived';
+        const thumb = compact ? 'w-10 h-10' : 'w-12 h-12';
+        return (
+            <div key={listing.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-gray-200 transition-all p-4 flex flex-col">
+                <div className="flex items-start gap-3">
+                    {listing.coverUrl ? (
+                        <img src={listing.coverUrl} alt="" className={`${thumb} rounded-xl object-cover shrink-0 bg-gray-100`} />
+                    ) : (
+                        <div className={`${thumb} rounded-xl bg-gray-100 flex items-center justify-center shrink-0`}>
+                            <BadgeIcon size={compact ? 16 : 18} className="text-gray-300" />
+                        </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${badge.bg} ${badge.color}`}>{listing.entityType}</span>
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-500 ml-auto">
+                                <span className={`w-1.5 h-1.5 rounded-full ${statusDot(listing)}`} />
+                                {statusLabel(listing)}
+                            </span>
+                        </div>
+                        <p className="font-bold text-sm text-gray-900 truncate">{listing.title}</p>
+                        {!compact && listing.category && (
+                            <p className="text-[10px] text-gray-400 font-medium mt-0.5 truncate">{listing.category}</p>
+                        )}
+                        {listing.coupon && (
+                            <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-md bg-tlb-yellow/15 text-tlb-dark text-[10px] font-black">
+                                <Tag size={9} /> {listing.coupon.code} · {couponDiscountLabel(listing.coupon)}
+                            </span>
+                        )}
+                    </div>
+                </div>
+                <div className="flex items-center justify-end gap-1 mt-3 pt-3 border-t border-gray-50">
+                    {listing.status === 'published' && (
+                        <button onClick={() => handleTogglePause(listing)}
+                            className={`p-2 rounded-lg transition-colors ${listing.isLive !== false ? 'text-amber-500 hover:bg-amber-50' : 'text-emerald-500 hover:bg-emerald-50'}`}
+                            title={listing.isLive !== false ? 'Pause' : 'Resume'}>
+                            {listing.isLive !== false ? <Pause size={15} /> : <Play size={15} />}
+                        </button>
+                    )}
+                    {(listing.status === 'published' || listing.status === 'archived') && (
+                        <button onClick={() => handleToggleArchive(listing)}
+                            className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                            title={listing.status === 'archived' ? 'Unarchive' : 'Archive'}>
+                            {listing.status === 'archived' ? <ArchiveRestore size={15} /> : <Archive size={15} />}
+                        </button>
+                    )}
+                    <button onClick={() => openCouponModal(listing)}
+                        className={`p-2 rounded-lg transition-colors ${listing.coupon ? 'text-tlb-dark bg-tlb-yellow/20 hover:bg-tlb-yellow/30' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'}`}
+                        title={listing.coupon ? 'Change coupon' : 'Attach coupon'}>
+                        <Ticket size={15} />
+                    </button>
+                    <button onClick={() => handleEdit(listing)} disabled={!editable}
+                        className={`p-2 rounded-lg transition-colors ${editable ? 'text-blue-500 hover:bg-blue-50' : 'text-gray-300 cursor-not-allowed'}`}
+                        title={editable ? 'Edit' : 'Locked'}>
+                        <Edit3 size={15} />
+                    </button>
+                </div>
+            </div>
+        );
     };
 
     return (
@@ -323,6 +455,24 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                                 <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-tlb-yellow rounded-full text-[9px] font-black text-tlb-dark flex items-center justify-center">{activeFilterCount}</span>
                             )}
                         </button>
+                        {/* Density / view control */}
+                        <div className="inline-flex bg-white border border-gray-200 rounded-xl p-1 shrink-0">
+                            {([
+                                { v: 'comfortable' as const, icon: LayoutGrid, label: 'Comfortable' },
+                                { v: 'compact' as const, icon: Grid3X3, label: 'Compact' },
+                                { v: 'list' as const, icon: List, label: 'List' },
+                            ]).map(({ v, icon: Icon, label }) => (
+                                <button
+                                    key={v}
+                                    onClick={() => setViewMode(v)}
+                                    title={label}
+                                    aria-label={label}
+                                    className={`p-1.5 rounded-lg transition-all ${viewMode === v ? 'bg-tlb-dark text-white' : 'text-gray-400 hover:text-gray-700'}`}
+                                >
+                                    <Icon size={16} />
+                                </button>
+                            ))}
+                        </div>
                     </div>
                     <div className="flex gap-1 overflow-x-auto">
                         {tabs.map((tab) => {
@@ -346,6 +496,11 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
 
                 {/* Table / Cards */}
                 {filtered.length > 0 ? (
+                    viewMode !== 'list' ? (
+                    <div className={gridClass}>
+                        {filtered.map((listing) => renderListingCard(listing, viewMode === 'compact'))}
+                    </div>
+                    ) : (
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                         {/* Desktop table */}
                         <div className="hidden md:block overflow-x-auto">
@@ -381,6 +536,11 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                                                                 <p className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-1">
                                                                     <Clock size={10} /> {fmtStart(listing.startDateTime)}
                                                                 </p>
+                                                            )}
+                                                            {listing.coupon && (
+                                                                <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-md bg-tlb-yellow/15 text-tlb-dark text-[10px] font-black">
+                                                                    <Tag size={9} /> {listing.coupon.code} · {couponDiscountLabel(listing.coupon)}
+                                                                </span>
                                                             )}
                                                         </div>
                                                     </div>
@@ -419,6 +579,13 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                                                                 {listing.status === 'archived' ? <ArchiveRestore size={15} /> : <Archive size={15} />}
                                                             </button>
                                                         )}
+                                                        <button
+                                                            onClick={() => openCouponModal(listing)}
+                                                            className={`p-2 rounded-lg transition-colors ${listing.coupon ? 'text-tlb-dark bg-tlb-yellow/20 hover:bg-tlb-yellow/30' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'}`}
+                                                            title={listing.coupon ? 'Change coupon' : 'Attach coupon'}
+                                                        >
+                                                            <Ticket size={15} />
+                                                        </button>
                                                         <button
                                                             onClick={() => handleEdit(listing)}
                                                             disabled={!editable}
@@ -466,9 +633,17 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                                                 {listing.category && (
                                                     <p className="text-[10px] text-gray-400 font-medium mt-0.5">{listing.category}</p>
                                                 )}
+                                                {listing.coupon && (
+                                                    <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-md bg-tlb-yellow/15 text-tlb-dark text-[10px] font-black">
+                                                        <Tag size={9} /> {listing.coupon.code} · {couponDiscountLabel(listing.coupon)}
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
                                         <div className="flex items-center justify-end gap-1 pt-1">
+                                            <button onClick={() => openCouponModal(listing)} className={`px-3 py-1.5 rounded-lg text-xs font-bold ${listing.coupon ? 'text-tlb-dark bg-tlb-yellow/20' : 'text-gray-500 bg-gray-50'}`}>
+                                                Coupon
+                                            </button>
                                             {listing.status === 'published' && (
                                                 <button onClick={() => handleTogglePause(listing)} className={`px-3 py-1.5 rounded-lg text-xs font-bold ${listing.isLive !== false ? 'text-amber-500 bg-amber-50' : 'text-emerald-500 bg-emerald-50'}`}>
                                                     {listing.isLive !== false ? 'Pause' : 'Resume'}
@@ -492,6 +667,7 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                             })}
                         </div>
                     </div>
+                    )
                 ) : (
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm text-center py-20 px-6">
                         <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-5">
@@ -516,6 +692,65 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                 allowedEntities={allowedEntities}
                 onNavigate={onNavigate}
             />
+
+            {/* Coupon attach/remove modal */}
+            {couponModalListing && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backdropFilter: 'blur(4px)', backgroundColor: 'rgba(0,0,0,0.4)' }} onClick={() => !savingCoupon && setCouponModalListing(null)}>
+                    <div className="bg-white w-full max-w-md rounded-3xl p-6 space-y-5" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                                <div className="w-9 h-9 rounded-xl bg-tlb-yellow/15 flex items-center justify-center shrink-0">
+                                    <Ticket size={18} className="text-tlb-dark" />
+                                </div>
+                                <div className="min-w-0">
+                                    <h2 className="font-black text-lg leading-tight">Listing Coupon</h2>
+                                    <p className="text-xs text-gray-400 font-medium truncate">{couponModalListing.title}</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setCouponModalListing(null)} className="p-1.5 rounded-xl hover:bg-gray-100 text-gray-400 transition-colors">
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Attach a coupon</label>
+                            {couponList.length > 0 ? (
+                                <Select
+                                    value={selectedCouponCode}
+                                    onChange={setSelectedCouponCode}
+                                    options={couponOptions}
+                                    placeholder="Select a coupon"
+                                    ariaLabel="Listing coupon"
+                                />
+                            ) : (
+                                <div className="text-sm text-gray-500 bg-gray-50 rounded-xl px-4 py-3">
+                                    You have no active coupons.{' '}
+                                    <button onClick={() => onNavigate('CREATE_COUPON')} className="font-bold text-tlb-dark underline">Create one</button>.
+                                </div>
+                            )}
+                            <p className="text-[11px] text-gray-400 mt-1.5">Customers see a discount badge on this listing. Pick “No coupon” to remove.</p>
+                        </div>
+
+                        <div className="flex gap-3 pt-1">
+                            <button
+                                onClick={() => setCouponModalListing(null)}
+                                className="flex-1 py-3 rounded-2xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={saveCoupon}
+                                disabled={savingCoupon || selectedCouponCode === (couponModalListing.coupon?.code || '')}
+                                className="tlb-button flex-1 py-3 disabled:opacity-50"
+                            >
+                                {savingCoupon
+                                    ? <><span className="w-4 h-4 border-2 border-tlb-dark/30 border-t-tlb-dark rounded-full animate-spin" /> Saving…</>
+                                    : 'Save'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Filter Bottom Sheet */}
             {showFilter && (

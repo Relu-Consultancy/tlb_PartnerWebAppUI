@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowRight, Plus, Trash2, Clock, Users, Calendar, DollarSign, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation } from '../../components/ui';
+import { WizardLayout, WizardNavigation, toast } from '../../components/ui';
 import {
     getCurrentProgramDraftId,
     getProgramBatches,
@@ -129,7 +129,7 @@ export const CreateProgramBatch: React.FC<Props> = ({ onNavigate }) => {
                 if (!b.isDirty) continue;
                 // Validate required fields per API 11.10
                 if (!b.startDate || !b.endDate || !b.startTime || !b.endTime || !b.fee || !b.totalSeats) {
-                    alert(`Batch "${b.name || 'Unnamed'}" is missing required fields (dates, times, fee, seats).`);
+                    toast.warning(`Batch "${b.name || 'Unnamed'}" is missing required fields (dates, times, fee, seats).`);
                     setSaving(false);
                     return;
                 }
@@ -155,7 +155,7 @@ export const CreateProgramBatch: React.FC<Props> = ({ onNavigate }) => {
             onNavigate('CREATE_PROGRAM_MEDIA');
         } catch (e: any) {
             console.error('Failed to save program batches', e);
-            alert(e?.message || 'Failed to save batches. Please try again.');
+            toast.error(e?.message || 'Failed to save batches. Please try again.');
         } finally {
             setSaving(false);
         }

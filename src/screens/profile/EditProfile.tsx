@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { Screen } from '../../types';
 import { getBusinessProfile, getExtendedProfile, updateExtendedProfile, getPartnerMedia, uploadPartnerMedia, deletePartnerMedia } from '../../api/onboarding';
-import { Loader } from '../../components/ui';
+import { Loader, toast } from '../../components/ui';
 
 const Instagram = ({ size, className }: { size: number; className?: string }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -116,7 +116,7 @@ export const BrandProfile: React.FC<ProfileProps> = ({ onNavigate, onOpenSidebar
             setIsEditing(false);
         } catch (err) {
             console.error('Save error', err);
-            alert('Failed to save profile.');
+            toast.error('Failed to save profile.');
         } finally {
             setSaving(false);
         }
@@ -133,11 +133,11 @@ export const BrandProfile: React.FC<ProfileProps> = ({ onNavigate, onOpenSidebar
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
                 if (file.type && !ALLOWED_IMAGE_TYPES.includes(file.type)) {
-                    alert(`${file.name}: unsupported format. Use JPG or PNG.`);
+                    toast.warning(`${file.name}: unsupported format. Use JPG or PNG.`);
                     continue;
                 }
                 if (file.size > 5 * 1024 * 1024) {
-                    alert(`${file.name} is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max is 5MB.`);
+                    toast.warning(`${file.name} is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max is 5MB.`);
                     continue;
                 }
                 const res = await uploadPartnerMedia(file, 'image');
@@ -146,7 +146,7 @@ export const BrandProfile: React.FC<ProfileProps> = ({ onNavigate, onOpenSidebar
             }
         } catch (err: any) {
             console.error('Image upload failed', err);
-            alert(err?.message || 'Could not upload image. Please try again.');
+            toast.error(err?.message || 'Could not upload image. Please try again.');
         }
         finally { setUploadingMedia(false); e.target.value = ''; }
     };
@@ -155,12 +155,12 @@ export const BrandProfile: React.FC<ProfileProps> = ({ onNavigate, onOpenSidebar
         if (!e.target.files?.length) return;
         const file = e.target.files[0];
         if (file.type && !ALLOWED_VIDEO_TYPES.includes(file.type)) {
-            alert(`${file.name}: unsupported format. Use MP4 or MOV.`);
+            toast.warning(`${file.name}: unsupported format. Use MP4 or MOV.`);
             e.target.value = '';
             return;
         }
         if (file.size > 100 * 1024 * 1024) {
-            alert(`${file.name} is too large (${(file.size / 1024 / 1024).toFixed(0)}MB). Max is 100MB.`);
+            toast.warning(`${file.name} is too large (${(file.size / 1024 / 1024).toFixed(0)}MB). Max is 100MB.`);
             e.target.value = '';
             return;
         }
@@ -170,7 +170,7 @@ export const BrandProfile: React.FC<ProfileProps> = ({ onNavigate, onOpenSidebar
             setMediaVideo(res.data || res);
         } catch (err: any) {
             console.error('Video upload failed', err);
-            alert(err?.message || 'Could not upload video. Please try again.');
+            toast.error(err?.message || 'Could not upload video. Please try again.');
         }
         finally { setUploadingMedia(false); e.target.value = ''; }
     };
@@ -180,7 +180,7 @@ export const BrandProfile: React.FC<ProfileProps> = ({ onNavigate, onOpenSidebar
             await deletePartnerMedia(id);
             if (type === 'image') setMediaImages(prev => prev.filter(m => m.id !== id));
             else setMediaVideo(null);
-        } catch { alert('Delete failed.'); }
+        } catch { toast.error('Delete failed.'); }
     };
 
     if (loading) {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowRight, Camera, Play, Trash2, Loader2, Image as ImageIcon } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation } from '../../components/ui';
+import { WizardLayout, WizardNavigation, toast } from '../../components/ui';
 import {
     getListingMedia,
     uploadListingMedia,
@@ -72,7 +72,7 @@ export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => {
     const handleCoverPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!draftId || !e.target.files?.[0]) return;
         const file = e.target.files[0];
-        if (file.size > COVER_MAX) { alert('Cover must be under 5 MB.'); e.target.value = ''; return; }
+        if (file.size > COVER_MAX) { toast.warning('Cover must be under 5 MB.'); e.target.value = ''; return; }
         setBusyKind('cover');
         try {
             // If a cover already exists, delete it first (only 1 allowed)
@@ -81,7 +81,7 @@ export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => {
             const data = res.data || res;
             setCover(data);
         } catch (err: any) {
-            alert(err?.message || 'Failed to upload cover.');
+            toast.error(err?.message || 'Failed to upload cover.');
         } finally {
             setBusyKind(null);
             e.target.value = '';
@@ -95,11 +95,11 @@ export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => {
         try {
             for (const file of files) {
                 if (gallery.length >= GALLERY_LIMIT) {
-                    alert(`Gallery limit (${GALLERY_LIMIT}) reached.`);
+                    toast.warning(`Gallery limit (${GALLERY_LIMIT}) reached.`);
                     break;
                 }
                 if (file.size > GALLERY_MAX) {
-                    alert(`${file.name} is over 5 MB — skipped.`);
+                    toast.warning(`${file.name} is over 5 MB — skipped.`);
                     continue;
                 }
                 const res = await uploadListingMedia(draftId, file, 'gallery');
@@ -107,7 +107,7 @@ export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => {
                 setGallery(prev => [...prev, data]);
             }
         } catch (err: any) {
-            alert(err?.message || 'Failed to upload gallery image.');
+            toast.error(err?.message || 'Failed to upload gallery image.');
         } finally {
             setBusyKind(null);
             e.target.value = '';
@@ -117,7 +117,7 @@ export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => {
     const handleVideoPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!draftId || !e.target.files?.[0]) return;
         const file = e.target.files[0];
-        if (file.size > VIDEO_MAX) { alert('Video must be under 100 MB.'); e.target.value = ''; return; }
+        if (file.size > VIDEO_MAX) { toast.warning('Video must be under 100 MB.'); e.target.value = ''; return; }
         setBusyKind('video');
         try {
             if (video) await deleteListingMedia(draftId, video.id);
@@ -125,7 +125,7 @@ export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => {
             const data = res.data || res;
             setVideo(data);
         } catch (err: any) {
-            alert(err?.message || 'Failed to upload video.');
+            toast.error(err?.message || 'Failed to upload video.');
         } finally {
             setBusyKind(null);
             e.target.value = '';
@@ -138,7 +138,7 @@ export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => {
             await deleteListingMedia(draftId, mediaId);
             setGallery(prev => prev.filter(m => m.id !== mediaId));
         } catch (err: any) {
-            alert(err?.message || 'Failed to delete image.');
+            toast.error(err?.message || 'Failed to delete image.');
         }
     };
 
@@ -148,7 +148,7 @@ export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => {
             await deleteListingMedia(draftId, cover.id);
             setCover(null);
         } catch (err: any) {
-            alert(err?.message || 'Failed to delete cover.');
+            toast.error(err?.message || 'Failed to delete cover.');
         }
     };
 
@@ -158,7 +158,7 @@ export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => {
             await deleteListingMedia(draftId, video.id);
             setVideo(null);
         } catch (err: any) {
-            alert(err?.message || 'Failed to delete video.');
+            toast.error(err?.message || 'Failed to delete video.');
         }
     };
 

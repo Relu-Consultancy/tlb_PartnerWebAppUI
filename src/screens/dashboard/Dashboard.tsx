@@ -1,12 +1,13 @@
 ﻿import React, { useState, useRef, useEffect } from 'react';
 import {
-  Menu, Bell, UserCircle, CheckCircle2, X,
+  Menu, UserCircle, CheckCircle2,
   Inbox, Eye, BarChart3, CreditCard, Plus, CalendarDays,
   Ticket, DollarSign, MapPin, Percent, Edit3, LogOut,
 } from 'lucide-react';
 import { Screen } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
 import { EntityPickerSheet } from '../../components/EntityPickerSheet';
+import { NotificationCenter } from '../../components/NotificationCenter';
 import { Loader, AreaSparkline, TrendBadge, fmtCurrency, trendPct } from '../../components/ui';
 import {
   getPartnerDashboard, getCurrentPartner, getBusinessProfile,
@@ -25,10 +26,8 @@ interface HomeProps { onNavigate: (screen: Screen) => void; onOpenSidebar: () =>
 
 export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
   const { allowedEntities, setAllowedEntities } = usePartner();
-  const [showNotifications, setShowNotifications] = useState(false);
   const [showEntityPicker, setShowEntityPicker] = useState(false);
   const [showProfilePopup, setShowProfilePopup] = useState(false);
-  const notificationRef = useRef<HTMLDivElement>(null);
   const profilePopupRef = useRef<HTMLDivElement>(null);
 
   const [partnerData, setPartnerData] = useState<any>(null);
@@ -115,15 +114,6 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (notificationRef.current && !notificationRef.current.contains(event.target as Node))
-        setShowNotifications(false);
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
       if (profilePopupRef.current && !profilePopupRef.current.contains(event.target as Node))
         setShowProfilePopup(false);
     };
@@ -153,8 +143,6 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
     }
     return 'Add New Listing';
   })();
-
-  const notifications = dashboardData?.notifications || [];
 
   const quickLinks = [
     { label: 'Brand Profile', screen: 'BRAND_PROFILE' as Screen, icon: UserCircle },
@@ -243,30 +231,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
         </div>
         <div className="flex items-center gap-2">
           {/* Notifications */}
-          <div className="relative" ref={notificationRef}>
-            <button onClick={() => setShowNotifications(!showNotifications)} className="relative p-2.5 rounded-xl hover:bg-gray-50 text-gray-500 transition-colors">
-              <Bell size={20} />
-              {notifications.length > 0 && <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full" />}
-            </button>
-            {showNotifications && (
-              <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-50">
-                <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-                  <h3 className="font-bold text-sm">Notifications</h3>
-                  <button onClick={() => setShowNotifications(false)} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
-                </div>
-                <div className="max-h-[300px] overflow-y-auto">
-                  {notifications.length === 0 ? (
-                    <div className="p-8 text-center text-sm text-gray-400">No notifications</div>
-                  ) : notifications.map((n: any, idx: number) => (
-                    <div key={n.id || idx} className="p-3 flex gap-3 hover:bg-gray-50 border-b border-gray-50 last:border-0">
-                      <Bell size={14} className="text-tlb-yellow shrink-0 mt-0.5" />
-                      <div><p className="text-xs font-bold text-gray-900">{n.title}</p><p className="text-[11px] text-gray-500">{n.message}</p></div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+          <NotificationCenter variant="light" />
           {/* Profile */}
           <div className="relative" ref={profilePopupRef}>
             <button onClick={() => setShowProfilePopup(!showProfilePopup)} className="w-9 h-9 rounded-full bg-tlb-yellow/10 text-tlb-yellow flex items-center justify-center hover:bg-tlb-yellow/20 transition-colors">

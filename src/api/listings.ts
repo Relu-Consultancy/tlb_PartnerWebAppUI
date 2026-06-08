@@ -814,12 +814,22 @@ export const markBookingAttended = async (bookingId: string) => {
     return response.json();
 };
 
+// NOTE: Partners cannot cancel attendee bookings — POST /cancel/ returns 403
+// PARTNER_BOOKING_CANCEL_FORBIDDEN. Only customers can cancel their own bookings.
+// `cancelBooking` is kept for reference/tests but is no longer wired into the UI.
 export const cancelBooking = async (bookingId: string, reason?: string) => {
     const response = await apiClient(`/api/v1/partner/bookings/${bookingId}/cancel/`, {
         method: 'POST',
         body: JSON.stringify({ reason: reason || 'partner_cancellation' }),
     });
     if (!response.ok) await handleError(response, 'Failed to cancel booking');
+    return response.json();
+};
+
+// Payment summary — partners only see method type + amount (no card/UPI details).
+export const getBookingPaymentDetail = async (bookingId: string) => {
+    const response = await apiClient(`/api/v1/partner/bookings/${bookingId}/payment-detail/`);
+    if (!response.ok) await handleError(response, 'Failed to load payment detail');
     return response.json();
 };
 

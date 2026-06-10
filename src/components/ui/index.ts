@@ -5,3 +5,4 @@ export * from './DashboardCharts';
 export * from './Toast';
 export * from './OnboardingShell';
 export * from './Select';
+export * from './FaqTermsEditor';

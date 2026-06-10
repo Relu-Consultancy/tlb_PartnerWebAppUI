@@ -36,12 +36,14 @@ export type Screen =
   | 'CREATE_EVENT_DETAILS'
   | 'CREATE_EVENT_SCHEDULE'
   | 'CREATE_EVENT_MEDIA'
+  | 'CREATE_EVENT_POLICIES'
   | 'CREATE_EVENT_PREVIEW'
   // Venue creation flow (new)
   | 'CREATE_VENUE_DETAILS'
   | 'CREATE_VENUE_OCCASIONS'
   | 'CREATE_VENUE_AVAILABILITY'
   | 'CREATE_VENUE_PACKAGES'
+  | 'CREATE_VENUE_POLICIES'
   | 'CREATE_VENUE_PREVIEW'
   // Programs flow
   | 'CREATE_PROGRAM_IDENTITY'
@@ -58,7 +60,8 @@ export type Screen =
   | 'STATISTICS'
   | 'ALL_COUPONS'
   | 'CREATE_COUPON'
-  | 'HELP_SUPPORT';
+  | 'HELP_SUPPORT'
+  | 'PARTNER_NETWORK';
 
 // ---------------------------------------------------------------------------
 // Partner

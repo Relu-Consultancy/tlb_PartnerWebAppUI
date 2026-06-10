@@ -166,9 +166,9 @@ export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => {
         return (
             <WizardLayout
                 title="New Event"
-                stepText="Step 3 of 4"
+                stepText="Step 3 of 5"
                 subtitle="Media"
-                progressPercentage={75}
+                progressPercentage={60}
                 themeColor="blue"
                 onBack={() => onNavigate('CREATE_EVENT_SCHEDULE')}
             >
@@ -183,9 +183,9 @@ export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => {
         return (
             <WizardLayout
                 title="New Event"
-                stepText="Step 3 of 4"
+                stepText="Step 3 of 5"
                 subtitle="Media"
-                progressPercentage={75}
+                progressPercentage={60}
                 themeColor="blue"
                 onBack={() => onNavigate('CREATE_EVENT_SCHEDULE')}
             >
@@ -199,9 +199,9 @@ export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => {
     return (
         <WizardLayout
             title="New Event"
-            stepText="Step 3 of 4"
+            stepText="Step 3 of 5"
             subtitle="Media"
-            progressPercentage={75}
+            progressPercentage={60}
             themeColor="blue"
             onBack={() => onNavigate('CREATE_EVENT_SCHEDULE')}
         >
@@ -331,8 +331,8 @@ export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => {
 
             <WizardNavigation
                 onBack={() => onNavigate('CREATE_EVENT_SCHEDULE')}
-                onNext={() => onNavigate('CREATE_EVENT_PREVIEW')}
-                nextText="Preview & Publish"
+                onNext={() => onNavigate('CREATE_EVENT_POLICIES')}
+                nextText="Next: FAQs & Terms"
                 nextIcon={<ArrowRight size={18} />}
                 themeColor="blue"
             />

@@ -218,12 +218,12 @@ describe('CreateEventPreview — submit modals', () => {
 });
 
 describe('CreateEventPreview — navigation', () => {
-    it('navigates back to CREATE_EVENT_MEDIA on Back click', async () => {
+    it('navigates back to CREATE_EVENT_POLICIES on Back click', async () => {
         setCurrentDraftId(DRAFT_ID);
         const user = userEvent.setup();
         render(<CreateEventPreview {...props} />);
         await waitFor(() => screen.getByText(/← back/i));
         await user.click(screen.getByText(/← back/i));
-        expect(mockNavigate).toHaveBeenCalledWith('CREATE_EVENT_MEDIA');
+        expect(mockNavigate).toHaveBeenCalledWith('CREATE_EVENT_POLICIES');
     });
 });

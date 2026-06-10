@@ -3,11 +3,41 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, Suspense, lazy, useCallback } from 'react';
+import React, { useState, useEffect, Suspense, lazy, useCallback, Component } from 'react';
+import type { ErrorInfo, ReactNode } from 'react';
 import { motion } from 'motion/react';
 import { Screen, EntityType } from './types';
 import { PartnerProvider, usePartner } from './context/PartnerContext';
 import { Loader, Toaster } from './components/ui';
+
+// ---------------------------------------------------------------------------
+// Error boundary — stops a single screen crash from blanking the whole app.
+// Keyed by screen so navigating away clears the error.
+// ---------------------------------------------------------------------------
+interface ErrorBoundaryProps { children: ReactNode }
+interface ErrorBoundaryState { error: Error | null }
+class ScreenErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  // `react` has no bundled types here, so the base class is untyped — declare members explicitly.
+  declare props: ErrorBoundaryProps;
+  state: ErrorBoundaryState = { error: null };
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState { return { error }; }
+  componentDidCatch(error: Error, info: ErrorInfo) { console.error('Screen crashed:', error, info); }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-gray-50 p-6 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center text-2xl">⚠️</div>
+          <div>
+            <h2 className="text-lg font-black text-gray-900">Something went wrong</h2>
+            <p className="text-sm text-gray-500 mt-1 max-w-sm">This screen hit an unexpected error. Use the menu to switch screens, or reload.</p>
+          </div>
+          <button onClick={() => window.location.reload()} className="tlb-button px-6 py-3">Reload</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // Helper for lazy loading named exports
 const lazyImport = <T extends Record<string, any>>(
@@ -52,6 +82,7 @@ const CreateClassPreview = lazyImport(() => import('./screens/classes'), 'Create
 const CreateEventDetails = lazyImport(() => import('./screens/events'), 'CreateEventDetails');
 const CreateEventSchedule = lazyImport(() => import('./screens/events'), 'CreateEventSchedule');
 const CreateEventMedia = lazyImport(() => import('./screens/events'), 'CreateEventMedia');
+const CreateEventPolicies = lazyImport(() => import('./screens/events'), 'CreateEventPolicies');
 const CreateEventPreview = lazyImport(() => import('./screens/events'), 'CreateEventPreview');
 
 // Programs creation screens
@@ -66,6 +97,7 @@ const CreateVenueDetails = lazyImport(() => import('./screens/venues'), 'CreateV
 const CreateVenueOccasions = lazyImport(() => import('./screens/venues'), 'CreateVenueOccasions');
 const CreateVenueAvailability = lazyImport(() => import('./screens/venues'), 'CreateVenueAvailability');
 const CreateVenuePackages = lazyImport(() => import('./screens/venues'), 'CreateVenuePackages');
+const CreateVenuePolicies = lazyImport(() => import('./screens/venues'), 'CreateVenuePolicies');
 const CreateVenuePreview = lazyImport(() => import('./screens/venues'), 'CreateVenuePreview');
 
 // Enquiries & Packages
@@ -81,6 +113,9 @@ const AllCoupons = lazyImport(() => import('./screens/coupons'), 'AllCoupons');
 
 // Help & Support
 const Support = lazyImport(() => import('./screens/support'), 'Support');
+
+// Partner Network
+const PartnerNetwork = lazyImport(() => import('./screens/network'), 'PartnerNetwork');
 
 // Screen-module chunk factories — prefetched on idle so navigating to a slide
 // for the first time (or reopening it) doesn't flash the Suspense fallback.
@@ -101,6 +136,7 @@ const SCREEN_CHUNKS = [
   () => import('./screens/statistics'),
   () => import('./screens/coupons'),
   () => import('./screens/support'),
+  () => import('./screens/network'),
 ];
 
 const prefetchScreens = () => {
@@ -156,6 +192,7 @@ const routes: Record<Screen, RouteConfig> = {
   CREATE_EVENT_DETAILS: { component: CreateEventDetails, hasSidebar: true },
   CREATE_EVENT_SCHEDULE: { component: CreateEventSchedule, hasSidebar: true },
   CREATE_EVENT_MEDIA: { component: CreateEventMedia, hasSidebar: true },
+  CREATE_EVENT_POLICIES: { component: CreateEventPolicies, hasSidebar: true },
   CREATE_EVENT_PREVIEW: { component: CreateEventPreview, hasSidebar: false },
 
   // Venue creation — has sidebar
@@ -163,6 +200,7 @@ const routes: Record<Screen, RouteConfig> = {
   CREATE_VENUE_OCCASIONS: { component: CreateVenueOccasions, hasSidebar: true },
   CREATE_VENUE_AVAILABILITY: { component: CreateVenueAvailability, hasSidebar: true },
   CREATE_VENUE_PACKAGES: { component: CreateVenuePackages, hasSidebar: true },
+  CREATE_VENUE_POLICIES: { component: CreateVenuePolicies, hasSidebar: true },
   CREATE_VENUE_PREVIEW: { component: CreateVenuePreview, hasSidebar: false },
 
   // Programs creation — has sidebar
@@ -184,6 +222,7 @@ const routes: Record<Screen, RouteConfig> = {
   ALL_COUPONS: { component: AllCoupons, hasSidebar: true },
   CREATE_COUPON: { component: CreateCoupon, hasSidebar: true },
   HELP_SUPPORT: { component: Support, hasSidebar: true },
+  PARTNER_NETWORK: { component: PartnerNetwork, hasSidebar: true },
 };
 
 // ---------------------------------------------------------------------------
@@ -360,12 +399,14 @@ function AppInner() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
           >
-            <Component
-              onNavigate={guardedNavigate}
-              authData={authData}
-              setAuthData={setAuthData}
-              {...(route.hasSidebar ? { onOpenSidebar: () => { setDesktopSidebarOpen(true); setIsSidebarOpen(true); } } : {})}
-            />
+            <ScreenErrorBoundary>
+              <Component
+                onNavigate={guardedNavigate}
+                authData={authData}
+                setAuthData={setAuthData}
+                {...(route.hasSidebar ? { onOpenSidebar: () => { setDesktopSidebarOpen(true); setIsSidebarOpen(true); } } : {})}
+              />
+            </ScreenErrorBoundary>
           </motion.div>
         </Suspense>
       </div>

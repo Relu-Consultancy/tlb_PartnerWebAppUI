@@ -296,11 +296,11 @@ export const CreateEventPreview: React.FC<Props> = ({ onNavigate }) => {
         return (
             <WizardLayout
                 title="New Event"
-                stepText="Step 4 of 4"
+                stepText="Step 5 of 5"
                 subtitle="Preview & Publish"
                 progressPercentage={100}
                 themeColor="blue"
-                onBack={() => onNavigate('CREATE_EVENT_MEDIA')}
+                onBack={() => onNavigate('CREATE_EVENT_POLICIES')}
             >
                 <div className="flex items-center justify-center gap-2 text-gray-400 text-xs font-bold py-12">
                     <Loader2 size={16} className="animate-spin" /> Loading preview…
@@ -313,11 +313,11 @@ export const CreateEventPreview: React.FC<Props> = ({ onNavigate }) => {
         return (
             <WizardLayout
                 title="New Event"
-                stepText="Step 4 of 4"
+                stepText="Step 5 of 5"
                 subtitle="Preview & Publish"
                 progressPercentage={100}
                 themeColor="blue"
-                onBack={() => onNavigate('CREATE_EVENT_MEDIA')}
+                onBack={() => onNavigate('CREATE_EVENT_POLICIES')}
             >
                 <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-xs font-bold text-red-600">
                     {loadError || 'Could not load event.'}
@@ -329,7 +329,7 @@ export const CreateEventPreview: React.FC<Props> = ({ onNavigate }) => {
     return (
         <WizardLayout
             title="New Event"
-            stepText="Step 4 of 4"
+            stepText="Step 5 of 5"
             subtitle="Preview & Publish"
             progressPercentage={100}
             themeColor="blue"
@@ -507,7 +507,7 @@ export const CreateEventPreview: React.FC<Props> = ({ onNavigate }) => {
             )}
 
             <WizardNavigation
-                onBack={() => onNavigate('CREATE_EVENT_MEDIA')}
+                onBack={() => onNavigate('CREATE_EVENT_POLICIES')}
                 onNext={canSubmit && !submitting ? handleSubmit : () => {}}
                 nextText={submitting ? 'Submitting…' : event.status === 'draft' ? 'Submit for Review' : 'Done'}
                 nextIcon={submitting ? <Loader2 size={20} className="animate-spin" /> : <Rocket size={20} />}

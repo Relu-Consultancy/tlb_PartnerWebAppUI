@@ -19,7 +19,8 @@ src/
 │   ├── coupons.ts          # Partner coupons CRUD (live) — get/create/update/deactivate/usages; CreateCouponInput targeting
 │   ├── help.ts             # Help & Support tickets — categories, list, create, detail, messages (poll), send, close
 │   ├── notifications.ts     # In-app notifications — list, unread-count, mark read/all, get/update preferences
-│   └── listings.ts         # Listings + ticket + media CRUD, bookings (+payment-detail), coupon_code on update, ApiError class
+│   ├── network.ts          # Partner Network — directory, profile, block/unblock, conversations + messages (1-to-1 chat)
+│   └── listings.ts         # Listings + ticket + media CRUD, bookings (+payment-detail), coupon_code, event/venue FAQ CRUD, generic terms, ApiError class
 ├── context/
 │   └── PartnerContext.tsx   # Global context: allowedEntities (synced to sessionStorage)
 ├── components/
@@ -30,6 +31,7 @@ src/
 │       ├── DashboardCharts.tsx  # Shared SVG chart primitives: AreaSparkline, TrendAreaChart, WeeklyBarChart, DonutChart, fmtCurrency, trendPct, TrendBadge
 │       ├── Toast.tsx            # Global imperative toast: `toast.success/error/warning/info()` singleton + <Toaster/> (mounted once in App.tsx). Card design (coloured top accent bar + bold title + message + dismiss). Legacy `useToasts()` + `<ToastContainer/>` kept as local-state shims rendering the same card.
 │       ├── Select.tsx           # Reusable animated dropdown (drop-in for native <select>). Menu rendered in a portal (fixed position, never clipped by overflow); keyboard nav, flip-up, click-outside, icons/dots/check
+│       ├── FaqTermsEditor.tsx   # Shared FAQ CRUD + Terms&Conditions editor (text + document upload); used by Event/Venue Policies steps. Theme-aware accent.
 │       └── OnboardingShell.tsx  # Shared layout for every onboarding screen: sticky branded header + ProgressDots + PageHeader + motion fade-in + decorative blurs
 ├── screens/
 │   ├── auth/               # Landing, Login, OTPVerify, PartnerAccess, PartnerAccessOTP, PartnerCategory
@@ -38,13 +40,14 @@ src/
 │   ├── profile/            # BrandProfile (EditProfile), PreviewProfile
 │   ├── services/           # ServiceListings (shared dashboard for all entities)
 │   ├── classes/            # CreateClass* (5 steps)
-│   ├── events/             # CreateEvent* (4 steps) + __tests__/
+│   ├── events/             # CreateEvent* (5 steps: Details, Schedule, Media, Policies, Preview) + __tests__/
 │   ├── programs/           # CreateProgram* (5 steps)
-│   ├── venues/             # CreateVenue* (5 steps)
+│   ├── venues/             # CreateVenue* (6 steps: Details, Occasions, Availability, Packages, Policies, Preview)
 │   ├── enquiries/          # Enquiries, ProgramEnquiries
 │   ├── attendees/          # Attendees — two-level: listings/dates grid (Comfortable/Compact/List density) → per-group bookings + detail drawer
 │   ├── coupons/            # CreateCoupon (form, live API + targeting), AllCoupons (live list + deactivate, sample fallback)
 │   ├── support/            # Support — Help & Support: ticket list → new ticket → chat thread (poll/refresh/close)
+│   ├── network/            # PartnerNetwork — directory (search/filter) → profile (listings, block, ping) → 1-to-1 chat
 │   ├── statistics/         # Statistics — tabbed analytics screen (Statistics.tsx + StatCharts.tsx)
 │   ├── packages/           # Packages
 │   └── financial/          # FinancialHub
@@ -229,6 +232,18 @@ Request → 401 Unauthorized?
 | `archiveListing` | POST | `/api/v1/partner/listings/{id}/archive/` | — | ServiceListings (all entity types) |
 | `unarchiveListing` | POST | `/api/v1/partner/listings/{id}/unarchive/` | — | ServiceListings (all entity types) |
 
+**FAQs & Terms (Events / Venues):**
+
+| Function | Method | Endpoint | Used By |
+|----------|--------|----------|---------|
+| `getEventFaqs` / `createEventFaq` / `updateEventFaq` / `deleteEventFaq` | GET/POST/PUT/DELETE | `/api/v1/partner/listings/events/{id}/faqs/[{faqId}/]` | CreateEventPolicies |
+| `getVenueFaqs` / `createVenueFaq` / `updateVenueFaq` / `deleteVenueFaq` | GET/POST/PUT/DELETE | `/api/v1/partner/listings/venues/{id}/faqs/[{faqId}/]` | CreateVenuePolicies |
+| `getListingTerms` | GET | `/api/v1/partner/listings/{id}/terms/` | FaqTermsEditor — returns `null` on 404 (not set) |
+| `setListingTerms` | PUT | `/api/v1/partner/listings/{id}/terms/` | FaqTermsEditor — **multipart** `content` and/or `document` file |
+| `deleteListingTerms` | DELETE | `/api/v1/partner/listings/{id}/terms/` | FaqTermsEditor |
+
+> **Terms is generic (all listing types):** the `/listings/{id}/terms/` endpoints work for events, venues, programs **and** classes via the listing UUID. Classes/Programs already collected FAQ/policies in their wizards; **Events and Venues** now get a dedicated **Policies** step (`FaqTermsEditor`) using the per-entity FAQ CRUD above + the generic terms endpoints. FAQ object: `{ id, question, answer, sort_order }`.
+
 > **Generic endpoints used for ALL entity types (fixed June 2026):** pause/resume/archive/unarchive in `ServiceListings` route through the generic `/api/v1/partner/listings/{id}/{action}/` endpoints for Events, Classes, Programs **and** Venues. The backend URLconf only registers these generic routes — the old entity-specific routes (`/classes/{id}/live/`, `/programs/{id}/archive|unarchive/`) return 404. The entity-specific helpers (`setClassListingLive`, `archiveProgramListing`, `unarchiveProgramListing`) remain defined in `listings.ts` (with passing unit tests) but are **no longer wired into the UI**.
 
 **Booking field reference:**
@@ -364,6 +379,25 @@ In-app notifications (partner JWT). Base `/api/v1/notifications/`. Surfaced by `
 | `getNotificationPreferences` / `updateNotificationPreferences` | GET / PATCH | `/notifications/preferences/` | Broadcast opt-outs: `broadcast_in_app`, `broadcast_email` (+ per-event flags) |
 
 > `notification_type` is `broadcast` for admin broadcasts (shown with an "Admin" badge via `metadata.broadcast_id`); other values include `booking_confirmed`, `partner_new_booking`, etc. Clicking a notification marks it read and opens its `action_url` (new tab) if present.
+
+### 2.9 Partner Network API (`src/api/network.ts`) — ✅ live (APPROVED partners only)
+
+Partner directory + 1-to-1 partner messaging. Base `/api/v1/partner/network/`.
+
+| Function | Method | Endpoint | Notes |
+|----------|--------|----------|-------|
+| `listNetworkPartners({ search?, category_id? })` | GET | `/network/partners/` | Approved partners (excludes self). `{ id, business_name, base_city, logo, bio, categories[], published_listing_count, is_verified }` |
+| `getNetworkPartner` | GET | `/network/partners/{id}/` | + social links, `cover_image`, `operating_cities[]`, `listings[]` cards |
+| `blockPartner` / `unblockPartner` | POST / DELETE | `/network/partners/{id}/block/` | 204 |
+| `listBlockedPartners` | GET | `/network/blocks/` | Directory-shaped items |
+| `startConversation({ partner_id })` | POST | `/network/conversations/` | Idempotent (200 resume / 201 new). 403 `BLOCKED`, 400 self |
+| `listConversations` | GET | `/network/conversations/list/` | `{ id, other_partner: {id,business_name,logo}, last_message_preview, last_message_at, unread_count }` |
+| `getConversation` | GET | `/network/conversations/{id}/` | header only |
+| `getConversationMessages` | GET | `/network/conversations/{id}/messages/?page=` | **Paginated oldest-first — all pages fetched.** Msg: `{ sender: {id,business_name}, content, attachments[], is_read, created_at }` |
+| `sendConversationMessage` | POST | `/network/conversations/{id}/messages/` | **multipart** `content` (+ optional files) |
+| `markConversationRead` | POST | `/network/conversations/{id}/messages/read/` | `{ marked_read }` |
+
+> **Shape gotchas (normalized in `network.ts`):** `other_partner` is an **object** (not a string); a message's text is `content` (not `body`) and its sender is `sender: { id, business_name }`. **Ownership:** a message is yours when `sender.id === your partner id` (from `getCurrentPartner().id`) — there is no email/`is_mine` field. `normalizeMessage` maps these to `{ sender_id, sender_name, body, attachments }`.
 
 ---
 
@@ -655,7 +689,8 @@ Theme color: `blue`. All wizard screens use `themeColor="blue"`.
 | 1 | **CreateEventDetails** | `getEventMetaCategories`, `getEventMetaFormats`, `getEventMetaAgeGroups` (on mount, parallel); `getListingDetail` (on mount if draft exists); `createEventDraft` + `updateListing` (on Next) | Fetches dynamic categories/formats/age-groups from API. Age group chips render `{r.min_age}–{r.max_age} yrs` (API returns `StaticRange` objects with no `label` field). Pre-fills from existing draft if `current_event_draft_id` is set. Mode-conditional: city/area/address (offline/hybrid), meeting link (online/hybrid). |
 | 2 | **CreateEventSchedule** | `getListingDetail` (on mount); `updateListing` (schedule + price_type + capacity); ticket CRUD on Next | Date+time inputs combined to ISO 8601 before sending. Warns on price_type switch (clears tickets on backend). Free: capacity only. Paid: ticket CRUD — creates new, updates dirty, deletes removed, all on Next click. |
 | 3 | **CreateEventMedia** | `getListingMedia` (on mount); `uploadListingMedia`, `deleteListingMedia` (immediate on change) | Cover upload replaces existing (delete-then-upload). Gallery up to 10 images, 5MB each. Video up to 100MB. All media ops are immediate (no batch on Next). Warns if no cover (required for submit). Media items have `file_url` field. |
-| 4 | **CreateEventPreview** | `getListingDetail` (on mount); `submitListing` (on Publish) | Renders full event from API. Client-side readiness check mirrors all backend submit requirements. Submit → `clearCurrentDraftId()` → navigate to `SERVICE_LISTINGS`. Non-draft events show locked state. |
+| 4 | **CreateEventPolicies** | `getEventFaqs` + `getListingTerms` (on mount via `FaqTermsEditor`); FAQ CRUD + `setListingTerms`/`deleteListingTerms` (immediate) | FAQ add/edit/delete (each persisted individually) + Terms (text + document upload). Both optional. Next → Preview. |
+| 5 | **CreateEventPreview** | `getListingDetail` (on mount); `submitListing` (on Publish) | Renders full event from API. Client-side readiness check mirrors all backend submit requirements. Submit → `clearCurrentDraftId()` → navigate to `SERVICE_LISTINGS`. Non-draft events show locked state. Back → Policies. |
 
 ### 6.9 Venue Creation Wizard (`src/screens/venues/`) — Fully API-Integrated
 
@@ -667,7 +702,8 @@ Theme color: `amber`. All wizard screens use `themeColor="amber"`.
 | 2 | **CreateVenueOccasions** | `getVenueMetaOccasions`, `getVenueMetaDiscoveryEnums`, `getVenueListingDetail`, `getVenueAttendeeFields` (on mount, parallel via `Promise.allSettled`); `updateVenueListing` + `updateVenueDiscovery` + `updateVenueAttendeeFields` (3 calls on Next) | Occasions sent as `occasion_ids: number[]` (integer IDs, not names). Discovery: `outing_types`, `activity_types`, `format_types` chip multi-select. Attendee fields: `child_name`, `child_age`, `contact_number`, `email`, `guest_count`, `special_requirements`. |
 | 3 | **CreateVenueAvailability** | `getVenueAvailability` (on mount); `createVenueAvailabilitySlot` (on Add); `deleteVenueAvailabilitySlot` (on Delete) | Inline add form: `date`, `start_time`, `end_time`, `note?`. Validates end > start. Requires ≥1 slot before proceeding to Step 4. |
 | 4 | **CreateVenuePackages** | `getVenuePackages` (on mount); `createVenuePackage` or `updateVenuePackage` (dirty packages on Next); `deleteVenuePackage` (on Delete) | Package fields: `name` (required), `price`, `description`, `duration_minutes?`, `max_guests?`. Optional fields omitted from payload if blank or < 1. Dirty tracking: only changed packages are saved on Next. |
-| 5 | **CreateVenuePreview** | `getVenueListingDetail` (single call — returns all sub-resources inline) | Venue detail response includes `media`, `availability`, `packages`, `discovery`, `occasions`, `required_attendee_fields` — no extra fetches needed. Cover = `media.find(m => m.media_type === 'cover')`, gallery = `media.filter(m => m.media_type === 'gallery')`. Readiness check: `title`, `city`, `address`, `subcategory`. Submit → `clearCurrentVenueDraftId()` → navigate to `SERVICE_LISTINGS`. |
+| 5 | **CreateVenuePolicies** | `getVenueFaqs` + `getListingTerms` (on mount via `FaqTermsEditor`); FAQ CRUD + `setListingTerms`/`deleteListingTerms` (immediate) | FAQ add/edit/delete + Terms (text + document upload). Both optional. Back → Packages, Next → Preview. |
+| 6 | **CreateVenuePreview** | `getVenueListingDetail` (single call — returns all sub-resources inline) | Venue detail response includes `media`, `availability`, `packages`, `discovery`, `occasions`, `required_attendee_fields` — no extra fetches needed. Cover = `media.find(m => m.media_type === 'cover')`, gallery = `media.filter(m => m.media_type === 'gallery')`. Readiness check: `title`, `city`, `address`, `subcategory`. Submit → `clearCurrentVenueDraftId()` → navigate to `SERVICE_LISTINGS`. Back → Policies. |
 
 ### 6.10 Class Creation Wizard (`src/screens/classes/`) — Fully API-Integrated
 
@@ -802,6 +838,19 @@ Three views in one screen, backed by the live `/help/tickets/` API (see §2.7):
 
 Sidebar entry "Help & Support" (LifeBuoy). `getTicketMessages` returns `{ ticket_status, messages }` and drives live status updates in the drawer.
 
+### 6.19 Partner Network (`src/screens/network/PartnerNetwork.tsx`)
+
+Partner directory + 1-to-1 chat, backed by the `/partner/network/` API (see §2.9). One screen with Discover/Messages tabs, a profile view, and a chat view.
+
+| View | Detail |
+|------|--------|
+| **Discover** | Debounced search + category filter (`Select`) → grid of partner cards (logo/initials, verified badge, city, bio, listing count). Click → profile. |
+| **Profile** | Cover + logo, verified, bio/contact/operating cities, social links, **published listings** grid. Actions: **Ping / Message** (`startConversation` → open chat) and **Block / Unblock** (`blockPartner`/`unblockPartner`). |
+| **Messages** | Conversation list (`other_partner.business_name`, last-message preview, time, **unread badge**; tab shows total unread). |
+| **Chat** | Thread (all pages fetched, oldest-first); **own vs. other by `sender.id === getCurrentPartner().id`** (yours right/yellow, theirs left/white with name); attachment links; 15s poll + manual Refresh; `markConversationRead` on open; composer sends multipart `content`. |
+
+Sidebar entry "Partner Network" (Network icon). Resilience: a top-level `ScreenErrorBoundary` (in `App.tsx`) wraps every routed screen so a render error shows a recoverable fallback (Reload) with the sidebar still usable, instead of blanking the whole app.
+
 ---
 
 ## 7. State Management
@@ -921,11 +970,13 @@ One canonical type scale lives in `src/styles/components.css`; use these instead
 | CREATE_EVENT_DETAILS | ✅/❌ | — | CreateEventDetails | ✅ Meta + draft create/update (theme: blue) |
 | CREATE_EVENT_SCHEDULE | ✅/❌ | — | CreateEventSchedule | ✅ Schedule + tickets CRUD (theme: blue) |
 | CREATE_EVENT_MEDIA | ✅/❌ | — | CreateEventMedia | ✅ Cover/gallery/video upload (theme: blue) |
+| CREATE_EVENT_POLICIES | ✅/❌ | — | CreateEventPolicies | ✅ FAQ CRUD + Terms (FaqTermsEditor) (theme: blue) |
 | CREATE_EVENT_PREVIEW | ✅/❌ | — | CreateEventPreview | ✅ Full detail + submit (theme: blue) |
 | CREATE_VENUE_DETAILS | ✅/❌ | Venues | CreateVenueDetails | ✅ booking_type (enquiry/direct_booking), location, capacity, age, media |
 | CREATE_VENUE_OCCASIONS | ✅/❌ | Venues | CreateVenueOccasions | ✅ Occasion IDs, discovery tags, attendee fields |
 | CREATE_VENUE_AVAILABILITY | ✅/❌ | Venues | CreateVenueAvailability | ✅ Slot CRUD |
 | CREATE_VENUE_PACKAGES | ✅/❌ | Venues | CreateVenuePackages | ✅ Package CRUD |
+| CREATE_VENUE_POLICIES | ✅/❌ | Venues | CreateVenuePolicies | ✅ FAQ CRUD + Terms (FaqTermsEditor) (theme: amber) |
 | CREATE_VENUE_PREVIEW | ✅/❌ | Venues | CreateVenuePreview | ✅ Single-call detail + submit |
 | CREATE_PROGRAM_IDENTITY | ✅/❌ | Programs | CreateProgramIdentity | ✅ createProgramDraft + updateProgramListing; booking_type card (theme: emerald) |
 | CREATE_PROGRAM_BATCH | ✅/❌ | Programs | CreateProgramBatch | ✅ Batch CRUD — days=3-letter abbr, capacity field |
@@ -938,6 +989,7 @@ One canonical type scale lives in `src/styles/components.css`; use these instead
 | ALL_COUPONS | ✅ | — | AllCoupons | ✅ Live getCoupons + deactivate; sample fallback; status filters/search |
 | CREATE_COUPON | ✅ | — | CreateCoupon | ✅ Live createCoupon + targeting (listing dropdown / category / audience) |
 | HELP_SUPPORT | ✅ | — | Support | ✅ Live /help/tickets/ — categories, list, create, chat thread (poll/refresh), close |
+| PARTNER_NETWORK | ✅ | — | PartnerNetwork | ✅ Live /partner/network/ — directory, profile, block, conversations + chat |
 | PACKAGES | ✅ | — | Packages | ❌ Placeholder |
 | FINANCIAL_HUB | ✅ | — | FinancialHub | ⚡ Partial — bank details from `getCurrentPartner` |
 
@@ -1214,6 +1266,11 @@ npm run test:report   # run tests → generate test-report.html + test-report.pd
 | `docs/venue-listings-db-spec.md` | Venues module — tables (`venues`, `venue_occasions`, `venue_availability`, `venue_packages`, `venue_media`), occasion/time-slot/attendee-field reference, bulk availability pattern, API endpoints |
 
 ---
+
+*Phase 24 (2026-06-10) — FAQ/Terms for Events & Venues + Partner Network + error boundary:*
+- *FAQ & Terms: new shared `FaqTermsEditor` (FAQ CRUD + Terms text/document upload). Added a **Policies** step to the Events (now 5 steps) and Venues (now 6 steps) wizards via per-entity FAQ endpoints (`/events|venues/{id}/faqs/`) + the generic `/listings/{id}/terms/` endpoints. Classes/Programs unchanged. Renumbered steps + rewired Media→Policies→Preview (events) and Packages→Policies→Preview (venues); updated 2 event nav tests.*
+- *Partner Network: new `src/api/network.ts` + `src/screens/network/PartnerNetwork.tsx` — directory (search/category filter), partner profile (listings, social links, block/unblock), and 1-to-1 chat (start/resume conversation, paginated messages, multipart send, mark-read, 15s poll + refresh). New `PARTNER_NETWORK` screen + sidebar entry. Normalizes the API's nested shapes (`other_partner` object, message `sender:{id}` / `content`); ownership by `sender.id === getCurrentPartner().id`.*
+- *Resilience: added a `ScreenErrorBoundary` in `App.tsx` wrapping each routed screen so a render crash shows a recoverable fallback (with the sidebar intact) instead of blanking the whole app. (Note: project has no `@types/react`, so `react` is implicitly `any` — boundary class declares its own `props`/`state`.)*
 
 *Phase 23 (2026-06-08) — Notifications + venue booking_type + listing density controls:*
 - *In-app notifications: new `src/api/notifications.ts` (list / unread-count / mark read / mark-all / preferences) + `src/components/NotificationCenter.tsx` (bell with 60s-polled badge, slide-in drawer with mark-read/all, "Admin" broadcast badge, broadcast email/in-app preference toggles). Mounted as the Dashboard top-right bell (`variant="light"`), replacing the old static popup; the sidebar bell was removed so there's one surface.*

@@ -193,9 +193,9 @@ export const CreateEventSchedule: React.FC<Props> = ({ onNavigate }) => {
         return (
             <WizardLayout
                 title="New Event"
-                stepText="Step 2 of 4"
+                stepText="Step 2 of 5"
                 subtitle="Schedule & Pricing"
-                progressPercentage={50}
+                progressPercentage={40}
                 themeColor="blue"
                 onBack={() => onNavigate('CREATE_EVENT_DETAILS')}
             >
@@ -210,9 +210,9 @@ export const CreateEventSchedule: React.FC<Props> = ({ onNavigate }) => {
         return (
             <WizardLayout
                 title="New Event"
-                stepText="Step 2 of 4"
+                stepText="Step 2 of 5"
                 subtitle="Schedule & Pricing"
-                progressPercentage={50}
+                progressPercentage={40}
                 themeColor="blue"
                 onBack={() => onNavigate('CREATE_EVENT_DETAILS')}
             >
@@ -226,9 +226,9 @@ export const CreateEventSchedule: React.FC<Props> = ({ onNavigate }) => {
     return (
         <WizardLayout
             title="New Event"
-            stepText="Step 2 of 4"
+            stepText="Step 2 of 5"
             subtitle="Schedule & Pricing"
-            progressPercentage={50}
+            progressPercentage={40}
             themeColor="blue"
             onBack={() => onNavigate('CREATE_EVENT_DETAILS')}
         >

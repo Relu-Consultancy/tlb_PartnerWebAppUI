@@ -752,6 +752,71 @@ export const deleteProgramFaq = async (listingId: string, faqId: number) => {
     return response.json().catch(() => ({}));
 };
 
+// ─── Event FAQs ─────────────────────────────────────────────────────────────
+export const getEventFaqs = async (listingId: string) => {
+    const response = await apiClient(`/api/v1/partner/listings/events/${listingId}/faqs/`);
+    if (!response.ok) await handleError(response, 'Failed to load event FAQs');
+    return response.json();
+};
+export const createEventFaq = async (listingId: string, data: { question: string; answer: string; sort_order?: number }) => {
+    const response = await apiClient(`/api/v1/partner/listings/events/${listingId}/faqs/`, { method: 'POST', body: JSON.stringify(data) });
+    if (!response.ok) await handleError(response, 'Failed to create event FAQ');
+    return response.json();
+};
+export const updateEventFaq = async (listingId: string, faqId: number, data: { question: string; answer: string; sort_order?: number }) => {
+    const response = await apiClient(`/api/v1/partner/listings/events/${listingId}/faqs/${faqId}/`, { method: 'PUT', body: JSON.stringify(data) });
+    if (!response.ok) await handleError(response, 'Failed to update event FAQ');
+    return response.json();
+};
+export const deleteEventFaq = async (listingId: string, faqId: number) => {
+    const response = await apiClient(`/api/v1/partner/listings/events/${listingId}/faqs/${faqId}/`, { method: 'DELETE' });
+    if (!response.ok) await handleError(response, 'Failed to delete event FAQ');
+    return response.status === 204 ? {} : response.json().catch(() => ({}));
+};
+
+// ─── Venue FAQs ─────────────────────────────────────────────────────────────
+export const getVenueFaqs = async (listingId: string) => {
+    const response = await apiClient(`/api/v1/partner/listings/venues/${listingId}/faqs/`);
+    if (!response.ok) await handleError(response, 'Failed to load venue FAQs');
+    return response.json();
+};
+export const createVenueFaq = async (listingId: string, data: { question: string; answer: string; sort_order?: number }) => {
+    const response = await apiClient(`/api/v1/partner/listings/venues/${listingId}/faqs/`, { method: 'POST', body: JSON.stringify(data) });
+    if (!response.ok) await handleError(response, 'Failed to create venue FAQ');
+    return response.json();
+};
+export const updateVenueFaq = async (listingId: string, faqId: number, data: { question: string; answer: string; sort_order?: number }) => {
+    const response = await apiClient(`/api/v1/partner/listings/venues/${listingId}/faqs/${faqId}/`, { method: 'PUT', body: JSON.stringify(data) });
+    if (!response.ok) await handleError(response, 'Failed to update venue FAQ');
+    return response.json();
+};
+export const deleteVenueFaq = async (listingId: string, faqId: number) => {
+    const response = await apiClient(`/api/v1/partner/listings/venues/${listingId}/faqs/${faqId}/`, { method: 'DELETE' });
+    if (!response.ok) await handleError(response, 'Failed to delete venue FAQ');
+    return response.status === 204 ? {} : response.json().catch(() => ({}));
+};
+
+// ─── Terms & Conditions (generic — works for all listing types) ─────────────
+export const getListingTerms = async (listingId: string) => {
+    const response = await apiClient(`/api/v1/partner/listings/${listingId}/terms/`);
+    if (response.status === 404) return null; // TERMS_NOT_FOUND → not set yet
+    if (!response.ok) await handleError(response, 'Failed to load terms');
+    return response.json();
+};
+export const setListingTerms = async (listingId: string, data: { content?: string; document?: File | null }) => {
+    const fd = new FormData();
+    if (data.content != null) fd.append('content', data.content);
+    if (data.document) fd.append('document', data.document);
+    const response = await apiClient(`/api/v1/partner/listings/${listingId}/terms/`, { method: 'PUT', body: fd });
+    if (!response.ok) await handleError(response, 'Failed to save terms');
+    return response.json();
+};
+export const deleteListingTerms = async (listingId: string) => {
+    const response = await apiClient(`/api/v1/partner/listings/${listingId}/terms/`, { method: 'DELETE' });
+    if (!response.ok) await handleError(response, 'Failed to delete terms');
+    return {};
+};
+
 // ─── Program Media ─────────────────────────────────────────────────────────
 
 export const getProgramMedia = async (listingId: string) => {

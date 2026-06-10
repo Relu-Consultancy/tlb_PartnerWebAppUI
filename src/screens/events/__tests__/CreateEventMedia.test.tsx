@@ -142,13 +142,13 @@ describe('CreateEventMedia — cover deletion', () => {
 });
 
 describe('CreateEventMedia — navigation', () => {
-    it('navigates to CREATE_EVENT_PREVIEW on Next click', async () => {
+    it('navigates to CREATE_EVENT_POLICIES on Next click', async () => {
         setCurrentDraftId(DRAFT_ID);
         const user = userEvent.setup();
         render(<CreateEventMedia {...props} />);
-        await waitFor(() => screen.getByText(/preview & publish/i));
-        await user.click(screen.getByText(/preview & publish/i));
-        expect(mockNavigate).toHaveBeenCalledWith('CREATE_EVENT_PREVIEW');
+        await waitFor(() => screen.getByText(/faqs & terms/i));
+        await user.click(screen.getByText(/faqs & terms/i));
+        expect(mockNavigate).toHaveBeenCalledWith('CREATE_EVENT_POLICIES');
     });
 
     it('navigates back to CREATE_EVENT_SCHEDULE on Back click', async () => {

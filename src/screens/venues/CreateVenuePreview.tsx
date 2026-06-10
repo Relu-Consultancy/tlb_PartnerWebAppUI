@@ -219,7 +219,7 @@ export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
 
     if (loading) {
         return (
-            <WizardLayout title="Review Listing" stepText="Step 5 of 5" subtitle="Preview & Publish" progressPercentage={100} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_PACKAGES')}>
+            <WizardLayout title="Review Listing" stepText="Step 6 of 6" subtitle="Preview & Publish" progressPercentage={100} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_POLICIES')}>
                 <div className="flex items-center justify-center gap-2 text-gray-400 text-xs font-bold py-12">
                     <Loader2 size={16} className="animate-spin" /> Loading preview…
                 </div>
@@ -229,7 +229,7 @@ export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
 
     if (loadError || !venue) {
         return (
-            <WizardLayout title="Review Listing" stepText="Step 5 of 5" subtitle="Preview & Publish" progressPercentage={100} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_PACKAGES')}>
+            <WizardLayout title="Review Listing" stepText="Step 6 of 6" subtitle="Preview & Publish" progressPercentage={100} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_POLICIES')}>
                 <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-xs font-bold text-red-600">
                     {loadError || 'Could not load venue.'}
                 </div>
@@ -238,7 +238,7 @@ export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
     }
 
     return (
-        <WizardLayout title="Review Listing" stepText="Step 5 of 5" subtitle="Preview & Publish" progressPercentage={100} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_PACKAGES')}>
+        <WizardLayout title="Review Listing" stepText="Step 6 of 6" subtitle="Preview & Publish" progressPercentage={100} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_POLICIES')}>
             <div className="text-center space-y-1">
                 <h2 className="text-2xl font-black">Preview Your Venue</h2>
                 <p className="text-sm text-gray-400">Review everything before submitting.</p>
@@ -437,7 +437,7 @@ export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
             )}
 
             <WizardNavigation
-                onBack={() => onNavigate('CREATE_VENUE_PACKAGES')}
+                onBack={() => onNavigate('CREATE_VENUE_POLICIES')}
                 onNext={canSubmit && !submitting ? handleSubmit : () => {}}
                 nextText={submitting ? 'Submitting…' : venue.status === 'draft' ? 'Submit for Review' : 'Done'}
                 nextIcon={submitting ? <Loader2 size={20} className="animate-spin" /> : <Rocket size={20} />}

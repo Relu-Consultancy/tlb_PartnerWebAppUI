@@ -112,7 +112,7 @@ export const CreateVenuePackages: React.FC<Props> = ({ onNavigate }) => {
                     await createVenuePackage(draftId, payload);
                 }
             }
-            onNavigate('CREATE_VENUE_PREVIEW');
+            onNavigate('CREATE_VENUE_POLICIES');
         } catch (err: any) {
             toast.error(err?.message || 'Failed to save packages.');
         } finally {
@@ -122,7 +122,7 @@ export const CreateVenuePackages: React.FC<Props> = ({ onNavigate }) => {
 
     if (loading) {
         return (
-            <WizardLayout title="Packages & Pricing" stepText="Step 4 of 5" subtitle="Packages" progressPercentage={80} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_AVAILABILITY')}>
+            <WizardLayout title="Packages & Pricing" stepText="Step 4 of 6" subtitle="Packages" progressPercentage={66} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_AVAILABILITY')}>
                 <div className="flex items-center justify-center gap-2 text-gray-400 text-xs font-bold py-12">
                     <Loader2 size={16} className="animate-spin" /> Loading packages…
                 </div>
@@ -132,14 +132,14 @@ export const CreateVenuePackages: React.FC<Props> = ({ onNavigate }) => {
 
     if (loadError) {
         return (
-            <WizardLayout title="Packages & Pricing" stepText="Step 4 of 5" subtitle="Packages" progressPercentage={80} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_AVAILABILITY')}>
+            <WizardLayout title="Packages & Pricing" stepText="Step 4 of 6" subtitle="Packages" progressPercentage={66} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_AVAILABILITY')}>
                 <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-xs font-bold text-red-600">{loadError}</div>
             </WizardLayout>
         );
     }
 
     return (
-        <WizardLayout title="Packages & Pricing" stepText="Step 4 of 5" subtitle="Packages" progressPercentage={80} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_AVAILABILITY')}>
+        <WizardLayout title="Packages & Pricing" stepText="Step 4 of 6" subtitle="Packages" progressPercentage={66} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_AVAILABILITY')}>
             <div className="space-y-1">
                 <h2 className="text-2xl font-black">Build Your Packages</h2>
                 <p className="text-sm text-gray-400">Offer different tiers for customers to choose from.</p>
@@ -243,7 +243,7 @@ export const CreateVenuePackages: React.FC<Props> = ({ onNavigate }) => {
             <WizardNavigation
                 onBack={() => onNavigate('CREATE_VENUE_AVAILABILITY')}
                 onNext={handleNext}
-                nextText={proceeding ? 'Saving…' : 'Review & Publish'}
+                nextText={proceeding ? 'Saving…' : 'Next: FAQs & Terms'}
                 nextIcon={proceeding ? <Loader2 size={20} className="animate-spin" /> : <CheckCircle2 size={20} />}
                 themeColor="amber"
             />

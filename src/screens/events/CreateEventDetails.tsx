@@ -187,9 +187,9 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
     return (
         <WizardLayout
             title="New Event"
-            stepText="Step 1 of 4"
+            stepText="Step 1 of 5"
             subtitle="Details"
-            progressPercentage={25}
+            progressPercentage={20}
             themeColor="blue"
             onBack={() => onNavigate('SERVICE_LISTINGS')}
         >

@@ -13,6 +13,7 @@ import {
   BarChart3,
   Ticket,
   LifeBuoy,
+  Network,
   ChevronRight,
   PanelLeftClose,
 } from 'lucide-react';
@@ -56,6 +57,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen
     { id: 'PROGRAM_ENQUIRIES', label: 'Program Enquiries', icon: Inbox, visible: hasPrograms },
     { id: 'PACKAGES', label: 'Packages', icon: Package, visible: false },
     { id: 'ALL_COUPONS', label: 'Coupons', icon: Ticket, visible: true },
+    { id: 'PARTNER_NETWORK', label: 'Partner Network', icon: Network, visible: true },
     { id: 'FINANCIAL_HUB', label: 'Finance', icon: DollarSign, visible: true },
     { id: 'HELP_SUPPORT', label: 'Help & Support', icon: LifeBuoy, visible: true },
   ];

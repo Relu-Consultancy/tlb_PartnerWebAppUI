@@ -263,7 +263,7 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
 
     if (metaLoading) {
         return (
-            <WizardLayout title="New Venue Listing" stepText="Step 1 of 5" subtitle="Details" progressPercentage={20} themeColor="amber" onBack={() => onNavigate('SERVICE_LISTINGS')}>
+            <WizardLayout title="New Venue Listing" stepText="Step 1 of 6" subtitle="Details" progressPercentage={17} themeColor="amber" onBack={() => onNavigate('SERVICE_LISTINGS')}>
                 <div className="flex items-center justify-center gap-2 text-gray-400 text-xs font-bold py-12">
                     <Loader2 size={16} className="animate-spin" /> Loading…
                 </div>
@@ -273,14 +273,14 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
 
     if (metaError) {
         return (
-            <WizardLayout title="New Venue Listing" stepText="Step 1 of 5" subtitle="Details" progressPercentage={20} themeColor="amber" onBack={() => onNavigate('SERVICE_LISTINGS')}>
+            <WizardLayout title="New Venue Listing" stepText="Step 1 of 6" subtitle="Details" progressPercentage={17} themeColor="amber" onBack={() => onNavigate('SERVICE_LISTINGS')}>
                 <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-xs font-bold text-red-600">{metaError}</div>
             </WizardLayout>
         );
     }
 
     return (
-        <WizardLayout title="New Venue Listing" stepText="Step 1 of 5" subtitle="Details" progressPercentage={20} themeColor="amber" onBack={() => onNavigate('SERVICE_LISTINGS')}>
+        <WizardLayout title="New Venue Listing" stepText="Step 1 of 6" subtitle="Details" progressPercentage={17} themeColor="amber" onBack={() => onNavigate('SERVICE_LISTINGS')}>
             <div className="space-y-1">
                 <h2 className="text-2xl font-black">Venue Details</h2>
                 <p className="text-sm text-gray-400">Tell us about your space.</p>

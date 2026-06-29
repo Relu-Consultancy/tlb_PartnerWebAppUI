@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Edit3, Rocket, Clock, Users, MapPin, CalendarDays, Tag, Loader2, AlertCircle, CheckCircle2, ShieldCheck, LockKeyhole } from 'lucide-react';
+import { Rocket, Clock, Loader2, AlertCircle, CheckCircle2, ShieldCheck, LockKeyhole } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation } from '../../components/ui';
+import { WizardLayout, WizardNavigation, AppListingPreview } from '../../components/ui';
+import type { AppListingPreviewModel, PreviewFact } from '../../components/ui';
 import {
     getListingDetail,
     submitListing,
@@ -190,17 +191,6 @@ const ResultModal: React.FC<ResultModalProps> = ({ variant, message, onClose }) 
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-const fmtDate = (iso?: string) => {
-    if (!iso) return '—';
-    try {
-        return new Date(iso).toLocaleString(undefined, {
-            day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
-        });
-    } catch {
-        return iso;
-    }
-};
-
 const API_BASE = 'https://tlb-api.reluconsultancy.in';
 const resolveUrl = (url: string) => {
     if (!url) return '';
@@ -209,6 +199,21 @@ const resolveUrl = (url: string) => {
 };
 
 const titleCase = (s?: string) => s ? s.charAt(0).toUpperCase() + s.slice(1) : '—';
+
+// "Saturday, 21 Mar · 3:00 PM – 6:00 PM"
+const fmtRange = (s?: string, e?: string): string | undefined => {
+    if (!s) return undefined;
+    const sd = new Date(s);
+    if (Number.isNaN(sd.getTime())) return undefined;
+    const datePart = sd.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short' });
+    const t1 = sd.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    let out = `${datePart} · ${t1}`;
+    if (e) {
+        const ed = new Date(e);
+        if (!Number.isNaN(ed.getTime())) out += ` – ${ed.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
+    }
+    return out;
+};
 
 export const CreateEventPreview: React.FC<Props> = ({ onNavigate }) => {
     const [draftId, setDraftId] = useState<string | null>(null);
@@ -265,6 +270,32 @@ export const CreateEventPreview: React.FC<Props> = ({ onNavigate }) => {
         if (!cover) missing.push('Cover image');
     }
     const canSubmit = !!event && missing.length === 0 && event.status === 'draft';
+
+    const isOnline = event?.mode === 'online';
+    const minTicket = event?.tickets && event.tickets.length
+        ? Math.min(...event.tickets.map(t => Number(t.price) || 0)) : undefined;
+    const previewModel: AppListingPreviewModel | null = event ? {
+        typeLabel: 'Event',
+        title: event.title || '',
+        coverUrl: cover ? resolveUrl(cover.file_url) : undefined,
+        gallery: gallery.map(g => resolveUrl(g.file_url)),
+        tags: [event.category?.name, event.subcategory?.name, event.format ? titleCase(event.format) : undefined].filter(Boolean) as string[],
+        locationLine: isOnline ? 'Online event' : ([event.area, event.city].filter(Boolean).join(', ') || event.address || undefined),
+        address: isOnline ? undefined : (event.address || [event.area, event.city].filter(Boolean).join(', ') || undefined),
+        dateLine: fmtRange(event.start_datetime, event.end_datetime),
+        description: event.description || '',
+        aboutTitle: 'About Event',
+        facts: [
+            event.age_group ? { icon: 'age', label: 'Age Group', value: `${event.age_group.min_age}–${event.age_group.max_age} yrs` } : null,
+            event.format ? { icon: 'format', label: 'Format', value: titleCase(event.format) } : null,
+            event.mode ? { icon: 'mode', label: 'Mode', value: titleCase(event.mode) } : null,
+            event.available_seats != null
+                ? { icon: 'spots', label: 'Spots available', value: String(event.available_seats) }
+                : event.capacity != null ? { icon: 'spots', label: 'Capacity', value: String(event.capacity) } : null,
+        ].filter(Boolean) as PreviewFact[],
+        priceLabel: event.price_type === 'free' ? 'Free' : (minTicket != null ? (minTicket > 0 ? `₹${minTicket}` : 'Free') : '—'),
+        ctaLabel: 'Book Now',
+    } : null;
 
     const handleSubmit = async () => {
         if (!draftId || !canSubmit) return;
@@ -340,146 +371,7 @@ export const CreateEventPreview: React.FC<Props> = ({ onNavigate }) => {
                 <p className="text-sm text-gray-400">This is how attendees will see your event.</p>
             </div>
 
-            {/* Event Card */}
-            <div className="bg-white rounded-3xl border-2 border-gray-200 overflow-hidden shadow-xl max-w-md mx-auto">
-                <div className="h-52 relative bg-gray-100">
-                    {cover ? (
-                        <img src={resolveUrl(cover.file_url)} alt="Cover" className="w-full h-full object-cover" />
-                    ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center text-gray-300">
-                            <CalendarDays size={32} />
-                            <span className="text-xs font-bold mt-2">No cover image</span>
-                        </div>
-                    )}
-                    <div className="absolute top-3 left-3 bg-blue-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest flex items-center gap-1">
-                        <CalendarDays size={10} /> Event
-                    </div>
-                    <div className={`absolute top-3 right-3 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest ${
-                        event.status === 'draft' ? 'bg-gray-500' :
-                        event.status === 'pending' ? 'bg-amber-500' :
-                        event.status === 'published' ? 'bg-emerald-500' : 'bg-red-500'
-                    }`}>
-                        {event.status}
-                    </div>
-                    <button
-                        onClick={() => onNavigate('CREATE_EVENT_MEDIA')}
-                        className="absolute bottom-3 right-3 bg-white/90 p-2 rounded-xl shadow text-gray-600 hover:bg-white"
-                        aria-label="Edit media"
-                    >
-                        <Edit3 size={14} />
-                    </button>
-                </div>
-
-                <div className="p-5 space-y-4">
-                    <div className="flex items-start justify-between">
-                        <div>
-                            <h3 className="text-xl font-black">{event.title || 'Untitled Event'}</h3>
-                            <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mt-0.5">
-                                {event.category?.name || '—'} {event.subcategory && `› ${event.subcategory.name}`}
-                            </p>
-                        </div>
-                        <button onClick={() => onNavigate('CREATE_EVENT_DETAILS')} className="text-gray-400 hover:text-blue-500 p-1">
-                            <Edit3 size={14} />
-                        </button>
-                    </div>
-
-                    {event.format && (
-                        <div className="flex flex-wrap gap-1.5">
-                            <span className="bg-blue-50 text-blue-600 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase">
-                                {event.format}
-                            </span>
-                        </div>
-                    )}
-
-                    <div className="flex flex-wrap gap-3">
-                        {event.age_group && (
-                            <div className="flex items-center gap-1.5 bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold">
-                                <Users size={12} /> Ages {event.age_group.min_age}–{event.age_group.max_age}
-                            </div>
-                        )}
-                        {event.mode && (
-                            <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg text-xs font-bold">
-                                <MapPin size={12} /> {titleCase(event.mode)}
-                            </div>
-                        )}
-                        {event.start_datetime && (
-                            <div className="flex items-center gap-1.5 bg-amber-50 text-amber-600 px-3 py-1.5 rounded-lg text-xs font-bold">
-                                <CalendarDays size={12} /> {fmtDate(event.start_datetime)}
-                            </div>
-                        )}
-                    </div>
-
-                    {event.description && (
-                        <div className="relative">
-                            <p className="text-sm text-gray-600 leading-relaxed">{event.description}</p>
-                            <button onClick={() => onNavigate('CREATE_EVENT_DETAILS')} className="absolute -top-1 -right-1 text-gray-400 hover:text-blue-500 p-1">
-                                <Edit3 size={12} />
-                            </button>
-                        </div>
-                    )}
-
-                    {(event.city || event.address) && (
-                        <div className="bg-gray-50 rounded-xl p-3 text-xs">
-                            <p className="font-bold text-gray-600">{event.city}{event.area && `, ${event.area}`}</p>
-                            {event.address && <p className="text-gray-400 mt-0.5">{event.address}</p>}
-                        </div>
-                    )}
-
-                    {/* Schedule */}
-                    <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                            <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Schedule</p>
-                            <button onClick={() => onNavigate('CREATE_EVENT_SCHEDULE')} className="text-gray-400 hover:text-blue-500 p-1">
-                                <Edit3 size={12} />
-                            </button>
-                        </div>
-                        <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="bg-blue-100 p-1.5 rounded-lg text-blue-500"><Clock size={14} /></div>
-                                <div>
-                                    <p className="text-sm font-bold">{fmtDate(event.start_datetime)}</p>
-                                    <p className="text-[11px] text-gray-400">to {fmtDate(event.end_datetime)}</p>
-                                </div>
-                            </div>
-                            {event.available_seats != null && (
-                                <span className="text-[10px] font-bold text-emerald-500">{event.available_seats} seats left</span>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Tickets */}
-                    {event.tickets && event.tickets.length > 0 && (
-                        <div className="space-y-2">
-                            <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Tickets</p>
-                            {event.tickets.map(t => (
-                                <div key={t.id} className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="bg-amber-100 p-1.5 rounded-lg text-amber-500"><Tag size={14} /></div>
-                                        <div>
-                                            <p className="text-sm font-bold">{t.name}</p>
-                                            <p className="text-[11px] text-gray-400">{t.available_quantity}/{t.total_quantity} available</p>
-                                        </div>
-                                    </div>
-                                    <span className="text-sm font-black text-blue-600">
-                                        {t.price > 0 ? `₹${t.price}` : 'Free'}
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
-                    {gallery.length > 0 && (
-                        <div className="space-y-2">
-                            <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Gallery</p>
-                            <div className="flex gap-2 overflow-x-auto pb-1">
-                                {gallery.map(g => (
-                                    <img key={g.id} src={resolveUrl(g.file_url)} alt="" className="w-20 h-20 rounded-xl object-cover shrink-0" />
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </div>
+            {previewModel && <AppListingPreview model={previewModel} listingId={draftId || undefined} />}
 
             {/* Submission readiness */}
             {missing.length > 0 ? (

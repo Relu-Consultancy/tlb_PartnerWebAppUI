@@ -135,41 +135,14 @@ describe('CreateProgramIdentity — pre-fill from existing draft', () => {
 });
 
 describe('CreateProgramIdentity — booking type', () => {
-    it('renders both Enquiry and Booking options', async () => {
+    it('does not expose a Direct Booking / Enquiry option in the UI', async () => {
         renderComponent();
-        await waitFor(() => screen.queryByText('Dance'));
-        expect(screen.getByText('Enquiry')).toBeInTheDocument();
-        expect(screen.getByText('Direct Booking')).toBeInTheDocument();
+        await waitFor(() => expect(screen.queryByText('Dance')).toBeInTheDocument(), { timeout: 3000 });
+        expect(screen.queryByText('Direct Booking')).not.toBeInTheDocument();
+        expect(screen.queryByText('Enquiry')).not.toBeInTheDocument();
     });
 
-    it('defaults to Enquiry selected', async () => {
-        renderComponent();
-        await waitFor(() => screen.getByText('Enquiry'));
-        const enquiryBtn = screen.getByText('Enquiry').closest('button');
-        expect(enquiryBtn?.className).toMatch(/border-emerald-400/);
-    });
-
-    it('can select Direct Booking type', async () => {
-        renderComponent();
-        const user = userEvent.setup();
-        await waitFor(() => screen.getByText('Direct Booking'));
-        await user.click(screen.getByText('Direct Booking'));
-        const bookingBtn = screen.getByText('Direct Booking').closest('button');
-        expect(bookingBtn?.className).toMatch(/border-emerald-400/);
-    });
-
-    it('pre-fills booking_type from existing draft', async () => {
-        sessionStorage.setItem('current_program_draft_id', PROGRAM_DRAFT_ID);
-        server.use(http.get(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/`, () =>
-            HttpResponse.json({ success: true, data: { ...mockProgramDraft, booking_type: 'direct_booking' } })));
-        renderComponent();
-        await waitFor(() => {
-            const bookingBtn = screen.getByText('Direct Booking').closest('button');
-            expect(bookingBtn?.className).toMatch(/border-emerald-400/);
-        }, { timeout: 3000 });
-    });
-
-    it('includes booking_type in the PATCH payload', async () => {
+    it('defaults booking_type to "enquiry" in the PATCH payload', async () => {
         let patchBody: any = null;
         server.use(http.patch(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/`, async ({ request }) => {
             patchBody = await request.json();
@@ -181,8 +154,7 @@ describe('CreateProgramIdentity — booking type', () => {
         // Wait for metadata to fully load before interacting
         await waitFor(() => expect(screen.queryByText('Dance')).toBeInTheDocument(), { timeout: 3000 });
         await user.type(screen.getByPlaceholderText('e.g. Advanced Robotics Program'), 'My Program');
-        await user.click(screen.getByText('Direct Booking'));
         await user.click(screen.getByRole('button', { name: /next|continue/i }));
-        await waitFor(() => expect(patchBody?.booking_type).toBe('direct_booking'), { timeout: 3000 });
+        await waitFor(() => expect(patchBody?.booking_type).toBe('enquiry'), { timeout: 3000 });
     });
 });

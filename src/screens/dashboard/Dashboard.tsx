@@ -8,7 +8,7 @@ import { Screen } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
 import { EntityPickerSheet } from '../../components/EntityPickerSheet';
 import { NotificationCenter } from '../../components/NotificationCenter';
-import { Loader, AreaSparkline, TrendBadge, fmtCurrency, trendPct } from '../../components/ui';
+import { Loader, AreaSparkline, TrendBadge, fmtCurrency, trendPct, BookingsCalendar } from '../../components/ui';
 import {
   getPartnerDashboard, getCurrentPartner, getBusinessProfile,
   getExtendedProfile, getPartnerMedia, getPartnerFollowerCount
@@ -28,6 +28,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
   const { allowedEntities, setAllowedEntities } = usePartner();
   const [showEntityPicker, setShowEntityPicker] = useState(false);
   const [showProfilePopup, setShowProfilePopup] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
   const profilePopupRef = useRef<HTMLDivElement>(null);
 
   const [partnerData, setPartnerData] = useState<any>(null);
@@ -120,6 +121,13 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!showCalendar) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowCalendar(false); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [showCalendar]);
 
   const handleAddListing = () => {
     if (allowedEntities.length === 1) {
@@ -230,6 +238,15 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* Bookings calendar */}
+          <button
+            onClick={() => setShowCalendar(true)}
+            className="h-9 px-3 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors flex items-center gap-2"
+            title="Bookings calendar"
+          >
+            <CalendarDays size={18} />
+            <span className="text-sm font-bold hidden md:inline">Calendar</span>
+          </button>
           {/* Notifications */}
           <NotificationCenter variant="light" />
           {/* Profile */}
@@ -446,6 +463,21 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
           <p className="text-[11px] text-gray-600">&copy; 2026 The Little Broadway &middot; Partner Portal V3.0</p>
         </div>
       </footer>
+
+      {/* Bookings calendar popup */}
+      {showCalendar && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center p-4 sm:p-6 overflow-y-auto bg-black/40 backdrop-blur-sm"
+          onClick={() => setShowCalendar(false)}
+        >
+          <div className="w-full max-w-md mt-8 sm:mt-16" onClick={(e) => e.stopPropagation()}>
+            <BookingsCalendar
+              onClose={() => setShowCalendar(false)}
+              onViewAll={() => { setShowCalendar(false); onNavigate('ATTENDEES'); }}
+            />
+          </div>
+        </div>
+      )}
 
       <EntityPickerSheet
         isOpen={showEntityPicker}

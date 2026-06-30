@@ -19,36 +19,43 @@ src/
 │   ├── coupons.ts          # Partner coupons CRUD (live) — get/create/update/deactivate/usages; CreateCouponInput targeting
 │   ├── help.ts             # Help & Support tickets — categories, list, create, detail, messages (poll), send, close
 │   ├── notifications.ts     # In-app notifications — list, unread-count, mark read/all, get/update preferences
-│   ├── network.ts          # Partner Network — directory, profile, block/unblock, conversations + messages (1-to-1 chat)
-│   └── listings.ts         # Listings + ticket + media CRUD, bookings (+payment-detail), coupon_code, event/venue FAQ CRUD, generic terms, ApiError class
+│   ├── network.ts          # Partner Network — directory, profile, block/unblock, conversations + single-message send
+│   ├── reviews.ts          # Partner reviews — getPartnerReviews (all, paginated) + getListingReviews (per listing, 404-safe)
+│   └── listings.ts         # Listings + ticket + media CRUD, bookings (+payment-detail), coupon_code, event/venue FAQ CRUD, generic terms, class + venue enquiries, ApiError class
 ├── context/
 │   └── PartnerContext.tsx   # Global context: allowedEntities (synced to sessionStorage)
 ├── components/
 │   ├── Navigation.tsx           # Sidebar: fixed push-content on desktop (lg+, dark navy #0f1729), always-`lg:hidden` overlay drawer on mobile; collapse via in-sidebar toggle, re-expand via hamburger (App.tsx onOpenSidebar sets both desktop+mobile state). Includes "Coupons" → ALL_COUPONS and "Help & Support" → HELP_SUPPORT entries.
-│   ├── NotificationCenter.tsx   # Bell + badge (polls unread-count 60s) + slide-in drawer (list, mark read/all, broadcast prefs). `variant` 'light'|'dark'. Mounted in Dashboard header.
+│   ├── NotificationCenter.tsx   # Bell + badge (polls unread-count 60s). Click navigates to the dedicated MESSAGES screen (the slide-in drawer was replaced). `variant` 'light'|'dark'. Mounted in Dashboard header.
 │   ├── EntityPickerSheet.tsx    # Bottom sheet for entity type selection
 │   └── ui/
 │       ├── DashboardCharts.tsx  # Shared SVG chart primitives: AreaSparkline, TrendAreaChart, WeeklyBarChart, DonutChart, fmtCurrency, trendPct, TrendBadge
 │       ├── Toast.tsx            # Global imperative toast: `toast.success/error/warning/info()` singleton + <Toaster/> (mounted once in App.tsx). Card design (coloured top accent bar + bold title + message + dismiss). Legacy `useToasts()` + `<ToastContainer/>` kept as local-state shims rendering the same card.
 │       ├── Select.tsx           # Reusable animated dropdown (drop-in for native <select>). Menu rendered in a portal (fixed position, never clipped by overflow); keyboard nav, flip-up, click-outside, icons/dots/check
 │       ├── FaqTermsEditor.tsx   # Shared FAQ CRUD + Terms&Conditions editor (text + document upload); used by Event/Venue Policies steps. Theme-aware accent.
+│       ├── BookingsCalendar.tsx # Month grid marking the partner's bookings per day; opened as a Dashboard popup
+│       ├── LatestListings.tsx   # Compact upcoming/live listings list (soonest first, Live/Soon highlight); Dashboard popup
+│       ├── AppListingPreview.tsx# Mobile-app-style listing detail preview (phone frame) shared by all 4 wizard Preview steps
 │       └── OnboardingShell.tsx  # Shared layout for every onboarding screen: sticky branded header + ProgressDots + PageHeader + motion fade-in + decorative blurs
 ├── screens/
 │   ├── auth/               # Landing, Login, OTPVerify, PartnerAccess, PartnerAccessOTP, PartnerCategory
 │   ├── onboarding/         # Registration, AppSubmitted, AppApproved, AgreementSubmit, IdentityVerification, BankSetup, OnboardingComplete
 │   ├── dashboard/          # Dashboard (Home) — lean layout; analytics moved to Statistics
 │   ├── profile/            # BrandProfile (EditProfile), PreviewProfile
-│   ├── services/           # ServiceListings (shared dashboard for all entities)
+│   ├── services/           # ServiceListings (shared dashboard for all entities) — interactive stat-chips + animated cover-banner cards + animated table rows
 │   ├── classes/            # CreateClass* (5 steps)
 │   ├── events/             # CreateEvent* (5 steps: Details, Schedule, Media, Policies, Preview) + __tests__/
 │   ├── programs/           # CreateProgram* (5 steps)
 │   ├── venues/             # CreateVenue* (6 steps: Details, Occasions, Availability, Packages, Policies, Preview)
-│   ├── enquiries/          # Enquiries, ProgramEnquiries
-│   ├── attendees/          # Attendees — two-level: listings/dates grid (Comfortable/Compact/List density) → per-group bookings + detail drawer
+│   ├── enquiries/          # Enquiries (Classes), ProgramEnquiries, VenueEnquiries
+│   ├── attendees/          # Attendees (attended-only) + Bookings (all, History split + happen-date sort/Live-Soon highlight) — shared parameterized component (variant)
+│   ├── reviews/            # Reviews — per-listing ratings/reviews with overall summary
+│   ├── documents/          # Documents — KYC (PAN/GST/bank) + brand assets (logo/cover) + uploaded media/docs
+│   ├── messages/           # Messages — full-screen notification inbox (replaces the bell drawer)
 │   ├── coupons/            # CreateCoupon (form, live API + targeting), AllCoupons (live list + deactivate, sample fallback)
 │   ├── support/            # Support — Help & Support: ticket list → new ticket → chat thread (poll/refresh/close)
-│   ├── network/            # PartnerNetwork — directory (search/filter) → profile (listings, block, ping) → 1-to-1 chat
-│   ├── statistics/         # Statistics — tabbed analytics screen (Statistics.tsx + StatCharts.tsx)
+│   ├── network/            # PartnerNetwork — directory (search/filter) → profile (listings, block) → single-message compose (no chat)
+│   ├── statistics/         # Statistics — tabbed analytics + Bookings→Attendees & Enquiries→Bookings(venue) ratios
 │   ├── packages/           # Packages
 │   └── financial/          # FinancialHub
 ├── test/
@@ -183,6 +190,22 @@ Request → 401 Unauthorized?
 | `getClassEnquiryDetail` | GET | `/api/v1/partner/listings/classes/enquiries/<id>/` | — | Enquiries |
 | `updateClassEnquiry` | PUT | `/api/v1/partner/listings/classes/enquiries/<id>/` | `{ status, internal_notes }` | Enquiries |
 | `unlockClassEnquiry` | POST | `/api/v1/partner/listings/classes/enquiries/<id>/unlock/` | — | Enquiries |
+
+**Enquiries (Venues):** flat endpoints mirroring the Class CRM.
+
+| Function | Method | Endpoint | Payload | Used By |
+|----------|--------|----------|---------|---------|
+| `getVenueEnquiries` | GET | `/api/v1/partner/listings/venues/enquiries/[?status=]` | — | VenueEnquiries |
+| `getVenueEnquiryDetail` | GET | `/api/v1/partner/listings/venues/enquiries/<id>/` | — | VenueEnquiries |
+| `updateVenueEnquiry` | PUT | `/api/v1/partner/listings/venues/enquiries/<id>/` | `{ status, internal_notes }` | VenueEnquiries |
+| `unlockVenueEnquiry` | POST | `/api/v1/partner/listings/venues/enquiries/<id>/unlock/` | — | VenueEnquiries |
+
+**Reviews:**
+
+| Function | Method | Endpoint | Notes |
+|----------|--------|----------|-------|
+| `getPartnerReviews` | GET | `/api/v1/partner/reviews/?page=` | All reviews, every page fetched; normalized `{ listing_id, listing_title, rating, comment, reviewer_name, created_at }` |
+| `getListingReviews` | GET | `/api/v1/partner/listings/<id>/reviews/` | Per-listing; returns `[]` on 404 |
 
 **Programs:**
 
@@ -985,11 +1008,16 @@ One canonical type scale lives in `src/styles/components.css`; use these instead
 | CREATE_PROGRAM_PREVIEW | ✅/❌ | Programs | CreateProgramPreview | ✅ Full detail + submit; success/under_review/error modals |
 | ENQUIRIES | ✅ | Classes | Enquiries | ✅ getClassEnquiries, unlock, status/notes PUT |
 | PROGRAM_ENQUIRIES | ✅ | Programs | ProgramEnquiries | ✅ getProgramListings → getProgramEnquiries per-listing, updateProgramEnquiry |
-| ATTENDEES | ✅ | — | Attendees | ✅ Two-level (listings/dates grid → group bookings + drawer); paginated getBookings (+listing_title), getBookingDetail, getBookingPaymentDetail, markBookingAttended (no partner cancel — 403) |
+| VENUE_ENQUIRIES | ✅ | Venues | VenueEnquiries | ✅ getVenueEnquiries (flat) + unlock + status/notes PUT — mirrors Class CRM |
+| ATTENDEES | ✅ | — | Attendees | ✅ Attended-only entries; listing/date grid + History split; detail drawer |
+| BOOKINGS | ✅ | — | Bookings (Attendees variant) | ✅ All bookings; happen-date sort + Live/Soon highlight + History split; status tabs + drawer |
+| REVIEWS | ✅ | — | Reviews | ✅ Per-listing reviews + overall summary (getPartnerReviews; 404-safe) |
 | ALL_COUPONS | ✅ | — | AllCoupons | ✅ Live getCoupons + deactivate; sample fallback; status filters/search |
 | CREATE_COUPON | ✅ | — | CreateCoupon | ✅ Live createCoupon + targeting (listing dropdown / category / audience) |
 | HELP_SUPPORT | ✅ | — | Support | ✅ Live /help/tickets/ — categories, list, create, chat thread (poll/refresh), close |
-| PARTNER_NETWORK | ✅ | — | PartnerNetwork | ✅ Live /partner/network/ — directory, profile, block, conversations + chat |
+| PARTNER_NETWORK | ✅ | — | PartnerNetwork | ✅ Live /partner/network/ — directory, profile, block, single-message compose (no chat) |
+| DOCUMENTS | ✅ | — | Documents | ✅ KYC (submitVerification) + logo/cover (extended-profile) + media upload/delete |
+| MESSAGES | ✅ | — | Messages | ✅ Full-screen notification inbox (list, mark read/all, prefs, paginate); bell navigates here |
 | PACKAGES | ✅ | — | Packages | ❌ Placeholder |
 | FINANCIAL_HUB | ✅ | — | FinancialHub | ⚡ Partial — bank details from `getCurrentPartner` |
 
@@ -1266,6 +1294,22 @@ npm run test:report   # run tests → generate test-report.html + test-report.pd
 | `docs/venue-listings-db-spec.md` | Venues module — tables (`venues`, `venue_occasions`, `venue_availability`, `venue_packages`, `venue_media`), occasion/time-slot/attendee-field reference, bulk availability pattern, API endpoints |
 
 ---
+
+*Phase 26 (2026-06-30) — Bookings/Reviews/Documents/Messages/Venue-Enquiries screens, dashboard popups, ratios, single-message network, interactive listings:*
+- *Bookings vs Attendees: `attendees/Attendees.tsx` parameterized with a `variant` ('attendees' | 'bookings') and exported twice (`Attendees` default + `Bookings`). **Attendees** now shows only `status==='attended'` entries; **Bookings** (new `BOOKINGS` screen + sidebar) shows all. By-Listing grid sorts by each listing's happen date (live → soonest upcoming → recent past → undated) and highlights **Live** / **Soon** (≤2 days) cards; past-dated listings move to a separate **History** section. Captures `happenAt`/`happenEnd`/`is_live` from listing payloads.*
+- *Reviews: new `src/api/reviews.ts` (`getPartnerReviews` paginated + `getListingReviews` 404-safe) + `src/screens/reviews/Reviews.tsx` (`REVIEWS` screen + sidebar) — overall rating/total/listings-reviewed summary + per-listing accordion of reviews.*
+- *Documents: new `src/screens/documents/Documents.tsx` (`DOCUMENTS` screen + sidebar) — verification status banner, KYC (PAN/GST/bank via `submitVerification`), brand assets (logo/cover via `updateExtendedProfile`), and uploaded media (getPartnerMedia / uploadPartnerMedia / deletePartnerMedia).*
+- *Messages: bell drawer removed — `NotificationCenter` is now just a badge+navigate bell; new `src/screens/messages/Messages.tsx` (`MESSAGES` screen + sidebar, Bell icon) is a full-screen notification inbox (list, mark read/all, preferences, paginate).*
+- *Venue Enquiries: new `src/screens/enquiries/VenueEnquiries.tsx` (`VENUE_ENQUIRIES`, requiresEntities ['Venues']) + venue enquiry API in `listings.ts` (`getVenueEnquiries`/detail/update/unlock at `/listings/venues/enquiries/`) — mirrors the Class Enquiries CRM (venue/occasion/guests/event-date fields).*
+- *Dashboard popups: header **Latest** (new `LatestListings` — upcoming/live, past excluded) and **Calendar** (`BookingsCalendar`) buttons open centered popups (Esc/backdrop/X). **Removed** the "Add New Listing" CTA and the footer.*
+- *Statistics: added **Bookings → Attendees** (all types) and **Enquiries → Bookings** (venues only) ratio cards (donut + counts), computed client-side from raw bookings + venue enquiries.*
+- *Partner Network: replaced the chat with a **single-message compose popup** (one editable enquiry per partner; `startConversation` → `sendConversationMessage`, then "Message Sent"/disabled). Directory cards redesigned with richer hover (glow, accent wipe, avatar zoom, animated arrow).*
+- *Listings (`ServiceListings`): interactive status **stat-chips** (quick filters), animated **cover-banner cards** (hover zoom/lift, live-pulse status pill, re-animate on tab/view/filter change), and animated table rows with thumbnail zoom.*
+- *Classes & Programs: removed the Direct Booking / Enquiry selector from the identity UI (booking_type still defaults to `enquiry` in the payload); tests updated.*
+
+*Phase 25 (2026-06-12) — App-style previews + dashboard bookings calendar:*
+- *`AppListingPreview` shared component renders each listing as it appears in the TLB user app (phone frame: hero, tag pills, about, things-to-know, gallery, map+directions, organized-by, terms, reviews empty state, sticky price/CTA). Wired into all four wizard Preview steps via per-entity normalized models; submission logic untouched.*
+- *`BookingsCalendar` — month grid marking the partner's bookings per day, opened from a Dashboard header button as a popup.*
 
 *Phase 24 (2026-06-10) — FAQ/Terms for Events & Venues + Partner Network + error boundary:*
 - *FAQ & Terms: new shared `FaqTermsEditor` (FAQ CRUD + Terms text/document upload). Added a **Policies** step to the Events (now 5 steps) and Venues (now 6 steps) wizards via per-entity FAQ endpoints (`/events|venues/{id}/faqs/`) + the generic `/listings/{id}/terms/` endpoints. Classes/Programs unchanged. Renumbered steps + rewired Media→Policies→Preview (events) and Packages→Policies→Preview (venues); updated 2 event nav tests.*

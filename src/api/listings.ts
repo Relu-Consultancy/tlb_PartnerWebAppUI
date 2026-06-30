@@ -566,6 +566,41 @@ export const unlockClassEnquiry = async (enquiryId: string) => {
     return response.json();
 };
 
+// ─── Venue Enquiries ───────────────────────────────────────────────────────
+// Mirrors the Class Enquiries CRM (flat endpoint + unlock + status/notes update).
+
+export const getVenueEnquiries = async (status?: string) => {
+    const url = status
+        ? `/api/v1/partner/listings/venues/enquiries/?status=${encodeURIComponent(status)}`
+        : '/api/v1/partner/listings/venues/enquiries/';
+    const response = await apiClient(url);
+    if (!response.ok) await handleError(response, 'Failed to load venue enquiries');
+    return response.json();
+};
+
+export const getVenueEnquiryDetail = async (enquiryId: string) => {
+    const response = await apiClient(`/api/v1/partner/listings/venues/enquiries/${enquiryId}/`);
+    if (!response.ok) await handleError(response, 'Failed to load venue enquiry detail');
+    return response.json();
+};
+
+export const updateVenueEnquiry = async (enquiryId: string, data: Record<string, any>) => {
+    const response = await apiClient(`/api/v1/partner/listings/venues/enquiries/${enquiryId}/`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    });
+    if (!response.ok) await handleError(response, 'Failed to update venue enquiry');
+    return response.json();
+};
+
+export const unlockVenueEnquiry = async (enquiryId: string) => {
+    const response = await apiClient(`/api/v1/partner/listings/venues/enquiries/${enquiryId}/unlock/`, {
+        method: 'POST',
+    });
+    if (!response.ok) await handleError(response, 'Failed to unlock venue enquiry');
+    return response.json();
+};
+
 // ─── Program Metadata (public) ────────────────────────────────────────────
 
 export const getProgramMetaCategories = async () => {

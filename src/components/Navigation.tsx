@@ -14,6 +14,10 @@ import {
   Ticket,
   LifeBuoy,
   Network,
+  ClipboardList,
+  Star,
+  FileText,
+  Bell,
   ChevronRight,
   PanelLeftClose,
 } from 'lucide-react';
@@ -46,15 +50,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen
 
   const hasClasses = allowedEntities.includes('Classes');
   const hasPrograms = allowedEntities.includes('Programs');
+  const hasVenues = allowedEntities.includes('Venues');
 
   const menuItems = [
     { id: 'HOME', label: 'Dashboard', icon: Home, visible: true },
+    { id: 'MESSAGES', label: 'Messages', icon: Bell, visible: true },
     { id: 'STATISTICS', label: 'Statistics', icon: BarChart3, visible: true },
     { id: 'BRAND_PROFILE', label: 'Brand Profile', icon: UserCircle, visible: true },
+    { id: 'DOCUMENTS', label: 'Documents', icon: FileText, visible: true },
     { id: 'SERVICE_LISTINGS', label: listingsLabel, icon: CalendarDays, visible: true },
+    { id: 'BOOKINGS', label: 'Bookings', icon: ClipboardList, visible: true },
     { id: 'ATTENDEES', label: 'Attendees', icon: Users, visible: true },
+    { id: 'REVIEWS', label: 'Reviews', icon: Star, visible: true },
     { id: 'ENQUIRIES', label: 'Class Enquiries', icon: Inbox, visible: hasClasses },
     { id: 'PROGRAM_ENQUIRIES', label: 'Program Enquiries', icon: Inbox, visible: hasPrograms },
+    { id: 'VENUE_ENQUIRIES', label: 'Venue Enquiries', icon: Inbox, visible: hasVenues },
     { id: 'PACKAGES', label: 'Packages', icon: Package, visible: false },
     { id: 'ALL_COUPONS', label: 'Coupons', icon: Ticket, visible: true },
     { id: 'PARTNER_NETWORK', label: 'Partner Network', icon: Network, visible: true },

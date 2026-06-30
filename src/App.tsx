@@ -65,6 +65,10 @@ const OnboardingComplete = lazyImport(() => import('./screens/onboarding'), 'Onb
 // Core App screens
 const Dashboard = lazyImport(() => import('./screens/dashboard'), 'Home');
 const Attendees = lazy(() => import('./screens/attendees'));
+const Bookings = lazyImport(() => import('./screens/attendees'), 'Bookings');
+const Reviews = lazy(() => import('./screens/reviews'));
+const Documents = lazy(() => import('./screens/documents'));
+const Messages = lazy(() => import('./screens/messages'));
 const Packages = lazy(() => import('./screens/packages'));
 const FinancialHub = lazy(() => import('./screens/financial'));
 const BrandProfile = lazyImport(() => import('./screens/profile'), 'BrandProfile');
@@ -103,6 +107,7 @@ const CreateVenuePreview = lazyImport(() => import('./screens/venues'), 'CreateV
 // Enquiries & Packages
 const Enquiries = lazyImport(() => import('./screens/enquiries'), 'Enquiries');
 const ProgramEnquiries = lazyImport(() => import('./screens/enquiries'), 'ProgramEnquiries');
+const VenueEnquiries = lazyImport(() => import('./screens/enquiries'), 'VenueEnquiries');
 
 // Statistics
 const StatisticsScreen = lazyImport(() => import('./screens/statistics'), 'Statistics');
@@ -124,6 +129,9 @@ const SCREEN_CHUNKS = [
   () => import('./screens/onboarding'),
   () => import('./screens/dashboard'),
   () => import('./screens/attendees'),
+  () => import('./screens/reviews'),
+  () => import('./screens/documents'),
+  () => import('./screens/messages'),
   () => import('./screens/packages'),
   () => import('./screens/financial'),
   () => import('./screens/profile'),
@@ -213,9 +221,14 @@ const routes: Record<Screen, RouteConfig> = {
   // Enquiries — restricted to Classes/Programs partners
   ENQUIRIES: { component: Enquiries, hasSidebar: true, requiresEntities: ['Classes'] },
   PROGRAM_ENQUIRIES: { component: ProgramEnquiries, hasSidebar: true, requiresEntities: ['Programs'] },
+  VENUE_ENQUIRIES: { component: VenueEnquiries, hasSidebar: true, requiresEntities: ['Venues'] },
 
   // Other
   ATTENDEES: { component: Attendees, hasSidebar: true },
+  BOOKINGS: { component: Bookings, hasSidebar: true },
+  REVIEWS: { component: Reviews, hasSidebar: true },
+  DOCUMENTS: { component: Documents, hasSidebar: true },
+  MESSAGES: { component: Messages, hasSidebar: true },
   PACKAGES: { component: Packages, hasSidebar: true },
   FINANCIAL_HUB: { component: FinancialHub, hasSidebar: true },
   STATISTICS: { component: StatisticsScreen, hasSidebar: true },

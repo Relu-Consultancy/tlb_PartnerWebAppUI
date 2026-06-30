@@ -54,8 +54,13 @@ export type Screen =
   // Other
   | 'ENQUIRIES'
   | 'PROGRAM_ENQUIRIES'
+  | 'VENUE_ENQUIRIES'
   | 'PACKAGES'
   | 'ATTENDEES'
+  | 'BOOKINGS'
+  | 'REVIEWS'
+  | 'DOCUMENTS'
+  | 'MESSAGES'
   | 'FINANCIAL_HUB'
   | 'STATISTICS'
   | 'ALL_COUPONS'

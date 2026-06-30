@@ -1,14 +1,14 @@
 ﻿import React, { useState, useRef, useEffect } from 'react';
 import {
   Menu, UserCircle, CheckCircle2,
-  Inbox, Eye, BarChart3, CreditCard, Plus, CalendarDays,
-  Ticket, DollarSign, MapPin, Percent, Edit3, LogOut,
+  Inbox, Eye, BarChart3, CreditCard, CalendarDays,
+  Ticket, DollarSign, MapPin, Percent, Edit3, LogOut, Sparkles,
 } from 'lucide-react';
 import { Screen } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
 import { EntityPickerSheet } from '../../components/EntityPickerSheet';
 import { NotificationCenter } from '../../components/NotificationCenter';
-import { Loader, AreaSparkline, TrendBadge, fmtCurrency, trendPct, BookingsCalendar } from '../../components/ui';
+import { Loader, AreaSparkline, TrendBadge, fmtCurrency, trendPct, BookingsCalendar, LatestListings } from '../../components/ui';
 import {
   getPartnerDashboard, getCurrentPartner, getBusinessProfile,
   getExtendedProfile, getPartnerMedia, getPartnerFollowerCount
@@ -29,6 +29,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
   const [showEntityPicker, setShowEntityPicker] = useState(false);
   const [showProfilePopup, setShowProfilePopup] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [showLatest, setShowLatest] = useState(false);
   const profilePopupRef = useRef<HTMLDivElement>(null);
 
   const [partnerData, setPartnerData] = useState<any>(null);
@@ -123,34 +124,11 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
   }, []);
 
   useEffect(() => {
-    if (!showCalendar) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowCalendar(false); };
+    if (!showCalendar && !showLatest) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setShowCalendar(false); setShowLatest(false); } };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [showCalendar]);
-
-  const handleAddListing = () => {
-    if (allowedEntities.length === 1) {
-      const e = allowedEntities[0];
-      if (e === 'Events') onNavigate('CREATE_EVENT_DETAILS');
-      else if (e === 'Venues') onNavigate('CREATE_VENUE_DETAILS');
-      else if (e === 'Programs') onNavigate('CREATE_PROGRAM_IDENTITY');
-      else onNavigate('CREATE_CLASS_IDENTITY');
-    } else if (allowedEntities.length > 1) setShowEntityPicker(true);
-    else onNavigate('CREATE_CLASS_IDENTITY');
-  };
-
-  const ctaLabel = (() => {
-    if (!allowedEntities.length) return 'Add New Listing';
-    if (allowedEntities.length === 1) {
-      const e = allowedEntities[0];
-      if (e === 'Events') return 'Create Event';
-      if (e === 'Classes') return 'Add New Class';
-      if (e === 'Programs') return 'Add New Program';
-      if (e === 'Venues') return 'Add Venue';
-    }
-    return 'Add New Listing';
-  })();
+  }, [showCalendar, showLatest]);
 
   const quickLinks = [
     { label: 'Brand Profile', screen: 'BRAND_PROFILE' as Screen, icon: UserCircle },
@@ -238,6 +216,15 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* Latest listings */}
+          <button
+            onClick={() => setShowLatest(true)}
+            className="h-9 px-3 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors flex items-center gap-2"
+            title="Latest listings"
+          >
+            <Sparkles size={18} />
+            <span className="text-sm font-bold hidden md:inline">Latest</span>
+          </button>
           {/* Bookings calendar */}
           <button
             onClick={() => setShowCalendar(true)}
@@ -248,7 +235,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
             <span className="text-sm font-bold hidden md:inline">Calendar</span>
           </button>
           {/* Notifications */}
-          <NotificationCenter variant="light" />
+          <NotificationCenter variant="light" onNavigate={onNavigate} />
           {/* Profile */}
           <div className="relative" ref={profilePopupRef}>
             <button onClick={() => setShowProfilePopup(!showProfilePopup)} className="w-9 h-9 rounded-full bg-tlb-yellow/10 text-tlb-yellow flex items-center justify-center hover:bg-tlb-yellow/20 transition-colors">
@@ -434,12 +421,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
         </section>
 
         {/* Quick actions row */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-          {/* CTA */}
-          <button onClick={handleAddListing} className="lg:col-span-2 bg-tlb-yellow text-tlb-dark rounded-2xl p-5 flex items-center gap-4 hover:brightness-105 active:scale-[0.99] transition-all">
-            <div className="w-12 h-12 bg-black/10 rounded-xl flex items-center justify-center shrink-0"><Plus size={24} /></div>
-            <div className="text-left"><p className="font-black text-base">{ctaLabel}</p><p className="text-xs font-medium text-black/50 mt-0.5">Start building your next listing</p></div>
-          </button>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Quick links */}
           {quickLinks.slice(0, 3).map((link) => (
             <button key={link.label} onClick={() => onNavigate(link.screen)} className="bg-white rounded-2xl border border-gray-100 p-5 flex items-center gap-3 hover:border-gray-300 hover:shadow-sm transition-all group">
@@ -453,16 +435,20 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
 
       </main>
 
-      {/* Footer */}
-      <footer className="bg-[#0f1729] text-white px-6 py-6 mt-4">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <img src="/tlbAppIcon.png" alt="TLB" className="w-8 h-8 rounded-lg" />
-            <span className="text-sm font-bold text-gray-400">The Little Broadway</span>
+      {/* Latest listings popup */}
+      {showLatest && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center p-4 sm:p-6 overflow-y-auto bg-black/40 backdrop-blur-sm"
+          onClick={() => setShowLatest(false)}
+        >
+          <div className="w-full max-w-md mt-8 sm:mt-16" onClick={(e) => e.stopPropagation()}>
+            <LatestListings
+              onClose={() => setShowLatest(false)}
+              onViewAll={() => { setShowLatest(false); onNavigate('SERVICE_LISTINGS'); }}
+            />
           </div>
-          <p className="text-[11px] text-gray-600">&copy; 2026 The Little Broadway &middot; Partner Portal V3.0</p>
         </div>
-      </footer>
+      )}
 
       {/* Bookings calendar popup */}
       {showCalendar && (

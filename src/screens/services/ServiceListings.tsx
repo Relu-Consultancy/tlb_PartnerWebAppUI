@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, Plus, Search, Filter, Users, Edit3, CalendarDays, BarChart3, MapPin, Layers, Clock, X, Check, SlidersHorizontal, Play, Pause, Archive, ArchiveRestore, Ticket, Tag, LayoutGrid, Grid3X3, List } from 'lucide-react';
+import { motion } from 'motion/react';
+import { Menu, Plus, Search, Filter, Users, Edit3, CalendarDays, BarChart3, MapPin, Layers, Clock, X, Check, SlidersHorizontal, Play, Pause, Archive, ArchiveRestore, Ticket, Tag, LayoutGrid, Grid3X3, List, LayoutList, Sparkles, CircleDot, FileEdit } from 'lucide-react';
 import { Loader, toast, Select, SelectOption } from '../../components/ui';
 import { Screen, EntityType } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
@@ -320,6 +321,25 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
 
     const tabs: (EntityType | 'All')[] = ['All', ...allowedEntities];
 
+    // Interactive status quick-filters (drive filterStatuses)
+    const statusCounts = {
+        published: listings.filter(l => l.status === 'published').length,
+        pending: listings.filter(l => l.status === 'pending').length,
+        draft: listings.filter(l => l.status === 'draft').length,
+        archived: listings.filter(l => l.status === 'archived').length,
+    };
+    const STAT_CHIPS: { key: ListingStatus | 'all'; label: string; count: number; icon: any; fg: string; bg: string }[] = [
+        { key: 'all', label: 'All Listings', count: listings.length, icon: LayoutList, fg: '#CA8A04', bg: '#FEFCE8' },
+        { key: 'published', label: 'Live', count: statusCounts.published, icon: Sparkles, fg: '#059669', bg: '#ECFDF5' },
+        { key: 'pending', label: 'In Review', count: statusCounts.pending, icon: CircleDot, fg: '#D97706', bg: '#FFFBEB' },
+        { key: 'draft', label: 'Drafts', count: statusCounts.draft, icon: FileEdit, fg: '#4B5563', bg: '#F3F4F6' },
+        { key: 'archived', label: 'Archived', count: statusCounts.archived, icon: Archive, fg: '#6B7280', bg: '#F3F4F6' },
+    ];
+    const toggleStatusFilter = (s: ListingStatus | 'all') => {
+        if (s === 'all') { setFilterStatuses([]); return; }
+        setFilterStatuses(prev => prev.length === 1 && prev[0] === s ? [] : [s]);
+    };
+
     if (loading) {
         return (
             <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-3">
@@ -346,67 +366,77 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
         ? 'grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3'
         : 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4';
 
-    const renderListingCard = (listing: Listing, compact: boolean) => {
+    const renderListingCard = (listing: Listing, compact: boolean, index: number) => {
         const badge = entityBadgeConfig[listing.entityType];
         const BadgeIcon = badge.icon;
         const editable = listing.status !== 'published' && listing.status !== 'archived';
-        const thumb = compact ? 'w-10 h-10' : 'w-12 h-12';
         return (
-            <div key={listing.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-gray-200 transition-all p-4 flex flex-col">
-                <div className="flex items-start gap-3">
+            <motion.div
+                key={listing.id}
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.22, delay: Math.min(index * 0.03, 0.3) }}
+                whileHover={{ y: -5 }}
+                className="group relative overflow-hidden bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl hover:border-gray-200 transition-[box-shadow,border-color] duration-300 flex flex-col"
+            >
+                {/* Cover banner */}
+                <div className={`relative ${compact ? 'h-20' : 'h-28'} overflow-hidden`}>
                     {listing.coverUrl ? (
-                        <img src={listing.coverUrl} alt="" className={`${thumb} rounded-xl object-cover shrink-0 bg-gray-100`} />
+                        <img src={listing.coverUrl} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ease-out" />
                     ) : (
-                        <div className={`${thumb} rounded-xl bg-gray-100 flex items-center justify-center shrink-0`}>
-                            <BadgeIcon size={compact ? 16 : 18} className="text-gray-300" />
+                        <div className={`w-full h-full flex items-center justify-center ${badge.bg}`}>
+                            <BadgeIcon size={compact ? 22 : 28} className={`${badge.color} opacity-60`} />
                         </div>
                     )}
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${badge.bg} ${badge.color}`}>{listing.entityType}</span>
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-500 ml-auto">
-                                <span className={`w-1.5 h-1.5 rounded-full ${statusDot(listing)}`} />
-                                {statusLabel(listing)}
-                            </span>
-                        </div>
-                        <p className="font-bold text-sm text-gray-900 truncate">{listing.title}</p>
-                        {!compact && listing.category && (
-                            <p className="text-[10px] text-gray-400 font-medium mt-0.5 truncate">{listing.category}</p>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
+                    <span className={`absolute top-2 left-2 inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-md ${badge.bg} ${badge.color} shadow-sm`}>
+                        <BadgeIcon size={9} /> {listing.entityType}
+                    </span>
+                    <span className="absolute top-2 right-2 inline-flex items-center gap-1 text-[10px] font-bold text-gray-700 bg-white/90 backdrop-blur px-2 py-0.5 rounded-md shadow-sm">
+                        <span className={`w-1.5 h-1.5 rounded-full ${statusDot(listing)} ${listing.status === 'published' && listing.isLive !== false ? 'animate-pulse' : ''}`} />
+                        {statusLabel(listing)}
+                    </span>
+                </div>
+
+                {/* Body */}
+                <div className={`flex-1 flex flex-col ${compact ? 'p-3' : 'p-4'}`}>
+                    <p className="font-bold text-sm text-gray-900 truncate">{listing.title}</p>
+                    {!compact && listing.category && (
+                        <p className="text-[11px] text-gray-400 font-medium mt-0.5 truncate">{listing.category}</p>
+                    )}
+                    {listing.coupon && (
+                        <span className="inline-flex w-max items-center gap-1 mt-2 px-2 py-0.5 rounded-md bg-tlb-yellow/15 text-tlb-dark text-[10px] font-black">
+                            <Tag size={9} /> {listing.coupon.code} · {couponDiscountLabel(listing.coupon)}
+                        </span>
+                    )}
+                    <div className="flex items-center justify-end gap-1 mt-auto pt-3 border-t border-gray-50 group-hover:border-gray-100 transition-colors">
+                        {listing.status === 'published' && (
+                            <button onClick={() => handleTogglePause(listing)}
+                                className={`p-2 rounded-lg transition-colors ${listing.isLive !== false ? 'text-amber-500 hover:bg-amber-50' : 'text-emerald-500 hover:bg-emerald-50'}`}
+                                title={listing.isLive !== false ? 'Pause' : 'Resume'}>
+                                {listing.isLive !== false ? <Pause size={15} /> : <Play size={15} />}
+                            </button>
                         )}
-                        {listing.coupon && (
-                            <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-md bg-tlb-yellow/15 text-tlb-dark text-[10px] font-black">
-                                <Tag size={9} /> {listing.coupon.code} · {couponDiscountLabel(listing.coupon)}
-                            </span>
+                        {(listing.status === 'published' || listing.status === 'archived') && (
+                            <button onClick={() => handleToggleArchive(listing)}
+                                className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                                title={listing.status === 'archived' ? 'Unarchive' : 'Archive'}>
+                                {listing.status === 'archived' ? <ArchiveRestore size={15} /> : <Archive size={15} />}
+                            </button>
                         )}
+                        <button onClick={() => openCouponModal(listing)}
+                            className={`p-2 rounded-lg transition-colors ${listing.coupon ? 'text-tlb-dark bg-tlb-yellow/20 hover:bg-tlb-yellow/30' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'}`}
+                            title={listing.coupon ? 'Change coupon' : 'Attach coupon'}>
+                            <Ticket size={15} />
+                        </button>
+                        <button onClick={() => handleEdit(listing)} disabled={!editable}
+                            className={`p-2 rounded-lg transition-colors ${editable ? 'text-blue-500 hover:bg-blue-50' : 'text-gray-300 cursor-not-allowed'}`}
+                            title={editable ? 'Edit' : 'Locked'}>
+                            <Edit3 size={15} />
+                        </button>
                     </div>
                 </div>
-                <div className="flex items-center justify-end gap-1 mt-3 pt-3 border-t border-gray-50">
-                    {listing.status === 'published' && (
-                        <button onClick={() => handleTogglePause(listing)}
-                            className={`p-2 rounded-lg transition-colors ${listing.isLive !== false ? 'text-amber-500 hover:bg-amber-50' : 'text-emerald-500 hover:bg-emerald-50'}`}
-                            title={listing.isLive !== false ? 'Pause' : 'Resume'}>
-                            {listing.isLive !== false ? <Pause size={15} /> : <Play size={15} />}
-                        </button>
-                    )}
-                    {(listing.status === 'published' || listing.status === 'archived') && (
-                        <button onClick={() => handleToggleArchive(listing)}
-                            className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
-                            title={listing.status === 'archived' ? 'Unarchive' : 'Archive'}>
-                            {listing.status === 'archived' ? <ArchiveRestore size={15} /> : <Archive size={15} />}
-                        </button>
-                    )}
-                    <button onClick={() => openCouponModal(listing)}
-                        className={`p-2 rounded-lg transition-colors ${listing.coupon ? 'text-tlb-dark bg-tlb-yellow/20 hover:bg-tlb-yellow/30' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'}`}
-                        title={listing.coupon ? 'Change coupon' : 'Attach coupon'}>
-                        <Ticket size={15} />
-                    </button>
-                    <button onClick={() => handleEdit(listing)} disabled={!editable}
-                        className={`p-2 rounded-lg transition-colors ${editable ? 'text-blue-500 hover:bg-blue-50' : 'text-gray-300 cursor-not-allowed'}`}
-                        title={editable ? 'Edit' : 'Locked'}>
-                        <Edit3 size={15} />
-                    </button>
-                </div>
-            </div>
+            </motion.div>
         );
     };
 
@@ -430,6 +460,33 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                 {error && (
                     <div className="bg-red-50 border border-red-200 rounded-2xl p-3 text-xs font-bold text-red-600">{error}</div>
                 )}
+
+                {/* Interactive status stat-chips (quick filters) */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                    {STAT_CHIPS.map((chip, i) => {
+                        const active = chip.key === 'all'
+                            ? filterStatuses.length === 0
+                            : filterStatuses.length === 1 && filterStatuses[0] === chip.key;
+                        return (
+                            <motion.button
+                                key={chip.key}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.2, delay: Math.min(i * 0.04, 0.2) }}
+                                whileHover={{ y: -3 }}
+                                whileTap={{ scale: 0.97 }}
+                                onClick={() => toggleStatusFilter(chip.key)}
+                                className={`text-left rounded-2xl p-4 border bg-white transition-all ${active ? 'border-tlb-yellow ring-2 ring-tlb-yellow/30 shadow-md' : 'border-gray-100 shadow-sm hover:shadow-md'}`}
+                            >
+                                <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-2.5" style={{ background: chip.bg, color: chip.fg }}>
+                                    <chip.icon size={16} />
+                                </div>
+                                <p className="text-2xl font-black leading-none text-gray-900">{chip.count}</p>
+                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1.5">{chip.label}</p>
+                            </motion.button>
+                        );
+                    })}
+                </div>
 
                 {/* Search + Filter + Tabs row */}
                 <div className="flex flex-col lg:flex-row lg:items-center gap-4">
@@ -497,8 +554,8 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                 {/* Table / Cards */}
                 {filtered.length > 0 ? (
                     viewMode !== 'list' ? (
-                    <div className={gridClass}>
-                        {filtered.map((listing) => renderListingCard(listing, viewMode === 'compact'))}
+                    <div key={`${activeTab}-${viewMode}-${filterStatuses.join()}`} className={gridClass}>
+                        {filtered.map((listing, i) => renderListingCard(listing, viewMode === 'compact', i))}
                     </div>
                     ) : (
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -515,16 +572,24 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-50">
-                                    {filtered.map((listing) => {
+                                    {filtered.map((listing, i) => {
                                         const badge = entityBadgeConfig[listing.entityType];
                                         const BadgeIcon = badge.icon;
                                         const editable = listing.status !== 'published' && listing.status !== 'archived';
                                         return (
-                                            <tr key={listing.id} className="hover:bg-gray-50/40 transition-colors group">
+                                            <motion.tr
+                                                key={listing.id}
+                                                initial={{ opacity: 0, y: 6 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ duration: 0.18, delay: Math.min(i * 0.015, 0.25) }}
+                                                className="hover:bg-tlb-yellow/[0.04] transition-colors group"
+                                            >
                                                 <td className="px-5 py-4">
                                                     <div className="flex items-center gap-3">
                                                         {listing.coverUrl ? (
-                                                            <img src={listing.coverUrl} alt="" className="w-12 h-12 rounded-xl object-cover shrink-0 bg-gray-100" />
+                                                            <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 bg-gray-100">
+                                                                <img src={listing.coverUrl} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ease-out" />
+                                                            </div>
                                                         ) : (
                                                             <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center shrink-0">
                                                                 <BadgeIcon size={18} className="text-gray-300" />
@@ -596,7 +661,7 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                                                         </button>
                                                     </div>
                                                 </td>
-                                            </tr>
+                                            </motion.tr>
                                         );
                                     })}
                                 </tbody>

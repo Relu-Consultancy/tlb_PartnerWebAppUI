@@ -5,7 +5,7 @@ import {
     User, CreditCard, Users, CheckCircle,
     Inbox, RefreshCw, Phone, Mail, Wallet,
     FileText, AlertCircle, CalendarDays, GraduationCap, Layers, MapPin,
-    LayoutGrid, Grid3X3, List,
+    LayoutGrid, Grid3X3, List, History,
 } from 'lucide-react';
 import { Screen, EntityType } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
@@ -14,9 +14,13 @@ import {
     getEventListings, getClassListings, getProgramListings, getVenueListings,
 } from '../../api/listings';
 
+type ScreenVariant = 'attendees' | 'bookings';
+
 interface Props {
     onNavigate: (screen: Screen) => void;
     onOpenSidebar: () => void;
+    /** 'attendees' = only people who attended; 'bookings' = every booking. */
+    variant?: ScreenVariant;
 }
 
 type BookingStatus = 'confirmed' | 'awaiting_payment' | 'attended' | 'cancelled';
@@ -104,9 +108,54 @@ interface ListingCard {
     title: string;
     type: BookingType;
     status?: string;
+    /** When the listing happens (ISO) — used to sort & highlight upcoming listings. */
+    happenAt?: string;
+    happenEnd?: string;
+    isLive?: boolean;
     /** True when the card is derived from bookings (listing no longer in catalog). */
     synthetic?: boolean;
 }
+
+type UpcomingState = 'live' | 'soon' | null;
+
+const MS_TWO_DAYS = 48 * 60 * 60 * 1000;
+
+const happenTime = (c: ListingCard): number => {
+    if (!c.happenAt) return NaN;
+    const t = new Date(c.happenAt).getTime();
+    return Number.isNaN(t) ? NaN : t;
+};
+
+// Currently live, or happening within the next two days.
+const upcomingStateOf = (c: ListingCard, nowMs: number): UpcomingState => {
+    if (c.isLive) return 'live';
+    const t = happenTime(c);
+    if (Number.isNaN(t)) return null;
+    const end = c.happenEnd ? new Date(c.happenEnd).getTime() : NaN;
+    if (!Number.isNaN(end) && t <= nowMs && nowMs <= end) return 'live';
+    if (t >= nowMs && t - nowMs <= MS_TWO_DAYS) return 'soon';
+    // Started earlier today (no end info) → treat as live for the day
+    const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
+    if (t >= startOfToday.getTime() && t <= nowMs) return 'live';
+    return null;
+};
+
+// Sort: live first, then soonest upcoming, then most-recent past, then undated.
+const byHappenDate = (nowMs: number) => (a: ListingCard, b: ListingCard): number => {
+    const rank = (c: ListingCard): number => {
+        if (upcomingStateOf(c, nowMs) === 'live') return 0;
+        const t = happenTime(c);
+        if (Number.isNaN(t)) return 3;
+        return t >= nowMs ? 1 : 2;
+    };
+    const ra = rank(a), rb = rank(b);
+    if (ra !== rb) return ra - rb;
+    const ta = happenTime(a), tb = happenTime(b);
+    if (Number.isNaN(ta) && Number.isNaN(tb)) return 0;
+    if (Number.isNaN(ta)) return 1;
+    if (Number.isNaN(tb)) return -1;
+    return ra === 2 ? tb - ta : ta - tb; // past: newest first; else soonest first
+};
 
 const TYPE_META: Record<BookingType, { label: string; icon: React.ElementType; grad: string; badge: string }> = {
     event:   { label: 'Event',   icon: CalendarDays,  grad: 'from-blue-700 to-blue-800',     badge: 'bg-blue-100 text-blue-700' },
@@ -193,11 +242,22 @@ interface GroupItemProps {
     index: number;
     onClick: () => void;
     size?: Density;
+    highlight?: UpcomingState;
 }
+
+// Pill shown on listings that are live now / happening within two days.
+const LivePill: React.FC<{ state: Exclude<UpcomingState, null>; className?: string }> = ({ state, className = '' }) => (
+    <span className={`inline-flex items-center gap-1 rounded-full font-black uppercase tracking-wider ${
+        state === 'live' ? 'bg-emerald-500 text-white' : 'bg-amber-400 text-amber-950'
+    } ${className}`}>
+        <span className={`w-1.5 h-1.5 rounded-full bg-white ${state === 'live' ? 'animate-pulse' : ''}`} />
+        {state === 'live' ? 'Live' : 'Soon'}
+    </span>
+);
 
 // Refined, interactive card used in both the By-Listing and By-Date grids.
 // `size === 'compact'` renders a denser variant for large catalogs.
-const GroupCard: React.FC<GroupItemProps> = ({ title, subtitle, counts: c, grad, icon: Icon, badge, index, onClick, size = 'comfortable' }) => {
+const GroupCard: React.FC<GroupItemProps> = ({ title, subtitle, counts: c, grad, icon: Icon, badge, index, onClick, size = 'comfortable', highlight }) => {
     const attendedPct = c.total ? Math.round((c.attended / c.total) * 100) : 0;
     const compact = size === 'compact';
     return (
@@ -206,7 +266,11 @@ const GroupCard: React.FC<GroupItemProps> = ({ title, subtitle, counts: c, grad,
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.22, delay: Math.min(index * 0.03, 0.25) }}
             onClick={onClick}
-            className="group text-left bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-gray-200 transition-all duration-200 overflow-hidden"
+            className={`group text-left bg-white rounded-3xl border shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-200 overflow-hidden ${
+                highlight === 'live' ? 'border-emerald-300 ring-2 ring-emerald-200' :
+                highlight === 'soon' ? 'border-amber-300 ring-2 ring-amber-200' :
+                'border-gray-100 hover:border-gray-200'
+            }`}
         >
             {/* Banner */}
             <div className={`relative ${compact ? 'h-16 px-4 py-3' : 'h-24 px-5 py-4'} bg-gradient-to-br ${grad} flex flex-col justify-between overflow-hidden`}>
@@ -216,7 +280,9 @@ const GroupCard: React.FC<GroupItemProps> = ({ title, subtitle, counts: c, grad,
                     <div className={`${compact ? 'w-8 h-8 rounded-lg' : 'w-10 h-10 rounded-xl'} bg-white/20 backdrop-blur flex items-center justify-center`}>
                         <Icon size={compact ? 16 : 20} className="text-white" />
                     </div>
-                    {badge && (
+                    {highlight ? (
+                        <LivePill state={highlight} className={compact ? 'text-[9px] px-2 py-0.5' : 'text-[10px] px-2.5 py-1'} />
+                    ) : badge && (
                         <span className={`font-black rounded-full bg-white/25 text-white uppercase tracking-widest ${compact ? 'text-[9px] px-2 py-0.5' : 'text-[10px] px-2.5 py-1'}`}>
                             {badge}
                         </span>
@@ -264,7 +330,7 @@ const GroupCard: React.FC<GroupItemProps> = ({ title, subtitle, counts: c, grad,
 };
 
 // Dense one-per-row layout — best for hundreds of listings.
-const GroupRow: React.FC<GroupItemProps> = ({ title, subtitle, counts: c, grad, icon: Icon, badge, index, onClick }) => {
+const GroupRow: React.FC<GroupItemProps> = ({ title, subtitle, counts: c, grad, icon: Icon, badge, index, onClick, highlight }) => {
     const attendedPct = c.total ? Math.round((c.attended / c.total) * 100) : 0;
     return (
         <motion.button
@@ -272,7 +338,11 @@ const GroupRow: React.FC<GroupItemProps> = ({ title, subtitle, counts: c, grad, 
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.18, delay: Math.min(index * 0.015, 0.2) }}
             onClick={onClick}
-            className="group w-full text-left flex items-center gap-4 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-gray-200 transition-all px-3.5 py-3"
+            className={`group w-full text-left flex items-center gap-4 bg-white rounded-2xl border shadow-sm hover:shadow-md transition-all px-3.5 py-3 ${
+                highlight === 'live' ? 'border-emerald-300 ring-2 ring-emerald-200' :
+                highlight === 'soon' ? 'border-amber-300 ring-2 ring-amber-200' :
+                'border-gray-100 hover:border-gray-200'
+            }`}
         >
             <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${grad} flex items-center justify-center shrink-0`}>
                 <Icon size={18} className="text-white" />
@@ -280,7 +350,9 @@ const GroupRow: React.FC<GroupItemProps> = ({ title, subtitle, counts: c, grad, 
             <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                     <p className="font-bold text-sm text-gray-900 truncate">{title}</p>
-                    {badge && <span className="hidden sm:inline text-[9px] font-black px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 uppercase tracking-wider shrink-0">{badge}</span>}
+                    {highlight
+                        ? <LivePill state={highlight} className="text-[9px] px-1.5 py-0.5 shrink-0" />
+                        : badge && <span className="hidden sm:inline text-[9px] font-black px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 uppercase tracking-wider shrink-0">{badge}</span>}
                 </div>
                 {subtitle && <p className="text-[11px] text-gray-400 truncate">{subtitle}</p>}
             </div>
@@ -304,8 +376,9 @@ const GroupRow: React.FC<GroupItemProps> = ({ title, subtitle, counts: c, grad, 
     );
 };
 
-const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
+const BookingsBase: React.FC<Props> = ({ onOpenSidebar, variant = 'attendees' }) => {
     const { allowedEntities } = usePartner();
+    const isAttendees = variant === 'attendees';
 
     // ── Data ──
     const [loading, setLoading] = useState(true);
@@ -359,6 +432,10 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
                             title: item.title || 'Untitled',
                             type: ENTITY_TO_TYPE[ent],
                             status: item.status as string | undefined,
+                            happenAt: item.start_datetime || item.start_date || item.next_session_at
+                                || item.next_batch_start || item.next_occurrence || item.starts_at || item.event_date || undefined,
+                            happenEnd: item.end_datetime || item.end_date || undefined,
+                            isLive: item.is_live === true,
                         } as ListingCard))
                         : [];
                 }).catch(() => [] as ListingCard[]),
@@ -386,9 +463,14 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
             const listingCards: ListingCard[] = listingResults.flat();
             const byId = new Map(listingCards.map(l => [l.id, l]));
 
+            // Attendees screen shows ONLY attended entries; Bookings screen shows all.
+            const sourceBookings = isAttendees
+                ? allBookings.filter(b => b.status === 'attended')
+                : allBookings;
+
             // Group bookings; synthesize cards for listings not in the catalog
             const grouped: Record<string, BookingSummary[]> = {};
-            allBookings.forEach(b => {
+            sourceBookings.forEach(b => {
                 const key = b.listing_id || UNLINKED_KEY;
                 (grouped[key] ||= []).push(b);
             });
@@ -414,20 +496,25 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
 
             // Group the same bookings by date for the "By Date" view
             const byDate: Record<string, BookingSummary[]> = {};
-            allBookings.forEach(b => {
+            sourceBookings.forEach(b => {
                 const key = dateKeyOf(b.created_at);
                 (byDate[key] ||= []).push(b);
             });
 
-            setListings(listingCards);
+            // On the Attendees screen, hide listings that have no attended entries.
+            const finalCards = isAttendees
+                ? listingCards.filter(l => (grouped[l.id]?.length || 0) > 0)
+                : listingCards;
+
+            setListings(finalCards);
             setBookingsByListing(grouped);
             setBookingsByDate(byDate);
         } catch (e: unknown) {
-            setError((e as Error)?.message || 'Failed to load attendees');
+            setError((e as Error)?.message || 'Failed to load bookings');
         } finally {
             setLoading(false);
         }
-    }, [allowedEntities]);
+    }, [allowedEntities, isAttendees]);
 
     useEffect(() => { loadAll(); }, [loadAll]);
 
@@ -509,15 +596,30 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
             ? (bookingsByListing[selected.key] || [])
             : (bookingsByDate[selected.key] || []);
     const listingCounts = computeCounts(listingBookings);
+    const groupRevenue = listingBookings.reduce((s, b) => s + (Number(b.total_amount) || 0), 0);
+    const groupGuests = new Set(listingBookings.map(b => b.customer_email).filter(Boolean)).size;
+    const groupKpis: { label: string; value: number | string; color: string; bg: string }[] = isAttendees
+        ? [
+            { label: 'Attended', value: listingCounts.total, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+            { label: 'Unique Guests', value: groupGuests, color: 'text-violet-600', bg: 'bg-violet-50' },
+            { label: 'Revenue', value: formatAmount(groupRevenue), color: 'text-gray-900', bg: 'bg-white' },
+        ]
+        : [
+            { label: 'Total Bookings', value: listingCounts.total, color: 'text-gray-900', bg: 'bg-white' },
+            { label: 'Awaiting Payment', value: listingCounts.awaiting_payment, color: 'text-amber-600', bg: 'bg-amber-50' },
+            { label: 'Confirmed', value: listingCounts.confirmed, color: 'text-sky-600', bg: 'bg-sky-50' },
+            { label: 'Attended', value: listingCounts.attended, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+            { label: 'Cancelled', value: listingCounts.cancelled, color: 'text-red-500', bg: 'bg-red-50' },
+        ];
 
     // Title / subtitle for the drill-down header (works for listing or date)
     const detailTitle = !selected
-        ? 'Attendees'
+        ? (isAttendees ? 'Attendees' : 'Bookings')
         : selected.mode === 'listing'
             ? (selectedListing?.title || 'Listing')
             : formatFullDate(selected.key);
     const detailSubtitle = !selected
-        ? 'Pick a listing or date to view its attendees & bookings'
+        ? (isAttendees ? 'People who attended your listings' : 'Every booking across your listings')
         : selected.mode === 'listing' && selectedListing
             ? `${TYPE_META[selectedListing.type].label} · ${listingCounts.total} booking${listingCounts.total === 1 ? '' : 's'}`
             : `${listingCounts.total} booking${listingCounts.total === 1 ? '' : 's'} · ${new Set(listingBookings.map(b => b.listing_id || UNLINKED_KEY)).size} listing${new Set(listingBookings.map(b => b.listing_id || UNLINKED_KEY)).size === 1 ? '' : 's'}`;
@@ -534,13 +636,40 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
         );
     });
 
-    const visibleListings = listings.filter(l =>
-        l.title.toLowerCase().includes(listingSearch.toLowerCase()),
-    );
+    const nowMs = Date.now();
+    const startOfTodayMs = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); })();
+    const visibleListings = listings
+        .filter(l => l.title.toLowerCase().includes(listingSearch.toLowerCase()))
+        // Bookings screen: always order by when the listing is due to happen.
+        .sort(isAttendees ? () => 0 : byHappenDate(nowMs));
+    // A listing is "history" once its happen date has passed (and it isn't live now).
+    const isPastListing = (l: ListingCard) => {
+        const t = happenTime(l);
+        return !Number.isNaN(t) && t < startOfTodayMs && upcomingStateOf(l, nowMs) !== 'live';
+    };
+    const currentListings = visibleListings.filter(l => !isPastListing(l));
+    const historyListings = visibleListings
+        .filter(isPastListing)
+        .sort((a, b) => happenTime(b) - happenTime(a)); // most recent first
 
     const allBookings: BookingSummary[] = [];
     Object.keys(bookingsByDate).forEach(k => allBookings.push(...bookingsByDate[k]));
     const globalCounts = computeCounts(allBookings);
+    const uniqueCustomers = new Set(allBookings.map(b => b.customer_email).filter(Boolean)).size;
+
+    const globalKpis = isAttendees
+        ? [
+            { label: 'Total Attended', value: globalCounts.total, icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+            { label: 'Listings', value: listings.length, icon: Layers, color: 'text-tlb-dark', bg: 'bg-tlb-yellow/15' },
+            { label: 'Days', value: Object.keys(bookingsByDate).length, icon: CalendarDays, color: 'text-sky-600', bg: 'bg-sky-50' },
+            { label: 'Unique Guests', value: uniqueCustomers, icon: Users, color: 'text-violet-600', bg: 'bg-violet-50' },
+        ]
+        : [
+            { label: 'Total Bookings', value: globalCounts.total, icon: Users, color: 'text-tlb-dark', bg: 'bg-tlb-yellow/15' },
+            { label: 'Confirmed', value: globalCounts.confirmed, icon: CalendarDays, color: 'text-sky-600', bg: 'bg-sky-50' },
+            { label: 'Attended', value: globalCounts.attended, icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+            { label: 'Awaiting Payment', value: globalCounts.awaiting_payment, icon: CreditCard, color: 'text-amber-600', bg: 'bg-amber-50' },
+        ];
 
     const ItemComp = density === 'list' ? GroupRow : GroupCard;
     const gridClass = density === 'list'
@@ -607,12 +736,7 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
                             <>
                                 {/* Summary KPI strip */}
                                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-                                    {[
-                                        { label: 'Total Bookings', value: globalCounts.total, icon: Users, color: 'text-tlb-dark', bg: 'bg-tlb-yellow/15' },
-                                        { label: 'Confirmed', value: globalCounts.confirmed, icon: CalendarDays, color: 'text-sky-600', bg: 'bg-sky-50' },
-                                        { label: 'Attended', value: globalCounts.attended, icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                                        { label: 'Awaiting Payment', value: globalCounts.awaiting_payment, icon: CreditCard, color: 'text-amber-600', bg: 'bg-amber-50' },
-                                    ].map(({ label, value, icon: Icon, color, bg }) => (
+                                    {globalKpis.map(({ label, value, icon: Icon, color, bg }) => (
                                         <div key={label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
                                             <div className={`w-11 h-11 rounded-xl ${bg} flex items-center justify-center shrink-0`}>
                                                 <Icon size={20} className={color} />
@@ -687,30 +811,65 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
                                             animate={{ opacity: 1, y: 0 }}
                                             exit={{ opacity: 0, y: -8 }}
                                             transition={{ duration: 0.18 }}
-                                            className={gridClass}
+                                            className="space-y-6"
                                         >
-                                            {visibleListings.map((l, i) => {
-                                                const meta = TYPE_META[l.type];
-                                                const c = computeCounts(bookingsByListing[l.id] || []);
-                                                return (
-                                                    <ItemComp
-                                                        key={l.id}
-                                                        index={i}
-                                                        title={l.title}
-                                                        subtitle={meta.label}
-                                                        counts={c}
-                                                        grad={meta.grad}
-                                                        icon={meta.icon}
-                                                        badge={meta.label}
-                                                        size={density}
-                                                        onClick={() => openGroup('listing', l.id)}
-                                                    />
-                                                );
-                                            })}
-                                            {visibleListings.length === 0 && (
-                                                <div className="col-span-full flex flex-col items-center gap-2 py-16 text-center">
-                                                    <Inbox size={30} className="text-gray-200" />
-                                                    <p className="text-sm font-bold text-gray-400">No listings match “{listingSearch}”</p>
+                                            <div className={gridClass}>
+                                                {currentListings.map((l, i) => {
+                                                    const meta = TYPE_META[l.type];
+                                                    const c = computeCounts(bookingsByListing[l.id] || []);
+                                                    return (
+                                                        <ItemComp
+                                                            key={l.id}
+                                                            index={i}
+                                                            title={l.title}
+                                                            subtitle={meta.label}
+                                                            counts={c}
+                                                            grad={meta.grad}
+                                                            icon={meta.icon}
+                                                            badge={meta.label}
+                                                            size={density}
+                                                            highlight={isAttendees ? null : upcomingStateOf(l, nowMs)}
+                                                            onClick={() => openGroup('listing', l.id)}
+                                                        />
+                                                    );
+                                                })}
+                                                {visibleListings.length === 0 && (
+                                                    <div className="col-span-full flex flex-col items-center gap-2 py-16 text-center">
+                                                        <Inbox size={30} className="text-gray-200" />
+                                                        <p className="text-sm font-bold text-gray-400">No listings match “{listingSearch}”</p>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* History — listings whose date has already passed */}
+                                            {historyListings.length > 0 && (
+                                                <div>
+                                                    <div className="flex items-center gap-2 mb-3">
+                                                        <History size={15} className="text-gray-400" />
+                                                        <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">History</h3>
+                                                        <span className="text-[10px] font-black text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">{historyListings.length}</span>
+                                                    </div>
+                                                    <div className={`${gridClass} opacity-80`}>
+                                                        {historyListings.map((l, i) => {
+                                                            const meta = TYPE_META[l.type];
+                                                            const c = computeCounts(bookingsByListing[l.id] || []);
+                                                            return (
+                                                                <ItemComp
+                                                                    key={l.id}
+                                                                    index={i}
+                                                                    title={l.title}
+                                                                    subtitle={meta.label}
+                                                                    counts={c}
+                                                                    grad={meta.grad}
+                                                                    icon={meta.icon}
+                                                                    badge={meta.label}
+                                                                    size={density}
+                                                                    highlight={null}
+                                                                    onClick={() => openGroup('listing', l.id)}
+                                                                />
+                                                            );
+                                                        })}
+                                                    </div>
                                                 </div>
                                             )}
                                         </motion.div>
@@ -761,14 +920,8 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
                 {selected && (
                     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
                         {/* KPI Cards */}
-                        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-                            {[
-                                { label: 'Total Bookings', value: listingCounts.total, color: 'text-gray-900', bg: 'bg-white' },
-                                { label: 'Awaiting Payment', value: listingCounts.awaiting_payment, color: 'text-amber-600', bg: 'bg-amber-50' },
-                                { label: 'Confirmed', value: listingCounts.confirmed, color: 'text-sky-600', bg: 'bg-sky-50' },
-                                { label: 'Attended', value: listingCounts.attended, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                                { label: 'Cancelled', value: listingCounts.cancelled, color: 'text-red-500', bg: 'bg-red-50' },
-                            ].map(card => (
+                        <div className={`grid grid-cols-2 gap-4 ${isAttendees ? 'lg:grid-cols-3' : 'lg:grid-cols-5'}`}>
+                            {groupKpis.map(card => (
                                 <div key={card.label} className={`${card.bg} rounded-2xl p-5 border border-gray-100 shadow-sm`}>
                                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{card.label}</p>
                                     <p className={`text-3xl font-black ${card.color}`}>{card.value}</p>
@@ -779,6 +932,7 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
                         {/* Table card */}
                         <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
                             {/* Tabs */}
+                            {!isAttendees && (
                             <div className="flex gap-1 border-b border-gray-100 px-4 pt-4 overflow-x-auto">
                                 {TABS.map(tab => (
                                     <button
@@ -801,6 +955,7 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
                                     </button>
                                 ))}
                             </div>
+                            )}
 
                             {/* Search */}
                             <div className="p-4 border-b border-gray-50">
@@ -1129,5 +1284,8 @@ const Attendees: React.FC<Props> = ({ onOpenSidebar }) => {
         </div>
     );
 };
+
+const Attendees: React.FC<Props> = (props) => <BookingsBase {...props} variant="attendees" />;
+export const Bookings: React.FC<Props> = (props) => <BookingsBase {...props} variant="bookings" />;
 
 export default Attendees;

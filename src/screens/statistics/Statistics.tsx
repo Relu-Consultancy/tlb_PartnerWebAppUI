@@ -12,6 +12,7 @@ import {
     getStatsOverview, getStatsEvents, getStatsVenues, getStatsEnquiries,
     StatsOverview, StatsEvents, StatsVenues, StatsEnquiries,
 } from '../../api/stats';
+import { getBookings, getVenueEnquiries } from '../../api/listings';
 import {
     InteractiveAreaChart, InteractiveBarChart, AnimatedDonut, FunnelBars,
     CountUp, fmtCurrency, fmtCompact, AreaPoint,
@@ -115,6 +116,9 @@ export const Statistics: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
     const [events, setEvents] = useState<StatsEvents | null>(null);
     const [venues, setVenues] = useState<StatsVenues | null>(null);
     const [enquiries, setEnquiries] = useState<StatsEnquiries | null>(null);
+    // Derived from raw bookings + venue enquiries (computed client-side for the ratios)
+    const [bookingStats, setBookingStats] = useState({ total: 0, attended: 0, venueBookings: 0 });
+    const [venueEnquiryCount, setVenueEnquiryCount] = useState(0);
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
@@ -124,13 +128,37 @@ export const Statistics: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
         setLoading(true);
         setError(false);
         try {
-            const [oRes, eRes, vRes, enqRes] = await Promise.allSettled([
+            const fetchAllBookings = async (): Promise<any[]> => {
+                const all: any[] = [];
+                let page = 1;
+                for (let guard = 0; guard < 30; guard++) {
+                    const res: any = await getBookings({ page });
+                    const d = res?.data || res;
+                    all.push(...((d?.results || []) as any[]));
+                    if (!d?.next) break;
+                    page++;
+                }
+                return all;
+            };
+            const [oRes, eRes, vRes, enqRes, bRes, veRes] = await Promise.allSettled([
                 getStatsOverview(), getStatsEvents(), getStatsVenues(), getStatsEnquiries(),
+                fetchAllBookings(), getVenueEnquiries(),
             ]);
             setOverview(settledValue(oRes));
             setEvents(settledValue(eRes));
             setVenues(settledValue(vRes));
             setEnquiries(settledValue(enqRes));
+
+            const bookings = settledValue(bRes) || [];
+            setBookingStats({
+                total: bookings.length,
+                attended: bookings.filter((b: any) => b.status === 'attended').length,
+                venueBookings: bookings.filter((b: any) => b.booking_type === 'venue').length,
+            });
+            const ve: any = settledValue(veRes);
+            const veArr = Array.isArray(ve) ? ve : (ve?.data || ve?.results || []);
+            setVenueEnquiryCount(veArr.length);
+
             if ([oRes, eRes, vRes, enqRes].every(r => r.status === 'rejected')) setError(true);
         } finally {
             setLoading(false);
@@ -339,6 +367,26 @@ export const Statistics: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                                 formatValue={primaryTrend.fmt}
                                             />
                                         </Panel>
+
+                                        {/* Conversion ratios */}
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                            <RatioCard
+                                                title="Bookings → Attendees"
+                                                subtitle="Booked guests who actually attended"
+                                                fromLabel="Bookings" fromValue={bookingStats.total}
+                                                toLabel="Attended" toValue={bookingStats.attended}
+                                                accent="emerald"
+                                            />
+                                            {hasVenues && (
+                                                <RatioCard
+                                                    title="Enquiries → Bookings"
+                                                    subtitle="Venue enquiries converted to bookings"
+                                                    fromLabel="Enquiries" fromValue={venueEnquiryCount}
+                                                    toLabel="Bookings" toValue={bookingStats.venueBookings}
+                                                    accent="amber"
+                                                />
+                                            )}
+                                        </div>
                                     </motion.div>
                                 )}
 
@@ -426,6 +474,14 @@ export const Statistics: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                             right={<DeltaPill pct={lastDelta(revenueTrend)} />}>
                                             <InteractiveAreaChart points={revenueTrend} color={ACCENTS.amber.solid} id="vnu-trend" formatValue={fmtCurrency} />
                                         </Panel>
+
+                                        <RatioCard
+                                            title="Enquiries → Bookings"
+                                            subtitle="Venue enquiries converted to bookings"
+                                            fromLabel="Enquiries" fromValue={venueEnquiryCount}
+                                            toLabel="Bookings" toValue={bookingStats.venueBookings}
+                                            accent="amber"
+                                        />
                                     </motion.div>
                                 )}
 
@@ -512,6 +568,46 @@ const CategoryBars: React.FC<{ items: { label: string; count: number; amount: nu
                 </div>
             ))}
         </div>
+    );
+};
+
+// ── Ratio card: from → to with a donut + counts ──
+const RatioCard: React.FC<{
+    title: string; subtitle?: string;
+    fromLabel: string; fromValue: number;
+    toLabel: string; toValue: number;
+    accent: AccentKey;
+}> = ({ title, subtitle, fromLabel, fromValue, toLabel, toValue, accent }) => {
+    const a = ACCENTS[accent];
+    const pct = fromValue > 0 ? Math.round((toValue / fromValue) * 100) : 0;
+    return (
+        <Panel title={title} subtitle={subtitle}>
+            <div className="flex items-center gap-5">
+                <AnimatedDonut
+                    segments={[
+                        { value: pct, color: a.solid, label: toLabel },
+                        { value: Math.max(0, 100 - pct), color: '#F3F4F6', label: 'Rest' },
+                    ]}
+                    centerLabel={`${pct}%`}
+                    centerSub="rate"
+                />
+                <div className="flex-1 space-y-3">
+                    <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-gray-300" />
+                        <span className="text-xs text-gray-500 flex-1">{fromLabel}</span>
+                        <span className="text-sm font-black text-gray-900"><CountUp value={fromValue} /></span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: a.solid }} />
+                        <span className="text-xs text-gray-500 flex-1">{toLabel}</span>
+                        <span className="text-sm font-black text-gray-900"><CountUp value={toValue} /></span>
+                    </div>
+                    <div className="pt-2 border-t border-gray-100 text-[11px] font-bold text-gray-400">
+                        {toValue} of {fromValue} {fromLabel.toLowerCase()} &rarr; {toLabel.toLowerCase()}
+                    </div>
+                </div>
+            </div>
+        </Panel>
     );
 };
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Menu, Plus, Search, Filter, Users, Edit3, CalendarDays, BarChart3, MapPin, Layers, Clock, X, Check, SlidersHorizontal, Play, Pause, Archive, ArchiveRestore, Ticket, Tag, LayoutGrid, Grid3X3, List, LayoutList, Sparkles, CircleDot, FileEdit } from 'lucide-react';
-import { Loader, toast, Select, SelectOption } from '../../components/ui';
+import { SkeletonListings, toast, Select, SelectOption } from '../../components/ui';
 import { Screen, EntityType } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
 import { EntityPickerSheet } from '../../components/EntityPickerSheet';
@@ -218,7 +218,13 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                         status: (item.status as ListingStatus) || 'draft',
                         coverUrl: item.cover_url || item.cover,
                         startDateTime: item.start_datetime,
-                        isLive: item.is_live,
+                        // Pause/Live state comes from `is_paused` (the flag the
+                        // pause/resume endpoints actually toggle). `is_live` is a
+                        // separate, unmaintained field and must NOT be used here —
+                        // reading it made resumed listings snap back to "Paused"
+                        // on refetch. Fall back to legacy is_live only if is_paused
+                        // is absent for some entity type.
+                        isLive: item.is_paused != null ? !item.is_paused : (item.is_live !== false),
                         coupon: item.coupon || null,
                     }));
                     setListings(normalized);
@@ -341,12 +347,7 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
     };
 
     if (loading) {
-        return (
-            <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-3">
-                <Loader />
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Loading listings…</p>
-            </div>
-        );
+        return <SkeletonListings />;
     }
 
     const statusDot = (listing: Listing) => {

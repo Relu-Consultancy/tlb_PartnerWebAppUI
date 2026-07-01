@@ -8,7 +8,7 @@ import type { ErrorInfo, ReactNode } from 'react';
 import { motion } from 'motion/react';
 import { Screen, EntityType } from './types';
 import { PartnerProvider, usePartner } from './context/PartnerContext';
-import { Loader, Toaster } from './components/ui';
+import { SkeletonPage, Toaster } from './components/ui';
 
 // ---------------------------------------------------------------------------
 // Error boundary — stops a single screen crash from blanking the whole app.
@@ -67,6 +67,7 @@ const Dashboard = lazyImport(() => import('./screens/dashboard'), 'Home');
 const Attendees = lazy(() => import('./screens/attendees'));
 const Bookings = lazyImport(() => import('./screens/attendees'), 'Bookings');
 const Reviews = lazy(() => import('./screens/reviews'));
+const Followers = lazy(() => import('./screens/followers'));
 const Documents = lazy(() => import('./screens/documents'));
 const Messages = lazy(() => import('./screens/messages'));
 const Packages = lazy(() => import('./screens/packages'));
@@ -112,6 +113,9 @@ const VenueEnquiries = lazyImport(() => import('./screens/enquiries'), 'VenueEnq
 // Statistics
 const StatisticsScreen = lazyImport(() => import('./screens/statistics'), 'Statistics');
 
+// Analytics (audience & growth)
+const Analytics = lazy(() => import('./screens/analytics'));
+
 // Coupons
 const CreateCoupon = lazyImport(() => import('./screens/coupons'), 'CreateCoupon');
 const AllCoupons = lazyImport(() => import('./screens/coupons'), 'AllCoupons');
@@ -130,6 +134,7 @@ const SCREEN_CHUNKS = [
   () => import('./screens/dashboard'),
   () => import('./screens/attendees'),
   () => import('./screens/reviews'),
+  () => import('./screens/followers'),
   () => import('./screens/documents'),
   () => import('./screens/messages'),
   () => import('./screens/packages'),
@@ -142,6 +147,7 @@ const SCREEN_CHUNKS = [
   () => import('./screens/venues'),
   () => import('./screens/enquiries'),
   () => import('./screens/statistics'),
+  () => import('./screens/analytics'),
   () => import('./screens/coupons'),
   () => import('./screens/support'),
   () => import('./screens/network'),
@@ -227,11 +233,13 @@ const routes: Record<Screen, RouteConfig> = {
   ATTENDEES: { component: Attendees, hasSidebar: true },
   BOOKINGS: { component: Bookings, hasSidebar: true },
   REVIEWS: { component: Reviews, hasSidebar: true },
+  FOLLOWERS: { component: Followers, hasSidebar: true },
   DOCUMENTS: { component: Documents, hasSidebar: true },
   MESSAGES: { component: Messages, hasSidebar: true },
   PACKAGES: { component: Packages, hasSidebar: true },
   FINANCIAL_HUB: { component: FinancialHub, hasSidebar: true },
   STATISTICS: { component: StatisticsScreen, hasSidebar: true },
+  ANALYTICS: { component: Analytics, hasSidebar: true },
   ALL_COUPONS: { component: AllCoupons, hasSidebar: true },
   CREATE_COUPON: { component: CreateCoupon, hasSidebar: true },
   HELP_SUPPORT: { component: Support, hasSidebar: true },
@@ -375,12 +383,7 @@ function AppInner() {
 
   // Show loading spinner while restoring session
   if (initializing) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 gap-4">
-        <Loader />
-        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Loading your session…</p>
-      </div>
-    );
+    return <SkeletonPage />;
   }
 
   const route = routes[currentScreen] ?? routes.LANDING;
@@ -399,11 +402,7 @@ function AppInner() {
         />
       )}
       <div className={route.hasSidebar && desktopSidebarOpen ? 'lg:ml-60' : ''}>
-        <Suspense fallback={
-          <div className="min-h-screen flex items-center justify-center bg-gray-50">
-            <Loader />
-          </div>
-        }>
+        <Suspense fallback={<SkeletonPage />}>
           {/* Enter-only fade — no `mode="wait"` exit gap, so the new screen mounts
               immediately instead of leaving a blank window while the old one exits. */}
           <motion.div

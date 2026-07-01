@@ -3,7 +3,7 @@
 > **Definitive architectural reference for the TLB Partner Portal.**
 > Base URL: `https://tlb-api.reluconsultancy.in`
 > Framework: React + Vite + TypeScript (SPA)
-> Last Updated: June 4, 2026
+> Last Updated: July 1, 2026
 
 ---
 
@@ -14,7 +14,7 @@ src/
 ├── api/
 │   ├── client.ts           # Centralized fetch wrapper, auth headers, 401 refresh
 │   ├── auth.ts             # requestOtp, verifyOtp, getCurrentUser, logout
-│   ├── onboarding.ts       # All partner CRUD endpoints (profile, media, categories, etc.)
+│   ├── onboarding.ts       # All partner CRUD endpoints (profile, media, categories, etc.) + getPartnerFollowerCount + getPartnerFollowers (paginated list)
 │   ├── stats.ts            # Partner statistics endpoints (overview, events, venues, enquiries) + trackProfileView
 │   ├── coupons.ts          # Partner coupons CRUD (live) — get/create/update/deactivate/usages; CreateCouponInput targeting
 │   ├── help.ts             # Help & Support tickets — categories, list, create, detail, messages (poll), send, close
@@ -25,7 +25,7 @@ src/
 ├── context/
 │   └── PartnerContext.tsx   # Global context: allowedEntities (synced to sessionStorage)
 ├── components/
-│   ├── Navigation.tsx           # Sidebar: fixed push-content on desktop (lg+, dark navy #0f1729), always-`lg:hidden` overlay drawer on mobile; collapse via in-sidebar toggle, re-expand via hamburger (App.tsx onOpenSidebar sets both desktop+mobile state). Includes "Coupons" → ALL_COUPONS and "Help & Support" → HELP_SUPPORT entries.
+│   ├── Navigation.tsx           # Sidebar: fixed push-content on desktop (lg+, brand black #141414 — black/white/yellow theme), always-`lg:hidden` overlay drawer on mobile; collapse via in-sidebar toggle, re-expand via hamburger (App.tsx onOpenSidebar sets both desktop+mobile state). Includes "Coupons" → ALL_COUPONS and "Help & Support" → HELP_SUPPORT entries.
 │   ├── NotificationCenter.tsx   # Bell + badge (polls unread-count 60s). Click navigates to the dedicated MESSAGES screen (the slide-in drawer was replaced). `variant` 'light'|'dark'. Mounted in Dashboard header.
 │   ├── EntityPickerSheet.tsx    # Bottom sheet for entity type selection
 │   └── ui/
@@ -36,11 +36,12 @@ src/
 │       ├── BookingsCalendar.tsx # Month grid marking the partner's bookings per day; opened as a Dashboard popup
 │       ├── LatestListings.tsx   # Compact upcoming/live listings list (soonest first, Live/Soon highlight); Dashboard popup
 │       ├── AppListingPreview.tsx# Mobile-app-style listing detail preview (phone frame) shared by all 4 wizard Preview steps
+│       ├── Skeleton.tsx         # Layout-matched skeleton loaders (SkeletonPage/Dashboard/Listings/Profile/List/Card) — CSS-only, replaces the spinner during loads
 │       └── OnboardingShell.tsx  # Shared layout for every onboarding screen: sticky branded header + ProgressDots + PageHeader + motion fade-in + decorative blurs
 ├── screens/
 │   ├── auth/               # Landing, Login, OTPVerify, PartnerAccess, PartnerAccessOTP, PartnerCategory
 │   ├── onboarding/         # Registration, AppSubmitted, AppApproved, AgreementSubmit, IdentityVerification, BankSetup, OnboardingComplete
-│   ├── dashboard/          # Dashboard (Home) — lean layout; analytics moved to Statistics
+│   ├── dashboard/          # Dashboard (Home) — redesigned: hero + completion ring/checklist, animated KPI cards, inline Latest Listings + Bookings Calendar, entity-aware quick actions (black/white/yellow theme)
 │   ├── profile/            # BrandProfile (EditProfile), PreviewProfile
 │   ├── services/           # ServiceListings (shared dashboard for all entities) — interactive stat-chips + animated cover-banner cards + animated table rows
 │   ├── classes/            # CreateClass* (5 steps)
@@ -50,12 +51,14 @@ src/
 │   ├── enquiries/          # Enquiries (Classes), ProgramEnquiries, VenueEnquiries
 │   ├── attendees/          # Attendees (attended-only) + Bookings (all, History split + happen-date sort/Live-Soon highlight) — shared parameterized component (variant)
 │   ├── reviews/            # Reviews — per-listing ratings/reviews with overall summary
+│   ├── followers/          # Followers — users following the brand (tolerant list + count, search, new/30d)
 │   ├── documents/          # Documents — KYC (PAN/GST/bank) + brand assets (logo/cover) + uploaded media/docs
 │   ├── messages/           # Messages — full-screen notification inbox (replaces the bell drawer)
 │   ├── coupons/            # CreateCoupon (form, live API + targeting), AllCoupons (live list + deactivate, sample fallback)
 │   ├── support/            # Support — Help & Support: ticket list → new ticket → chat thread (poll/refresh/close)
 │   ├── network/            # PartnerNetwork — directory (search/filter) → profile (listings, block) → single-message compose (no chat)
 │   ├── statistics/         # Statistics — tabbed analytics + Bookings→Attendees & Enquiries→Bookings(venue) ratios
+│   ├── analytics/          # Analytics — audience & growth (views/followers/reach/engagement, auto-insights, reach trend, weekly activity, audience-by-category); complements Statistics
 │   ├── packages/           # Packages
 │   └── financial/          # FinancialHub
 ├── test/
@@ -982,6 +985,7 @@ One canonical type scale lives in `src/styles/components.css`; use these instead
 | ONBOARDING_COMPLETE | ❌ | — | OnboardingComplete | Static |
 | HOME | ✅ | — | Dashboard | ✅ getCurrentPartner, getPartnerDashboard, getPartnerFollowerCount — lean layout: Profile Performance at top, analytics in Statistics |
 | STATISTICS | ✅ | — | Statistics | ✅ Parallel `getStatsOverview` + `getStatsEvents` + `getStatsVenues` + `getStatsEnquiries`; tabbed UI (Overview/Events/Venues/Classes/Programs, entity-conditional) with interactive hover charts (`StatCharts.tsx`) |
+| ANALYTICS | ✅ | — | Analytics | ✅ Audience & growth — `getStatsOverview/Events/Enquiries/Venues` (allSettled); hero KPIs (views/followers/reach/engagement), auto growth-insights, reach trend, weekly activity, audience-by-category (reuses `StatCharts.tsx`) |
 | BRAND_PROFILE | ✅ | — | BrandProfile | ✅ Full profile CRUD |
 | PREVIEW_PROFILE | ✅ | — | PreviewProfile | ✅ Profile read |
 | SERVICE_LISTINGS | ✅ | — | ServiceListings | ✅ Parallel fetch: events + venues + classes + programs (tagged at fetch time) |
@@ -1012,6 +1016,7 @@ One canonical type scale lives in `src/styles/components.css`; use these instead
 | ATTENDEES | ✅ | — | Attendees | ✅ Attended-only entries; listing/date grid + History split; detail drawer |
 | BOOKINGS | ✅ | — | Bookings (Attendees variant) | ✅ All bookings; happen-date sort + Live/Soon highlight + History split; status tabs + drawer |
 | REVIEWS | ✅ | — | Reviews | ✅ Per-listing reviews + overall summary (getPartnerReviews; 404-safe) |
+| FOLLOWERS | ✅ | — | Followers | ✅ `getCurrentPartner` → `getPartnerFollowers` (paginated) + `getPartnerFollowerCount`; tolerant normalizer, total + new-30d, search |
 | ALL_COUPONS | ✅ | — | AllCoupons | ✅ Live getCoupons + deactivate; sample fallback; status filters/search |
 | CREATE_COUPON | ✅ | — | CreateCoupon | ✅ Live createCoupon + targeting (listing dropdown / category / audience) |
 | HELP_SUPPORT | ✅ | — | Support | ✅ Live /help/tickets/ — categories, list, create, chat thread (poll/refresh), close |
@@ -1294,6 +1299,16 @@ npm run test:report   # run tests → generate test-report.html + test-report.pd
 | `docs/venue-listings-db-spec.md` | Venues module — tables (`venues`, `venue_occasions`, `venue_availability`, `venue_packages`, `venue_media`), occasion/time-slot/attendee-field reference, bulk availability pattern, API endpoints |
 
 ---
+
+*Phase 27 (2026-07-01) — Followers & Analytics screens, structured address, dashboard redesign, black/white/yellow theme, skeleton loaders, load testing, pause/resume fix:*
+- *Followers: new `src/screens/followers/Followers.tsx` (`FOLLOWERS` screen + sidebar, Heart icon) + `getPartnerFollowers` (paginated) in `onboarding.ts` — resolves partner via `getCurrentPartner`, tolerant follower normalizer (name/avatar/city/date across nested shapes), total + new-in-30-days + search; graceful empty/error states.*
+- *Analytics: new `src/screens/analytics/Analytics.tsx` (`ANALYTICS` screen + sidebar, LineChart icon) — audience-&-growth view (views/followers/reach/engagement, auto plain-language growth insights, reach trend, weekly activity, audience-by-category donut) reusing `StatCharts.tsx`; complements the operational Statistics screen.*
+- *Structured address: all four creation wizards (Classes/Events/Programs/Venues) replaced the single free-text address with discrete **City / District / State / Pincode** fields (full load+save round-trip, numeric-only pincode) **plus a separate optional Full address** box; `area` field retired. Event test updated.*
+- *Dashboard redesign: richer black hero, animated completion ring + actionable profile checklist, animated KPI cards (lead card solid black), **inline Latest Listings + Bookings Calendar** widgets (header popups removed), entity-aware quick-actions grid surfacing Analytics/Reviews/Followers/Bookings.*
+- *Theme (black/white/yellow, white base + black & yellow accents): sidebar → brand black `#141414`; dashboard accents unified to black badge + yellow glyph; `components.css` adds `.tlb-button-dark` + `.tlb-badge`, page-title token → `tlb-dark`.*
+- *Skeleton loaders: new `src/components/ui/Skeleton.tsx` — layout-matched skeletons (`SkeletonDashboard`, `SkeletonListings`+`SkeletonCard`, `SkeletonProfile`, `SkeletonList`, generic `SkeletonPage`) replacing the spinner in App Suspense/session, Dashboard, ServiceListings, Edit/PreviewProfile, and the class wizards. CSS-only (`animate-pulse`), zero server impact.*
+- *Load testing: added `loadtest/` (k6 harness `k6-portal.js` + README) driving the busiest read endpoints; ran a gentle prod smoke (3 VUs/20s) → 0 errors, p95 ~707ms. Documented client→API fan-out amplifiers (Statistics/Bookings/Followers pagination loops).*
+- *Bug fix (Pause/Resume revert): `ServiceListings` derived the Live/Paused badge from `is_live`, but `pause`/`resume` toggle a separate `is_paused` flag (verified against the live API — `is_live` never changes). Resumed listings snapped back to "Paused" on refetch. Now normalizes `isLive` from `is_paused` (falls back to `is_live` only if absent).*
 
 *Phase 26 (2026-06-30) — Bookings/Reviews/Documents/Messages/Venue-Enquiries screens, dashboard popups, ratios, single-message network, interactive listings:*
 - *Bookings vs Attendees: `attendees/Attendees.tsx` parameterized with a `variant` ('attendees' | 'bookings') and exported twice (`Attendees` default + `Bookings`). **Attendees** now shows only `status==='attended'` entries; **Bookings** (new `BOOKINGS` screen + sidebar) shows all. By-Listing grid sorts by each listing's happen date (live → soonest upcoming → recent past → undated) and highlights **Live** / **Soon** (≤2 days) cards; past-dated listings move to a separate **History** section. Captures `happenAt`/`happenEnd`/`is_live` from listing payloads.*

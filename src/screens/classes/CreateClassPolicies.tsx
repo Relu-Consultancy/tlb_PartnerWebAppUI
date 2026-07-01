@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, Plus, Trash2, HelpCircle, FileText, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation, Loader } from '../../components/ui';
+import { WizardLayout, WizardNavigation, SkeletonList } from '../../components/ui';
 import {
     getCurrentClassDraftId,
     getClassListingDetail,
@@ -87,9 +87,7 @@ export const CreateClassPolicies: React.FC<Props> = ({ onNavigate }) => {
                 themeColor="yellow"
                 onBack={() => onNavigate('CREATE_CLASS_MEDIA')}
             >
-                <div className="flex justify-center py-12">
-                    <Loader />
-                </div>
+                <SkeletonList rows={3} className="py-2" />
             </WizardLayout>
         );
     }

@@ -32,8 +32,11 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
     const [programFormat, setProgramFormat] = useState('');
     const [deliveryMode, setDeliveryMode] = useState('offline');
     const [city, setCity] = useState('');
-    const [area, setArea] = useState('');
+    const [district, setDistrict] = useState('');
+    const [stateName, setStateName] = useState('');
+    const [pincode, setPincode] = useState('');
     const [address, setAddress] = useState('');
+    const [fullAddress, setFullAddress] = useState('');
     const [meetingLink, setMeetingLink] = useState('');
 
     // API-driven metadata
@@ -98,8 +101,11 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                 const loadedBookingType = d.booking_type;
                 if (loadedBookingType === 'enquiry' || loadedBookingType === 'direct_booking') setBookingType(loadedBookingType);
                 setCity(d.city || '');
-                setArea(d.area || '');
+                setDistrict(d.district || '');
+                setStateName(d.state || '');
+                setPincode(d.pincode || '');
                 setAddress(d.address || '');
+                setFullAddress(d.full_address || '');
                 setMeetingLink(d.meeting_link || '');
                 // Category & subcategory come as objects { id, name }
                 const catId = d.category?.id;
@@ -166,8 +172,11 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
             if (moduleCount) payload.module_count = Number(moduleCount);
             if (needsAddress) {
                 if (city.trim()) payload.city = city.trim();
-                if (area.trim()) payload.area = area.trim();
+                if (district.trim()) payload.district = district.trim();
+                if (stateName.trim()) payload.state = stateName.trim();
+                if (pincode.trim()) payload.pincode = pincode.trim();
                 if (address.trim()) payload.address = address.trim();
+                if (fullAddress.trim()) payload.full_address = fullAddress.trim();
             }
             if ((deliveryMode === 'online' || deliveryMode === 'hybrid') && meetingLink.trim()) {
                 payload.meeting_link = meetingLink.trim();
@@ -338,11 +347,14 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block">
                         <MapPin size={12} className="inline mr-1" /> Program Location
                     </label>
+                    <textarea className="tlb-input w-full min-h-[70px] resize-y" placeholder="Street, building, landmark" value={address} onChange={(e) => setAddress(e.target.value)} />
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <input className="tlb-input w-full" placeholder="City" maxLength={100} value={city} onChange={(e) => setCity(e.target.value)} />
-                        <input className="tlb-input w-full" placeholder="Area / Neighborhood" maxLength={100} value={area} onChange={(e) => setArea(e.target.value)} />
+                        <input className="tlb-input w-full" placeholder="District" maxLength={100} value={district} onChange={(e) => setDistrict(e.target.value)} />
+                        <input className="tlb-input w-full" placeholder="State" maxLength={100} value={stateName} onChange={(e) => setStateName(e.target.value)} />
+                        <input className="tlb-input w-full" placeholder="Pincode" inputMode="numeric" maxLength={6} value={pincode} onChange={(e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))} />
                     </div>
-                    <textarea className="tlb-input w-full min-h-[80px] resize-y" placeholder="Full address (street, building, pincode)" value={address} onChange={(e) => setAddress(e.target.value)} />
+                    <textarea className="tlb-input w-full min-h-[80px] resize-y" placeholder="Full address (optional) — write out the complete address as you'd like customers to see it" value={fullAddress} onChange={(e) => setFullAddress(e.target.value)} />
                 </div>
             )}
 

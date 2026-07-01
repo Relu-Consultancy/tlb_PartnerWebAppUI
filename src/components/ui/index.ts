@@ -1,6 +1,7 @@
 export * from './WizardLayout';
 export * from './WizardNavigation';
 export * from './Loader';
+export * from './Skeleton';
 export * from './DashboardCharts';
 export * from './Toast';
 export * from './OnboardingShell';

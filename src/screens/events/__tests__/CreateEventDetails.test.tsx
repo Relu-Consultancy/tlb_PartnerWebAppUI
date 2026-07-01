@@ -105,12 +105,14 @@ describe('CreateEventDetails — form interactions', () => {
         expect(chip.className).not.toContain('bg-purple-500');
     });
 
-    it('shows city/area/address when offline mode is selected', async () => {
+    it('shows structured address fields when offline mode is selected', async () => {
         render(<CreateEventDetails {...defaultProps} />);
         await waitFor(() => screen.getByText('Offline'));
         // Offline is default
         expect(screen.getByPlaceholderText('City')).toBeInTheDocument();
-        expect(screen.getByPlaceholderText('Area / Neighborhood')).toBeInTheDocument();
+        expect(screen.getByPlaceholderText('District')).toBeInTheDocument();
+        expect(screen.getByPlaceholderText('State')).toBeInTheDocument();
+        expect(screen.getByPlaceholderText('Pincode')).toBeInTheDocument();
     });
 
     it('shows meeting link when online mode is selected', async () => {
@@ -174,5 +176,62 @@ describe('CreateEventDetails — Next button', () => {
         await user.click(screen.getByText(/next: schedule/i));
         await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('CREATE_EVENT_SCHEDULE'));
         expect(createCalled).toBe(false); // should not create, only update
+    });
+});
+
+describe('CreateEventDetails — structured address fields', () => {
+    it('renders City / District / State / Pincode plus the optional full-address box in offline mode', async () => {
+        render(<CreateEventDetails {...defaultProps} />);
+        await waitFor(() => screen.getByPlaceholderText('City'));
+        expect(screen.getByPlaceholderText('City')).toBeInTheDocument();
+        expect(screen.getByPlaceholderText('District')).toBeInTheDocument();
+        expect(screen.getByPlaceholderText('State')).toBeInTheDocument();
+        expect(screen.getByPlaceholderText('Pincode')).toBeInTheDocument();
+        expect(screen.getByPlaceholderText(/full address \(optional\)/i)).toBeInTheDocument();
+    });
+
+    it('strips non-numeric characters from pincode and caps it at 6 digits', async () => {
+        const user = userEvent.setup();
+        render(<CreateEventDetails {...defaultProps} />);
+        await waitFor(() => screen.getByPlaceholderText('Pincode'));
+        const pincode = screen.getByPlaceholderText('Pincode') as HTMLInputElement;
+        await user.type(pincode, '4a0b0c050999');
+        expect(pincode.value).toBe('400050');
+    });
+
+    it('pre-fills structured address fields from an existing draft', async () => {
+        listingsApi.setCurrentDraftId(DRAFT_ID);
+        server.use(http.get(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, () =>
+            HttpResponse.json({
+                success: true,
+                data: { ...mockDraft, district: 'Suburban', state: 'Maharashtra', pincode: '400050', full_address: '123 Test St, Bandra' },
+            })));
+        render(<CreateEventDetails {...defaultProps} />);
+        await waitFor(() => expect((screen.getByPlaceholderText('District') as HTMLInputElement).value).toBe('Suburban'));
+        expect((screen.getByPlaceholderText('State') as HTMLInputElement).value).toBe('Maharashtra');
+        expect((screen.getByPlaceholderText('Pincode') as HTMLInputElement).value).toBe('400050');
+        expect((screen.getByPlaceholderText(/full address \(optional\)/i) as HTMLTextAreaElement).value).toBe('123 Test St, Bandra');
+    });
+
+    it('sends district / state / pincode / full_address in the save payload', async () => {
+        listingsApi.setCurrentDraftId(DRAFT_ID);
+        let captured: any = null;
+        server.use(http.patch(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, async ({ request }) => {
+            captured = await request.json();
+            return HttpResponse.json({ success: true, data: mockDraft });
+        }));
+        const user = userEvent.setup();
+        render(<CreateEventDetails {...defaultProps} />);
+        await waitFor(() => screen.getByPlaceholderText('District'));
+        await user.type(screen.getByPlaceholderText('District'), 'Suburban');
+        await user.type(screen.getByPlaceholderText('State'), 'Maharashtra');
+        await user.type(screen.getByPlaceholderText('Pincode'), '400050');
+        await user.type(screen.getByPlaceholderText(/full address \(optional\)/i), 'Full addr line');
+        await user.click(screen.getByText(/next: schedule/i));
+        await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('CREATE_EVENT_SCHEDULE'));
+        expect(captured.district).toBe('Suburban');
+        expect(captured.state).toBe('Maharashtra');
+        expect(captured.pincode).toBe('400050');
+        expect(captured.full_address).toBe('Full addr line');
     });
 });

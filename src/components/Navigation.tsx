@@ -11,11 +11,13 @@ import {
   DollarSign,
   Package,
   BarChart3,
+  LineChart,
   Ticket,
   LifeBuoy,
   Network,
   ClipboardList,
   Star,
+  Heart,
   FileText,
   Bell,
   ChevronRight,
@@ -56,12 +58,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen
     { id: 'HOME', label: 'Dashboard', icon: Home, visible: true },
     { id: 'MESSAGES', label: 'Messages', icon: Bell, visible: true },
     { id: 'STATISTICS', label: 'Statistics', icon: BarChart3, visible: true },
+    { id: 'ANALYTICS', label: 'Analytics', icon: LineChart, visible: true },
     { id: 'BRAND_PROFILE', label: 'Brand Profile', icon: UserCircle, visible: true },
     { id: 'DOCUMENTS', label: 'Documents', icon: FileText, visible: true },
     { id: 'SERVICE_LISTINGS', label: listingsLabel, icon: CalendarDays, visible: true },
     { id: 'BOOKINGS', label: 'Bookings', icon: ClipboardList, visible: true },
     { id: 'ATTENDEES', label: 'Attendees', icon: Users, visible: true },
     { id: 'REVIEWS', label: 'Reviews', icon: Star, visible: true },
+    { id: 'FOLLOWERS', label: 'Followers', icon: Heart, visible: true },
     { id: 'ENQUIRIES', label: 'Class Enquiries', icon: Inbox, visible: hasClasses },
     { id: 'PROGRAM_ENQUIRIES', label: 'Program Enquiries', icon: Inbox, visible: hasPrograms },
     { id: 'VENUE_ENQUIRIES', label: 'Venue Enquiries', icon: Inbox, visible: hasVenues },
@@ -80,14 +84,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen
   };
 
   const sidebarContent = (
-    <div className="flex flex-col h-full bg-[#0f1729] text-white">
+    <div className="flex flex-col h-full bg-tlb-dark text-white">
       {/* Logo header */}
       <div className="px-5 py-5 flex items-center justify-between border-b border-white/10">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-tlb-yellow flex items-center justify-center">
             <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5">
-              <path d="M9 12l2 2 4-4" stroke="#0f1729" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-              <circle cx="12" cy="12" r="10" stroke="#0f1729" strokeWidth="2" />
+              <path d="M9 12l2 2 4-4" stroke="#141414" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx="12" cy="12" r="10" stroke="#141414" strokeWidth="2" />
             </svg>
           </div>
           <div>
@@ -114,13 +118,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen
               onClick={() => handleNav(item.id as Screen)}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all group ${
                 isActive
-                  ? 'bg-tlb-yellow text-[#0f1729]'
+                  ? 'bg-tlb-yellow text-tlb-dark'
                   : 'text-gray-400 hover:bg-white/5 hover:text-white'
               }`}
             >
-              <item.icon size={18} className={isActive ? 'text-[#0f1729]' : 'text-gray-500 group-hover:text-gray-300'} />
-              <span className={`text-sm font-semibold flex-1 ${isActive ? 'text-[#0f1729]' : ''}`}>{item.label}</span>
-              {isActive && <ChevronRight size={14} className="text-[#0f1729]/50" />}
+              <item.icon size={18} className={isActive ? 'text-tlb-dark' : 'text-gray-500 group-hover:text-gray-300'} />
+              <span className={`text-sm font-semibold flex-1 ${isActive ? 'text-tlb-dark' : ''}`}>{item.label}</span>
+              {isActive && <ChevronRight size={14} className="text-tlb-dark/50" />}
             </button>
           );
         })}

@@ -97,9 +97,9 @@ const HeroCards: React.FC<{ rotateX?: MotionValue<number>; rotateY?: MotionValue
             className="relative w-full h-[420px] sm:h-[460px] overflow-hidden"
             style={{ rotateX, rotateY, transformStyle: 'preserve-3d', perspective: 1000 }}
         >
-            {/* Backdrop gradient blob */}
+            {/* Backdrop gradient blob — deeper gold wash */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-72 h-72 bg-tlb-yellow/30 rounded-full blur-3xl" />
+                <div className="w-72 h-72 bg-yellow-500/45 rounded-full blur-3xl" />
             </div>
 
             {cards.map((card, i) => {
@@ -229,8 +229,21 @@ export const Landing: React.FC<AuthProps> = ({ onNavigate }) => {
     const rotateX = useSpring(rawRotateX, { stiffness: 80, damping: 18 });
     const rotateY = useSpring(rawRotateY, { stiffness: 80, damping: 18 });
 
-    // CSS gradient that follows the cursor — uses motion template so it updates without re-render.
-    const spotlight = useMotionTemplate`radial-gradient(450px circle at ${mouseX}px ${mouseY}px, rgba(250, 204, 21, 0.18), transparent 70%)`;
+    // Window-level cursor tracking so the spotlight spans the WHOLE viewport
+    // (not just the hero rectangle). Uses viewport (client) coordinates, paired
+    // with a position:fixed overlay below. The hero-relative mouseX/mouseY above
+    // still drive the 3D card tilt.
+    const winX = useMotionValue(-9999);
+    const winY = useMotionValue(-9999);
+    useEffect(() => {
+        const onMove = (e: MouseEvent) => { winX.set(e.clientX); winY.set(e.clientY); };
+        window.addEventListener('mousemove', onMove);
+        return () => window.removeEventListener('mousemove', onMove);
+    }, [winX, winY]);
+
+    // CSS gradient that follows the cursor across the whole screen — motion
+    // template so it updates without re-render.
+    const spotlight = useMotionTemplate`radial-gradient(450px circle at ${winX}px ${winY}px, rgba(234, 179, 8, 0.24), transparent 70%)`;
 
     const features = [
         {
@@ -294,6 +307,13 @@ export const Landing: React.FC<AuthProps> = ({ onNavigate }) => {
 
     return (
         <div className="min-h-screen bg-[#FDFCF8] text-tlb-dark">
+            {/* ── Full-screen cursor spotlight (behind all content) ── */}
+            <motion.div
+                aria-hidden
+                className="pointer-events-none fixed inset-0 -z-10 hidden sm:block"
+                style={{ background: spotlight }}
+            />
+
             {/* ── Scroll progress bar (thin yellow line, very top) ── */}
             <motion.div
                 className="fixed top-0 left-0 right-0 h-[3px] bg-tlb-yellow origin-left z-[60]"
@@ -339,12 +359,6 @@ export const Landing: React.FC<AuthProps> = ({ onNavigate }) => {
                 onMouseLeave={handleHeroMouseLeave}
                 className="relative max-w-6xl mx-auto px-4 sm:px-6 pt-8 sm:pt-12 pb-16 sm:pb-24"
             >
-                {/* Mouse-following spotlight — "your stage" theme: a soft yellow glow follows the cursor */}
-                <motion.div
-                    aria-hidden
-                    className="pointer-events-none absolute inset-0 z-0 hidden sm:block"
-                    style={{ background: spotlight }}
-                />
                 <div className="relative z-10 grid lg:grid-cols-2 gap-10 lg:gap-12 items-center">
                     {/* Left: copy */}
                     <div>

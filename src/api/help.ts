@@ -159,3 +159,64 @@ export const getTicketCategories = async (): Promise<TicketCategory[]> => {
 
 export const ticketCategoryLabel = (value: string) =>
     DEFAULT_CATEGORIES.find((c) => c.value === value)?.label || humanize(value || '');
+
+// ---------------------------------------------------------------------------
+// Shared queries — tickets admin shared with this partner
+// Base: /api/v1/help/partner/shared-tickets/
+// ---------------------------------------------------------------------------
+
+export interface SharedTicketListItem {
+    id: string;
+    category: string;
+    subject: string;
+    status: TicketStatus;
+    raised_by_role: string;
+    booking_reference?: string | null;
+    shared_at: string;
+    created_at: string;
+    updated_at: string;
+    unread_count: number;
+}
+
+export interface SharedTicketDetail {
+    ticket: {
+        id: string;
+        category: string;
+        subject: string;
+        status: TicketStatus;
+        booking_reference?: string | null;
+        created_at: string;
+        updated_at: string;
+        closed_at?: string | null;
+    };
+    ticket_status: TicketStatus;
+    messages: TicketMessage[];
+}
+
+export const listSharedTickets = async (): Promise<SharedTicketListItem[]> => {
+    const res = await apiClient('/api/v1/help/partner/shared-tickets/');
+    return unwrapList<SharedTicketListItem>(res, 'Failed to load shared queries');
+};
+
+export const getSharedTicket = async (ticketId: string): Promise<SharedTicketDetail> => {
+    const res = await apiClient(`/api/v1/help/partner/shared-tickets/${ticketId}/`);
+    return unwrap<SharedTicketDetail>(res, 'Failed to load shared query');
+};
+
+export const getSharedTicketMessages = async (ticketId: string, since?: string): Promise<TicketMessagesResult> => {
+    const qs = since ? `?since=${encodeURIComponent(since)}` : '';
+    const res = await apiClient(`/api/v1/help/partner/shared-tickets/${ticketId}/messages/${qs}`);
+    const data = await unwrap<any>(res, 'Failed to load messages');
+    if (Array.isArray(data)) return { messages: data as TicketMessage[] };
+    if (Array.isArray(data?.messages)) return { ticket_status: data.ticket_status, messages: data.messages };
+    if (Array.isArray(data?.results)) return { messages: data.results };
+    return { messages: [] };
+};
+
+export const sendSharedTicketMessage = async (ticketId: string, body: string): Promise<TicketMessage> => {
+    const res = await apiClient(`/api/v1/help/partner/shared-tickets/${ticketId}/messages/send/`, {
+        method: 'POST',
+        body: JSON.stringify({ body }),
+    });
+    return unwrap<TicketMessage>(res, 'Failed to send message');
+};

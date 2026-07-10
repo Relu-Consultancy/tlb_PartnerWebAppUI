@@ -28,7 +28,8 @@ const LOCATION_TYPES = [
 ] as const;
 
 const API_BASE = 'https://tlb-api.reluconsultancy.in';
-const COVER_MAX = 5 * 1024 * 1024;
+const COVER_IMG_MAX = 5 * 1024 * 1024;
+const COVER_VID_MAX = 15 * 1024 * 1024;
 const GALLERY_MAX = 5 * 1024 * 1024;
 const VIDEO_MAX = 100 * 1024 * 1024;
 const GALLERY_LIMIT = 10;
@@ -40,6 +41,8 @@ const resolveUrl = (url: string | undefined) => {
 };
 
 const getUrl = (item: MediaItem) => resolveUrl(item.url || item.file_url || '');
+const isVideoFile = (name: string) => /\.(mp4|mov)$/i.test(name);
+const isVideoUrl = (url: string) => /\.(mp4|mov)$/i.test(url);
 
 export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
     // Core info
@@ -155,7 +158,9 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
     const handleCoverPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files?.[0]) return;
         const file = e.target.files[0];
-        if (file.size > COVER_MAX) { toast.warning('Cover must be under 5 MB.'); e.target.value = ''; return; }
+        const isVid = isVideoFile(file.name);
+        const maxSize = isVid ? COVER_VID_MAX : COVER_IMG_MAX;
+        if (file.size > maxSize) { toast.warning(isVid ? 'Banner video must be under 15 MB.' : 'Cover image must be under 5 MB.'); e.target.value = ''; return; }
         const id = await ensureDraft();
         if (!id) { e.target.value = ''; return; }
         setBusyKind('cover');
@@ -539,12 +544,16 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
             {/* Cover Image */}
             <div>
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">
-                    Cover Image <span className="text-red-400">*</span>
+                    Cover Banner <span className="text-red-400">*</span>
                 </label>
-                <input ref={coverInputRef} type="file" accept="image/jpeg,image/png" className="hidden" onChange={handleCoverPick} />
+                <input ref={coverInputRef} type="file" accept="image/jpeg,image/png,video/mp4,video/quicktime" className="hidden" onChange={handleCoverPick} />
                 {cover ? (
                     <div className="relative w-full sm:w-80 aspect-[16/9] rounded-2xl overflow-hidden border border-gray-200">
-                        <img src={getUrl(cover)} alt="Cover" className="w-full h-full object-cover" />
+                        {isVideoUrl(getUrl(cover)) ? (
+                            <video src={getUrl(cover)} autoPlay muted loop playsInline className="w-full h-full object-cover" />
+                        ) : (
+                            <img src={getUrl(cover)} alt="Cover" className="w-full h-full object-cover" />
+                        )}
                         <button onClick={handleDeleteCover} className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-lg shadow text-red-500 hover:bg-white" aria-label="Remove cover">
                             <Trash2 size={14} />
                         </button>
@@ -556,7 +565,7 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
                     <button onClick={() => coverInputRef.current?.click()} disabled={busyKind === 'cover'} className="w-full sm:w-80 aspect-[16/9] bg-amber-50 rounded-2xl border-2 border-dashed border-amber-200 flex flex-col items-center justify-center text-amber-500 hover:bg-amber-100 transition-colors disabled:opacity-60">
                         {busyKind === 'cover' ? <Loader2 size={28} className="animate-spin" /> : <Camera size={28} />}
                         <span className="text-xs font-bold mt-2">{busyKind === 'cover' ? 'Uploading…' : 'Upload Cover'}</span>
-                        <span className="text-[10px] text-amber-400 mt-1">JPG/PNG · Max 5MB</span>
+                        <span className="text-[10px] text-amber-400 mt-1">JPG/PNG or MP4/MOV · Image 5MB / Video 15MB</span>
                     </button>
                 )}
             </div>

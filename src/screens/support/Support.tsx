@@ -3,17 +3,22 @@ import { motion } from 'motion/react';
 import {
     Menu, ArrowLeft, Plus, LifeBuoy, Search, RefreshCw, AlertCircle,
     Send, CheckCircle2, MessageSquare, Clock, Lock, Ticket as TicketIcon,
+    Share2,
 } from 'lucide-react';
 import { Screen } from '../../types';
 import { Select, SelectOption, toast } from '../../components/ui';
 import {
     listTickets, getTicket, createTicket, closeTicket,
     getTicketMessages, sendTicketMessage, getTicketCategories, ticketCategoryLabel,
+    listSharedTickets, getSharedTicket, getSharedTicketMessages, sendSharedTicketMessage,
     TicketListItem, Ticket, TicketMessage, TicketCategory,
+    SharedTicketListItem, SharedTicketDetail,
 } from '../../api/help';
 import { getBookings } from '../../api/listings';
 
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
+
+type Tab = 'my' | 'shared';
 
 // ---------------------------------------------------------------------------
 // Status styling
@@ -40,24 +45,30 @@ const toCount = (v: number | string | undefined) => {
     return Number.isFinite(n) && (n as number) > 0 ? (n as number) : 0;
 };
 
+const ROLE_LABEL: Record<string, string> = {
+    customer: 'Customer',
+    admin: 'Admin',
+    support: 'TLB Support',
+    staff: 'TLB Support',
+};
+
 export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
-    // List
+    const [activeTab, setActiveTab] = useState<Tab>('my');
+
+    // ── My Tickets state ──
     const [tickets, setTickets] = useState<TicketListItem[]>([]);
     const [loadingList, setLoadingList] = useState(true);
     const [listError, setListError] = useState<string | null>(null);
     const [query, setQuery] = useState('');
 
-    // Categories + bookings (for the new-ticket form)
     const [categories, setCategories] = useState<TicketCategory[]>([]);
     const [bookingOptions, setBookingOptions] = useState<SelectOption[]>([]);
 
-    // New ticket
     const [creating, setCreating] = useState(false);
     const [form, setForm] = useState({ subject: '', category: '', body: '', bookingId: '' });
     const [formErrors, setFormErrors] = useState<{ subject?: string; category?: string; body?: string }>({});
     const [submitting, setSubmitting] = useState(false);
 
-    // Detail
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [detail, setDetail] = useState<Ticket | null>(null);
     const [messages, setMessages] = useState<TicketMessage[]>([]);
@@ -70,7 +81,24 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
     const lastTsRef = useRef<string | undefined>(undefined);
     const bottomRef = useRef<HTMLDivElement>(null);
 
-    // ── Load list + categories on mount ──
+    // ── Shared Queries state ──
+    const [sharedTickets, setSharedTickets] = useState<SharedTicketListItem[]>([]);
+    const [loadingShared, setLoadingShared] = useState(true);
+    const [sharedError, setSharedError] = useState<string | null>(null);
+    const [sharedQuery, setSharedQuery] = useState('');
+
+    const [sharedSelectedId, setSharedSelectedId] = useState<string | null>(null);
+    const [sharedDetail, setSharedDetail] = useState<SharedTicketDetail | null>(null);
+    const [sharedMessages, setSharedMessages] = useState<TicketMessage[]>([]);
+    const [loadingSharedDetail, setLoadingSharedDetail] = useState(false);
+    const [sharedReply, setSharedReply] = useState('');
+    const [sendingShared, setSendingShared] = useState(false);
+    const [refreshingShared, setRefreshingShared] = useState(false);
+
+    const sharedLastTsRef = useRef<string | undefined>(undefined);
+    const sharedBottomRef = useRef<HTMLDivElement>(null);
+
+    // ── Load my tickets + categories on mount ──
     const loadList = async () => {
         setLoadingList(true);
         setListError(null);
@@ -83,8 +111,21 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
         }
     };
 
+    const loadSharedList = async () => {
+        setLoadingShared(true);
+        setSharedError(null);
+        try {
+            setSharedTickets(await listSharedTickets());
+        } catch (e: any) {
+            setSharedError(e?.message || 'Failed to load shared queries');
+        } finally {
+            setLoadingShared(false);
+        }
+    };
+
     useEffect(() => {
         loadList();
+        loadSharedList();
         getTicketCategories().then(setCategories).catch(() => {});
         getBookings()
             .then((res: any) => {
@@ -99,14 +140,11 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
             .catch(() => setBookingOptions([{ value: '', label: 'No booking' }]));
     }, []);
 
-    // ── Poll messages while a ticket is open ──
-    // Cadence follows the ticket status: in_progress → 5s (feels real-time),
-    // open → 30s, resolved → 60s, closed → stop. `lastTsRef` carries the UTC
-    // cursor verbatim so deltas work correctly.
+    // ── Poll my ticket messages ──
     useEffect(() => {
         if (!selectedId) return;
         const status = detail?.status;
-        if (status === 'closed') return; // terminal — no more messages
+        if (status === 'closed') return;
         const intervalMs = status === 'in_progress' ? 5000 : status === 'resolved' ? 60000 : 30000;
         const poll = async () => {
             try {
@@ -128,11 +166,41 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
         return () => clearInterval(iv);
     }, [selectedId, detail?.status]);
 
-    // Auto-scroll the thread to the newest message
+    // ── Poll shared ticket messages ──
+    useEffect(() => {
+        if (!sharedSelectedId) return;
+        const status = sharedDetail?.ticket_status || sharedDetail?.ticket?.status;
+        if (status === 'closed') return;
+        const intervalMs = status === 'in_progress' ? 5000 : status === 'resolved' ? 60000 : 30000;
+        const poll = async () => {
+            try {
+                const { messages: msgs, ticket_status } = await getSharedTicketMessages(sharedSelectedId, sharedLastTsRef.current);
+                if (msgs.length) {
+                    setSharedMessages(prev => {
+                        const seen = new Set(prev.map(m => m.id));
+                        const fresh = msgs.filter(m => !seen.has(m.id));
+                        return fresh.length ? [...prev, ...fresh] : prev;
+                    });
+                    sharedLastTsRef.current = msgs[msgs.length - 1].created_at;
+                }
+                if (ticket_status && sharedDetail) {
+                    setSharedDetail(prev => prev ? { ...prev, ticket_status } : prev);
+                }
+            } catch { /* silent during polling */ }
+        };
+        const iv = setInterval(poll, intervalMs);
+        return () => clearInterval(iv);
+    }, [sharedSelectedId, sharedDetail?.ticket_status, sharedDetail?.ticket?.status]);
+
+    // Auto-scroll
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }, [messages.length]);
+    useEffect(() => {
+        sharedBottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }, [sharedMessages.length]);
 
+    // ── My ticket handlers ──
     const openTicket = async (id: string) => {
         setSelectedId(id);
         setDetail(null);
@@ -145,7 +213,6 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
             setDetail(msgsRes.ticket_status ? { ...t, status: msgsRes.ticket_status } : t);
             setMessages(msgsRes.messages);
             lastTsRef.current = msgsRes.messages.length ? msgsRes.messages[msgsRes.messages.length - 1].created_at : undefined;
-            // Optimistically clear unread badge in the list
             setTickets(prev => prev.map(tk => tk.id === id ? { ...tk, unread_count: 0 } : tk));
         } catch (e: any) {
             toast.error(e?.message || 'Failed to load ticket');
@@ -185,7 +252,6 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
         loadList();
     };
 
-    // ── New ticket ──
     const openNew = () => {
         setForm({ subject: '', category: categories[0]?.value || '', body: '', bookingId: '' });
         setFormErrors({});
@@ -251,22 +317,127 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
         }
     };
 
+    // ── Shared ticket handlers ──
+    const openSharedTicket = async (id: string) => {
+        setSharedSelectedId(id);
+        setSharedDetail(null);
+        setSharedMessages([]);
+        setSharedReply('');
+        sharedLastTsRef.current = undefined;
+        setLoadingSharedDetail(true);
+        try {
+            const data = await getSharedTicket(id);
+            setSharedDetail(data);
+            setSharedMessages(data.messages || []);
+            if (data.messages?.length) {
+                sharedLastTsRef.current = data.messages[data.messages.length - 1].created_at;
+            }
+            setSharedTickets(prev => prev.map(tk => tk.id === id ? { ...tk, unread_count: 0 } : tk));
+        } catch (e: any) {
+            toast.error(e?.message || 'Failed to load shared query');
+            setSharedSelectedId(null);
+        } finally {
+            setLoadingSharedDetail(false);
+        }
+    };
+
+    const refreshSharedMessages = async () => {
+        if (!sharedSelectedId) return;
+        setRefreshingShared(true);
+        try {
+            const { messages: msgs, ticket_status } = await getSharedTicketMessages(sharedSelectedId, sharedLastTsRef.current);
+            if (msgs.length) {
+                setSharedMessages(prev => {
+                    const seen = new Set(prev.map(m => m.id));
+                    const fresh = msgs.filter(m => !seen.has(m.id));
+                    return fresh.length ? [...prev, ...fresh] : prev;
+                });
+                sharedLastTsRef.current = msgs[msgs.length - 1].created_at;
+            }
+            if (ticket_status && sharedDetail) {
+                setSharedDetail(prev => prev ? { ...prev, ticket_status } : prev);
+            }
+        } catch (e: any) {
+            toast.error(e?.message || 'Failed to refresh messages');
+        } finally {
+            setRefreshingShared(false);
+        }
+    };
+
+    const sendSharedReply = async (ev: React.FormEvent) => {
+        ev.preventDefault();
+        const body = sharedReply.trim();
+        if (!body || !sharedSelectedId) return;
+        setSendingShared(true);
+        try {
+            const msg = await sendSharedTicketMessage(sharedSelectedId, body);
+            setSharedMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
+            sharedLastTsRef.current = msg.created_at;
+            setSharedReply('');
+        } catch (e: any) {
+            toast.error(e?.message || 'Failed to send message');
+        } finally {
+            setSendingShared(false);
+        }
+    };
+
+    const backToSharedList = () => {
+        setSharedSelectedId(null);
+        setSharedDetail(null);
+        setSharedMessages([]);
+        loadSharedList();
+    };
+
+    // ── Filters ──
     const filtered = tickets.filter(t => {
         const q = query.trim().toLowerCase();
         if (!q) return true;
         return t.subject.toLowerCase().includes(q) || ticketCategoryLabel(t.category).toLowerCase().includes(q);
     });
 
+    const filteredShared = sharedTickets.filter(t => {
+        const q = sharedQuery.trim().toLowerCase();
+        if (!q) return true;
+        return t.subject.toLowerCase().includes(q)
+            || ticketCategoryLabel(t.category).toLowerCase().includes(q)
+            || (t.booking_reference || '').toLowerCase().includes(q);
+    });
+
     const openCount = tickets.filter(t => !isClosed(t.status)).length;
+    const sharedUnread = sharedTickets.reduce((s, t) => s + toCount(t.unread_count), 0);
+
+    const isInDetail = activeTab === 'my' ? !!selectedId : !!sharedSelectedId;
 
     // -----------------------------------------------------------------------
     // Header
     // -----------------------------------------------------------------------
+    const headerTitle = () => {
+        if (creating) return 'Raise a Ticket';
+        if (activeTab === 'my' && detail) return detail.subject;
+        if (activeTab === 'shared' && sharedDetail) return sharedDetail.ticket.subject;
+        return 'Help & Support';
+    };
+    const headerSub = () => {
+        if (creating) return 'Tell us what you need help with';
+        if (activeTab === 'my' && detail) {
+            return `${ticketCategoryLabel(detail.category)}${detail.booking_reference ? ` · ${detail.booking_reference}` : ''}`;
+        }
+        if (activeTab === 'shared' && sharedDetail) {
+            const t = sharedDetail.ticket;
+            return `${ticketCategoryLabel(t.category)}${t.booking_reference ? ` · ${t.booking_reference}` : ''}`;
+        }
+        return 'Raise tickets and chat with the TLB team';
+    };
+
     const header = (
         <header className="bg-white/90 backdrop-blur-sm px-5 md:px-8 py-5 flex items-center gap-4 sticky top-0 z-30 border-b border-gray-100">
-            {(creating || selectedId) ? (
+            {(creating || isInDetail) ? (
                 <button
-                    onClick={() => (creating ? setCreating(false) : backToList())}
+                    onClick={() => {
+                        if (creating) setCreating(false);
+                        else if (activeTab === 'my') backToList();
+                        else backToSharedList();
+                    }}
                     className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors flex items-center gap-1.5 text-gray-500 hover:text-gray-900"
                     aria-label="Back"
                 >
@@ -277,21 +448,44 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                 <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors"><Menu size={24} /></button>
             )}
             <div className="flex-1 min-w-0">
-                <h1 className="tlb-page-title truncate">
-                    {creating ? 'Raise a Ticket' : detail ? detail.subject : 'Help & Support'}
-                </h1>
-                <p className="tlb-page-sub">
-                    {creating ? 'Tell us what you need help with'
-                        : detail ? `${ticketCategoryLabel(detail.category)}${detail.booking_reference ? ` · ${detail.booking_reference}` : ''}`
-                            : 'Raise tickets and chat with the TLB team'}
-                </p>
+                <h1 className="tlb-page-title truncate">{headerTitle()}</h1>
+                <p className="tlb-page-sub">{headerSub()}</p>
             </div>
-            {!creating && !selectedId && (
+            {!creating && !isInDetail && activeTab === 'my' && (
                 <button onClick={openNew} className="tlb-button hidden sm:inline-flex">
                     <Plus size={18} /> New Ticket
                 </button>
             )}
         </header>
+    );
+
+    // -----------------------------------------------------------------------
+    // Tab bar (only shown in list view)
+    // -----------------------------------------------------------------------
+    const tabBar = !creating && !isInDetail && (
+        <div className="bg-white border-b border-gray-100 px-5 md:px-8">
+            <div className="max-w-4xl mx-auto flex gap-1">
+                {([
+                    { key: 'my' as Tab, label: 'My Tickets', icon: <TicketIcon size={14} />, badge: 0 },
+                    { key: 'shared' as Tab, label: 'Shared Queries', icon: <Share2 size={14} />, badge: sharedUnread },
+                ]).map(tab => (
+                    <button
+                        key={tab.key}
+                        onClick={() => setActiveTab(tab.key)}
+                        className={`relative flex items-center gap-2 px-4 py-3 text-sm font-bold transition-colors border-b-2 ${
+                            activeTab === tab.key
+                                ? 'border-tlb-yellow text-gray-900'
+                                : 'border-transparent text-gray-400 hover:text-gray-600'
+                        }`}
+                    >
+                        {tab.icon} {tab.label}
+                        {tab.badge > 0 && (
+                            <span className="text-[10px] font-black text-white bg-red-500 rounded-full px-1.5 py-0.5 leading-none">{tab.badge}</span>
+                        )}
+                    </button>
+                ))}
+            </div>
+        </div>
     );
 
     // -----------------------------------------------------------------------
@@ -371,9 +565,9 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
     }
 
     // -----------------------------------------------------------------------
-    // Ticket detail (conversation)
+    // My Ticket detail (conversation)
     // -----------------------------------------------------------------------
-    if (selectedId) {
+    if (selectedId && activeTab === 'my') {
         const closed = isClosed(detail?.status);
         const st = detail ? statusStyle(detail.status) : null;
         return (
@@ -385,7 +579,6 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                     </div>
                 ) : (
                     <>
-                        {/* Sub-bar */}
                         {detail && st && (
                             <div className="bg-white border-b border-gray-100 px-5 md:px-8 py-3 flex items-center gap-3 flex-wrap">
                                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${st.cls}`}>
@@ -414,7 +607,6 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                             </div>
                         )}
 
-                        {/* Thread */}
                         <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6">
                             <div className="max-w-3xl mx-auto space-y-3">
                                 {messages.length === 0 ? (
@@ -428,9 +620,7 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                         <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
                                             <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${mine ? 'bg-tlb-yellow text-tlb-dark rounded-br-md' : 'bg-white border border-gray-100 text-gray-800 rounded-bl-md shadow-sm'}`}>
                                                 {!mine && (
-                                                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
-                                                        {m.sender_role === 'customer' ? 'Customer' : 'TLB Support'}
-                                                    </p>
+                                                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">TLB Support</p>
                                                 )}
                                                 <p className="text-sm leading-snug whitespace-pre-wrap break-words">{m.body}</p>
                                                 <p className={`text-[10px] mt-1 ${mine ? 'text-tlb-dark/50' : 'text-gray-400'}`}>{fmtTime(m.created_at)}</p>
@@ -442,7 +632,6 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                             </div>
                         </div>
 
-                        {/* Composer */}
                         <div className="bg-white border-t border-gray-100 px-4 md:px-8 py-4">
                             {closed ? (
                                 <p className="max-w-3xl mx-auto text-center text-sm font-bold text-gray-400 flex items-center justify-center gap-2">
@@ -471,97 +660,287 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
     }
 
     // -----------------------------------------------------------------------
-    // Ticket list
+    // Shared query detail (three-party conversation)
+    // -----------------------------------------------------------------------
+    if (sharedSelectedId && activeTab === 'shared') {
+        const ticket = sharedDetail?.ticket;
+        const status = sharedDetail?.ticket_status || ticket?.status || '';
+        const closed = isClosed(status);
+        const st = statusStyle(status);
+        return (
+            <div className="min-h-screen bg-gray-50 flex flex-col h-screen">
+                {header}
+                {loadingSharedDetail ? (
+                    <div className="flex-1 flex items-center justify-center">
+                        <RefreshCw size={26} className="text-gray-300 animate-spin" />
+                    </div>
+                ) : (
+                    <>
+                        {ticket && (
+                            <div className="bg-white border-b border-gray-100 px-5 md:px-8 py-3 flex items-center gap-3 flex-wrap">
+                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${st.cls}`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} /> {st.label}
+                                </span>
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border bg-purple-50 text-purple-700 border-purple-200">
+                                    <Share2 size={10} /> Shared Query
+                                </span>
+                                {ticket.booking_reference && (
+                                    <span className="text-xs font-bold text-gray-400">Ref: {ticket.booking_reference}</span>
+                                )}
+                                <span className="text-xs font-bold text-gray-400 flex items-center gap-1.5">
+                                    <Clock size={12} /> Opened {fmtDate(ticket.created_at)}
+                                </span>
+                                <div className="ml-auto flex items-center gap-2">
+                                    <button onClick={refreshSharedMessages} disabled={refreshingShared}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                                        title="Refresh messages">
+                                        <RefreshCw size={12} className={refreshingShared ? 'animate-spin' : ''} /> Refresh
+                                    </button>
+                                    {closed && (
+                                        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-gray-400">
+                                            <Lock size={12} /> Closed
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6">
+                            <div className="max-w-3xl mx-auto space-y-3">
+                                {sharedMessages.length === 0 ? (
+                                    <div className="flex flex-col items-center gap-2 py-16 text-center">
+                                        <MessageSquare size={30} className="text-gray-200" />
+                                        <p className="text-sm font-bold text-gray-400">No messages in this thread yet.</p>
+                                    </div>
+                                ) : sharedMessages.map(m => {
+                                    const mine = m.sender_role === 'partner';
+                                    const roleLabel = ROLE_LABEL[m.sender_role] || m.sender_role;
+                                    const isCustomer = m.sender_role === 'customer';
+                                    return (
+                                        <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+                                            <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
+                                                mine
+                                                    ? 'bg-tlb-yellow text-tlb-dark rounded-br-md'
+                                                    : isCustomer
+                                                        ? 'bg-blue-50 border border-blue-100 text-gray-800 rounded-bl-md'
+                                                        : 'bg-white border border-gray-100 text-gray-800 rounded-bl-md shadow-sm'
+                                            }`}>
+                                                {!mine && (
+                                                    <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isCustomer ? 'text-blue-400' : 'text-gray-400'}`}>
+                                                        {roleLabel}
+                                                    </p>
+                                                )}
+                                                <p className="text-sm leading-snug whitespace-pre-wrap break-words">{m.body}</p>
+                                                <p className={`text-[10px] mt-1 ${mine ? 'text-tlb-dark/50' : 'text-gray-400'}`}>{fmtTime(m.created_at)}</p>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                <div ref={sharedBottomRef} />
+                            </div>
+                        </div>
+
+                        <div className="bg-white border-t border-gray-100 px-4 md:px-8 py-4">
+                            {closed ? (
+                                <p className="max-w-3xl mx-auto text-center text-sm font-bold text-gray-400 flex items-center justify-center gap-2">
+                                    <Lock size={14} /> This ticket is closed.
+                                </p>
+                            ) : (
+                                <form onSubmit={sendSharedReply} className="max-w-3xl mx-auto flex items-end gap-3">
+                                    <textarea
+                                        rows={1} value={sharedReply}
+                                        onChange={e => setSharedReply(e.target.value)}
+                                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendSharedReply(e); } }}
+                                        placeholder="Reply to this query…"
+                                        className="flex-1 tlb-input resize-none max-h-32 py-3"
+                                    />
+                                    <button type="submit" disabled={sendingShared || !sharedReply.trim()}
+                                        className="tlb-button !px-4 py-3 shrink-0 disabled:opacity-50">
+                                        {sendingShared ? <RefreshCw size={18} className="animate-spin" /> : <Send size={18} />}
+                                    </button>
+                                </form>
+                            )}
+                        </div>
+                    </>
+                )}
+            </div>
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // List view (both tabs)
     // -----------------------------------------------------------------------
     return (
         <div className="min-h-screen bg-gray-50 pb-24">
             {header}
+            {tabBar}
             <main className="p-5 md:p-6">
                 <div className="max-w-4xl mx-auto space-y-6">
-                    {/* Summary + search */}
-                    <div className="flex flex-col md:flex-row md:items-center gap-3 justify-between">
-                        <p className="text-sm font-bold text-gray-500">
-                            {tickets.length} ticket{tickets.length === 1 ? '' : 's'}
-                            {openCount > 0 && <span className="text-gray-400"> · {openCount} open</span>}
-                        </p>
-                        <div className="relative md:w-72">
-                            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                            <input
-                                type="text" value={query} onChange={e => setQuery(e.target.value)}
-                                placeholder="Search tickets"
-                                className="tlb-input !pl-9 !py-2.5"
-                            />
-                        </div>
-                    </div>
-
-                    {loadingList ? (
-                        <div className="flex items-center justify-center py-24">
-                            <RefreshCw size={26} className="text-gray-300 animate-spin" />
-                        </div>
-                    ) : listError ? (
-                        <div className="tlb-card flex flex-col items-center justify-center text-center py-16">
-                            <AlertCircle size={32} className="text-red-300 mb-3" />
-                            <p className="text-sm font-bold text-gray-500">{listError}</p>
-                            <button onClick={loadList} className="text-xs font-black text-blue-500 hover:underline mt-3">Try again</button>
-                        </div>
-                    ) : filtered.length === 0 ? (
-                        <div className="tlb-card flex flex-col items-center justify-center text-center py-16">
-                            <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
-                                <LifeBuoy size={28} className="text-gray-400" />
+                    {activeTab === 'my' ? (
+                        <>
+                            <div className="flex flex-col md:flex-row md:items-center gap-3 justify-between">
+                                <p className="text-sm font-bold text-gray-500">
+                                    {tickets.length} ticket{tickets.length === 1 ? '' : 's'}
+                                    {openCount > 0 && <span className="text-gray-400"> · {openCount} open</span>}
+                                </p>
+                                <div className="relative md:w-72">
+                                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                    <input
+                                        type="text" value={query} onChange={e => setQuery(e.target.value)}
+                                        placeholder="Search tickets"
+                                        className="tlb-input !pl-9 !py-2.5"
+                                    />
+                                </div>
                             </div>
-                            <h3 className="tlb-h3">{query ? 'No tickets match your search' : 'No support tickets yet'}</h3>
-                            <p className="text-sm text-gray-500 mt-1 max-w-xs">
-                                {query ? 'Try a different search term.' : 'Raise a ticket and our team will get back to you here.'}
-                            </p>
-                            {!query && (
-                                <button onClick={openNew} className="tlb-button mt-5"><Plus size={18} /> Raise your first ticket</button>
+
+                            {loadingList ? (
+                                <div className="flex items-center justify-center py-24">
+                                    <RefreshCw size={26} className="text-gray-300 animate-spin" />
+                                </div>
+                            ) : listError ? (
+                                <div className="tlb-card flex flex-col items-center justify-center text-center py-16">
+                                    <AlertCircle size={32} className="text-red-300 mb-3" />
+                                    <p className="text-sm font-bold text-gray-500">{listError}</p>
+                                    <button onClick={loadList} className="text-xs font-black text-blue-500 hover:underline mt-3">Try again</button>
+                                </div>
+                            ) : filtered.length === 0 ? (
+                                <div className="tlb-card flex flex-col items-center justify-center text-center py-16">
+                                    <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
+                                        <LifeBuoy size={28} className="text-gray-400" />
+                                    </div>
+                                    <h3 className="tlb-h3">{query ? 'No tickets match your search' : 'No support tickets yet'}</h3>
+                                    <p className="text-sm text-gray-500 mt-1 max-w-xs">
+                                        {query ? 'Try a different search term.' : 'Raise a ticket and our team will get back to you here.'}
+                                    </p>
+                                    {!query && (
+                                        <button onClick={openNew} className="tlb-button mt-5"><Plus size={18} /> Raise your first ticket</button>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {filtered.map((t, i) => {
+                                        const st = statusStyle(t.status);
+                                        const unread = toCount(t.unread_count);
+                                        return (
+                                            <motion.button
+                                                key={t.id}
+                                                initial={{ opacity: 0, y: 8 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ duration: 0.2, delay: Math.min(i * 0.03, 0.2) }}
+                                                onClick={() => openTicket(t.id)}
+                                                className="w-full text-left tlb-card !p-4 flex items-center gap-4 hover:shadow-md hover:border-gray-200 transition-all"
+                                            >
+                                                <div className="w-11 h-11 rounded-2xl bg-tlb-yellow/15 flex items-center justify-center shrink-0">
+                                                    <TicketIcon size={20} className="text-tlb-dark" />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="font-bold text-gray-900 truncate">{t.subject}</p>
+                                                        {unread > 0 && (
+                                                            <span className="shrink-0 text-[10px] font-black text-white bg-red-500 rounded-full px-1.5 py-0.5">{unread}</span>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-xs text-gray-400 font-medium mt-0.5 truncate">
+                                                        {ticketCategoryLabel(t.category)} · Updated {fmtDate(t.updated_at)}
+                                                    </p>
+                                                </div>
+                                                <span className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${st.cls}`}>
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} /> {st.label}
+                                                </span>
+                                            </motion.button>
+                                        );
+                                    })}
+                                </div>
                             )}
-                        </div>
+                        </>
                     ) : (
-                        <div className="space-y-3">
-                            {filtered.map((t, i) => {
-                                const st = statusStyle(t.status);
-                                const unread = toCount(t.unread_count);
-                                return (
-                                    <motion.button
-                                        key={t.id}
-                                        initial={{ opacity: 0, y: 8 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ duration: 0.2, delay: Math.min(i * 0.03, 0.2) }}
-                                        onClick={() => openTicket(t.id)}
-                                        className="w-full text-left tlb-card !p-4 flex items-center gap-4 hover:shadow-md hover:border-gray-200 transition-all"
-                                    >
-                                        <div className="w-11 h-11 rounded-2xl bg-tlb-yellow/15 flex items-center justify-center shrink-0">
-                                            <TicketIcon size={20} className="text-tlb-dark" />
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex items-center gap-2">
-                                                <p className="font-bold text-gray-900 truncate">{t.subject}</p>
-                                                {unread > 0 && (
-                                                    <span className="shrink-0 text-[10px] font-black text-white bg-red-500 rounded-full px-1.5 py-0.5">{unread}</span>
-                                                )}
-                                            </div>
-                                            <p className="text-xs text-gray-400 font-medium mt-0.5 truncate">
-                                                {ticketCategoryLabel(t.category)} · Updated {fmtDate(t.updated_at)}
-                                            </p>
-                                        </div>
-                                        <span className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${st.cls}`}>
-                                            <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} /> {st.label}
-                                        </span>
-                                    </motion.button>
-                                );
-                            })}
-                        </div>
+                        /* ── Shared Queries tab ── */
+                        <>
+                            <div className="flex flex-col md:flex-row md:items-center gap-3 justify-between">
+                                <p className="text-sm font-bold text-gray-500">
+                                    {sharedTickets.length} shared quer{sharedTickets.length === 1 ? 'y' : 'ies'}
+                                </p>
+                                <div className="relative md:w-72">
+                                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                    <input
+                                        type="text" value={sharedQuery} onChange={e => setSharedQuery(e.target.value)}
+                                        placeholder="Search shared queries"
+                                        className="tlb-input !pl-9 !py-2.5"
+                                    />
+                                </div>
+                            </div>
+
+                            {loadingShared ? (
+                                <div className="flex items-center justify-center py-24">
+                                    <RefreshCw size={26} className="text-gray-300 animate-spin" />
+                                </div>
+                            ) : sharedError ? (
+                                <div className="tlb-card flex flex-col items-center justify-center text-center py-16">
+                                    <AlertCircle size={32} className="text-red-300 mb-3" />
+                                    <p className="text-sm font-bold text-gray-500">{sharedError}</p>
+                                    <button onClick={loadSharedList} className="text-xs font-black text-blue-500 hover:underline mt-3">Try again</button>
+                                </div>
+                            ) : filteredShared.length === 0 ? (
+                                <div className="tlb-card flex flex-col items-center justify-center text-center py-16">
+                                    <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
+                                        <Share2 size={28} className="text-gray-400" />
+                                    </div>
+                                    <h3 className="tlb-h3">{sharedQuery ? 'No queries match your search' : 'No shared queries'}</h3>
+                                    <p className="text-sm text-gray-500 mt-1 max-w-xs">
+                                        {sharedQuery ? 'Try a different search term.' : 'When admin shares a customer query with you, it will appear here.'}
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {filteredShared.map((t, i) => {
+                                        const st = statusStyle(t.status);
+                                        const unread = toCount(t.unread_count);
+                                        return (
+                                            <motion.button
+                                                key={t.id}
+                                                initial={{ opacity: 0, y: 8 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ duration: 0.2, delay: Math.min(i * 0.03, 0.2) }}
+                                                onClick={() => openSharedTicket(t.id)}
+                                                className="w-full text-left tlb-card !p-4 flex items-center gap-4 hover:shadow-md hover:border-gray-200 transition-all"
+                                            >
+                                                <div className="w-11 h-11 rounded-2xl bg-purple-100 flex items-center justify-center shrink-0">
+                                                    <Share2 size={18} className="text-purple-600" />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="font-bold text-gray-900 truncate">{t.subject}</p>
+                                                        {unread > 0 && (
+                                                            <span className="shrink-0 text-[10px] font-black text-white bg-red-500 rounded-full px-1.5 py-0.5">{unread}</span>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-xs text-gray-400 font-medium mt-0.5 truncate">
+                                                        {ticketCategoryLabel(t.category)}
+                                                        {t.booking_reference && <> · Ref: {t.booking_reference}</>}
+                                                        {t.raised_by_role && <> · By: {t.raised_by_role}</>}
+                                                        {t.shared_at && <> · Shared {fmtDate(t.shared_at)}</>}
+                                                    </p>
+                                                </div>
+                                                <span className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${st.cls}`}>
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} /> {st.label}
+                                                </span>
+                                            </motion.button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
             </main>
 
-            {/* Mobile FAB */}
-            <button onClick={openNew}
-                className="sm:hidden fixed bottom-6 right-6 z-40 w-14 h-14 rounded-2xl bg-tlb-yellow text-tlb-dark shadow-xl flex items-center justify-center"
-                aria-label="New ticket">
-                <Plus size={26} />
-            </button>
+            {activeTab === 'my' && (
+                <button onClick={openNew}
+                    className="sm:hidden fixed bottom-6 right-6 z-40 w-14 h-14 rounded-2xl bg-tlb-yellow text-tlb-dark shadow-xl flex items-center justify-center"
+                    aria-label="New ticket">
+                    <Plus size={26} />
+                </button>
+            )}
         </div>
     );
 };

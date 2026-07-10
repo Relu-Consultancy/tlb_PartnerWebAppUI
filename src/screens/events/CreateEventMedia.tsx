@@ -19,7 +19,8 @@ interface MediaItem {
 }
 
 const API_BASE = 'https://tlb-api.reluconsultancy.in';
-const COVER_MAX = 5 * 1024 * 1024;
+const COVER_IMG_MAX = 5 * 1024 * 1024;
+const COVER_VID_MAX = 15 * 1024 * 1024;
 const GALLERY_MAX = 5 * 1024 * 1024;
 const VIDEO_MAX = 100 * 1024 * 1024;
 const GALLERY_LIMIT = 10;
@@ -29,6 +30,9 @@ const resolveUrl = (url: string) => {
     if (url.startsWith('http')) return url;
     return `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
 };
+
+const isVideoFile = (name: string) => /\.(mp4|mov)$/i.test(name);
+const isVideoUrl = (url: string) => /\.(mp4|mov)$/i.test(url);
 
 export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => {
     const [draftId, setDraftId] = useState<string | null>(null);
@@ -72,7 +76,9 @@ export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => {
     const handleCoverPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!draftId || !e.target.files?.[0]) return;
         const file = e.target.files[0];
-        if (file.size > COVER_MAX) { toast.warning('Cover must be under 5 MB.'); e.target.value = ''; return; }
+        const isVid = isVideoFile(file.name);
+        const maxSize = isVid ? COVER_VID_MAX : COVER_IMG_MAX;
+        if (file.size > maxSize) { toast.warning(isVid ? 'Banner video must be under 15 MB.' : 'Cover image must be under 5 MB.'); e.target.value = ''; return; }
         setBusyKind('cover');
         try {
             // If a cover already exists, delete it first (only 1 allowed)
@@ -213,12 +219,16 @@ export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => {
             {/* Cover */}
             <div>
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">
-                    Cover Image <span className="text-red-400">*</span>
+                    Cover Banner <span className="text-red-400">*</span>
                 </label>
-                <input ref={coverInputRef} type="file" accept="image/jpeg,image/png" className="hidden" onChange={handleCoverPick} />
+                <input ref={coverInputRef} type="file" accept="image/jpeg,image/png,video/mp4,video/quicktime" className="hidden" onChange={handleCoverPick} />
                 {cover ? (
                     <div className="relative w-full sm:w-80 aspect-[16/9] rounded-2xl overflow-hidden border border-gray-200">
-                        <img src={resolveUrl(cover.file_url)} alt="Cover" className="w-full h-full object-cover" />
+                        {isVideoUrl(resolveUrl(cover.file_url)) ? (
+                            <video src={resolveUrl(cover.file_url)} autoPlay muted loop playsInline className="w-full h-full object-cover" />
+                        ) : (
+                            <img src={resolveUrl(cover.file_url)} alt="Cover" className="w-full h-full object-cover" />
+                        )}
                         <button
                             onClick={handleDeleteCover}
                             className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-lg shadow text-red-500 hover:bg-white"
@@ -242,7 +252,7 @@ export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => {
                     >
                         {busyKind === 'cover' ? <Loader2 size={28} className="animate-spin" /> : <Camera size={28} />}
                         <span className="text-xs font-bold mt-2">{busyKind === 'cover' ? 'Uploading…' : 'Upload Cover'}</span>
-                        <span className="text-[10px] text-blue-400 mt-1">JPG/PNG · Max 5MB</span>
+                        <span className="text-[10px] text-blue-400 mt-1">JPG/PNG or MP4/MOV · Image 5MB / Video 15MB</span>
                     </button>
                 )}
             </div>
@@ -325,7 +335,7 @@ export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => {
 
             {!cover && (
                 <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-[11px] font-bold text-amber-700">
-                    Cover image is required to submit this event.
+                    Cover banner is required to submit this event.
                 </div>
             )}
 

@@ -177,7 +177,7 @@ export interface EventListingData {
 // ---------------------------------------------------------------------------
 // Enquiries (CRM)
 // ---------------------------------------------------------------------------
-export type EnquiryStatus = 'new' | 'contacted' | 'trial_booked' | 'enrolled' | 'closed';
+export type EnquiryStatus = 'new' | 'contacted' | 'trial_booked' | 'enrolled' | 'site_visit_scheduled' | 'closed';
 
 export interface EnquiryData {
   id: string;

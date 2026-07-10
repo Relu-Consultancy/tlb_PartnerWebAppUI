@@ -569,11 +569,12 @@ export const unlockClassEnquiry = async (enquiryId: string) => {
 // ─── Venue Enquiries ───────────────────────────────────────────────────────
 // Mirrors the Class Enquiries CRM (flat endpoint + unlock + status/notes update).
 
-export const getVenueEnquiries = async (status?: string) => {
-    const url = status
-        ? `/api/v1/partner/listings/venues/enquiries/?status=${encodeURIComponent(status)}`
-        : '/api/v1/partner/listings/venues/enquiries/';
-    const response = await apiClient(url);
+export const getVenueEnquiries = async (params?: { status?: string; listing_id?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.status) query.set('status', params.status);
+    if (params?.listing_id) query.set('listing_id', params.listing_id);
+    const qs = query.toString();
+    const response = await apiClient(`/api/v1/partner/listings/venues/enquiries/${qs ? `?${qs}` : ''}`);
     if (!response.ok) await handleError(response, 'Failed to load venue enquiries');
     return response.json();
 };

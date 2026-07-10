@@ -1,54 +1,68 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
     Menu, Search, Filter, Lock, Phone, MessageCircle, X, StickyNote, Inbox, Loader2,
-    Users, Sparkles, CheckCircle2, CalendarClock, Check,
+    Users, Sparkles, CheckCircle2, CalendarClock, Check, Mail, Clock,
+    IndianRupee, ClipboardList, Calendar, MapPin,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Screen, EnquiryStatus } from '../../types';
+import { Screen } from '../../types';
 import { toast, Select } from '../../components/ui';
-import { getVenueEnquiries, updateVenueEnquiry, unlockVenueEnquiry } from '../../api/listings';
+import { getVenueEnquiries, getVenueEnquiryDetail, updateVenueEnquiry, unlockVenueEnquiry } from '../../api/listings';
 
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
+
+type VenueEnquiryStatus = 'new' | 'contacted' | 'site_visit_scheduled' | 'closed';
+
+interface ProjectDetails {
+    occasion: string | null;
+    guest_count: number | null;
+    event_date: string | null;
+    budget: string | null;
+    duration_hours: number | null;
+    requirements: string | null;
+    message: string | null;
+    preferred_slot: { id: number; date: string; start_time: string; end_time: string } | null;
+}
 
 interface Lead {
     id: string;
     venueTitle: string;
     customerName: string;
+    email?: string;
     occasion?: string;
     guests: string;
     eventDate?: string;
     dateTime: string;
     contact: string;
     isUnlocked: boolean;
-    status: EnquiryStatus;
+    status: VenueEnquiryStatus;
     message?: string;
-    area?: string;
     notes: string;
+    respondedAt?: string;
+    projectDetails?: ProjectDetails;
 }
 
-// ── API status values ↔ display labels (same set as Class Enquiries) ────────
-const STATUS_OPTIONS: { value: EnquiryStatus; label: string }[] = [
-    { value: 'new',          label: 'New' },
-    { value: 'contacted',    label: 'Contacted' },
-    { value: 'trial_booked', label: 'Visit Booked' },
-    { value: 'closed',       label: 'Closed' },
+const STATUS_OPTIONS: { value: VenueEnquiryStatus; label: string }[] = [
+    { value: 'new',                   label: 'New' },
+    { value: 'contacted',             label: 'Contacted' },
+    { value: 'site_visit_scheduled',  label: 'Site Visit' },
+    { value: 'closed',                label: 'Closed' },
 ];
 
-const STATUS_META: Record<EnquiryStatus, { fg: string; bg: string; dot: string }> = {
-    new:          { fg: '#2563EB', bg: '#EFF6FF', dot: '#3B82F6' },
-    contacted:    { fg: '#059669', bg: '#ECFDF5', dot: '#10B981' },
-    trial_booked: { fg: '#B45309', bg: '#FFFBEB', dot: '#F59E0B' },
-    enrolled:     { fg: '#B45309', bg: '#FFFBEB', dot: '#F59E0B' },
-    closed:       { fg: '#4B5563', bg: '#F3F4F6', dot: '#9CA3AF' },
+const STATUS_META: Record<VenueEnquiryStatus, { fg: string; bg: string; dot: string }> = {
+    new:                   { fg: '#2563EB', bg: '#EFF6FF', dot: '#3B82F6' },
+    contacted:             { fg: '#059669', bg: '#ECFDF5', dot: '#10B981' },
+    site_visit_scheduled:  { fg: '#B45309', bg: '#FFFBEB', dot: '#F59E0B' },
+    closed:                { fg: '#4B5563', bg: '#F3F4F6', dot: '#9CA3AF' },
 };
 
-const statusStyle = (s: EnquiryStatus) => {
+const statusStyle = (s: VenueEnquiryStatus) => {
     switch (s) {
-        case 'new':          return 'bg-blue-500 text-white border-blue-600';
-        case 'contacted':    return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-        case 'trial_booked': return 'bg-amber-100 text-amber-700 border-amber-200';
-        case 'closed':       return 'bg-gray-100 text-gray-600 border-gray-200';
-        default:             return 'bg-gray-100 text-gray-600 border-gray-200';
+        case 'new':                   return 'bg-blue-500 text-white border-blue-600';
+        case 'contacted':             return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+        case 'site_visit_scheduled':  return 'bg-amber-100 text-amber-700 border-amber-200';
+        case 'closed':                return 'bg-gray-100 text-gray-600 border-gray-200';
+        default:                      return 'bg-gray-100 text-gray-600 border-gray-200';
     }
 };
 
@@ -61,46 +75,67 @@ const avatarTint = (name: string) => {
     return palette[h % palette.length];
 };
 
-const fmtDate = (iso?: string) => {
+const fmtDate = (iso?: string | null) => {
     if (!iso) return '';
     const d = new Date(iso);
-    return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    return Number.isNaN(d.getTime()) ? String(iso) : d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 };
+
+const fmtCurrency = (val?: string | null) => {
+    if (!val) return null;
+    const n = parseFloat(val);
+    if (isNaN(n)) return val;
+    return n.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+};
+
+const fmtTime = (t?: string | null) => {
+    if (!t) return '';
+    const [h, m] = t.split(':').map(Number);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${ampm}`;
+};
+
+const normalizeStatus = (s: string): VenueEnquiryStatus => {
+    if (['new', 'contacted', 'site_visit_scheduled', 'closed'].includes(s)) return s as VenueEnquiryStatus;
+    if (s === 'trial_booked') return 'site_visit_scheduled';
+    return 'new';
+};
+
+const parseLead = (item: any): Lead => ({
+    id: String(item.id),
+    venueTitle: item.venue_title || item.listing_title || item.listing?.title || '',
+    customerName: item.customer_name || item.name || item.contact_name || 'Unknown',
+    email: item.email || undefined,
+    occasion: item.occasion || item.project_details?.occasion || undefined,
+    guests: item.guest_count != null ? String(item.guest_count) : (item.project_details?.guest_count != null ? String(item.project_details.guest_count) : 'N/A'),
+    eventDate: fmtDate(item.event_date || item.project_details?.event_date) || undefined,
+    dateTime: item.created_at ? new Date(item.created_at).toLocaleString() : '',
+    contact: item.mobile || item.contact_number || 'Hidden',
+    isUnlocked: !!item.is_contact_unlocked,
+    status: normalizeStatus(item.status || 'new'),
+    message: item.message || item.project_details?.message || undefined,
+    notes: item.internal_notes || '',
+    respondedAt: item.responded_at || undefined,
+    projectDetails: item.project_details || undefined,
+});
 
 export const VenueEnquiries: React.FC<Props> = ({ onOpenSidebar }) => {
     const [leads, setLeads] = useState<Lead[]>([]);
     const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+    const [detailLoading, setDetailLoading] = useState(false);
     const [search, setSearch] = useState('');
-    const [statusFilter, setStatusFilter] = useState<EnquiryStatus | ''>('');
+    const [statusFilter, setStatusFilter] = useState<VenueEnquiryStatus | ''>('');
     const [showFilter, setShowFilter] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
 
-    useEffect(() => {
-        loadEnquiries();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    useEffect(() => { loadEnquiries(); }, []);
 
     const loadEnquiries = async () => {
         try {
             setIsLoading(true);
             const res = await getVenueEnquiries();
-            const raw: any[] = Array.isArray(res) ? res : (res.data || res.results || []);
-            const formattedData: Lead[] = raw.map((item: any) => ({
-                id: String(item.id),
-                venueTitle: item.venue_title || item.listing_title || item.listing?.title || '',
-                customerName: item.customer_name || item.name || item.contact_name || 'Unknown',
-                occasion: item.occasion || item.occasion_name || item.event_type || undefined,
-                guests: item.guest_count != null ? String(item.guest_count) : (item.guests != null ? String(item.guests) : 'N/A'),
-                eventDate: fmtDate(item.event_date || item.preferred_date || item.booking_date) || undefined,
-                dateTime: item.created_at ? new Date(item.created_at).toLocaleString() : '',
-                contact: item.mobile || item.contact_number || 'Hidden',
-                isUnlocked: !!item.is_contact_unlocked,
-                status: (item.status || 'new') as EnquiryStatus,
-                message: item.message || undefined,
-                area: item.area || item.location || undefined,
-                notes: item.internal_notes || '',
-            }));
-            setLeads(formattedData);
+            const raw: any[] = Array.isArray(res) ? res : (res.data?.results || res.data || res.results || []);
+            setLeads(raw.map(parseLead));
         } catch (e) {
             console.error('Failed to load venue enquiries', e);
         } finally {
@@ -108,52 +143,58 @@ export const VenueEnquiries: React.FC<Props> = ({ onOpenSidebar }) => {
         }
     };
 
+    const openDetail = async (lead: Lead) => {
+        setSelectedLead(lead);
+        setDetailLoading(true);
+        try {
+            const res = await getVenueEnquiryDetail(lead.id);
+            const item = res.data || res;
+            const full = parseLead(item);
+            setSelectedLead(full);
+        } catch {
+            // keep the list-level data if detail fetch fails
+        } finally {
+            setDetailLoading(false);
+        }
+    };
+
     const unlockLead = async (id: string) => {
         try {
             const res = await unlockVenueEnquiry(id);
             const item = res.data || res;
-            const updatedLead: Partial<Lead> = {
+            const patch: Partial<Lead> = {
                 isUnlocked: !!item.is_contact_unlocked,
                 contact: item.mobile || item.contact_number || 'Hidden',
             };
-            setLeads(prev => prev.map(l => l.id === id ? { ...l, ...updatedLead } : l));
-            if (selectedLead && selectedLead.id === id) {
-                setSelectedLead({ ...selectedLead, ...updatedLead });
-            }
+            setLeads(prev => prev.map(l => l.id === id ? { ...l, ...patch } : l));
+            if (selectedLead?.id === id) setSelectedLead(prev => prev ? { ...prev, ...patch } : prev);
         } catch (e: any) {
-            console.error('Failed to unlock lead', e);
             toast.error(e?.message || 'Failed to unlock contact. Please try again.');
         }
     };
 
-    const updateStatus = async (id: string, status: EnquiryStatus) => {
+    const updateStatus = async (id: string, status: VenueEnquiryStatus) => {
+        setLeads(prev => prev.map(l => l.id === id ? { ...l, status } : l));
+        if (selectedLead?.id === id) setSelectedLead(prev => prev ? { ...prev, status } : prev);
         try {
-            setLeads(prev => prev.map(l => l.id === id ? { ...l, status } : l));
             await updateVenueEnquiry(id, { status });
-            if (selectedLead && selectedLead.id === id) {
-                setSelectedLead({ ...selectedLead, status });
-            }
-        } catch (e) {
-            console.error('Failed to update status', e);
+        } catch {
             loadEnquiries();
         }
     };
 
     const updateNotes = async (id: string, notes: string) => {
+        setLeads(prev => prev.map(l => l.id === id ? { ...l, notes } : l));
+        if (selectedLead?.id === id) setSelectedLead(prev => prev ? { ...prev, notes } : prev);
         try {
-            setLeads(prev => prev.map(l => l.id === id ? { ...l, notes } : l));
             await updateVenueEnquiry(id, { internal_notes: notes });
-            if (selectedLead && selectedLead.id === id) {
-                setSelectedLead({ ...selectedLead, notes });
-            }
-        } catch (e) {
-            console.error('Failed to update notes', e);
+        } catch {
             loadEnquiries();
         }
     };
 
     const counts = useMemo(() => {
-        const c: Record<string, number> = { '': leads.length, new: 0, contacted: 0, trial_booked: 0, closed: 0 };
+        const c: Record<string, number> = { '': leads.length, new: 0, contacted: 0, site_visit_scheduled: 0, closed: 0 };
         for (const l of leads) c[l.status] = (c[l.status] || 0) + 1;
         return c;
     }, [leads]);
@@ -164,13 +205,16 @@ export const VenueEnquiries: React.FC<Props> = ({ onOpenSidebar }) => {
          l.venueTitle.toLowerCase().includes(search.toLowerCase()))
     );
 
-    const kpiCards: { key: EnquiryStatus | ''; label: string; icon: React.ElementType; fg: string; bg: string }[] = [
-        { key: '',            label: 'Total Leads',  icon: Users,         fg: '#B45309', bg: '#FFFBEB' },
-        { key: 'new',         label: 'New',          icon: Sparkles,      fg: STATUS_META.new.fg,          bg: STATUS_META.new.bg },
-        { key: 'contacted',   label: 'Contacted',    icon: Phone,         fg: STATUS_META.contacted.fg,    bg: STATUS_META.contacted.bg },
-        { key: 'trial_booked',label: 'Visit Booked', icon: CalendarClock, fg: STATUS_META.trial_booked.fg, bg: STATUS_META.trial_booked.bg },
-        { key: 'closed',      label: 'Closed',       icon: CheckCircle2,  fg: STATUS_META.closed.fg,       bg: STATUS_META.closed.bg },
+    const kpiCards: { key: VenueEnquiryStatus | ''; label: string; icon: React.ElementType; fg: string; bg: string }[] = [
+        { key: '',                     label: 'Total Leads',  icon: Users,         fg: '#B45309', bg: '#FFFBEB' },
+        { key: 'new',                  label: 'New',          icon: Sparkles,      fg: STATUS_META.new.fg,                  bg: STATUS_META.new.bg },
+        { key: 'contacted',            label: 'Contacted',    icon: Phone,         fg: STATUS_META.contacted.fg,            bg: STATUS_META.contacted.bg },
+        { key: 'site_visit_scheduled', label: 'Site Visit',   icon: CalendarClock, fg: STATUS_META.site_visit_scheduled.fg, bg: STATUS_META.site_visit_scheduled.bg },
+        { key: 'closed',               label: 'Closed',       icon: CheckCircle2,  fg: STATUS_META.closed.fg,               bg: STATUS_META.closed.bg },
     ];
+
+    const pd = selectedLead?.projectDetails;
+    const hasBrief = pd && (pd.occasion || pd.guest_count || pd.event_date || pd.budget || pd.duration_hours || pd.requirements);
 
     return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -191,7 +235,7 @@ export const VenueEnquiries: React.FC<Props> = ({ onOpenSidebar }) => {
                         return (
                             <motion.div
                                 key={card.key || 'all'}
-                                onClick={() => setStatusFilter(card.key)}
+                                onClick={() => setStatusFilter(card.key as any)}
                                 whileHover={{ y: -3 }}
                                 whileTap={{ scale: 0.97 }}
                                 className={`cursor-pointer rounded-2xl p-4 border bg-white transition-all ${active ? 'border-tlb-yellow ring-2 ring-tlb-yellow/30 shadow-md' : 'border-gray-100 shadow-sm hover:shadow-md'}`}
@@ -292,7 +336,7 @@ export const VenueEnquiries: React.FC<Props> = ({ onOpenSidebar }) => {
                                         initial={{ opacity: 0, y: 6 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ duration: 0.25, delay: Math.min(i * 0.03, 0.3) }}
-                                        onClick={() => setSelectedLead(lead)}
+                                        onClick={() => openDetail(lead)}
                                         className={`hover:bg-gray-50/70 transition-colors cursor-pointer ${lead.status === 'new' ? 'bg-blue-50/30' : ''}`}
                                     >
                                         <td className="px-6 py-4">
@@ -325,7 +369,7 @@ export const VenueEnquiries: React.FC<Props> = ({ onOpenSidebar }) => {
                                                     onClick={() => unlockLead(lead.id)}
                                                     className="bg-tlb-yellow/10 text-tlb-yellow px-4 py-2 rounded-xl flex items-center justify-center gap-2 text-xs font-black border border-tlb-yellow/20 hover:bg-tlb-yellow/20 transition-all"
                                                 >
-                                                    <Lock size={14} /> Unlock Mobile
+                                                    <Lock size={14} /> Unlock
                                                 </button>
                                             ) : (
                                                 <div className="flex items-center gap-3">
@@ -344,8 +388,8 @@ export const VenueEnquiries: React.FC<Props> = ({ onOpenSidebar }) => {
                                         <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                                             <Select
                                                 value={lead.status}
-                                                onChange={(v) => updateStatus(lead.id, v as EnquiryStatus)}
-                                                options={STATUS_OPTIONS}
+                                                onChange={(v) => updateStatus(lead.id, v as VenueEnquiryStatus)}
+                                                options={STATUS_OPTIONS as any}
                                                 ariaLabel="Lead status"
                                                 align="right"
                                                 className="inline-block"
@@ -361,7 +405,7 @@ export const VenueEnquiries: React.FC<Props> = ({ onOpenSidebar }) => {
             </div>
         </main>
 
-        {/* Slide-out Lead Card */}
+        {/* Slide-out Lead Detail */}
         <AnimatePresence>
         {selectedLead && (
             <>
@@ -372,10 +416,10 @@ export const VenueEnquiries: React.FC<Props> = ({ onOpenSidebar }) => {
                 <motion.div
                     initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
                     transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-                    className="fixed top-0 right-0 bottom-0 w-full sm:w-[420px] bg-white z-50 shadow-2xl flex flex-col"
+                    className="fixed top-0 right-0 bottom-0 w-full sm:w-[440px] bg-white z-50 shadow-2xl flex flex-col"
                 >
                     {/* Gradient header */}
-                    <div className="relative p-6 pb-7 bg-gradient-to-br from-gray-900 to-gray-700 text-white">
+                    <div className="relative p-6 pb-7 bg-gradient-to-br from-gray-900 to-gray-700 text-white shrink-0">
                         <button onClick={() => setSelectedLead(null)} className="absolute top-5 right-5 p-2 hover:bg-white/10 rounded-full transition-colors"><X size={18} /></button>
                         <div className="flex items-center gap-4">
                             <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-black shrink-0" style={{ background: avatarTint(selectedLead.customerName) }}>
@@ -389,6 +433,12 @@ export const VenueEnquiries: React.FC<Props> = ({ onOpenSidebar }) => {
                     </div>
 
                     <div className="flex-1 overflow-auto p-6 space-y-5 -mt-3 bg-white rounded-t-3xl">
+                        {detailLoading && (
+                            <div className="flex items-center justify-center py-4">
+                                <Loader2 size={18} className="text-gray-300 animate-spin" />
+                            </div>
+                        )}
+
                         {/* Status segmented control */}
                         <div>
                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">Status</label>
@@ -412,41 +462,111 @@ export const VenueEnquiries: React.FC<Props> = ({ onOpenSidebar }) => {
                             </div>
                         </div>
 
-                        {/* Detail grid */}
-                        <div className="space-y-3">
-                            {selectedLead.venueTitle && (
-                                <div className="bg-gray-50 rounded-xl px-4 py-3">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Venue</p>
-                                    <p className="text-sm font-bold mt-0.5">{selectedLead.venueTitle}</p>
+                        {/* Project Details Card */}
+                        {hasBrief && (
+                            <div className="bg-amber-50/50 border border-amber-100 rounded-2xl p-4 space-y-3">
+                                <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest flex items-center gap-1.5">
+                                    <ClipboardList size={12} /> Project Brief
+                                </p>
+                                <div className="grid grid-cols-2 gap-2.5">
+                                    {pd!.occasion && (
+                                        <div className="bg-white rounded-xl px-3 py-2.5 border border-amber-100/60">
+                                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Occasion</p>
+                                            <p className="text-sm font-bold text-gray-800 mt-0.5">{pd!.occasion}</p>
+                                        </div>
+                                    )}
+                                    {pd!.guest_count && (
+                                        <div className="bg-white rounded-xl px-3 py-2.5 border border-amber-100/60">
+                                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1"><Users size={10} /> Guests</p>
+                                            <p className="text-sm font-bold text-gray-800 mt-0.5">{pd!.guest_count}</p>
+                                        </div>
+                                    )}
+                                    {pd!.event_date && (
+                                        <div className="bg-white rounded-xl px-3 py-2.5 border border-amber-100/60">
+                                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1"><Calendar size={10} /> Event Date</p>
+                                            <p className="text-sm font-bold text-gray-800 mt-0.5">{fmtDate(pd!.event_date)}</p>
+                                        </div>
+                                    )}
+                                    {pd!.budget && (
+                                        <div className="bg-white rounded-xl px-3 py-2.5 border border-amber-100/60">
+                                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1"><IndianRupee size={10} /> Budget</p>
+                                            <p className="text-sm font-bold text-gray-800 mt-0.5">{fmtCurrency(pd!.budget)}</p>
+                                        </div>
+                                    )}
+                                    {pd!.duration_hours && (
+                                        <div className="bg-white rounded-xl px-3 py-2.5 border border-amber-100/60">
+                                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1"><Clock size={10} /> Duration</p>
+                                            <p className="text-sm font-bold text-gray-800 mt-0.5">{pd!.duration_hours}h</p>
+                                        </div>
+                                    )}
                                 </div>
-                            )}
-                            {selectedLead.occasion && (
-                                <div className="bg-gray-50 rounded-xl px-4 py-3">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Occasion</p>
-                                    <p className="text-sm font-bold mt-0.5">{selectedLead.occasion}</p>
-                                </div>
-                            )}
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="bg-gray-50 rounded-xl px-4 py-3">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Guests</p>
-                                    <p className="text-sm font-bold mt-0.5">{selectedLead.guests}</p>
-                                </div>
-                                <div className="bg-gray-50 rounded-xl px-4 py-3">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Event Date</p>
-                                    <p className="text-sm font-bold mt-0.5">{selectedLead.eventDate || '—'}</p>
+                                {pd!.requirements && (
+                                    <div className="bg-white rounded-xl px-3 py-2.5 border border-amber-100/60">
+                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Requirements</p>
+                                        <p className="text-sm text-gray-700 mt-0.5 leading-relaxed">{pd!.requirements}</p>
+                                    </div>
+                                )}
+                                {pd!.preferred_slot && (
+                                    <div className="bg-white rounded-xl px-3 py-2.5 border border-amber-100/60">
+                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1"><MapPin size={10} /> Preferred Slot</p>
+                                        <p className="text-sm font-bold text-gray-800 mt-0.5">
+                                            {fmtDate(pd!.preferred_slot.date)} &middot; {fmtTime(pd!.preferred_slot.start_time)} - {fmtTime(pd!.preferred_slot.end_time)}
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Basic details (when no project brief) */}
+                        {!hasBrief && (
+                            <div className="space-y-3">
+                                {selectedLead.venueTitle && (
+                                    <div className="bg-gray-50 rounded-xl px-4 py-3">
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Venue</p>
+                                        <p className="text-sm font-bold mt-0.5">{selectedLead.venueTitle}</p>
+                                    </div>
+                                )}
+                                {selectedLead.occasion && (
+                                    <div className="bg-gray-50 rounded-xl px-4 py-3">
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Occasion</p>
+                                        <p className="text-sm font-bold mt-0.5">{selectedLead.occasion}</p>
+                                    </div>
+                                )}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="bg-gray-50 rounded-xl px-4 py-3">
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Guests</p>
+                                        <p className="text-sm font-bold mt-0.5">{selectedLead.guests}</p>
+                                    </div>
+                                    <div className="bg-gray-50 rounded-xl px-4 py-3">
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Event Date</p>
+                                        <p className="text-sm font-bold mt-0.5">{selectedLead.eventDate || '--'}</p>
+                                    </div>
                                 </div>
                             </div>
+                        )}
+
+                        {/* Enquiry date & responded */}
+                        <div className="grid grid-cols-2 gap-3">
                             <div className="bg-gray-50 rounded-xl px-4 py-3">
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Enquiry Date</p>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Received</p>
                                 <p className="text-sm font-bold mt-0.5">{selectedLead.dateTime}</p>
                             </div>
-                            {selectedLead.area && (
-                                <div className="bg-gray-50 rounded-xl px-4 py-3">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Area / Locality</p>
-                                    <p className="text-sm font-bold mt-0.5">{selectedLead.area}</p>
-                                </div>
-                            )}
+                            <div className="bg-gray-50 rounded-xl px-4 py-3">
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Responded</p>
+                                <p className="text-sm font-bold mt-0.5">{selectedLead.respondedAt ? fmtDate(selectedLead.respondedAt) : 'Not yet'}</p>
+                            </div>
                         </div>
+
+                        {/* Email */}
+                        {selectedLead.email && (
+                            <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center gap-3">
+                                <Mail size={14} className="text-gray-400 shrink-0" />
+                                <div className="min-w-0">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Email</p>
+                                    <p className="text-sm font-bold mt-0.5 truncate">{selectedLead.email}</p>
+                                </div>
+                            </div>
+                        )}
 
                         {selectedLead.message && (
                             <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4">
@@ -462,7 +582,7 @@ export const VenueEnquiries: React.FC<Props> = ({ onOpenSidebar }) => {
                             </label>
                             <textarea
                                 className="tlb-input w-full min-h-[96px] resize-y"
-                                placeholder="Add your notes here... (e.g. Called on 12th, site visit scheduled for Saturday)"
+                                placeholder="Add your notes here..."
                                 defaultValue={selectedLead.notes}
                                 onBlur={(e) => updateNotes(selectedLead.id, e.target.value)}
                             />

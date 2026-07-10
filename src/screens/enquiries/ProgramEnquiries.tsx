@@ -40,8 +40,9 @@ const STATUS_META: Record<EnquiryStatus, { fg: string; bg: string; dot: string }
     new:          { fg: '#059669', bg: '#ECFDF5', dot: '#10B981' },
     contacted:    { fg: '#2563EB', bg: '#EFF6FF', dot: '#3B82F6' },
     enrolled:     { fg: '#7C3AED', bg: '#F5F3FF', dot: '#8B5CF6' },
-    trial_booked: { fg: '#7C3AED', bg: '#F5F3FF', dot: '#8B5CF6' },
-    closed:       { fg: '#4B5563', bg: '#F3F4F6', dot: '#9CA3AF' },
+    trial_booked:         { fg: '#7C3AED', bg: '#F5F3FF', dot: '#8B5CF6' },
+    site_visit_scheduled: { fg: '#B45309', bg: '#FFFBEB', dot: '#F59E0B' },
+    closed:               { fg: '#4B5563', bg: '#F3F4F6', dot: '#9CA3AF' },
 };
 
 const statusStyle = (s: EnquiryStatus) => {

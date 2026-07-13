@@ -3,14 +3,16 @@ import {
     Menu, ArrowRight, Activity, Users, Target, Star, TrendingUp, TrendingDown,
     Clock, BookOpen, CalendarDays, Ticket, Zap, Eye, Heart,
     DollarSign, MapPin, Percent, RefreshCw, LayoutGrid, Award,
-    GraduationCap, Layers,
+    GraduationCap, Layers, Wallet, MessageSquare,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Screen } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
 import {
     getStatsOverview, getStatsEvents, getStatsVenues, getStatsEnquiries,
+    getStatsRevenue, getStatsReviews,
     StatsOverview, StatsEvents, StatsVenues, StatsEnquiries,
+    StatsRevenue, StatsReviews, RevenuePeriod,
 } from '../../api/stats';
 import { getBookings, getVenueEnquiries } from '../../api/listings';
 import {
@@ -30,6 +32,8 @@ const moneyToNumber = (s: string | number | null | undefined): number => {
     return Number.isFinite(n) ? n : 0;
 };
 const monthShort = (full: string): string => full?.split(' ')[0] ?? full ?? '';
+const fmtDate = (iso: string) =>
+    new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 const settledValue = <T,>(r: PromiseSettledResult<T>): T | null =>
     r.status === 'fulfilled' ? r.value : null;
 
@@ -107,7 +111,7 @@ const fadeUp = {
     transition: { duration: 0.25 },
 };
 
-type TabKey = 'overview' | 'events' | 'venues' | 'classes' | 'programs';
+type TabKey = 'overview' | 'events' | 'venues' | 'classes' | 'programs' | 'revenue' | 'reviews';
 
 export const Statistics: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
     const { allowedEntities } = usePartner();
@@ -116,6 +120,9 @@ export const Statistics: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
     const [events, setEvents] = useState<StatsEvents | null>(null);
     const [venues, setVenues] = useState<StatsVenues | null>(null);
     const [enquiries, setEnquiries] = useState<StatsEnquiries | null>(null);
+    const [revenue, setRevenue] = useState<StatsRevenue | null>(null);
+    const [reviews, setReviews] = useState<StatsReviews | null>(null);
+    const [revenuePeriod, setRevenuePeriod] = useState<RevenuePeriod>('30d');
     // Derived from raw bookings + venue enquiries (computed client-side for the ratios)
     const [bookingStats, setBookingStats] = useState({ total: 0, attended: 0, venueBookings: 0 });
     const [venueEnquiryCount, setVenueEnquiryCount] = useState(0);
@@ -140,14 +147,17 @@ export const Statistics: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                 }
                 return all;
             };
-            const [oRes, eRes, vRes, enqRes, bRes, veRes] = await Promise.allSettled([
+            const [oRes, eRes, vRes, enqRes, revRes, rwRes, bRes, veRes] = await Promise.allSettled([
                 getStatsOverview(), getStatsEvents(), getStatsVenues(), getStatsEnquiries(),
+                getStatsRevenue(revenuePeriod), getStatsReviews(),
                 fetchAllBookings(), getVenueEnquiries(),
             ]);
             setOverview(settledValue(oRes));
             setEvents(settledValue(eRes));
             setVenues(settledValue(vRes));
             setEnquiries(settledValue(enqRes));
+            setRevenue(settledValue(revRes));
+            setReviews(settledValue(rwRes));
 
             const bookings = settledValue(bRes) || [];
             setBookingStats({
@@ -159,13 +169,20 @@ export const Statistics: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
             const veArr = Array.isArray(ve) ? ve : (ve?.data || ve?.results || []);
             setVenueEnquiryCount(veArr.length);
 
-            if ([oRes, eRes, vRes, enqRes].every(r => r.status === 'rejected')) setError(true);
+            if ([oRes, eRes, vRes, enqRes, revRes, rwRes].every(r => r.status === 'rejected')) setError(true);
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [revenuePeriod]);
 
     useEffect(() => { load(); }, [load]);
+
+    const changeRevenuePeriod = useCallback(async (p: RevenuePeriod) => {
+        setRevenuePeriod(p);
+        try {
+            setRevenue(await getStatsRevenue(p));
+        } catch { /* will show existing data */ }
+    }, []);
 
     const hasEvents = allowedEntities.includes('Events');
     const hasVenues = allowedEntities.includes('Venues');
@@ -182,6 +199,8 @@ export const Statistics: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
         if (hasVenues) t.push({ key: 'venues', label: 'Venues', icon: MapPin });
         if (hasClasses) t.push({ key: 'classes', label: 'Classes', icon: GraduationCap });
         if (hasPrograms) t.push({ key: 'programs', label: 'Programs', icon: Layers });
+        t.push({ key: 'revenue', label: 'Revenue', icon: Wallet });
+        t.push({ key: 'reviews', label: 'Reviews', icon: Star });
         return t;
     }, [hasEvents, hasVenues, hasClasses, hasPrograms]);
 
@@ -206,6 +225,16 @@ export const Statistics: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
         label: monthShort(t.month), value: t.count,
         note: t.earnings ? fmtCurrency(moneyToNumber(t.earnings)) : undefined,
     }));
+
+    const globalRevenueTrend: AreaPoint[] = (revenue?.revenue_trend ?? []).map(r => ({
+        label: monthShort(r.month), value: moneyToNumber(r.earnings),
+    }));
+    const ratingTrend: AreaPoint[] = (reviews?.avg_rating_trend ?? [])
+        .filter(r => r.avg_rating != null)
+        .map(r => ({
+            label: monthShort(r.month), value: r.avg_rating!,
+            note: `${r.count} review${r.count === 1 ? '' : 's'}`,
+        }));
 
     const lastDelta = (arr: AreaPoint[]) => {
         if (arr.length < 2) return 0;
@@ -528,6 +557,191 @@ export const Statistics: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                         </button>
                                     </motion.div>
                                 )}
+                                {/* ════════ REVENUE ════════ */}
+                                {activeTab === 'revenue' && revenue && (
+                                    <motion.div key="revenue" {...fadeUp} className="space-y-6">
+                                        {/* Period selector */}
+                                        <div className="flex gap-1 p-1 bg-gray-100 rounded-2xl w-fit">
+                                            {(['7d', '30d', '90d', '1y', 'all'] as RevenuePeriod[]).map(p => {
+                                                const active = revenuePeriod === p;
+                                                const label = p === '7d' ? '7 Days' : p === '30d' ? '30 Days' : p === '90d' ? '90 Days' : p === '1y' ? '1 Year' : 'All Time';
+                                                return (
+                                                    <button
+                                                        key={p}
+                                                        onClick={() => changeRevenuePeriod(p)}
+                                                        className={`relative px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors ${active ? 'text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
+                                                    >
+                                                        {active && (
+                                                            <motion.div layoutId="rev-period-pill" className="absolute inset-0 bg-white rounded-xl shadow-sm" transition={{ type: 'spring', stiffness: 400, damping: 32 }} />
+                                                        )}
+                                                        <span className="relative z-10">{label}</span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+
+                                        {/* Revenue KPI tiles */}
+                                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                                            <StatTile icon={DollarSign} label="Gross Revenue" value={moneyToNumber(revenue.gross_revenue)} accent="emerald" format={fmtCurrency} big />
+                                            <StatTile icon={Wallet} label="Net Earnings" value={moneyToNumber(revenue.net_earnings)} accent="blue" format={fmtCurrency} big />
+                                            <StatTile icon={Percent} label="Platform Fees" value={moneyToNumber(revenue.platform_fees)} accent="amber" format={fmtCurrency} />
+                                            <StatTile icon={TrendingDown} label="Refunds" value={moneyToNumber(revenue.refunds)} accent="rose" format={fmtCurrency} />
+                                            <StatTile icon={Ticket} label="Confirmed Bookings" value={revenue.confirmed_bookings} accent="purple" format={fmtCompact} />
+                                            <StatTile icon={Target} label="Avg. Order Value" value={moneyToNumber(revenue.avg_order_value)} accent="amber" format={fmtCurrency} />
+                                        </div>
+
+                                        {/* MoM growth */}
+                                        <Panel title="Month-on-Month" subtitle="Calendar month comparison (independent of period filter)">
+                                            <div className="flex items-center gap-6 flex-wrap">
+                                                <div>
+                                                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">This Month</p>
+                                                    <p className="text-2xl font-black text-gray-900">{fmtCurrency(moneyToNumber(revenue.this_month))}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Prev Month</p>
+                                                    <p className="text-2xl font-black text-gray-400">{fmtCurrency(moneyToNumber(revenue.prev_month))}</p>
+                                                </div>
+                                                <div>
+                                                    {moneyToNumber(revenue.prev_month) === 0
+                                                        ? <span className="inline-flex items-center gap-1 text-xs font-black px-3 py-1 rounded-full bg-blue-50 text-blue-600">New</span>
+                                                        : <DeltaPill pct={revenue.revenue_growth_pct} />
+                                                    }
+                                                </div>
+                                            </div>
+                                        </Panel>
+
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                            {/* Revenue by type */}
+                                            {revenue.revenue_by_type.length > 0 && (
+                                                <Panel title="Revenue by Type" subtitle="Gross revenue split by listing type">
+                                                    <div className="flex items-center gap-5">
+                                                        <AnimatedDonut
+                                                            segments={revenue.revenue_by_type.map((r, i) => ({
+                                                                value: moneyToNumber(r.amount),
+                                                                color: [ACCENTS.amber.solid, ACCENTS.purple.solid, ACCENTS.emerald.solid, ACCENTS.blue.solid][i % 4],
+                                                                label: r.type,
+                                                            }))}
+                                                            centerLabel={fmtCurrency(moneyToNumber(revenue.gross_revenue))}
+                                                            centerSub="Total"
+                                                        />
+                                                        <div className="flex-1 space-y-3">
+                                                            {revenue.revenue_by_type.map((r, i) => (
+                                                                <div key={r.type} className="flex items-center gap-2">
+                                                                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{
+                                                                        background: [ACCENTS.amber.solid, ACCENTS.purple.solid, ACCENTS.emerald.solid, ACCENTS.blue.solid][i % 4],
+                                                                    }} />
+                                                                    <span className="text-xs text-gray-500 flex-1 capitalize">{r.type}</span>
+                                                                    <span className="text-xs font-bold text-gray-400">{r.count} bookings</span>
+                                                                    <span className="text-sm font-black text-gray-900">{fmtCurrency(moneyToNumber(r.amount))}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </Panel>
+                                            )}
+
+                                            {/* Revenue trend */}
+                                            <Panel title="Revenue Trend" subtitle="Last 6 months (always full context)"
+                                                right={<DeltaPill pct={lastDelta(globalRevenueTrend)} />}>
+                                                <InteractiveAreaChart
+                                                    points={globalRevenueTrend}
+                                                    color={ACCENTS.emerald.solid}
+                                                    id="rev-trend"
+                                                    formatValue={fmtCurrency}
+                                                />
+                                            </Panel>
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {/* ════════ REVIEWS ════════ */}
+                                {activeTab === 'reviews' && reviews && (
+                                    <motion.div key="reviews" {...fadeUp} className="space-y-6">
+                                        {/* Rating hero + tiles */}
+                                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                                            <motion.div
+                                                className="tlb-card p-5 flex flex-col items-center justify-center text-center col-span-2 lg:col-span-1"
+                                                whileHover={{ y: -3 }}
+                                                transition={{ type: 'spring', stiffness: 300, damping: 22 }}
+                                            >
+                                                <div className="flex items-center gap-1.5 mb-2">
+                                                    {[1, 2, 3, 4, 5].map(s => (
+                                                        <Star key={s} size={18} className={s <= Math.round(reviews.avg_rating ?? 0) ? 'text-amber-400 fill-amber-400' : 'text-gray-200'} />
+                                                    ))}
+                                                </div>
+                                                <p className="text-3xl font-black text-gray-900 leading-none">
+                                                    {reviews.avg_rating != null ? reviews.avg_rating.toFixed(1) : '—'}
+                                                </p>
+                                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1.5">Avg Rating</p>
+                                            </motion.div>
+                                            <StatTile icon={MessageSquare} label="Total Reviews" value={reviews.total_reviews} accent="purple" format={fmtCompact} />
+                                            <StatTile icon={TrendingUp} label="This Month" value={reviews.reviews_this_month} accent="emerald" format={fmtCompact} />
+                                            <StatTile icon={Clock} label="Prev Month" value={reviews.reviews_prev_month} accent="amber" format={fmtCompact} />
+                                        </div>
+
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                            {/* Rating distribution */}
+                                            <Panel title="Rating Distribution" subtitle="All-time breakdown by star rating">
+                                                <RatingDistribution distribution={reviews.rating_distribution} total={reviews.total_reviews} />
+                                            </Panel>
+
+                                            {/* Rating trend */}
+                                            <Panel title="Avg. Rating Trend" subtitle="Monthly average (months with no reviews are skipped)"
+                                                right={<DeltaPill pct={lastDelta(ratingTrend)} />}>
+                                                {ratingTrend.length >= 2 ? (
+                                                    <InteractiveAreaChart
+                                                        points={ratingTrend}
+                                                        color={ACCENTS.amber.solid}
+                                                        id="rev-rating-trend"
+                                                        formatValue={n => n.toFixed(1)}
+                                                    />
+                                                ) : <EmptyMini text="Not enough rating data yet" />}
+                                            </Panel>
+                                        </div>
+
+                                        {/* Recent reviews */}
+                                        {reviews.recent_reviews.length > 0 && (
+                                            <Panel title="Recent Reviews" subtitle="Latest feedback from your customers">
+                                                <div className="space-y-4">
+                                                    {reviews.recent_reviews.map((r, i) => (
+                                                        <motion.div
+                                                            key={i}
+                                                            className="bg-gray-50 rounded-2xl p-4"
+                                                            initial={{ opacity: 0, y: 8 }}
+                                                            animate={{ opacity: 1, y: 0 }}
+                                                            transition={{ duration: 0.2, delay: i * 0.06 }}
+                                                        >
+                                                            <div className="flex items-center justify-between mb-2">
+                                                                <div className="flex items-center gap-1">
+                                                                    {[1, 2, 3, 4, 5].map(s => (
+                                                                        <Star key={s} size={13} className={s <= r.rating ? 'text-amber-400 fill-amber-400' : 'text-gray-200'} />
+                                                                    ))}
+                                                                </div>
+                                                                <span className="text-[10px] font-bold text-gray-400">{fmtDate(r.created_at)}</span>
+                                                            </div>
+                                                            {r.comment && <p className="text-sm text-gray-700 leading-relaxed">{r.comment}</p>}
+                                                            {r.listing_title && (
+                                                                <p className="text-[10px] font-bold text-gray-400 mt-2 uppercase tracking-widest">{r.listing_title}</p>
+                                                            )}
+                                                        </motion.div>
+                                                    ))}
+                                                </div>
+                                            </Panel>
+                                        )}
+                                    </motion.div>
+                                )}
+
+                                {/* No data fallback for revenue/reviews when null */}
+                                {activeTab === 'revenue' && !revenue && !loading && (
+                                    <motion.div key="revenue-empty" {...fadeUp}>
+                                        <EmptyMini text="Revenue data unavailable" />
+                                    </motion.div>
+                                )}
+                                {activeTab === 'reviews' && !reviews && !loading && (
+                                    <motion.div key="reviews-empty" {...fadeUp}>
+                                        <EmptyMini text="Reviews data unavailable" />
+                                    </motion.div>
+                                )}
                             </AnimatePresence>
                         </>
                     )}
@@ -567,6 +781,37 @@ const CategoryBars: React.FC<{ items: { label: string; count: number; amount: nu
                     </div>
                 </div>
             ))}
+        </div>
+    );
+};
+
+// ── Rating distribution — horizontal bars 5★→1★ ──
+const RatingDistribution: React.FC<{
+    distribution: { rating: number; count: number }[];
+    total: number;
+}> = ({ distribution, total }) => {
+    const sorted = [...distribution].sort((a, b) => b.rating - a.rating);
+    const max = Math.max(...sorted.map(d => d.count), 1);
+    return (
+        <div className="space-y-3">
+            {sorted.map((d, i) => {
+                const pct = total > 0 ? Math.round((d.count / total) * 100) : 0;
+                return (
+                    <div key={d.rating} className="flex items-center gap-3">
+                        <span className="text-xs font-bold text-gray-500 w-5 text-right">{d.rating}★</span>
+                        <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden">
+                            <motion.div
+                                className="h-full rounded-full bg-amber-400"
+                                initial={{ width: 0 }}
+                                animate={{ width: `${(d.count / max) * 100}%` }}
+                                transition={{ duration: 0.7, delay: i * 0.08, ease: 'easeOut' }}
+                            />
+                        </div>
+                        <span className="text-xs font-black text-gray-700 w-8 text-right">{d.count}</span>
+                        <span className="text-[10px] font-bold text-gray-400 w-9 text-right">{pct}%</span>
+                    </div>
+                );
+            })}
         </div>
     );
 };

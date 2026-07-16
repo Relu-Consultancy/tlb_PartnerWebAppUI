@@ -102,6 +102,7 @@ const CreateVenueDetails = lazyImport(() => import('./screens/venues'), 'CreateV
 const CreateVenueOccasions = lazyImport(() => import('./screens/venues'), 'CreateVenueOccasions');
 const CreateVenueAvailability = lazyImport(() => import('./screens/venues'), 'CreateVenueAvailability');
 const CreateVenuePackages = lazyImport(() => import('./screens/venues'), 'CreateVenuePackages');
+const CreateVenueAmenities = lazyImport(() => import('./screens/venues'), 'CreateVenueAmenities');
 const CreateVenuePolicies = lazyImport(() => import('./screens/venues'), 'CreateVenuePolicies');
 const CreateVenuePreview = lazyImport(() => import('./screens/venues'), 'CreateVenuePreview');
 
@@ -214,6 +215,7 @@ const routes: Record<Screen, RouteConfig> = {
   CREATE_VENUE_OCCASIONS: { component: CreateVenueOccasions, hasSidebar: true },
   CREATE_VENUE_AVAILABILITY: { component: CreateVenueAvailability, hasSidebar: true },
   CREATE_VENUE_PACKAGES: { component: CreateVenuePackages, hasSidebar: true },
+  CREATE_VENUE_AMENITIES: { component: CreateVenueAmenities, hasSidebar: true },
   CREATE_VENUE_POLICIES: { component: CreateVenuePolicies, hasSidebar: true },
   CREATE_VENUE_PREVIEW: { component: CreateVenuePreview, hasSidebar: false },
 

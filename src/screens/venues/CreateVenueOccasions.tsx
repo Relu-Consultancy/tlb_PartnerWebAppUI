@@ -144,7 +144,7 @@ export const CreateVenueOccasions: React.FC<Props> = ({ onNavigate }) => {
 
     if (loading) {
         return (
-            <WizardLayout title="Occasions & Discovery" stepText="Step 2 of 6" subtitle="Configuration" progressPercentage={33} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_DETAILS')}>
+            <WizardLayout title="Occasions & Discovery" stepText="Step 2 of 7" subtitle="Configuration" progressPercentage={29} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_DETAILS')}>
                 <div className="flex items-center justify-center gap-2 text-gray-400 text-xs font-bold py-12">
                     <Loader2 size={16} className="animate-spin" /> Loading…
                 </div>
@@ -154,7 +154,7 @@ export const CreateVenueOccasions: React.FC<Props> = ({ onNavigate }) => {
 
     if (loadError) {
         return (
-            <WizardLayout title="Occasions & Discovery" stepText="Step 2 of 6" subtitle="Configuration" progressPercentage={33} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_DETAILS')}>
+            <WizardLayout title="Occasions & Discovery" stepText="Step 2 of 7" subtitle="Configuration" progressPercentage={29} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_DETAILS')}>
                 <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-xs font-bold text-red-600">{loadError}</div>
             </WizardLayout>
         );
@@ -186,7 +186,7 @@ export const CreateVenueOccasions: React.FC<Props> = ({ onNavigate }) => {
     );
 
     return (
-        <WizardLayout title="Occasions & Discovery" stepText="Step 2 of 6" subtitle="Configuration" progressPercentage={33} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_DETAILS')}>
+        <WizardLayout title="Occasions & Discovery" stepText="Step 2 of 7" subtitle="Configuration" progressPercentage={29} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_DETAILS')}>
             <div className="space-y-1">
                 <h2 className="text-2xl font-black">Occasions & Discovery</h2>
                 <p className="text-sm text-gray-400">Help customers find the right fit.</p>

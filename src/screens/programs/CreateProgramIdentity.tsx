@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowRight, MapPin, Tag, Check, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
 import { WizardLayout, WizardNavigation, Select } from '../../components/ui';
+import { INDIAN_STATES, getCitiesForState } from '../../data/indianStatesAndCities';
 import {
     getCurrentProgramDraftId,
     setCurrentProgramDraftId,
@@ -349,9 +350,9 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                     </label>
                     <textarea className="tlb-input w-full min-h-[70px] resize-y" placeholder="Street, building, landmark" value={address} onChange={(e) => setAddress(e.target.value)} />
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <input className="tlb-input w-full" placeholder="City" maxLength={100} value={city} onChange={(e) => setCity(e.target.value)} />
+                        <Select value={stateName} onChange={(v: string) => { setStateName(v); setCity(''); }} options={INDIAN_STATES.map(s => ({ value: s, label: s }))} placeholder="State" />
+                        <Select value={city} onChange={setCity} options={getCitiesForState(stateName).map(c => ({ value: c, label: c }))} placeholder="City" disabled={!stateName} />
                         <input className="tlb-input w-full" placeholder="District" maxLength={100} value={district} onChange={(e) => setDistrict(e.target.value)} />
-                        <input className="tlb-input w-full" placeholder="State" maxLength={100} value={stateName} onChange={(e) => setStateName(e.target.value)} />
                         <input className="tlb-input w-full" placeholder="Pincode" inputMode="numeric" maxLength={6} value={pincode} onChange={(e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))} />
                     </div>
                     <textarea className="tlb-input w-full min-h-[80px] resize-y" placeholder="Full address (optional) — write out the complete address as you'd like customers to see it" value={fullAddress} onChange={(e) => setFullAddress(e.target.value)} />

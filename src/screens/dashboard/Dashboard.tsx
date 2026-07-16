@@ -4,7 +4,7 @@ import {
   Menu, UserCircle, CheckCircle2, ArrowRight, ChevronRight,
   Inbox, Eye, BarChart3, CreditCard, CalendarDays, LineChart,
   Ticket, DollarSign, MapPin, Percent, Edit3, LogOut,
-  Star, Heart, ClipboardList, Network, TrendingUp,
+  Heart, TrendingUp,
 } from 'lucide-react';
 import { Screen } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
@@ -222,29 +222,6 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
       { label: 'Followers', value: (followerCount ?? 0).toString(), icon: Heart, color: 'text-rose-500', bg: 'bg-rose-50', hex: '#F43F5E', sparkId: 'gflw', spark: [0, 0, 0, 0, 0, 0, 0] as number[] },
     ];
   })();
-
-  // ------ Quick actions (entity-aware) ------
-  // Uniform brand accent: black badge with a yellow glyph.
-  const badge = 'bg-tlb-dark text-tlb-yellow';
-  const enquiryAction = hasClasses
-    ? { label: 'Class Enquiries', screen: 'ENQUIRIES' as Screen, icon: Inbox, tint: badge }
-    : hasPrograms
-      ? { label: 'Program Enquiries', screen: 'PROGRAM_ENQUIRIES' as Screen, icon: Inbox, tint: badge }
-      : hasVenues
-        ? { label: 'Venue Enquiries', screen: 'VENUE_ENQUIRIES' as Screen, icon: Inbox, tint: badge }
-        : null;
-
-  const quickActions = [
-    { label: 'My Listings', screen: 'SERVICE_LISTINGS' as Screen, icon: CalendarDays, tint: badge },
-    { label: 'Bookings', screen: 'BOOKINGS' as Screen, icon: ClipboardList, tint: badge },
-    { label: 'Analytics', screen: 'ANALYTICS' as Screen, icon: LineChart, tint: badge },
-    { label: 'Statistics', screen: 'STATISTICS' as Screen, icon: BarChart3, tint: badge },
-    { label: 'Reviews', screen: 'REVIEWS' as Screen, icon: Star, tint: badge },
-    { label: 'Followers', screen: 'FOLLOWERS' as Screen, icon: Heart, tint: badge },
-    ...(enquiryAction ? [enquiryAction] : []),
-    { label: 'Finance', screen: 'FINANCIAL_HUB' as Screen, icon: CreditCard, tint: badge },
-    { label: 'Partner Network', screen: 'PARTNER_NETWORK' as Screen, icon: Network, tint: badge },
-  ].slice(0, 8);
 
   const greeting = new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening';
 
@@ -509,38 +486,6 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
             <BookingsCalendar onViewAll={() => onNavigate('BOOKINGS')} />
           </motion.div>
         </div>
-
-        {/* Quick actions */}
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-black text-gray-900">Quick Actions</h2>
-          </div>
-          <motion.div
-            className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4"
-            variants={stagger}
-            initial="initial"
-            animate="animate"
-          >
-            {quickActions.map((link) => (
-              <motion.button
-                key={link.label}
-                variants={fadeUp}
-                whileHover={{ y: -3 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => onNavigate(link.screen)}
-                className="bg-white rounded-2xl border border-gray-100 p-4 sm:p-5 flex items-center gap-3 hover:border-gray-300 hover:shadow-sm transition-all group text-left"
-              >
-                <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${link.tint} group-hover:scale-105 transition-transform`}>
-                  <link.icon size={19} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <span className="text-sm font-bold text-gray-700 group-hover:text-gray-900 transition-colors block truncate">{link.label}</span>
-                </div>
-                <ChevronRight size={16} className="text-gray-300 group-hover:text-gray-500 shrink-0" />
-              </motion.button>
-            ))}
-          </motion.div>
-        </section>
 
       </main>
 

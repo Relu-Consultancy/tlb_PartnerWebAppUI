@@ -69,6 +69,55 @@ export const getVenueMetaOccasions = async () => {
     return response.json();
 };
 
+// ─── Venue Amenities ───────────────────────────────────────────────────────
+
+export interface AmenityItem {
+    id: number;
+    name: string;
+    slug: string;
+    group: string;
+    icon: string;
+}
+
+export interface AmenityGroup {
+    group: string;
+    label: string;
+    amenities: AmenityItem[];
+}
+
+export interface VenueAmenities {
+    amenities: AmenityItem[];
+    custom_amenities: string[];
+}
+
+export const getAmenityCatalog = async (): Promise<AmenityGroup[]> => {
+    const response = await apiClient('/api/v1/listings/venues/metadata/amenities/');
+    if (!response.ok) await handleError(response, 'Failed to load amenity catalog');
+    const json = await response.json();
+    return json?.data ?? json ?? [];
+};
+
+export const getVenueAmenities = async (listingId: string): Promise<VenueAmenities> => {
+    const response = await apiClient(`/api/v1/partner/listings/venues/${listingId}/amenities/`);
+    if (!response.ok) await handleError(response, 'Failed to load venue amenities');
+    const json = await response.json();
+    return (json?.data ?? json) as VenueAmenities;
+};
+
+export const updateVenueAmenities = async (
+    listingId: string,
+    amenityIds: number[],
+    customAmenities: string[],
+): Promise<VenueAmenities> => {
+    const response = await apiClient(`/api/v1/partner/listings/venues/${listingId}/amenities/`, {
+        method: 'PUT',
+        body: JSON.stringify({ amenity_ids: amenityIds, custom_amenities: customAmenities }),
+    });
+    if (!response.ok) await handleError(response, 'Failed to save venue amenities');
+    const json = await response.json();
+    return (json?.data ?? json) as VenueAmenities;
+};
+
 // ─── Event Listings ────────────────────────────────────────────────────────
 
 export const getEventListings = async (status?: string) => {

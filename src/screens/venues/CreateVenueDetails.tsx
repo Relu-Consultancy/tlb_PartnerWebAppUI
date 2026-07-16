@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ArrowRight, MapPin, Check, Camera, Play, Image as ImageIcon, Trash2, Loader2, MessageCircle, CalendarCheck } from 'lucide-react';
 import { Screen } from '../../types';
 import { WizardLayout, WizardNavigation, toast, Select } from '../../components/ui';
+import { INDIAN_STATES, getCitiesForState } from '../../data/indianStatesAndCities';
 import {
     getVenueMetaCategories,
     getVenueListingDetail,
@@ -277,7 +278,7 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
 
     if (metaLoading) {
         return (
-            <WizardLayout title="New Venue Listing" stepText="Step 1 of 6" subtitle="Details" progressPercentage={17} themeColor="amber" onBack={() => onNavigate('SERVICE_LISTINGS')}>
+            <WizardLayout title="New Venue Listing" stepText="Step 1 of 7" subtitle="Details" progressPercentage={14} themeColor="amber" onBack={() => onNavigate('SERVICE_LISTINGS')}>
                 <div className="flex items-center justify-center gap-2 text-gray-400 text-xs font-bold py-12">
                     <Loader2 size={16} className="animate-spin" /> Loading…
                 </div>
@@ -287,14 +288,14 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
 
     if (metaError) {
         return (
-            <WizardLayout title="New Venue Listing" stepText="Step 1 of 6" subtitle="Details" progressPercentage={17} themeColor="amber" onBack={() => onNavigate('SERVICE_LISTINGS')}>
+            <WizardLayout title="New Venue Listing" stepText="Step 1 of 7" subtitle="Details" progressPercentage={14} themeColor="amber" onBack={() => onNavigate('SERVICE_LISTINGS')}>
                 <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-xs font-bold text-red-600">{metaError}</div>
             </WizardLayout>
         );
     }
 
     return (
-        <WizardLayout title="New Venue Listing" stepText="Step 1 of 6" subtitle="Details" progressPercentage={17} themeColor="amber" onBack={() => onNavigate('SERVICE_LISTINGS')}>
+        <WizardLayout title="New Venue Listing" stepText="Step 1 of 7" subtitle="Details" progressPercentage={14} themeColor="amber" onBack={() => onNavigate('SERVICE_LISTINGS')}>
             <div className="space-y-1">
                 <h2 className="text-2xl font-black">Venue Details</h2>
                 <p className="text-sm text-gray-400">Tell us about your space.</p>
@@ -439,12 +440,18 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
                     onChange={e => setAddress(e.target.value)}
                 />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <input
-                        className="tlb-input w-full"
-                        placeholder="City *"
-                        maxLength={100}
+                    <Select
+                        value={stateName}
+                        onChange={v => { setStateName(v); setCity(''); }}
+                        options={INDIAN_STATES.map(s => ({ value: s, label: s }))}
+                        placeholder="State"
+                    />
+                    <Select
                         value={city}
-                        onChange={e => setCity(e.target.value)}
+                        onChange={setCity}
+                        options={getCitiesForState(stateName).map(c => ({ value: c, label: c }))}
+                        placeholder="City *"
+                        disabled={!stateName}
                     />
                     <input
                         className="tlb-input w-full"
@@ -452,13 +459,6 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
                         maxLength={100}
                         value={district}
                         onChange={e => setDistrict(e.target.value)}
-                    />
-                    <input
-                        className="tlb-input w-full"
-                        placeholder="State"
-                        maxLength={100}
-                        value={stateName}
-                        onChange={e => setStateName(e.target.value)}
                     />
                     <input
                         className="tlb-input w-full"

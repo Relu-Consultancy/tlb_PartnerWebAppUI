@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, MapPin, Check, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation, toast } from '../../components/ui';
+import { WizardLayout, WizardNavigation, toast, Select } from '../../components/ui';
+import { INDIAN_STATES, getCitiesForState } from '../../data/indianStatesAndCities';
 import {
     getEventMetaCategories,
     getEventMetaFormats,
@@ -421,12 +422,18 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
                         onChange={(e) => setAddress(e.target.value)}
                     />
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <input
-                            className="tlb-input w-full"
-                            placeholder="City"
-                            maxLength={100}
+                        <Select
+                            value={stateName}
+                            onChange={(v: string) => { setStateName(v); setCity(''); }}
+                            options={INDIAN_STATES.map(s => ({ value: s, label: s }))}
+                            placeholder="State"
+                        />
+                        <Select
                             value={city}
-                            onChange={(e) => setCity(e.target.value)}
+                            onChange={setCity}
+                            options={getCitiesForState(stateName).map(c => ({ value: c, label: c }))}
+                            placeholder="City"
+                            disabled={!stateName}
                         />
                         <input
                             className="tlb-input w-full"
@@ -434,13 +441,6 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
                             maxLength={100}
                             value={district}
                             onChange={(e) => setDistrict(e.target.value)}
-                        />
-                        <input
-                            className="tlb-input w-full"
-                            placeholder="State"
-                            maxLength={100}
-                            value={stateName}
-                            onChange={(e) => setStateName(e.target.value)}
                         />
                         <input
                             className="tlb-input w-full"

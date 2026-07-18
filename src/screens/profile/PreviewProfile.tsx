@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, MapPin, Mail, CheckCircle2, Star, Play, Phone, Globe } from 'lucide-react';
-import { Loader } from '../../components/ui';
+import { SkeletonProfile } from '../../components/ui';
 import { Screen } from '../../types';
 import { getBusinessProfile, getExtendedProfile, getPartnerMedia } from '../../api/onboarding';
 
@@ -71,11 +71,7 @@ export const PreviewProfile: React.FC<ProfileProps> = ({ onNavigate, onOpenSideb
     const websiteUrl = profile.website_url || '';
 
     if (loading) {
-        return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <Loader />
-            </div>
-        );
+        return <SkeletonProfile />;
     }
 
     return (

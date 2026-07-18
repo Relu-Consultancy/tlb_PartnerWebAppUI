@@ -1,26 +1,61 @@
-﻿import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { motion } from 'motion/react';
 import {
-  Menu, UserCircle, CheckCircle2,
-  Inbox, Eye, BarChart3, CreditCard, Plus, CalendarDays,
+  Menu, UserCircle, CheckCircle2, ArrowRight, ChevronRight,
+  Inbox, Eye, BarChart3, CreditCard, CalendarDays, LineChart,
   Ticket, DollarSign, MapPin, Percent, Edit3, LogOut,
+  Heart, TrendingUp,
 } from 'lucide-react';
 import { Screen } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
 import { EntityPickerSheet } from '../../components/EntityPickerSheet';
 import { NotificationCenter } from '../../components/NotificationCenter';
-import { Loader, AreaSparkline, TrendBadge, fmtCurrency, trendPct } from '../../components/ui';
+import { SkeletonDashboard, AreaSparkline, TrendBadge, fmtCurrency, trendPct, BookingsCalendar, LatestListings } from '../../components/ui';
 import {
   getPartnerDashboard, getCurrentPartner, getBusinessProfile,
   getExtendedProfile, getPartnerMedia, getPartnerFollowerCount
 } from '../../api/onboarding';
 import { getStatsOverview, StatsOverview } from '../../api/stats';
 
-// --------- Types / Constants ------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+// --------- Types / Constants -----------------------------------------------
 
 const ACTIVE_STATUSES = new Set(['activated_limited', 'under_review', 'approved']);
 const VERIFICATION_SUBMITTED_STATUSES = new Set(['under_review', 'approved']);
 
-// --------- Component ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+const stagger = {
+  animate: { transition: { staggerChildren: 0.06 } },
+};
+const fadeUp = {
+  initial: { opacity: 0, y: 14 },
+  animate: { opacity: 1, y: 0 },
+};
+
+// --------- Completion ring --------------------------------------------------
+
+const CompletionRing: React.FC<{ pct: number }> = ({ pct }) => {
+  const r = 34, circ = 2 * Math.PI * r;
+  const color = pct >= 100 ? '#141414' : '#FACC15';
+  return (
+    <div className="relative w-20 h-20 shrink-0">
+      <svg viewBox="0 0 80 80" className="w-20 h-20 -rotate-90">
+        <circle cx="40" cy="40" r={r} fill="none" stroke="#F3F4F6" strokeWidth="7" />
+        <motion.circle
+          cx="40" cy="40" r={r} fill="none" stroke={color} strokeWidth="7" strokeLinecap="round"
+          strokeDasharray={circ}
+          initial={{ strokeDashoffset: circ }}
+          animate={{ strokeDashoffset: circ - (pct / 100) * circ }}
+          transition={{ duration: 1, ease: 'easeOut' }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-lg font-black text-gray-900 leading-none">{pct}%</span>
+        <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Done</span>
+      </div>
+    </div>
+  );
+};
+
+// --------- Component --------------------------------------------------------
 
 interface HomeProps { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
 
@@ -80,7 +115,9 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
     fetchData();
   }, []);
 
-  const hasClassOrProgram = allowedEntities.includes('Classes') || allowedEntities.includes('Programs');
+  const hasClasses = allowedEntities.includes('Classes');
+  const hasPrograms = allowedEntities.includes('Programs');
+  const hasClassOrProgram = hasClasses || hasPrograms;
   const hasEvents = allowedEntities.includes('Events');
   const hasVenues = allowedEntities.includes('Venues');
 
@@ -96,19 +133,27 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
     }
   }, [loading, partnerData, partnerStatus]);
 
+  // ------ Profile completion + actionable checklist ------
+  const galleryImages = mediaItems.filter((m: any) => m.media_type === 'image');
+  const checklist = [
+    { label: 'Add a cover image', done: !!extendedData?.cover_image },
+    { label: 'Add your logo', done: !!extendedData?.logo },
+    { label: 'Upload gallery photos', done: galleryImages.length > 0 },
+    { label: 'Write your bio', done: !!extendedData?.bio },
+    { label: 'Add a contact number', done: !!extendedData?.contact_number },
+    { label: 'Add your address', done: !!extendedData?.address },
+    { label: 'Link Instagram', done: !!profileData?.instagram_url },
+    { label: 'Link Facebook', done: !!profileData?.facebook_url },
+    { label: 'Add your website', done: !!profileData?.website_url },
+    { label: 'Set your business name', done: !!(profileData?.business_name || partnerData?.business_name) },
+  ];
   const profileCompletion = (() => {
-    const galleryImages = mediaItems.filter((m: any) => m.media_type === 'image');
-    const fields = [
-      !!(extendedData?.cover_image), !!(extendedData?.logo), galleryImages.length > 0,
-      !!(profileData?.business_name || partnerData?.business_name), !!(extendedData?.bio),
-      !!(extendedData?.contact_number), !!(profileData?.instagram_url),
-      !!(profileData?.facebook_url), !!(profileData?.website_url), !!(extendedData?.address),
-    ];
-    const filled = fields.filter(Boolean).length;
+    const filled = checklist.filter(c => c.done).length;
     if (filled === 0 && !extendedData && !profileData)
       return dashboardData?.profile_completion ?? partnerData?.profile_completion ?? 0;
-    return Math.round((filled / fields.length) * 100);
+    return Math.round((filled / checklist.length) * 100);
   })();
+  const pendingChecklist = checklist.filter(c => !c.done).slice(0, 4);
 
   const businessName = partnerData?.business_name || partnerData?.business_profile?.business_name || 'Partner';
 
@@ -121,39 +166,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleAddListing = () => {
-    if (allowedEntities.length === 1) {
-      const e = allowedEntities[0];
-      if (e === 'Events') onNavigate('CREATE_EVENT_DETAILS');
-      else if (e === 'Venues') onNavigate('CREATE_VENUE_DETAILS');
-      else if (e === 'Programs') onNavigate('CREATE_PROGRAM_IDENTITY');
-      else onNavigate('CREATE_CLASS_IDENTITY');
-    } else if (allowedEntities.length > 1) setShowEntityPicker(true);
-    else onNavigate('CREATE_CLASS_IDENTITY');
-  };
-
-  const ctaLabel = (() => {
-    if (!allowedEntities.length) return 'Add New Listing';
-    if (allowedEntities.length === 1) {
-      const e = allowedEntities[0];
-      if (e === 'Events') return 'Create Event';
-      if (e === 'Classes') return 'Add New Class';
-      if (e === 'Programs') return 'Add New Program';
-      if (e === 'Venues') return 'Add Venue';
-    }
-    return 'Add New Listing';
-  })();
-
-  const quickLinks = [
-    { label: 'Brand Profile', screen: 'BRAND_PROFILE' as Screen, icon: UserCircle },
-    { label: 'My Listings', screen: 'SERVICE_LISTINGS' as Screen, icon: CalendarDays },
-    { label: 'Statistics', screen: 'STATISTICS' as Screen, icon: BarChart3 },
-    ...(hasClassOrProgram ? [{ label: 'Enquiries', screen: 'ENQUIRIES' as Screen, icon: Inbox }] : []),
-    { label: 'Finance', screen: 'FINANCIAL_HUB' as Screen, icon: CreditCard },
-  ];
-
-  // ------ KPI data ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
+  // ------ KPI data ------
   const d = dashboardData || {};
   const upcomingEvents = d.upcoming_events ?? 0;
   const ticketsSold = d.tickets_sold ?? 0;
@@ -167,8 +180,6 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
   const newEnquiries = overviewData?.new_enquiries ?? d.new_enquiries ?? 0;
   const activeBatches = overviewData?.active_batches ?? d.active_batches ?? 0;
 
-  // ------ KPI Metrics ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
   const kpiMetrics = (() => {
     if (hasClassOrProgram) {
       const enqSpark: number[] = d.weekly_enquiries || [0, 0, 0, 0, 0, 0, 0];
@@ -178,6 +189,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
         { label: 'New Enquiries', value: newEnquiries.toString(), icon: Inbox, color: 'text-blue-500', bg: 'bg-blue-50', hex: '#3B82F6', sparkId: 'enq', spark: enqSpark },
         { label: 'Active Batches', value: activeBatches.toString(), icon: BarChart3, color: 'text-emerald-500', bg: 'bg-emerald-50', hex: '#10B981', sparkId: 'bat', spark: batchSpark },
         { label: 'Profile Views', value: profileViews.toString(), icon: Eye, color: 'text-purple-500', bg: 'bg-purple-50', hex: '#8B5CF6', sparkId: 'vw', spark: viewsSpark },
+        { label: 'Followers', value: (followerCount ?? 0).toString(), icon: Heart, color: 'text-rose-500', bg: 'bg-rose-50', hex: '#F43F5E', sparkId: 'flw', spark: viewsSpark },
       ];
     }
     if (hasEvents) {
@@ -204,24 +216,23 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
       ];
     }
     return [
-      { label: 'New Enquiries', value: newEnquiries.toString(), icon: Inbox, color: 'text-blue-500', bg: 'bg-blue-50', hex: '#3B82F6', sparkId: 'genq', spark: [0,0,0,0,0,0,0] as number[] },
-      { label: 'Active Batches', value: activeBatches.toString(), icon: BarChart3, color: 'text-emerald-500', bg: 'bg-emerald-50', hex: '#10B981', sparkId: 'gbat', spark: [0,0,0,0,0,0,0] as number[] },
-      { label: 'Profile Views', value: profileViews.toString(), icon: Eye, color: 'text-purple-500', bg: 'bg-purple-50', hex: '#8B5CF6', sparkId: 'gvw', spark: [0,0,0,0,0,0,0] as number[] },
+      { label: 'New Enquiries', value: newEnquiries.toString(), icon: Inbox, color: 'text-blue-500', bg: 'bg-blue-50', hex: '#3B82F6', sparkId: 'genq', spark: [0, 0, 0, 0, 0, 0, 0] as number[] },
+      { label: 'Active Batches', value: activeBatches.toString(), icon: BarChart3, color: 'text-emerald-500', bg: 'bg-emerald-50', hex: '#10B981', sparkId: 'gbat', spark: [0, 0, 0, 0, 0, 0, 0] as number[] },
+      { label: 'Profile Views', value: profileViews.toString(), icon: Eye, color: 'text-purple-500', bg: 'bg-purple-50', hex: '#8B5CF6', sparkId: 'gvw', spark: [0, 0, 0, 0, 0, 0, 0] as number[] },
+      { label: 'Followers', value: (followerCount ?? 0).toString(), icon: Heart, color: 'text-rose-500', bg: 'bg-rose-50', hex: '#F43F5E', sparkId: 'gflw', spark: [0, 0, 0, 0, 0, 0, 0] as number[] },
     ];
   })();
 
+  const greeting = new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening';
+
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader />
-      </div>
-    );
+    return <SkeletonDashboard />;
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white px-6 md:px-8 py-4 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
+      <header className="bg-white/90 backdrop-blur-sm px-6 md:px-8 py-4 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
         <div className="flex items-center gap-4">
           <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors"><Menu size={22} /></button>
           <div>
@@ -230,8 +241,16 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => onNavigate('ANALYTICS')}
+            className="h-9 px-3 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors flex items-center gap-2"
+            title="Analytics"
+          >
+            <LineChart size={18} />
+            <span className="text-sm font-bold hidden md:inline">Analytics</span>
+          </button>
           {/* Notifications */}
-          <NotificationCenter variant="light" />
+          <NotificationCenter variant="light" onNavigate={onNavigate} />
           {/* Profile */}
           <div className="relative" ref={profilePopupRef}>
             <button onClick={() => setShowProfilePopup(!showProfilePopup)} className="w-9 h-9 rounded-full bg-tlb-yellow/10 text-tlb-yellow flex items-center justify-center hover:bg-tlb-yellow/20 transition-colors">
@@ -333,119 +352,142 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
           </section>
         )}
 
-        {/* Welcome + Profile row */}
+        {/* Hero + profile completion */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Welcome card */}
-          <section className="lg:col-span-2 relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0f1729] to-gray-900 p-6 text-white">
-            <div className="absolute -right-8 -top-8 w-40 h-40 bg-tlb-yellow/10 rounded-full blur-3xl" />
-            <div className="relative z-10">
-              <p className="text-sm text-gray-400 font-medium">Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'},</p>
-              <h2 className="text-2xl font-black mt-1">{businessName}</h2>
-              <div className="mt-5 flex items-center gap-4">
-                <div className="flex-1">
+          {/* Welcome hero */}
+          <motion.section
+            {...fadeUp}
+            transition={{ duration: 0.3 }}
+            className="lg:col-span-2 relative overflow-hidden rounded-3xl bg-gradient-to-br from-tlb-dark via-gray-900 to-black p-6 sm:p-8 text-white"
+          >
+            <div className="absolute -right-10 -top-10 w-52 h-52 bg-tlb-yellow/10 rounded-full blur-3xl" />
+            <div className="absolute -right-16 bottom-0 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl" />
+            <div className="relative z-10 flex flex-col h-full">
+              <p className="text-sm text-gray-400 font-medium">Good {greeting},</p>
+              <h2 className="text-2xl sm:text-3xl font-black mt-1">{businessName}</h2>
+              <p className="text-sm text-gray-400 mt-2 max-w-md">
+                Here's how your brand is doing today. Track your reach, manage listings, and grow your audience — all from one place.
+              </p>
+
+              <div className="mt-auto pt-6 flex flex-wrap items-center gap-3">
+                <div className="flex-1 min-w-[180px]">
                   <div className="flex justify-between text-xs mb-1.5">
                     <span className="text-gray-500 font-medium">Profile completion</span>
                     <span className="text-tlb-yellow font-black">{profileCompletion}%</span>
                   </div>
                   <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
-                    <div className="h-full bg-tlb-yellow rounded-full transition-all duration-700" style={{ width: `${profileCompletion}%` }} />
+                    <motion.div
+                      className="h-full bg-tlb-yellow rounded-full"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${profileCompletion}%` }}
+                      transition={{ duration: 0.8, ease: 'easeOut' }}
+                    />
                   </div>
                 </div>
-                {profileCompletion < 100 && (
-                  <button onClick={() => onNavigate('BRAND_PROFILE')} className="bg-tlb-yellow text-tlb-dark px-4 py-2 rounded-lg text-xs font-bold shrink-0 hover:brightness-110 transition-all">
-                    Complete
+                {profileCompletion < 100 ? (
+                  <button onClick={() => onNavigate('BRAND_PROFILE')} className="bg-tlb-yellow text-tlb-dark px-4 py-2.5 rounded-xl text-xs font-black shrink-0 hover:brightness-110 transition-all flex items-center gap-1.5">
+                    Complete Profile <ArrowRight size={14} />
+                  </button>
+                ) : (
+                  <button onClick={() => onNavigate('ANALYTICS')} className="bg-white/10 hover:bg-white/20 text-white px-4 py-2.5 rounded-xl text-xs font-black shrink-0 transition-all flex items-center gap-1.5">
+                    View Analytics <TrendingUp size={14} />
                   </button>
                 )}
               </div>
             </div>
-          </section>
+          </motion.section>
 
-          {/* Profile stats card */}
-          <section className="bg-white rounded-2xl border border-gray-100 p-5 flex flex-col justify-between">
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Profile</p>
-              <button onClick={() => onNavigate('BRAND_PROFILE')} className="text-[11px] font-bold text-blue-500 hover:underline">Edit</button>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { label: 'Views', value: profileViews, color: 'text-purple-500' },
-                { label: 'Followers', value: followerCount === null ? '-' : followerCount, color: 'text-blue-500' },
-                { label: 'Complete', value: `${profileCompletion}%`, color: 'text-emerald-500' },
-              ].map(s => (
-                <div key={s.label} className="text-center">
-                  <p className={`text-2xl font-black ${s.color}`}>{s.value}</p>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{s.label}</p>
-                </div>
-              ))}
-            </div>
-            <div className="mt-4 pt-3 border-t border-gray-100">
-              <div className="flex items-center gap-2">
-                <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full rounded-full transition-all duration-700" style={{ width: `${profileCompletion}%`, backgroundColor: profileCompletion >= 80 ? '#10B981' : profileCompletion >= 50 ? '#FACC15' : '#F87171' }} />
-                </div>
-                <span className="text-[10px] font-bold text-gray-500">{profileCompletion}%</span>
+          {/* Profile completion card w/ checklist */}
+          <motion.section {...fadeUp} transition={{ duration: 0.3, delay: 0.05 }} className="bg-white rounded-3xl border border-gray-100 p-5 sm:p-6 flex flex-col">
+            <div className="flex items-center gap-4">
+              <CompletionRing pct={profileCompletion} />
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Your Profile</p>
+                <p className="text-sm font-black text-gray-900 mt-1">
+                  {profileCompletion >= 100 ? 'All set! 🎉' : profileCompletion >= 60 ? 'Almost there' : 'Getting started'}
+                </p>
+                <button onClick={() => onNavigate('BRAND_PROFILE')} className="text-[11px] font-black text-blue-500 hover:underline mt-1 flex items-center gap-1">
+                  Edit profile <ChevronRight size={12} />
+                </button>
               </div>
             </div>
-          </section>
+
+            {pendingChecklist.length > 0 ? (
+              <div className="mt-5 pt-4 border-t border-gray-100 space-y-2">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Finish setting up</p>
+                {pendingChecklist.map(item => (
+                  <button
+                    key={item.label}
+                    onClick={() => onNavigate('BRAND_PROFILE')}
+                    className="w-full flex items-center gap-2.5 text-left group"
+                  >
+                    <span className="w-4 h-4 rounded-full border-2 border-gray-200 group-hover:border-tlb-yellow transition-colors shrink-0" />
+                    <span className="text-xs font-medium text-gray-600 group-hover:text-gray-900 transition-colors flex-1">{item.label}</span>
+                    <ArrowRight size={13} className="text-gray-300 group-hover:text-tlb-yellow group-hover:translate-x-0.5 transition-all" />
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-5 pt-4 border-t border-gray-100 flex items-center gap-2 text-emerald-600">
+                <CheckCircle2 size={16} />
+                <span className="text-xs font-bold">Your profile is complete</span>
+              </div>
+            )}
+          </motion.section>
         </div>
 
         {/* KPI Cards */}
-        <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {kpiMetrics.map((m) => {
+        <motion.section
+          className="grid grid-cols-2 lg:grid-cols-4 gap-4"
+          variants={stagger}
+          initial="initial"
+          animate="animate"
+        >
+          {kpiMetrics.map((m, i) => {
             const sparkHasData = m.spark.some(v => v > 0);
             const trend = trendPct(m.spark);
+            // Brand rhythm: the lead KPI is a solid black card, the rest are
+            // white cards with a black badge + yellow glyph. Sparklines follow.
+            const dark = i === 0;
             return (
-              <div key={m.label} className="bg-white rounded-2xl border border-gray-100 p-5 flex flex-col gap-3 overflow-hidden hover:shadow-md transition-shadow">
+              <motion.div
+                key={m.label}
+                variants={fadeUp}
+                whileHover={{ y: -4 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 22 }}
+                className={`rounded-2xl border p-5 flex flex-col gap-3 overflow-hidden transition-shadow ${dark ? 'bg-tlb-dark border-tlb-dark text-white hover:shadow-lg' : 'bg-white border-gray-100 hover:shadow-md'}`}
+              >
                 <div className="flex items-center justify-between">
-                  <div className={`w-9 h-9 ${m.bg} rounded-xl flex items-center justify-center ${m.color}`}>
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${dark ? 'bg-tlb-yellow text-tlb-dark' : 'bg-tlb-dark text-tlb-yellow'}`}>
                     <m.icon size={16} />
                   </div>
                   <TrendBadge pct={trend} />
                 </div>
                 <div>
-                  <p className="text-2xl font-black text-gray-900 leading-none">{m.value}</p>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">{m.label}</p>
+                  <p className={`text-2xl font-black leading-none ${dark ? 'text-white' : 'text-gray-900'}`}>{m.value}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest mt-1 text-gray-400">{m.label}</p>
                 </div>
                 {sparkHasData && (
                   <div className="h-10 -mx-1 mt-auto">
-                    <AreaSparkline data={m.spark} color={m.hex} id={m.sparkId} />
+                    <AreaSparkline data={m.spark} color={dark ? '#FACC15' : '#141414'} id={m.sparkId} />
                   </div>
                 )}
-              </div>
+              </motion.div>
             );
           })}
-        </section>
+        </motion.section>
 
-        {/* Quick actions row */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-          {/* CTA */}
-          <button onClick={handleAddListing} className="lg:col-span-2 bg-tlb-yellow text-tlb-dark rounded-2xl p-5 flex items-center gap-4 hover:brightness-105 active:scale-[0.99] transition-all">
-            <div className="w-12 h-12 bg-black/10 rounded-xl flex items-center justify-center shrink-0"><Plus size={24} /></div>
-            <div className="text-left"><p className="font-black text-base">{ctaLabel}</p><p className="text-xs font-medium text-black/50 mt-0.5">Start building your next listing</p></div>
-          </button>
-          {/* Quick links */}
-          {quickLinks.slice(0, 3).map((link) => (
-            <button key={link.label} onClick={() => onNavigate(link.screen)} className="bg-white rounded-2xl border border-gray-100 p-5 flex items-center gap-3 hover:border-gray-300 hover:shadow-sm transition-all group">
-              <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400 group-hover:bg-tlb-yellow/10 group-hover:text-tlb-yellow transition-colors">
-                <link.icon size={18} />
-              </div>
-              <span className="text-sm font-bold text-gray-700">{link.label}</span>
-            </button>
-          ))}
+        {/* Latest listings + Bookings calendar (functional widgets) */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <motion.div {...fadeUp} transition={{ duration: 0.3 }}>
+            <LatestListings onViewAll={() => onNavigate('SERVICE_LISTINGS')} />
+          </motion.div>
+          <motion.div {...fadeUp} transition={{ duration: 0.3, delay: 0.05 }}>
+            <BookingsCalendar onViewAll={() => onNavigate('BOOKINGS')} />
+          </motion.div>
         </div>
 
       </main>
-
-      {/* Footer */}
-      <footer className="bg-[#0f1729] text-white px-6 py-6 mt-4">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <img src="/tlbAppIcon.png" alt="TLB" className="w-8 h-8 rounded-lg" />
-            <span className="text-sm font-bold text-gray-400">The Little Broadway</span>
-          </div>
-          <p className="text-[11px] text-gray-600">&copy; 2026 The Little Broadway &middot; Partner Portal V3.0</p>
-        </div>
-      </footer>
 
       <EntityPickerSheet
         isOpen={showEntityPicker}

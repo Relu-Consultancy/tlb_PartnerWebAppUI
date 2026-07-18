@@ -1,35 +1,24 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import {
-    Menu, ArrowLeft, Search, RefreshCw, AlertCircle, Inbox, Send, MessageSquare,
-    MapPin, BadgeCheck, Ban, Layers, Building2, Globe, Instagram, Facebook, Phone, Mail, Users,
+    Menu, ArrowLeft, ArrowRight, Search, RefreshCw, AlertCircle, Inbox, Send, Check, X,
+    MapPin, BadgeCheck, Ban, Layers, Building2, Globe, Instagram, Facebook, Phone, Mail,
 } from 'lucide-react';
 import { Screen } from '../../types';
 import { Select, SelectOption, toast } from '../../components/ui';
 import { getPartnerCategories, getCurrentPartner } from '../../api/onboarding';
 import {
     listNetworkPartners, getNetworkPartner, blockPartner, unblockPartner, listBlockedPartners,
-    listConversations, startConversation, getConversationMessages, sendConversationMessage, markConversationRead,
-    NetworkPartner, NetworkPartnerDetail, NetworkListing, Conversation, NetworkMessage,
+    listConversations, startConversation, sendConversationMessage,
+    NetworkPartner, NetworkPartnerDetail, NetworkListing, Conversation,
 } from '../../api/network';
 
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
 
-const timeAgo = (iso: string | null): string => {
-    if (!iso) return '';
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return '';
-    const s = Math.floor((Date.now() - d.getTime()) / 1000);
-    if (s < 60) return 'just now';
-    const m = Math.floor(s / 60); if (m < 60) return `${m}m ago`;
-    const h = Math.floor(m / 60); if (h < 24) return `${h}h ago`;
-    const days = Math.floor(h / 24); if (days < 7) return `${days}d ago`;
-    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-};
-const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 const initials = (name: string) => (name || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase()).join('');
-const convoName = (c: Conversation): string =>
-    typeof c.other_partner === 'string' ? c.other_partner : (c.other_partner?.business_name || 'Partner');
+
+const otherPartnerId = (c: Conversation): string =>
+    typeof c.other_partner === 'object' ? String(c.other_partner?.id || '') : '';
 
 const parseListings = (l: NetworkPartnerDetail['listings']): NetworkListing[] => {
     if (Array.isArray(l)) return l;
@@ -38,9 +27,9 @@ const parseListings = (l: NetworkPartnerDetail['listings']): NetworkListing[] =>
 };
 
 export const PartnerNetwork: React.FC<Props> = ({ onOpenSidebar }) => {
-    const [tab, setTab] = useState<'discover' | 'messages'>('discover');
-    const [ownId, setOwnId] = useState('');
+    const [ownName, setOwnName] = useState('');
     const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
+    const [pingedIds, setPingedIds] = useState<Set<string>>(new Set());
 
     // Discover
     const [partners, setPartners] = useState<NetworkPartner[]>([]);
@@ -55,27 +44,16 @@ export const PartnerNetwork: React.FC<Props> = ({ onOpenSidebar }) => {
     const [profile, setProfile] = useState<NetworkPartnerDetail | null>(null);
     const [loadingProfile, setLoadingProfile] = useState(false);
     const [blocking, setBlocking] = useState(false);
+    const [pinging, setPinging] = useState(false);
+    const [pingOpen, setPingOpen] = useState(false);
+    const [pingText, setPingText] = useState('');
 
-    // Conversations
-    const [conversations, setConversations] = useState<Conversation[]>([]);
-    const [loadingConvos, setLoadingConvos] = useState(false);
-
-    // Chat
-    const [activeConvo, setActiveConvo] = useState<Conversation | null>(null);
-    const [messages, setMessages] = useState<NetworkMessage[]>([]);
-    const [loadingChat, setLoadingChat] = useState(false);
-    const [reply, setReply] = useState('');
-    const [sending, setSending] = useState(false);
-    const [refreshing, setRefreshing] = useState(false);
-    const bottomRef = useRef<HTMLDivElement>(null);
-
-    // ── Mount: own email, categories, blocked, partners ──
+    // ── Mount: own name, categories, blocked + already-pinged partners ──
     useEffect(() => {
-        // My partner id — used to tell which messages are mine (compare to sender.id)
         getCurrentPartner()
             .then((res: any) => {
                 const d = res?.data || res || {};
-                setOwnId(String(d.id || d.partner?.id || d.partner_id || ''));
+                setOwnName(d.business_name || d.business_profile?.business_name || 'A partner');
             })
             .catch(() => {});
         getPartnerCategories().then((res: any) => {
@@ -85,6 +63,10 @@ export const PartnerNetwork: React.FC<Props> = ({ onOpenSidebar }) => {
         }).catch(() => {});
         listBlockedPartners().then(list => {
             setBlockedIds(new Set(list.map((b: any) => String(b?.id ?? b?.partner_id ?? b?.partner?.id)).filter(Boolean)));
+        }).catch(() => {});
+        // Partners we've already pinged = partners we already have a conversation with.
+        listConversations().then(list => {
+            setPingedIds(new Set(list.map(otherPartnerId).filter(Boolean)));
         }).catch(() => {});
     }, []);
 
@@ -110,18 +92,6 @@ export const PartnerNetwork: React.FC<Props> = ({ onOpenSidebar }) => {
         return () => clearTimeout(t);
     }, [search, categoryId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const loadConversations = async () => {
-        setLoadingConvos(true);
-        try { setConversations(await listConversations()); }
-        catch (e: any) { toast.error(e?.message || 'Failed to load conversations'); }
-        finally { setLoadingConvos(false); }
-    };
-
-    const openMessagesTab = () => {
-        setTab('messages');
-        loadConversations();
-    };
-
     // ── Profile ──
     const openProfile = async (id: string) => {
         setSelectedId(id);
@@ -142,90 +112,39 @@ export const PartnerNetwork: React.FC<Props> = ({ onOpenSidebar }) => {
         finally { setBlocking(false); }
     };
 
-    // ── Chat ──
-    const openChat = async (convo: Conversation) => {
-        setActiveConvo(convo);
-        setMessages([]);
-        setReply('');
-        setLoadingChat(true);
-        try {
-            const msgs = await getConversationMessages(convo.id);
-            setMessages(msgs);
-            markConversationRead(convo.id).catch(() => {});
-            setConversations(prev => prev.map(c => c.id === convo.id ? { ...c, unread_count: 0 } : c));
-        } catch (e: any) {
-            toast.error(e?.message || 'Failed to load messages');
-        } finally {
-            setLoadingChat(false);
-        }
+    // ── Single message: compose ONE message (like an enquiry) — no chat thread ──
+    const openMessage = () => {
+        if (!profile || pingedIds.has(profile.id)) return;
+        setPingText(`Hi ${profile.business_name}, this is ${ownName || 'a fellow partner'}. We'd love to collaborate with you — could we connect?`);
+        setPingOpen(true);
     };
 
-    const pingPartner = async () => {
-        if (!profile) return;
+    const sendMessage = async () => {
+        const body = pingText.trim();
+        if (!profile || !body || pinging) return;
+        setPinging(true);
         try {
             const convo = await startConversation(profile.id);
-            if (!convo?.id) {
-                toast.error('Could not start conversation.');
-                return;
-            }
-            setProfile(null);
-            setSelectedId(null);
-            setTab('messages');
-            openChat(convo);
-            loadConversations(); // refresh the list in the background
+            if (!convo?.id) { toast.error('Could not send message.'); return; }
+            await sendConversationMessage(convo.id, body);
+            setPingedIds(prev => new Set(prev).add(profile.id));
+            setPingOpen(false);
+            toast.success('Message sent! Your enquiry has been delivered.');
         } catch (e: any) {
-            toast.error(e?.message || 'Could not start conversation');
-        }
-    };
-
-    // Poll the open chat
-    useEffect(() => {
-        if (!activeConvo) return;
-        const iv = setInterval(async () => {
-            try { setMessages(await getConversationMessages(activeConvo.id)); } catch { /* silent */ }
-        }, 15000);
-        return () => clearInterval(iv);
-    }, [activeConvo]);
-
-    useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [messages.length]);
-
-    const refreshChat = async () => {
-        if (!activeConvo) return;
-        setRefreshing(true);
-        try { setMessages(await getConversationMessages(activeConvo.id)); }
-        catch (e: any) { toast.error(e?.message || 'Failed to refresh'); }
-        finally { setRefreshing(false); }
-    };
-
-    const sendReply = async (ev: React.FormEvent) => {
-        ev.preventDefault();
-        const body = reply.trim();
-        if (!body || !activeConvo) return;
-        setSending(true);
-        try {
-            await sendConversationMessage(activeConvo.id, body);
-            setReply('');
-            setMessages(await getConversationMessages(activeConvo.id));
-        } catch (e: any) {
-            toast.error(e?.message || 'Failed to send message');
+            toast.error(e?.message || 'Could not send message');
         } finally {
-            setSending(false);
+            setPinging(false);
         }
     };
-
-    const totalUnread = conversations.reduce((s, c) => s + (c.unread_count || 0), 0);
 
     // =======================================================================
     // Header
     // =======================================================================
-    const back = () => {
-        if (activeConvo) { setActiveConvo(null); loadConversations(); return; }
-        if (selectedId) { setSelectedId(null); setProfile(null); return; }
-    };
+    const back = () => { setSelectedId(null); setProfile(null); };
 
     const header = (
         <header className="bg-white px-5 md:px-8 py-5 flex items-center gap-4 sticky top-0 z-30 border-b border-gray-100">
-            {(activeConvo || selectedId) ? (
+            {selectedId ? (
                 <button onClick={back} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors flex items-center gap-1.5 text-gray-500 hover:text-gray-900">
                     <ArrowLeft size={20} /><span className="hidden sm:inline text-sm font-bold">Back</span>
                 </button>
@@ -233,89 +152,18 @@ export const PartnerNetwork: React.FC<Props> = ({ onOpenSidebar }) => {
                 <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors"><Menu size={24} /></button>
             )}
             <div className="flex-1 min-w-0">
-                <h1 className="tlb-page-title truncate">
-                    {activeConvo ? convoName(activeConvo) : profile ? profile.business_name : 'Partner Network'}
-                </h1>
-                <p className="tlb-page-sub">
-                    {activeConvo ? 'Conversation' : profile ? (profile.base_city || 'Partner profile') : 'Discover partners & collaborate'}
-                </p>
+                <h1 className="tlb-page-title truncate">{profile ? profile.business_name : 'Partner Network'}</h1>
+                <p className="tlb-page-sub">{profile ? (profile.base_city || 'Partner profile') : 'Discover partners & send a collaboration ping'}</p>
             </div>
         </header>
     );
-
-    // =======================================================================
-    // Chat view
-    // =======================================================================
-    if (activeConvo) {
-        return (
-            <div className="min-h-screen bg-gray-50 flex flex-col h-screen">
-                {header}
-                <div className="bg-white border-b border-gray-100 px-5 md:px-8 py-2.5 flex items-center justify-end">
-                    <button onClick={refreshChat} disabled={refreshing}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-50">
-                        <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} /> Refresh
-                    </button>
-                </div>
-                {loadingChat ? (
-                    <div className="flex-1 flex items-center justify-center"><RefreshCw size={26} className="text-gray-300 animate-spin" /></div>
-                ) : (
-                    <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6">
-                        <div className="max-w-3xl mx-auto space-y-3">
-                            {messages.length === 0 ? (
-                                <div className="flex flex-col items-center gap-2 py-16 text-center">
-                                    <MessageSquare size={30} className="text-gray-200" />
-                                    <p className="text-sm font-bold text-gray-400">Say hello to start the conversation.</p>
-                                </div>
-                            ) : messages.map(m => {
-                                const otherId = typeof activeConvo.other_partner === 'object'
-                                    ? String(activeConvo.other_partner.id || '') : '';
-                                // Per API: a message is yours when sender.id === your partner id.
-                                const mine = ownId && m.sender_id
-                                    ? m.sender_id === ownId
-                                    : (otherId && m.sender_id ? m.sender_id !== otherId : false);
-                                return (
-                                    <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
-                                        <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${mine ? 'bg-tlb-yellow text-tlb-dark rounded-br-md' : 'bg-white border border-gray-100 text-gray-800 rounded-bl-md shadow-sm'}`}>
-                                            {!mine && <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">{m.sender_name || convoName(activeConvo)}</p>}
-                                            {m.body && <p className="text-sm leading-snug whitespace-pre-wrap break-words">{m.body}</p>}
-                                            {m.attachments.map(att => (
-                                                <a key={att.id} href={att.file_url} target="_blank" rel="noreferrer"
-                                                    className={`mt-1 flex items-center gap-1.5 text-xs font-bold underline ${mine ? 'text-tlb-dark/80' : 'text-blue-600'}`}>
-                                                    📎 {att.file_name}
-                                                </a>
-                                            ))}
-                                            <p className={`text-[10px] mt-1 ${mine ? 'text-tlb-dark/50' : 'text-gray-400'}`}>{fmtTime(m.created_at)}</p>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                            <div ref={bottomRef} />
-                        </div>
-                    </div>
-                )}
-                <div className="bg-white border-t border-gray-100 px-4 md:px-8 py-4">
-                    <form onSubmit={sendReply} className="max-w-3xl mx-auto flex items-end gap-3">
-                        <textarea
-                            rows={1} value={reply}
-                            onChange={e => setReply(e.target.value)}
-                            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply(e); } }}
-                            placeholder="Type your message…"
-                            className="flex-1 tlb-input resize-none max-h-32 py-3"
-                        />
-                        <button type="submit" disabled={sending || !reply.trim()} className="tlb-button !px-4 py-3 shrink-0 disabled:opacity-50">
-                            {sending ? <RefreshCw size={18} className="animate-spin" /> : <Send size={18} />}
-                        </button>
-                    </form>
-                </div>
-            </div>
-        );
-    }
 
     // =======================================================================
     // Profile view
     // =======================================================================
     if (selectedId) {
         const isBlocked = profile ? blockedIds.has(profile.id) : false;
+        const alreadyPinged = profile ? pingedIds.has(profile.id) : false;
         const listings = profile ? parseListings(profile.listings) : [];
         const socials = profile ? [
             { url: profile.website_url, icon: Globe, label: 'Website' },
@@ -335,7 +183,6 @@ export const PartnerNetwork: React.FC<Props> = ({ onOpenSidebar }) => {
                                 {profile.cover_image && <img src={profile.cover_image} alt="" className="w-full h-full object-cover" />}
                             </div>
                             <div className="px-6 pb-6">
-                                {/* Avatar overlaps the cover; name + details sit in the white area below */}
                                 <div className="w-20 h-20 -mt-10 rounded-2xl bg-white shadow-md ring-4 ring-white overflow-hidden flex items-center justify-center">
                                     {profile.logo
                                         ? <img src={profile.logo} alt="" className="w-full h-full object-cover" />
@@ -370,14 +217,26 @@ export const PartnerNetwork: React.FC<Props> = ({ onOpenSidebar }) => {
                                 )}
 
                                 <div className="flex items-center gap-3 mt-6">
-                                    <button onClick={pingPartner} disabled={isBlocked} className="tlb-button flex-1 sm:flex-none px-6 py-3 disabled:opacity-50">
-                                        <MessageSquare size={18} /> Ping / Message
+                                    <button
+                                        onClick={openMessage}
+                                        disabled={isBlocked || alreadyPinged}
+                                        className="tlb-button flex-1 sm:flex-none px-6 py-3 disabled:opacity-50"
+                                    >
+                                        {alreadyPinged ? <Check size={18} /> : <Send size={18} />}
+                                        {alreadyPinged ? 'Message Sent' : 'Send Message'}
                                     </button>
                                     <button onClick={() => toggleBlock(profile.id)} disabled={blocking}
                                         className={`inline-flex items-center gap-1.5 px-4 py-3 rounded-xl text-sm font-bold border transition-colors disabled:opacity-50 ${isBlocked ? 'border-gray-200 text-gray-600 hover:bg-gray-50' : 'border-red-200 text-red-600 hover:bg-red-50'}`}>
                                         <Ban size={16} /> {isBlocked ? 'Unblock' : 'Block'}
                                     </button>
                                 </div>
+                                {!isBlocked && (
+                                    <p className="text-[11px] text-gray-400 mt-2">
+                                        {alreadyPinged
+                                            ? 'You’ve already sent this partner a message.'
+                                            : 'Send a single message (like an enquiry). This is a one-time message, not a chat.'}
+                                    </p>
+                                )}
                             </div>
                         </div>
 
@@ -406,126 +265,132 @@ export const PartnerNetwork: React.FC<Props> = ({ onOpenSidebar }) => {
                         </div>
                     </main>
                 )}
+
+                {/* Single-message compose popup */}
+                {pingOpen && profile && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => !pinging && setPingOpen(false)}>
+                        <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+                            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                                <div>
+                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Message Partner</p>
+                                    <p className="font-black text-gray-900 truncate">{profile.business_name}</p>
+                                </div>
+                                <button onClick={() => !pinging && setPingOpen(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors" aria-label="Close">
+                                    <X size={18} />
+                                </button>
+                            </div>
+                            <div className="p-5 space-y-3">
+                                <textarea
+                                    value={pingText}
+                                    onChange={e => setPingText(e.target.value)}
+                                    rows={4}
+                                    maxLength={500}
+                                    autoFocus
+                                    placeholder="Write a short enquiry…"
+                                    className="tlb-input w-full resize-none"
+                                />
+                                <p className="text-[11px] text-gray-400">You can send <span className="font-bold text-gray-600">one message only</span> — like an enquiry. The partner cannot be messaged again from here.</p>
+                                <div className="flex items-center justify-end gap-2 pt-1">
+                                    <button onClick={() => setPingOpen(false)} disabled={pinging}
+                                        className="px-4 py-2.5 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-50">
+                                        Cancel
+                                    </button>
+                                    <button onClick={sendMessage} disabled={pinging || !pingText.trim()}
+                                        className="tlb-button px-5 py-2.5 disabled:opacity-50">
+                                        {pinging ? <RefreshCw size={16} className="animate-spin" /> : <Send size={16} />}
+                                        Send Message
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         );
     }
 
     // =======================================================================
-    // Directory + Messages tabs
+    // Directory
     // =======================================================================
     return (
         <div className="min-h-screen bg-gray-50">
             {header}
             <main className="p-5 md:p-8 max-w-6xl mx-auto space-y-6">
-                {/* Tabs */}
-                <div className="inline-flex bg-white border border-gray-100 rounded-2xl p-1 shadow-sm">
-                    <button onClick={() => setTab('discover')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${tab === 'discover' ? 'bg-tlb-dark text-white shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}>
-                        <Users size={15} /> Discover
-                    </button>
-                    <button onClick={openMessagesTab}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${tab === 'messages' ? 'bg-tlb-dark text-white shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}>
-                        <MessageSquare size={15} /> Messages
-                        {totalUnread > 0 && <span className="text-[10px] font-black text-white bg-red-500 rounded-full px-1.5 py-0.5">{totalUnread}</span>}
-                    </button>
+                {/* Filters */}
+                <div className="flex flex-col md:flex-row gap-3">
+                    <div className="flex-1 flex items-center gap-3 bg-white rounded-2xl px-4 py-3 border border-gray-100 shadow-sm">
+                        <Search size={16} className="text-gray-400 shrink-0" />
+                        <input className="flex-1 bg-transparent border-none focus:outline-none text-sm font-bold placeholder:text-gray-300"
+                            placeholder="Search by business name or city…" value={search} onChange={e => setSearch(e.target.value)} />
+                    </div>
+                    {categories.length > 0 && (
+                        <div className="md:w-56">
+                            <Select value={categoryId} onChange={setCategoryId}
+                                options={[{ value: '', label: 'All categories' }, ...categories]}
+                                ariaLabel="Filter by category" placeholder="All categories" />
+                        </div>
+                    )}
                 </div>
 
-                {tab === 'discover' ? (
-                    <>
-                        {/* Filters */}
-                        <div className="flex flex-col md:flex-row gap-3">
-                            <div className="flex-1 flex items-center gap-3 bg-white rounded-2xl px-4 py-3 border border-gray-100 shadow-sm">
-                                <Search size={16} className="text-gray-400 shrink-0" />
-                                <input className="flex-1 bg-transparent border-none focus:outline-none text-sm font-bold placeholder:text-gray-300"
-                                    placeholder="Search by business name or city…" value={search} onChange={e => setSearch(e.target.value)} />
-                            </div>
-                            {categories.length > 0 && (
-                                <div className="md:w-56">
-                                    <Select value={categoryId} onChange={setCategoryId}
-                                        options={[{ value: '', label: 'All categories' }, ...categories]}
-                                        ariaLabel="Filter by category" placeholder="All categories" />
-                                </div>
-                            )}
-                        </div>
-
-                        {loadingPartners ? (
-                            <div className="flex items-center justify-center py-24"><RefreshCw size={26} className="text-gray-300 animate-spin" /></div>
-                        ) : partnersError ? (
-                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm text-center py-16">
-                                <AlertCircle size={32} className="text-red-300 mx-auto mb-3" />
-                                <p className="text-sm font-bold text-gray-500">{partnersError}</p>
-                                <button onClick={loadPartners} className="text-xs font-black text-blue-500 hover:underline mt-3">Try again</button>
-                            </div>
-                        ) : partners.length === 0 ? (
-                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm text-center py-16">
-                                <Inbox size={32} className="text-gray-200 mx-auto mb-3" />
-                                <p className="text-sm font-bold text-gray-400">No partners found.</p>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5">
-                                {partners.map((p, i) => (
-                                    <motion.button key={p.id}
-                                        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                                        transition={{ duration: 0.22, delay: Math.min(i * 0.03, 0.25) }}
-                                        onClick={() => openProfile(p.id)}
-                                        className="group text-left bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-lg hover:-translate-y-0.5 hover:border-gray-200 transition-all p-5">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-12 h-12 rounded-2xl bg-gray-100 overflow-hidden shrink-0 flex items-center justify-center">
-                                                {p.logo ? <img src={p.logo} alt="" className="w-full h-full object-cover" /> : <span className="font-black text-gray-300">{initials(p.business_name)}</span>}
-                                            </div>
-                                            <div className="min-w-0 flex-1">
-                                                <div className="flex items-center gap-1.5">
-                                                    <p className="font-black text-gray-900 truncate">{p.business_name}</p>
-                                                    {p.is_verified && <BadgeCheck size={15} className="text-blue-500 shrink-0" />}
-                                                </div>
-                                                {p.base_city && <p className="text-xs text-gray-400 font-medium flex items-center gap-1 truncate"><MapPin size={11} /> {p.base_city}</p>}
-                                            </div>
-                                        </div>
-                                        {p.bio && <p className="text-xs text-gray-500 mt-3 line-clamp-2 leading-snug">{p.bio}</p>}
-                                        <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-50">
-                                            <span className="text-[11px] font-bold text-gray-500 flex items-center gap-1.5"><Layers size={12} className="text-gray-400" /> {p.published_listing_count} listings</span>
-                                            {blockedIds.has(p.id)
-                                                ? <span className="text-[10px] font-black text-red-500 uppercase tracking-wider">Blocked</span>
-                                                : <span className="text-[11px] font-black text-tlb-dark group-hover:underline">View →</span>}
-                                        </div>
-                                    </motion.button>
-                                ))}
-                            </div>
-                        )}
-                    </>
+                {loadingPartners ? (
+                    <div className="flex items-center justify-center py-24"><RefreshCw size={26} className="text-gray-300 animate-spin" /></div>
+                ) : partnersError ? (
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm text-center py-16">
+                        <AlertCircle size={32} className="text-red-300 mx-auto mb-3" />
+                        <p className="text-sm font-bold text-gray-500">{partnersError}</p>
+                        <button onClick={loadPartners} className="text-xs font-black text-blue-500 hover:underline mt-3">Try again</button>
+                    </div>
+                ) : partners.length === 0 ? (
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm text-center py-16">
+                        <Inbox size={32} className="text-gray-200 mx-auto mb-3" />
+                        <p className="text-sm font-bold text-gray-400">No partners found.</p>
+                    </div>
                 ) : (
-                    // Messages tab
-                    loadingConvos ? (
-                        <div className="flex items-center justify-center py-24"><RefreshCw size={26} className="text-gray-300 animate-spin" /></div>
-                    ) : conversations.length === 0 ? (
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm text-center py-16">
-                            <MessageSquare size={32} className="text-gray-200 mx-auto mb-3" />
-                            <p className="text-sm font-bold text-gray-400">No conversations yet</p>
-                            <p className="text-xs text-gray-400 mt-1">Find a partner in Discover and send them a ping.</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-3">
-                            {conversations.map((c, i) => (
-                                <motion.button key={c.id}
-                                    initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                                    transition={{ duration: 0.2, delay: Math.min(i * 0.03, 0.2) }}
-                                    onClick={() => openChat(c)}
-                                    className="w-full text-left bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-gray-200 transition-all p-4 flex items-center gap-4">
-                                    <div className="w-11 h-11 rounded-2xl bg-tlb-yellow/15 flex items-center justify-center shrink-0 font-black text-tlb-dark text-sm">
-                                        {initials(convoName(c))}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5">
+                        {partners.map((p, i) => (
+                            <motion.button key={p.id}
+                                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.22, delay: Math.min(i * 0.03, 0.25) }}
+                                whileHover={{ y: -5 }}
+                                whileTap={{ scale: 0.985 }}
+                                onClick={() => openProfile(p.id)}
+                                className="group relative overflow-hidden text-left bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-2xl hover:shadow-tlb-yellow/10 hover:border-tlb-yellow/50 transition-[box-shadow,border-color] duration-300 p-5">
+                                {/* Hover glow */}
+                                <div className="pointer-events-none absolute -right-12 -top-12 w-36 h-36 rounded-full bg-tlb-yellow/25 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                                {/* Top accent wipe */}
+                                <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-tlb-yellow to-amber-400 origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-300 ease-out" />
+
+                                <div className="relative flex items-center gap-3">
+                                    <div className="w-12 h-12 rounded-2xl bg-gray-100 overflow-hidden shrink-0 flex items-center justify-center ring-2 ring-transparent group-hover:ring-tlb-yellow/40 group-hover:scale-105 transition-all duration-300">
+                                        {p.logo
+                                            ? <img src={p.logo} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ease-out" />
+                                            : <span className="font-black text-gray-300 group-hover:text-tlb-yellow transition-colors duration-300">{initials(p.business_name)}</span>}
                                     </div>
                                     <div className="min-w-0 flex-1">
-                                        <div className="flex items-center gap-2">
-                                            <p className="font-bold text-gray-900 truncate">{convoName(c)}</p>
-                                            {c.unread_count > 0 && <span className="shrink-0 text-[10px] font-black text-white bg-red-500 rounded-full px-1.5 py-0.5">{c.unread_count}</span>}
+                                        <div className="flex items-center gap-1.5">
+                                            <p className="font-black text-gray-900 truncate">{p.business_name}</p>
+                                            {p.is_verified && <BadgeCheck size={15} className="text-blue-500 shrink-0" />}
                                         </div>
-                                        <p className="text-xs text-gray-400 font-medium truncate mt-0.5">{c.last_message_preview || 'No messages yet'}</p>
+                                        {p.base_city && <p className="text-xs text-gray-400 font-medium flex items-center gap-1 truncate"><MapPin size={11} /> {p.base_city}</p>}
                                     </div>
-                                    <span className="text-[10px] font-bold text-gray-400 shrink-0">{timeAgo(c.last_message_at)}</span>
-                                </motion.button>
-                            ))}
-                        </div>
-                    )
+                                </div>
+                                {p.bio && <p className="relative text-xs text-gray-500 mt-3 line-clamp-2 leading-snug">{p.bio}</p>}
+                                <div className="relative flex items-center justify-between mt-3 pt-3 border-t border-gray-50 group-hover:border-tlb-yellow/20 transition-colors duration-300">
+                                    <span className="text-[11px] font-bold text-gray-500 flex items-center gap-1.5"><Layers size={12} className="text-gray-400" /> {p.published_listing_count} listings</span>
+                                    {blockedIds.has(p.id)
+                                        ? <span className="text-[10px] font-black text-red-500 uppercase tracking-wider">Blocked</span>
+                                        : pingedIds.has(p.id)
+                                            ? <span className="text-[10px] font-black text-emerald-500 uppercase tracking-wider flex items-center gap-1"><Check size={11} /> Pinged</span>
+                                            : (
+                                                <span className="text-[11px] font-black text-gray-400 group-hover:text-tlb-dark inline-flex items-center gap-1 transition-colors duration-300">
+                                                    View
+                                                    <ArrowRight size={13} className="group-hover:translate-x-1 transition-transform duration-300" />
+                                                </span>
+                                            )}
+                                </div>
+                            </motion.button>
+                        ))}
+                    </div>
                 )}
             </main>
         </div>

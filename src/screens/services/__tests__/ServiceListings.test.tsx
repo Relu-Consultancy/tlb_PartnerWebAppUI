@@ -28,9 +28,10 @@ beforeEach(() => {
 });
 
 describe('ServiceListings — loading and error states', () => {
-    it('shows loading spinner initially', () => {
+    it('shows a skeleton loader initially', () => {
         renderWithPartner();
-        expect(screen.getByText(/loading listings/i)).toBeInTheDocument();
+        // Skeleton placeholders use the animate-pulse utility.
+        expect(document.querySelector('.animate-pulse')).toBeTruthy();
     });
 
     it('shows error message on API failure', async () => {

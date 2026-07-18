@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, MapPin, Tag, Check, Loader2, MessageCircle, CalendarCheck } from 'lucide-react';
+import { ArrowRight, MapPin, Tag, Check, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation } from '../../components/ui';
+import { WizardLayout, WizardNavigation, Select } from '../../components/ui';
+import { INDIAN_STATES, getCitiesForState } from '../../data/indianStatesAndCities';
 import {
     getCurrentClassDraftId,
     setCurrentClassDraftId,
@@ -28,8 +29,11 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
     const [mode, setMode] = useState('offline');
     const [bookingType, setBookingType] = useState<'enquiry' | 'direct_booking'>('enquiry');
     const [city, setCity] = useState('');
-    const [area, setArea] = useState('');
+    const [district, setDistrict] = useState('');
+    const [stateName, setStateName] = useState('');
+    const [pincode, setPincode] = useState('');
     const [address, setAddress] = useState('');
+    const [fullAddress, setFullAddress] = useState('');
     const [meetingLink, setMeetingLink] = useState('');
     const [tag, setTag] = useState('');
     const [price, setPrice] = useState('');
@@ -84,8 +88,11 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
                 if (rawMinAge != null) setMinAge(String(rawMinAge));
                 if (rawMaxAge != null) setMaxAge(String(rawMaxAge));
                 setCity(srv.city || d.city || '');
-                setArea(srv.area || d.area || '');
+                setDistrict(srv.district || d.district || '');
+                setStateName(srv.state || d.state || '');
+                setPincode(srv.pincode || d.pincode || '');
                 setAddress(srv.address || d.address || '');
+                setFullAddress(srv.full_address || d.full_address || '');
                 setMeetingLink(srv.meeting_link || d.meeting_link || '');
                 const loadedPrice = srv.price ?? d.price;
                 if (loadedPrice != null) setPrice(String(loadedPrice));
@@ -149,8 +156,11 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
             if (maxAge) payload.max_age = Number(maxAge);
             if (needsAddress) {
                 if (city.trim()) payload.city = city.trim();
-                if (area.trim()) payload.area = area.trim();
+                if (district.trim()) payload.district = district.trim();
+                if (stateName.trim()) payload.state = stateName.trim();
+                if (pincode.trim()) payload.pincode = pincode.trim();
                 if (address.trim()) payload.address = address.trim();
+                if (fullAddress.trim()) payload.full_address = fullAddress.trim();
             }
             if ((mode === 'online' || mode === 'hybrid') && meetingLink.trim()) {
                 payload.meeting_link = meetingLink.trim();
@@ -271,51 +281,6 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
                 )}
             </div>
 
-            {/* Booking Type */}
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">
-                    Listing Type <span className="text-red-400">*</span>
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                    {([
-                        {
-                            value: 'enquiry',
-                            label: 'Enquiry',
-                            icon: <MessageCircle size={22} />,
-                            desc: 'Parents express interest and you follow up to confirm.',
-                        },
-                        {
-                            value: 'direct_booking',
-                            label: 'Direct Booking',
-                            icon: <CalendarCheck size={22} />,
-                            desc: 'Parents directly book and pay for a seat online.',
-                        },
-                    ] as const).map((opt) => (
-                        <button
-                            key={opt.value}
-                            type="button"
-                            onClick={() => setBookingType(opt.value)}
-                            className={`relative flex flex-col items-start gap-2 p-4 rounded-2xl border-2 text-left transition-all ${
-                                bookingType === opt.value
-                                    ? 'border-tlb-yellow bg-tlb-yellow/10'
-                                    : 'border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm'
-                            }`}
-                        >
-                            {bookingType === opt.value && (
-                                <div className="absolute top-2.5 right-2.5 w-5 h-5 bg-tlb-yellow rounded-full flex items-center justify-center">
-                                    <Check size={11} className="text-tlb-dark" />
-                                </div>
-                            )}
-                            <span className={bookingType === opt.value ? 'text-tlb-dark' : 'text-gray-400'}>
-                                {opt.icon}
-                            </span>
-                            <span className="text-sm font-black text-gray-800 pr-6">{opt.label}</span>
-                            <span className="text-[11px] text-gray-400 leading-snug">{opt.desc}</span>
-                        </button>
-                    ))}
-                </div>
-            </div>
-
             {/* Fees */}
             <div>
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Fees (₹)</label>
@@ -335,27 +300,47 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block">
                         <MapPin size={12} className="inline mr-1" /> Location
                     </label>
+                    <textarea
+                        className="tlb-input w-full min-h-[70px] resize-y"
+                        placeholder="Street, building, landmark"
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                    />
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <input
-                            className="tlb-input w-full"
-                            placeholder="City"
-                            maxLength={100}
+                        <Select
+                            value={stateName}
+                            onChange={(v: string) => { setStateName(v); setCity(''); }}
+                            options={INDIAN_STATES.map(s => ({ value: s, label: s }))}
+                            placeholder="State"
+                        />
+                        <Select
                             value={city}
-                            onChange={(e) => setCity(e.target.value)}
+                            onChange={setCity}
+                            options={getCitiesForState(stateName).map(c => ({ value: c, label: c }))}
+                            placeholder="City"
+                            disabled={!stateName}
                         />
                         <input
                             className="tlb-input w-full"
-                            placeholder="Area / Neighborhood"
+                            placeholder="District"
                             maxLength={100}
-                            value={area}
-                            onChange={(e) => setArea(e.target.value)}
+                            value={district}
+                            onChange={(e) => setDistrict(e.target.value)}
+                        />
+                        <input
+                            className="tlb-input w-full"
+                            placeholder="Pincode"
+                            inputMode="numeric"
+                            maxLength={6}
+                            value={pincode}
+                            onChange={(e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                         />
                     </div>
                     <textarea
                         className="tlb-input w-full min-h-[80px] resize-y"
-                        placeholder="Full address (street, building, pincode)"
-                        value={address}
-                        onChange={(e) => setAddress(e.target.value)}
+                        placeholder="Full address (optional) — write out the complete address as you'd like customers to see it"
+                        value={fullAddress}
+                        onChange={(e) => setFullAddress(e.target.value)}
                     />
                 </div>
             )}

@@ -158,3 +158,35 @@ export const getPartnerFollowerCount = async (partnerId: string) => {
     }
     return response.json();
 };
+
+// A single user who follows the partner. Backend field names vary, so callers
+// should read via the tolerant normalizer in the Followers screen.
+export interface PartnerFollower {
+    id: string;
+    name: string;
+    avatar: string | null;
+    city: string | null;
+    followed_at: string | null;
+}
+
+// Fetch every page of the follower list. Tolerates array / { results } / paginated
+// { next } envelopes, and unwraps the { data } wrapper other endpoints use.
+export const getPartnerFollowers = async (partnerId: string): Promise<any[]> => {
+    const all: any[] = [];
+    let page = 1;
+    for (let guard = 0; guard < 50; guard++) {
+        const response = await apiClient(`/api/v1/partner/${partnerId}/followers/?page=${page}`);
+        if (!response.ok) {
+            const err = await response.json().catch(() => null);
+            throw new Error(err?.error?.message || err?.message || 'Failed to load followers');
+        }
+        const json = await response.json();
+        const data = json?.data ?? json;
+        const list = Array.isArray(data) ? data : (data?.results ?? []);
+        all.push(...list);
+        const next = json?.next ?? data?.next;
+        if (!next || list.length === 0) break;
+        page++;
+    }
+    return all;
+};

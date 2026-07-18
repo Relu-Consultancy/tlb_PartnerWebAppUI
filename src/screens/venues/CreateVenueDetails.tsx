@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ArrowRight, MapPin, Check, Camera, Play, Image as ImageIcon, Trash2, Loader2, MessageCircle, CalendarCheck } from 'lucide-react';
 import { Screen } from '../../types';
 import { WizardLayout, WizardNavigation, toast, Select } from '../../components/ui';
+import { INDIAN_STATES, getCitiesForState } from '../../data/indianStatesAndCities';
 import {
     getVenueMetaCategories,
     getVenueListingDetail,
@@ -28,7 +29,8 @@ const LOCATION_TYPES = [
 ] as const;
 
 const API_BASE = 'https://tlb-api.reluconsultancy.in';
-const COVER_MAX = 5 * 1024 * 1024;
+const COVER_IMG_MAX = 5 * 1024 * 1024;
+const COVER_VID_MAX = 15 * 1024 * 1024;
 const GALLERY_MAX = 5 * 1024 * 1024;
 const VIDEO_MAX = 100 * 1024 * 1024;
 const GALLERY_LIMIT = 10;
@@ -40,6 +42,8 @@ const resolveUrl = (url: string | undefined) => {
 };
 
 const getUrl = (item: MediaItem) => resolveUrl(item.url || item.file_url || '');
+const isVideoFile = (name: string) => /\.(mp4|mov)$/i.test(name);
+const isVideoUrl = (url: string) => /\.(mp4|mov)$/i.test(url);
 
 export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
     // Core info
@@ -53,8 +57,11 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
     // Location
     const [locationType, setLocationType] = useState('');
     const [city, setCity] = useState('');
-    const [area, setArea] = useState('');
+    const [district, setDistrict] = useState('');
+    const [stateName, setStateName] = useState('');
+    const [pincode, setPincode] = useState('');
     const [address, setAddress] = useState('');
+    const [fullAddress, setFullAddress] = useState('');
     const [latitude, setLatitude] = useState('');
     const [longitude, setLongitude] = useState('');
 
@@ -110,8 +117,11 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
                     if (d.booking_type === 'enquiry' || d.booking_type === 'direct_booking') setBookingType(d.booking_type);
                     setLocationType(d.location_type || '');
                     setCity(d.city || '');
-                    setArea(d.area || '');
+                    setDistrict(d.district || '');
+                    setStateName(d.state || '');
+                    setPincode(d.pincode || '');
                     setAddress(d.address || '');
+                    setFullAddress(d.full_address || '');
                     setLatitude(d.latitude != null ? String(d.latitude) : '');
                     setLongitude(d.longitude != null ? String(d.longitude) : '');
                     setMinAge(d.min_age != null ? String(d.min_age) : '');
@@ -149,7 +159,9 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
     const handleCoverPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files?.[0]) return;
         const file = e.target.files[0];
-        if (file.size > COVER_MAX) { toast.warning('Cover must be under 5 MB.'); e.target.value = ''; return; }
+        const isVid = isVideoFile(file.name);
+        const maxSize = isVid ? COVER_VID_MAX : COVER_IMG_MAX;
+        if (file.size > maxSize) { toast.warning(isVid ? 'Banner video must be under 15 MB.' : 'Cover image must be under 5 MB.'); e.target.value = ''; return; }
         const id = await ensureDraft();
         if (!id) { e.target.value = ''; return; }
         setBusyKind('cover');
@@ -243,8 +255,11 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
             if (selectedSubcategoryId != null) payload.subcategory_id = selectedSubcategoryId;
             if (locationType) payload.location_type = locationType;
             if (city.trim()) payload.city = city.trim();
-            if (area.trim()) payload.area = area.trim();
+            if (district.trim()) payload.district = district.trim();
+            if (stateName.trim()) payload.state = stateName.trim();
+            if (pincode.trim()) payload.pincode = pincode.trim();
             if (address.trim()) payload.address = address.trim();
+            if (fullAddress.trim()) payload.full_address = fullAddress.trim();
             if (latitude.trim()) payload.latitude = latitude.trim();
             if (longitude.trim()) payload.longitude = longitude.trim();
             if (minAge !== '') payload.min_age = parseInt(minAge, 10);
@@ -263,7 +278,7 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
 
     if (metaLoading) {
         return (
-            <WizardLayout title="New Venue Listing" stepText="Step 1 of 6" subtitle="Details" progressPercentage={17} themeColor="amber" onBack={() => onNavigate('SERVICE_LISTINGS')}>
+            <WizardLayout title="New Venue Listing" stepText="Step 1 of 7" subtitle="Details" progressPercentage={14} themeColor="amber" onBack={() => onNavigate('SERVICE_LISTINGS')}>
                 <div className="flex items-center justify-center gap-2 text-gray-400 text-xs font-bold py-12">
                     <Loader2 size={16} className="animate-spin" /> Loading…
                 </div>
@@ -273,14 +288,14 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
 
     if (metaError) {
         return (
-            <WizardLayout title="New Venue Listing" stepText="Step 1 of 6" subtitle="Details" progressPercentage={17} themeColor="amber" onBack={() => onNavigate('SERVICE_LISTINGS')}>
+            <WizardLayout title="New Venue Listing" stepText="Step 1 of 7" subtitle="Details" progressPercentage={14} themeColor="amber" onBack={() => onNavigate('SERVICE_LISTINGS')}>
                 <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-xs font-bold text-red-600">{metaError}</div>
             </WizardLayout>
         );
     }
 
     return (
-        <WizardLayout title="New Venue Listing" stepText="Step 1 of 6" subtitle="Details" progressPercentage={17} themeColor="amber" onBack={() => onNavigate('SERVICE_LISTINGS')}>
+        <WizardLayout title="New Venue Listing" stepText="Step 1 of 7" subtitle="Details" progressPercentage={14} themeColor="amber" onBack={() => onNavigate('SERVICE_LISTINGS')}>
             <div className="space-y-1">
                 <h2 className="text-2xl font-black">Venue Details</h2>
                 <p className="text-sm text-gray-400">Tell us about your space.</p>
@@ -418,31 +433,47 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
                     <MapPin size={12} /> Location
                 </label>
-                <div className="grid grid-cols-2 gap-3">
-                    <div>
-                        <input
-                            className="tlb-input w-full"
-                            placeholder="City *"
-                            maxLength={100}
-                            value={city}
-                            onChange={e => setCity(e.target.value)}
-                        />
-                    </div>
-                    <div>
-                        <input
-                            className="tlb-input w-full"
-                            placeholder="Area / Neighbourhood"
-                            maxLength={100}
-                            value={area}
-                            onChange={e => setArea(e.target.value)}
-                        />
-                    </div>
+                <textarea
+                    className="tlb-input w-full min-h-[70px] resize-y"
+                    placeholder="Street, building, landmark *"
+                    value={address}
+                    onChange={e => setAddress(e.target.value)}
+                />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Select
+                        value={stateName}
+                        onChange={v => { setStateName(v); setCity(''); }}
+                        options={INDIAN_STATES.map(s => ({ value: s, label: s }))}
+                        placeholder="State"
+                    />
+                    <Select
+                        value={city}
+                        onChange={setCity}
+                        options={getCitiesForState(stateName).map(c => ({ value: c, label: c }))}
+                        placeholder="City *"
+                        disabled={!stateName}
+                    />
+                    <input
+                        className="tlb-input w-full"
+                        placeholder="District"
+                        maxLength={100}
+                        value={district}
+                        onChange={e => setDistrict(e.target.value)}
+                    />
+                    <input
+                        className="tlb-input w-full"
+                        placeholder="Pincode"
+                        inputMode="numeric"
+                        maxLength={6}
+                        value={pincode}
+                        onChange={e => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    />
                 </div>
                 <textarea
                     className="tlb-input w-full min-h-[80px] resize-y"
-                    placeholder="Full address (street, building, pincode) *"
-                    value={address}
-                    onChange={e => setAddress(e.target.value)}
+                    placeholder="Full address (optional) — write out the complete address as you'd like customers to see it"
+                    value={fullAddress}
+                    onChange={e => setFullAddress(e.target.value)}
                 />
                 <div className="grid grid-cols-2 gap-3">
                     <input
@@ -513,12 +544,16 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
             {/* Cover Image */}
             <div>
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">
-                    Cover Image <span className="text-red-400">*</span>
+                    Cover Banner <span className="text-red-400">*</span>
                 </label>
-                <input ref={coverInputRef} type="file" accept="image/jpeg,image/png" className="hidden" onChange={handleCoverPick} />
+                <input ref={coverInputRef} type="file" accept="image/jpeg,image/png,video/mp4,video/quicktime" className="hidden" onChange={handleCoverPick} />
                 {cover ? (
                     <div className="relative w-full sm:w-80 aspect-[16/9] rounded-2xl overflow-hidden border border-gray-200">
-                        <img src={getUrl(cover)} alt="Cover" className="w-full h-full object-cover" />
+                        {isVideoUrl(getUrl(cover)) ? (
+                            <video src={getUrl(cover)} autoPlay muted loop playsInline className="w-full h-full object-cover" />
+                        ) : (
+                            <img src={getUrl(cover)} alt="Cover" className="w-full h-full object-cover" />
+                        )}
                         <button onClick={handleDeleteCover} className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-lg shadow text-red-500 hover:bg-white" aria-label="Remove cover">
                             <Trash2 size={14} />
                         </button>
@@ -530,7 +565,7 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
                     <button onClick={() => coverInputRef.current?.click()} disabled={busyKind === 'cover'} className="w-full sm:w-80 aspect-[16/9] bg-amber-50 rounded-2xl border-2 border-dashed border-amber-200 flex flex-col items-center justify-center text-amber-500 hover:bg-amber-100 transition-colors disabled:opacity-60">
                         {busyKind === 'cover' ? <Loader2 size={28} className="animate-spin" /> : <Camera size={28} />}
                         <span className="text-xs font-bold mt-2">{busyKind === 'cover' ? 'Uploading…' : 'Upload Cover'}</span>
-                        <span className="text-[10px] text-amber-400 mt-1">JPG/PNG · Max 5MB</span>
+                        <span className="text-[10px] text-amber-400 mt-1">JPG/PNG or MP4/MOV · Image 5MB / Video 15MB</span>
                     </button>
                 )}
             </div>

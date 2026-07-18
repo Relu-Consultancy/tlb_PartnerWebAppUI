@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, MapPin, Check, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation, toast } from '../../components/ui';
+import { WizardLayout, WizardNavigation, toast, Select } from '../../components/ui';
+import { INDIAN_STATES, getCitiesForState } from '../../data/indianStatesAndCities';
 import {
     getEventMetaCategories,
     getEventMetaFormats,
@@ -52,8 +53,11 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
     const [customMax, setCustomMax] = useState<string>('');
     const [mode, setMode] = useState<Mode>('offline');
     const [city, setCity] = useState('');
-    const [area, setArea] = useState('');
+    const [district, setDistrict] = useState('');
+    const [stateName, setStateName] = useState('');
+    const [pincode, setPincode] = useState('');
     const [address, setAddress] = useState('');
+    const [fullAddress, setFullAddress] = useState('');
     const [meetingLink, setMeetingLink] = useState('');
 
     const [saving, setSaving] = useState(false);
@@ -103,8 +107,11 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
                     }
                     if (d.mode) setMode(d.mode);
                     setCity(d.city || '');
-                    setArea(d.area || '');
+                    setDistrict(d.district || '');
+                    setStateName(d.state || '');
+                    setPincode(d.pincode || '');
                     setAddress(d.address || '');
+                    setFullAddress(d.full_address || '');
                     setMeetingLink(d.meeting_link || '');
                 } catch (err) {
                     console.warn('Could not load existing draft', err);
@@ -165,8 +172,11 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
             if (ageGroup) payload.age_group = ageGroup;
             if (mode === 'offline' || mode === 'hybrid') {
                 if (city) payload.city = city;
-                if (area) payload.area = area;
+                if (district) payload.district = district;
+                if (stateName) payload.state = stateName;
+                if (pincode) payload.pincode = pincode;
                 if (address) payload.address = address;
+                if (fullAddress) payload.full_address = fullAddress;
             }
             if (mode === 'online' || mode === 'hybrid') {
                 if (meetingLink) payload.meeting_link = meetingLink;
@@ -405,27 +415,47 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block">
                         <MapPin size={12} className="inline mr-1" /> Venue Location
                     </label>
-                    <div className="grid grid-cols-2 gap-3">
-                        <input
-                            className="tlb-input w-full"
-                            placeholder="City"
-                            maxLength={100}
+                    <textarea
+                        className="tlb-input w-full min-h-[70px] resize-y"
+                        placeholder="Street, building, landmark"
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                    />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <Select
+                            value={stateName}
+                            onChange={(v: string) => { setStateName(v); setCity(''); }}
+                            options={INDIAN_STATES.map(s => ({ value: s, label: s }))}
+                            placeholder="State"
+                        />
+                        <Select
                             value={city}
-                            onChange={(e) => setCity(e.target.value)}
+                            onChange={setCity}
+                            options={getCitiesForState(stateName).map(c => ({ value: c, label: c }))}
+                            placeholder="City"
+                            disabled={!stateName}
                         />
                         <input
                             className="tlb-input w-full"
-                            placeholder="Area / Neighborhood"
+                            placeholder="District"
                             maxLength={100}
-                            value={area}
-                            onChange={(e) => setArea(e.target.value)}
+                            value={district}
+                            onChange={(e) => setDistrict(e.target.value)}
+                        />
+                        <input
+                            className="tlb-input w-full"
+                            placeholder="Pincode"
+                            inputMode="numeric"
+                            maxLength={6}
+                            value={pincode}
+                            onChange={(e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                         />
                     </div>
                     <textarea
                         className="tlb-input w-full min-h-[80px] resize-y"
-                        placeholder="Full address (street, building, pincode)"
-                        value={address}
-                        onChange={(e) => setAddress(e.target.value)}
+                        placeholder="Full address (optional) — write out the complete address as you'd like customers to see it"
+                        value={fullAddress}
+                        onChange={(e) => setFullAddress(e.target.value)}
                     />
                 </div>
             )}

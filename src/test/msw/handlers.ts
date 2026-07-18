@@ -287,6 +287,13 @@ export const mockStatsEnquiries = {
     ],
 };
 
+// ─── Followers fixtures ───────────────────────────────────────────────────────
+
+export const mockFollowers = [
+    { id: 'f1', user: { name: 'Aarav Mehta', city: 'Mumbai' }, followed_at: '2026-06-20T10:00:00Z' },
+    { id: 'f2', user: { full_name: 'Diya Kapoor', city: 'Pune' }, followed_at: '2026-06-25T10:00:00Z' },
+];
+
 // ─── Default handlers ─────────────────────────────────────────────────────────
 
 export const handlers = [
@@ -592,4 +599,10 @@ export const handlers = [
         HttpResponse.json({ success: true, data: mockStatsEnquiries })),
     http.post(`${BASE}/api/v1/partner/:id/track-view/`, () =>
         HttpResponse.json({ success: true, data: { message: 'tracked' } })),
+
+    // ─── Followers ───
+    http.get(`${BASE}/api/v1/partner/:id/followers/count/`, () =>
+        HttpResponse.json({ success: true, data: { partner_id: 1, follower_count: 87 } })),
+    http.get(`${BASE}/api/v1/partner/:id/followers/`, () =>
+        HttpResponse.json({ success: true, data: mockFollowers })),
 ];

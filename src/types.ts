@@ -43,6 +43,7 @@ export type Screen =
   | 'CREATE_VENUE_OCCASIONS'
   | 'CREATE_VENUE_AVAILABILITY'
   | 'CREATE_VENUE_PACKAGES'
+  | 'CREATE_VENUE_AMENITIES'
   | 'CREATE_VENUE_POLICIES'
   | 'CREATE_VENUE_PREVIEW'
   // Programs flow
@@ -54,10 +55,17 @@ export type Screen =
   // Other
   | 'ENQUIRIES'
   | 'PROGRAM_ENQUIRIES'
+  | 'VENUE_ENQUIRIES'
   | 'PACKAGES'
   | 'ATTENDEES'
+  | 'BOOKINGS'
+  | 'REVIEWS'
+  | 'FOLLOWERS'
+  | 'DOCUMENTS'
+  | 'MESSAGES'
   | 'FINANCIAL_HUB'
   | 'STATISTICS'
+  | 'ANALYTICS'
   | 'ALL_COUPONS'
   | 'CREATE_COUPON'
   | 'HELP_SUPPORT'
@@ -170,7 +178,7 @@ export interface EventListingData {
 // ---------------------------------------------------------------------------
 // Enquiries (CRM)
 // ---------------------------------------------------------------------------
-export type EnquiryStatus = 'new' | 'contacted' | 'trial_booked' | 'enrolled' | 'closed';
+export type EnquiryStatus = 'new' | 'contacted' | 'trial_booked' | 'enrolled' | 'site_visit_scheduled' | 'closed';
 
 export interface EnquiryData {
   id: string;

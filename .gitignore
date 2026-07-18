@@ -14,3 +14,8 @@ Final_Backend_Estimation.csv
 # Generated test reports (never commit)
 test-report.pdf
 test-report.html
+
+# AI engineering context / guide files (kept local, not shared in repo)
+pro_fullstackdeveloper.md
+CLAUDE.md
+implementation_graph.md

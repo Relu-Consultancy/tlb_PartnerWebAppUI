@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Edit3, Rocket, Clock, Users, MapPin, Loader2, AlertCircle, CheckCircle2, ShieldCheck, BookOpen } from 'lucide-react';
+import { Rocket, Clock, Loader2, AlertCircle, CheckCircle2, ShieldCheck, BookOpen } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation } from '../../components/ui';
+import { WizardLayout, WizardNavigation, AppListingPreview } from '../../components/ui';
+import type { AppListingPreviewModel, PreviewFact } from '../../components/ui';
 import {
     getProgramListingDetail,
     submitProgramListing,
@@ -189,6 +190,32 @@ export const CreateProgramPreview: React.FC<Props> = ({ onNavigate }) => {
     // API 11.5: submit allowed for draft or rejected
     const canSubmit = !!program && missing.length === 0 && (program.status === 'draft' || program.status === 'rejected');
 
+    const pgCity = program?.city;
+    const pgArea = program?.area;
+    const pgLoc = program?.location;
+    const firstPgBatch = batches[0];
+    const pgPrice = program?.price ?? program?.fee;
+    const previewModel: AppListingPreviewModel | null = program ? {
+        typeLabel: 'Program',
+        title: program.title || '',
+        coverUrl: cover ? resolveUrl(cover.url || cover.file_url) : undefined,
+        gallery: gallery.map((g: any) => resolveUrl(g.url || g.file_url)),
+        tags: [category?.name, subcategory?.name, ...tags].filter(Boolean) as string[],
+        locationLine: deliveryMode === 'online' ? 'Online program' : ([pgArea, pgCity].filter(Boolean).join(', ') || pgLoc || undefined),
+        address: deliveryMode === 'online' ? undefined : (pgLoc || [pgArea, pgCity].filter(Boolean).join(', ') || undefined),
+        dateLine: firstPgBatch ? `${fmtDays(firstPgBatch.days || [])} · ${(firstPgBatch.start_time || '').slice(0, 5)}–${(firstPgBatch.end_time || '').slice(0, 5)}` : undefined,
+        description: program.description || program.short_description || '',
+        aboutTitle: 'About Program',
+        facts: [
+            (minAge != null || maxAge != null) ? { icon: 'age', label: 'Age Group', value: `${minAge ?? '?'}–${maxAge ?? '?'} yrs` } : null,
+            programFormat ? { icon: 'format', label: 'Format', value: titleCase(programFormat) } : null,
+            deliveryMode ? { icon: 'mode', label: 'Mode', value: titleCase(deliveryMode) } : null,
+            batches.length ? { icon: 'schedule', label: 'Batches', value: `${batches.length} batch${batches.length > 1 ? 'es' : ''}` } : null,
+        ].filter(Boolean) as PreviewFact[],
+        priceLabel: pgPrice != null ? (Number(pgPrice) > 0 ? `₹${Number(pgPrice).toLocaleString()}` : 'Free') : '—',
+        ctaLabel: 'Enquire Now',
+    } : null;
+
     const handleSubmit = async () => {
         if (!draftId || !canSubmit) return;
         setSubmitting(true);
@@ -247,150 +274,7 @@ export const CreateProgramPreview: React.FC<Props> = ({ onNavigate }) => {
                 <p className="text-sm text-gray-400">Review everything before submitting for approval.</p>
             </div>
 
-            {/* Program Card */}
-            <div className="bg-white rounded-3xl border-2 border-gray-200 overflow-hidden shadow-xl max-w-md mx-auto">
-                {/* Cover */}
-                <div className="h-52 relative bg-gray-100">
-                    {cover ? (
-                        <img
-                            src={resolveUrl(cover.url || cover.file_url)}
-                            alt="Cover"
-                            className="w-full h-full object-cover"
-                        />
-                    ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center text-gray-300">
-                            <BookOpen size={32} />
-                            <span className="text-xs font-bold mt-2">No cover image</span>
-                        </div>
-                    )}
-                    <div className="absolute top-3 left-3 bg-emerald-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest flex items-center gap-1">
-                        <BookOpen size={10} /> Program
-                    </div>
-                    <div className={`absolute top-3 right-3 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest ${
-                        program.status === 'draft' ? 'bg-gray-500' :
-                        program.status === 'under_review' ? 'bg-amber-500' :
-                        program.status === 'published' ? 'bg-emerald-500' : 'bg-red-500'
-                    }`}>
-                        {program.status}
-                    </div>
-                    <button
-                        onClick={() => onNavigate('CREATE_PROGRAM_MEDIA')}
-                        className="absolute bottom-3 right-3 bg-white/90 p-2 rounded-xl shadow text-gray-600 hover:bg-white"
-                        aria-label="Edit media"
-                    >
-                        <Edit3 size={14} />
-                    </button>
-                </div>
-
-                <div className="p-5 space-y-4">
-                    {/* Title & Category */}
-                    <div className="flex items-start justify-between">
-                        <div>
-                            <h3 className="text-xl font-black">{program.title || 'Untitled Program'}</h3>
-                            {(category || subcategory) && (
-                                <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mt-0.5">
-                                    {category?.name || ''}{subcategory ? ` › ${subcategory.name}` : ''}
-                                </p>
-                            )}
-                        </div>
-                        <button onClick={() => onNavigate('CREATE_PROGRAM_IDENTITY')} className="text-gray-400 hover:text-emerald-500 p-1">
-                            <Edit3 size={14} />
-                        </button>
-                    </div>
-
-                    {/* Tags */}
-                    {tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5">
-                            {tags.map((t: string) => (
-                                <span key={t} className="bg-emerald-50 text-emerald-600 text-[10px] font-bold px-2.5 py-1 rounded-full">{t}</span>
-                            ))}
-                        </div>
-                    )}
-
-                    {/* Age & Mode */}
-                    <div className="flex flex-wrap gap-3">
-                        {(minAge != null || maxAge != null) && (
-                            <div className="flex items-center gap-1.5 bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold">
-                                <Users size={12} />
-                                Ages {minAge != null ? minAge : '?'}–{maxAge != null ? maxAge : '?'}
-                            </div>
-                        )}
-                        {deliveryMode && (
-                            <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg text-xs font-bold">
-                                <MapPin size={12} /> {titleCase(deliveryMode)}
-                            </div>
-                        )}
-                        {programFormat && (
-                            <div className="flex items-center gap-1.5 bg-purple-50 text-purple-600 px-3 py-1.5 rounded-lg text-xs font-bold">
-                                {titleCase(programFormat)}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Description */}
-                    {(program.description || program.short_description) && (
-                        <div className="relative">
-                            <p className="text-sm text-gray-600 leading-relaxed line-clamp-4">
-                                {program.description || program.short_description}
-                            </p>
-                            <button onClick={() => onNavigate('CREATE_PROGRAM_IDENTITY')} className="absolute -top-1 -right-1 text-gray-400 hover:text-emerald-500 p-1">
-                                <Edit3 size={12} />
-                            </button>
-                        </div>
-                    )}
-
-                    {/* Batches */}
-                    {batches.length > 0 && (
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Schedule</p>
-                                <button onClick={() => onNavigate('CREATE_PROGRAM_BATCH')} className="text-gray-400 hover:text-emerald-500 p-1">
-                                    <Edit3 size={12} />
-                                </button>
-                            </div>
-                            {batches.map((b: any) => (
-                                <div key={b.id} className="bg-gray-50 rounded-xl px-4 py-3 space-y-1">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <div className="bg-emerald-100 p-1.5 rounded-lg text-emerald-500"><Clock size={14} /></div>
-                                            <div>
-                                                <p className="text-sm font-bold">{b.name || 'Unnamed Batch'}</p>
-                                                <p className="text-[11px] text-gray-400">
-                                                    {fmtDays(b.days_of_week || [])} · {(b.start_time || '').slice(0, 5)}–{(b.end_time || '').slice(0, 5)}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        {b.total_seats != null && (
-                                            <span className="text-[10px] font-bold text-emerald-500">{b.total_seats} seats</span>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center gap-4 text-[10px] text-gray-400 pl-9">
-                                        {b.start_date && <span>{b.start_date} → {b.end_date}</span>}
-                                        {b.fee != null && <span className="font-bold text-gray-600">₹{b.fee}</span>}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
-                    {/* Gallery */}
-                    {gallery.length > 0 && (
-                        <div className="space-y-2">
-                            <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Gallery</p>
-                            <div className="flex gap-2 overflow-x-auto pb-1">
-                                {gallery.map((g: any) => (
-                                    <img
-                                        key={g.id}
-                                        src={resolveUrl(g.url || g.file_url)}
-                                        alt=""
-                                        className="w-20 h-20 rounded-xl object-cover shrink-0"
-                                    />
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </div>
+            {previewModel && <AppListingPreview model={previewModel} listingId={draftId || undefined} />}
 
             {/* Submission readiness */}
             {missing.length > 0 ? (

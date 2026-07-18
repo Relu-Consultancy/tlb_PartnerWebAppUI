@@ -59,7 +59,7 @@ export interface StatsVenues {
     upcoming: number;
     monthly_earnings: string;        // decimal as string
     occupancy_rate: number;
-    avg_duration_minutes: number;
+    avg_duration_minutes: number | null;
     repeat_clients: number;
     revenue_trend: RevenueBucket[];
 }
@@ -75,9 +75,62 @@ export interface StatsEnquiries {
     conversion_funnel: ConversionFunnel;
     trial_requests: number;
     avg_response_hours: number | null;  // null until first responded enquiry exists
-    student_retention_pct: number;
+    student_retention_pct: number | null;
     monthly_enrolments: number;
     monthly_trend: MonthlyBucket[];
+}
+
+// ── Revenue (period-aware) ──
+export type RevenuePeriod = '7d' | '30d' | '90d' | '1y' | 'all';
+
+export interface RevenueByType {
+    type: string;
+    amount: string;   // decimal as string
+    count: number;
+}
+
+export interface StatsRevenue {
+    period: string;
+    gross_revenue: string;
+    platform_fees: string;
+    refunds: string;
+    net_earnings: string;
+    confirmed_bookings: number;
+    avg_order_value: string;
+    this_month: string;
+    prev_month: string;
+    revenue_growth_pct: number;
+    revenue_by_type: RevenueByType[];
+    revenue_trend: RevenueBucket[];
+}
+
+// ── Reviews ──
+export interface RatingBucket {
+    rating: number;
+    count: number;
+}
+
+export interface RatingTrendBucket {
+    month: string;
+    avg_rating: number | null;
+    count: number;
+}
+
+export interface RecentReview {
+    rating: number;
+    comment: string;
+    listing_title: string;
+    created_at: string;
+}
+
+export interface StatsReviews {
+    avg_rating: number | null;
+    total_reviews: number;
+    reviews_this_month: number;
+    reviews_prev_month: number;
+    rating_distribution: RatingBucket[];
+    avg_rating_trend: RatingTrendBucket[];
+    recent_reviews: RecentReview[];
 }
 
 // ── Helper: unwrap { success, data } envelope ──
@@ -108,6 +161,16 @@ export const getStatsVenues = async (): Promise<StatsVenues> => {
 export const getStatsEnquiries = async (): Promise<StatsEnquiries> => {
     const res = await apiClient('/api/v1/partner/stats/enquiries/');
     return unwrap<StatsEnquiries>(res, 'Failed to load enquiry stats');
+};
+
+export const getStatsRevenue = async (period: RevenuePeriod = '30d'): Promise<StatsRevenue> => {
+    const res = await apiClient(`/api/v1/partner/stats/revenue/?period=${period}`);
+    return unwrap<StatsRevenue>(res, 'Failed to load revenue stats');
+};
+
+export const getStatsReviews = async (): Promise<StatsReviews> => {
+    const res = await apiClient('/api/v1/partner/stats/reviews/');
+    return unwrap<StatsReviews>(res, 'Failed to load review stats');
 };
 
 // ── POST /api/v1/partner/<partner_id>/track-view/ ──

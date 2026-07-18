@@ -3,6 +3,16 @@
         @apply bg-tlb-yellow text-tlb-dark font-bold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] hover:brightness-105 cursor-pointer;
     }
 
+    /* Secondary CTA — brand black with yellow-on-hover affordance */
+    .tlb-button-dark {
+        @apply bg-tlb-dark text-white font-bold py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] hover:bg-black cursor-pointer;
+    }
+
+    /* Black icon badge with a yellow glyph — the core brand accent chip */
+    .tlb-badge {
+        @apply bg-tlb-dark text-tlb-yellow rounded-xl flex items-center justify-center;
+    }
+
     .tlb-card {
         @apply bg-white rounded-2xl p-6 border border-gray-100;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
@@ -30,7 +40,7 @@
          .tlb-muted       — secondary / helper copy
     */
     .tlb-page-title {
-        @apply text-2xl font-black text-gray-900 tracking-tight leading-tight;
+        @apply text-2xl font-black text-tlb-dark tracking-tight leading-tight;
     }
     .tlb-page-sub {
         @apply text-sm font-medium text-gray-400 mt-0.5;

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Edit3, Rocket, Clock, Users, MapPin, Loader2, AlertCircle, CheckCircle2, ShieldCheck, GraduationCap } from 'lucide-react';
+import { Rocket, Clock, Loader2, AlertCircle, CheckCircle2, ShieldCheck, GraduationCap } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation } from '../../components/ui';
+import { WizardLayout, WizardNavigation, AppListingPreview } from '../../components/ui';
+import type { AppListingPreviewModel, PreviewFact } from '../../components/ui';
 import {
     getClassListingDetail,
     submitClassListing,
@@ -189,6 +190,31 @@ export const CreateClassPreview: React.FC<Props> = ({ onNavigate }) => {
     }
     const canSubmit = !!listing && missing.length === 0 && listing.status === 'draft';
 
+    const clsCity = srv.city || listing?.city;
+    const clsArea = srv.area || listing?.area;
+    const clsLoc = srv.location || listing?.location;
+    const firstBatch = batches[0];
+    const clsPrice = listing?.price ?? srv.price ?? listing?.fee ?? srv.fee;
+    const previewModel: AppListingPreviewModel | null = listing ? {
+        typeLabel: 'Class',
+        title: listing.title || '',
+        coverUrl: cover ? resolveUrl(cover.url || cover.file_url) : undefined,
+        gallery: gallery.map((g: any) => resolveUrl(g.url || g.file_url)),
+        tags: [category?.name, subcategory?.name, ...tags].filter(Boolean) as string[],
+        locationLine: mode === 'online' ? 'Online class' : ([clsArea, clsCity].filter(Boolean).join(', ') || clsLoc || undefined),
+        address: mode === 'online' ? undefined : (clsLoc || [clsArea, clsCity].filter(Boolean).join(', ') || undefined),
+        dateLine: firstBatch ? `${fmtDays(firstBatch.days || [])} · ${(firstBatch.start_time || '').slice(0, 5)}–${(firstBatch.end_time || '').slice(0, 5)}` : undefined,
+        description: listing.description || listing.short_description || '',
+        aboutTitle: 'About Class',
+        facts: [
+            (minAge != null || maxAge != null) ? { icon: 'age', label: 'Age Group', value: `${minAge ?? '?'}–${maxAge ?? '?'} yrs` } : null,
+            mode ? { icon: 'mode', label: 'Mode', value: titleCase(mode) } : null,
+            batches.length ? { icon: 'schedule', label: 'Batches', value: `${batches.length} batch${batches.length > 1 ? 'es' : ''}` } : null,
+        ].filter(Boolean) as PreviewFact[],
+        priceLabel: clsPrice != null ? (Number(clsPrice) > 0 ? `₹${Number(clsPrice).toLocaleString()}` : 'Free') : '—',
+        ctaLabel: 'Enquire Now',
+    } : null;
+
     const handleSubmit = async () => {
         if (!draftId || !canSubmit) return;
         setSubmitting(true);
@@ -247,137 +273,7 @@ export const CreateClassPreview: React.FC<Props> = ({ onNavigate }) => {
                 <p className="text-sm text-gray-400">This is how parents will see your class. Review everything before publishing.</p>
             </div>
 
-            {/* Class Card */}
-            <div className="bg-white rounded-3xl border-2 border-gray-200 overflow-hidden shadow-xl max-w-md mx-auto">
-                {/* Cover */}
-                <div className="h-48 relative bg-gray-100">
-                    {cover ? (
-                        <img
-                            src={resolveUrl(cover.url || cover.file_url)}
-                            alt="Cover"
-                            className="w-full h-full object-cover"
-                        />
-                    ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center text-gray-300">
-                            <GraduationCap size={32} />
-                            <span className="text-xs font-bold mt-2">No cover image</span>
-                        </div>
-                    )}
-                    <div className={`absolute top-3 right-3 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest ${
-                        listing.status === 'draft' ? 'bg-gray-500' :
-                        listing.status === 'under_review' ? 'bg-amber-500' :
-                        listing.status === 'published' ? 'bg-emerald-500' : 'bg-red-500'
-                    }`}>
-                        {listing.status}
-                    </div>
-                    <button
-                        onClick={() => onNavigate('CREATE_CLASS_MEDIA')}
-                        className="absolute bottom-3 right-3 bg-white/90 p-2 rounded-xl shadow text-gray-600 hover:bg-white"
-                        aria-label="Edit media"
-                    >
-                        <Edit3 size={14} />
-                    </button>
-                </div>
-
-                <div className="p-5 space-y-4">
-                    {/* Title & Category */}
-                    <div className="flex items-start justify-between">
-                        <div>
-                            <h3 className="text-xl font-black">{listing.title || 'Untitled Class'}</h3>
-                            {(category || subcategory) && (
-                                <p className="text-[10px] font-bold text-tlb-yellow uppercase tracking-widest mt-0.5">
-                                    {category?.name || ''}{subcategory ? ` › ${subcategory.name}` : ''}
-                                </p>
-                            )}
-                        </div>
-                        <button onClick={() => onNavigate('CREATE_CLASS_IDENTITY')} className="text-gray-400 hover:text-tlb-yellow p-1">
-                            <Edit3 size={14} />
-                        </button>
-                    </div>
-
-                    {/* Tags */}
-                    {tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5">
-                            {tags.map((t: string) => (
-                                <span key={t} className="bg-tlb-yellow/10 text-tlb-yellow text-[10px] font-bold px-2.5 py-1 rounded-full">{t}</span>
-                            ))}
-                        </div>
-                    )}
-
-                    {/* Age & Mode */}
-                    <div className="flex flex-wrap gap-3">
-                        {(minAge != null || maxAge != null) && (
-                            <div className="flex items-center gap-1.5 bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold">
-                                <Users size={12} />
-                                Ages {minAge != null ? minAge : '?'}–{maxAge != null ? maxAge : '?'}
-                            </div>
-                        )}
-                        {mode && (
-                            <div className="flex items-center gap-1.5 bg-tlb-yellow/10 text-tlb-yellow px-3 py-1.5 rounded-lg text-xs font-bold">
-                                <MapPin size={12} /> {titleCase(mode)}
-                            </div>
-                        )}
-
-                    </div>
-
-                    {/* Description */}
-                    {(listing.description || listing.short_description) && (
-                        <div className="relative">
-                            <p className="text-sm text-gray-600 leading-relaxed line-clamp-4">
-                                {listing.description || listing.short_description}
-                            </p>
-                            <button onClick={() => onNavigate('CREATE_CLASS_IDENTITY')} className="absolute -top-1 -right-1 text-gray-400 hover:text-tlb-yellow p-1">
-                                <Edit3 size={12} />
-                            </button>
-                        </div>
-                    )}
-
-                    {/* Batches */}
-                    {batches.length > 0 && (
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Schedule</p>
-                                <button onClick={() => onNavigate('CREATE_CLASS_BATCH')} className="text-gray-400 hover:text-tlb-yellow p-1">
-                                    <Edit3 size={12} />
-                                </button>
-                            </div>
-                            {batches.map((b: any) => (
-                                <div key={b.id} className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="bg-tlb-yellow/10 p-1.5 rounded-lg text-tlb-yellow"><Clock size={14} /></div>
-                                        <div>
-                                            <p className="text-sm font-bold">{b.name}</p>
-                                            <p className="text-[11px] text-gray-400">
-                                                {fmtDays(b.days || [])} · {(b.start_time || '').slice(0, 5)}–{(b.end_time || '').slice(0, 5)}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    {b.capacity != null && (
-                                        <span className="text-[10px] font-bold text-tlb-yellow">{b.capacity} seats</span>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
-                    {/* Gallery */}
-                    {gallery.length > 0 && (
-                        <div className="space-y-2">
-                            <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Gallery</p>
-                            <div className="flex gap-2 overflow-x-auto pb-1">
-                                {gallery.map((g: any) => (
-                                    <img
-                                        key={g.id}
-                                        src={resolveUrl(g.url || g.file_url)}
-                                        alt=""
-                                        className="w-20 h-20 rounded-xl object-cover shrink-0"
-                                    />
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </div>
+            {previewModel && <AppListingPreview model={previewModel} listingId={draftId || undefined} />}
 
             {/* Submission readiness */}
             {missing.length > 0 ? (

@@ -90,7 +90,7 @@ export const CreateVenueAvailability: React.FC<Props> = ({ onNavigate }) => {
 
     if (loading) {
         return (
-            <WizardLayout title="Availability" stepText="Step 3 of 6" subtitle="Schedule" progressPercentage={50} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_OCCASIONS')}>
+            <WizardLayout title="Availability" stepText="Step 3 of 7" subtitle="Schedule" progressPercentage={43} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_OCCASIONS')}>
                 <div className="flex items-center justify-center gap-2 text-gray-400 text-xs font-bold py-12">
                     <Loader2 size={16} className="animate-spin" /> Loading availability…
                 </div>
@@ -100,14 +100,14 @@ export const CreateVenueAvailability: React.FC<Props> = ({ onNavigate }) => {
 
     if (loadError) {
         return (
-            <WizardLayout title="Availability" stepText="Step 3 of 6" subtitle="Schedule" progressPercentage={50} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_OCCASIONS')}>
+            <WizardLayout title="Availability" stepText="Step 3 of 7" subtitle="Schedule" progressPercentage={43} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_OCCASIONS')}>
                 <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-xs font-bold text-red-600">{loadError}</div>
             </WizardLayout>
         );
     }
 
     return (
-        <WizardLayout title="Availability" stepText="Step 3 of 6" subtitle="Schedule" progressPercentage={50} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_OCCASIONS')}>
+        <WizardLayout title="Availability" stepText="Step 3 of 7" subtitle="Schedule" progressPercentage={43} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_OCCASIONS')}>
             <div className="space-y-1">
                 <h2 className="text-2xl font-black">Schedule & Availability</h2>
                 <p className="text-sm text-gray-400">Add time slots when your venue can be booked.</p>

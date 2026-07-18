@@ -8,7 +8,7 @@ import type { ErrorInfo, ReactNode } from 'react';
 import { motion } from 'motion/react';
 import { Screen, EntityType } from './types';
 import { PartnerProvider, usePartner } from './context/PartnerContext';
-import { Loader, Toaster } from './components/ui';
+import { SkeletonPage, Toaster } from './components/ui';
 
 // ---------------------------------------------------------------------------
 // Error boundary — stops a single screen crash from blanking the whole app.
@@ -65,6 +65,11 @@ const OnboardingComplete = lazyImport(() => import('./screens/onboarding'), 'Onb
 // Core App screens
 const Dashboard = lazyImport(() => import('./screens/dashboard'), 'Home');
 const Attendees = lazy(() => import('./screens/attendees'));
+const Bookings = lazyImport(() => import('./screens/attendees'), 'Bookings');
+const Reviews = lazy(() => import('./screens/reviews'));
+const Followers = lazy(() => import('./screens/followers'));
+const Documents = lazy(() => import('./screens/documents'));
+const Messages = lazy(() => import('./screens/messages'));
 const Packages = lazy(() => import('./screens/packages'));
 const FinancialHub = lazy(() => import('./screens/financial'));
 const BrandProfile = lazyImport(() => import('./screens/profile'), 'BrandProfile');
@@ -97,15 +102,20 @@ const CreateVenueDetails = lazyImport(() => import('./screens/venues'), 'CreateV
 const CreateVenueOccasions = lazyImport(() => import('./screens/venues'), 'CreateVenueOccasions');
 const CreateVenueAvailability = lazyImport(() => import('./screens/venues'), 'CreateVenueAvailability');
 const CreateVenuePackages = lazyImport(() => import('./screens/venues'), 'CreateVenuePackages');
+const CreateVenueAmenities = lazyImport(() => import('./screens/venues'), 'CreateVenueAmenities');
 const CreateVenuePolicies = lazyImport(() => import('./screens/venues'), 'CreateVenuePolicies');
 const CreateVenuePreview = lazyImport(() => import('./screens/venues'), 'CreateVenuePreview');
 
 // Enquiries & Packages
 const Enquiries = lazyImport(() => import('./screens/enquiries'), 'Enquiries');
 const ProgramEnquiries = lazyImport(() => import('./screens/enquiries'), 'ProgramEnquiries');
+const VenueEnquiries = lazyImport(() => import('./screens/enquiries'), 'VenueEnquiries');
 
 // Statistics
 const StatisticsScreen = lazyImport(() => import('./screens/statistics'), 'Statistics');
+
+// Analytics (audience & growth)
+const Analytics = lazy(() => import('./screens/analytics'));
 
 // Coupons
 const CreateCoupon = lazyImport(() => import('./screens/coupons'), 'CreateCoupon');
@@ -124,6 +134,10 @@ const SCREEN_CHUNKS = [
   () => import('./screens/onboarding'),
   () => import('./screens/dashboard'),
   () => import('./screens/attendees'),
+  () => import('./screens/reviews'),
+  () => import('./screens/followers'),
+  () => import('./screens/documents'),
+  () => import('./screens/messages'),
   () => import('./screens/packages'),
   () => import('./screens/financial'),
   () => import('./screens/profile'),
@@ -134,6 +148,7 @@ const SCREEN_CHUNKS = [
   () => import('./screens/venues'),
   () => import('./screens/enquiries'),
   () => import('./screens/statistics'),
+  () => import('./screens/analytics'),
   () => import('./screens/coupons'),
   () => import('./screens/support'),
   () => import('./screens/network'),
@@ -200,6 +215,7 @@ const routes: Record<Screen, RouteConfig> = {
   CREATE_VENUE_OCCASIONS: { component: CreateVenueOccasions, hasSidebar: true },
   CREATE_VENUE_AVAILABILITY: { component: CreateVenueAvailability, hasSidebar: true },
   CREATE_VENUE_PACKAGES: { component: CreateVenuePackages, hasSidebar: true },
+  CREATE_VENUE_AMENITIES: { component: CreateVenueAmenities, hasSidebar: true },
   CREATE_VENUE_POLICIES: { component: CreateVenuePolicies, hasSidebar: true },
   CREATE_VENUE_PREVIEW: { component: CreateVenuePreview, hasSidebar: false },
 
@@ -213,12 +229,19 @@ const routes: Record<Screen, RouteConfig> = {
   // Enquiries — restricted to Classes/Programs partners
   ENQUIRIES: { component: Enquiries, hasSidebar: true, requiresEntities: ['Classes'] },
   PROGRAM_ENQUIRIES: { component: ProgramEnquiries, hasSidebar: true, requiresEntities: ['Programs'] },
+  VENUE_ENQUIRIES: { component: VenueEnquiries, hasSidebar: true, requiresEntities: ['Venues'] },
 
   // Other
   ATTENDEES: { component: Attendees, hasSidebar: true },
+  BOOKINGS: { component: Bookings, hasSidebar: true },
+  REVIEWS: { component: Reviews, hasSidebar: true },
+  FOLLOWERS: { component: Followers, hasSidebar: true },
+  DOCUMENTS: { component: Documents, hasSidebar: true },
+  MESSAGES: { component: Messages, hasSidebar: true },
   PACKAGES: { component: Packages, hasSidebar: true },
   FINANCIAL_HUB: { component: FinancialHub, hasSidebar: true },
   STATISTICS: { component: StatisticsScreen, hasSidebar: true },
+  ANALYTICS: { component: Analytics, hasSidebar: true },
   ALL_COUPONS: { component: AllCoupons, hasSidebar: true },
   CREATE_COUPON: { component: CreateCoupon, hasSidebar: true },
   HELP_SUPPORT: { component: Support, hasSidebar: true },
@@ -362,12 +385,7 @@ function AppInner() {
 
   // Show loading spinner while restoring session
   if (initializing) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 gap-4">
-        <Loader />
-        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Loading your session…</p>
-      </div>
-    );
+    return <SkeletonPage />;
   }
 
   const route = routes[currentScreen] ?? routes.LANDING;
@@ -386,11 +404,7 @@ function AppInner() {
         />
       )}
       <div className={route.hasSidebar && desktopSidebarOpen ? 'lg:ml-60' : ''}>
-        <Suspense fallback={
-          <div className="min-h-screen flex items-center justify-center bg-gray-50">
-            <Loader />
-          </div>
-        }>
+        <Suspense fallback={<SkeletonPage />}>
           {/* Enter-only fade — no `mode="wait"` exit gap, so the new screen mounts
               immediately instead of leaving a blank window while the old one exits. */}
           <motion.div

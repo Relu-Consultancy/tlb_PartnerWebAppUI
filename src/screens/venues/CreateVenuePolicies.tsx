@@ -22,11 +22,11 @@ export const CreateVenuePolicies: React.FC<Props> = ({ onNavigate }) => {
     return (
         <WizardLayout
             title="New Venue Listing"
-            stepText="Step 5 of 6"
+            stepText="Step 6 of 7"
             subtitle="FAQs & Terms"
-            progressPercentage={83}
+            progressPercentage={86}
             themeColor="amber"
-            onBack={() => onNavigate('CREATE_VENUE_PACKAGES')}
+            onBack={() => onNavigate('CREATE_VENUE_AMENITIES')}
         >
             <div className="space-y-1 mb-6">
                 <h2 className="text-2xl font-black">FAQs &amp; Terms</h2>

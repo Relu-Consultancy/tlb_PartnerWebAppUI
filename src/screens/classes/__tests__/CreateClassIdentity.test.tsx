@@ -132,42 +132,14 @@ describe('CreateClassIdentity — pre-fill from existing draft', () => {
 });
 
 describe('CreateClassIdentity — booking type', () => {
-    it('renders both Enquiry and Booking options', async () => {
+    it('does not expose a Direct Booking / Enquiry option in the UI', async () => {
         renderComponent();
         await waitFor(() => screen.getByText(/identity & story/i));
-        expect(screen.getByText('Enquiry')).toBeInTheDocument();
-        expect(screen.getByText('Direct Booking')).toBeInTheDocument();
+        expect(screen.queryByText('Direct Booking')).not.toBeInTheDocument();
+        expect(screen.queryByText('Enquiry')).not.toBeInTheDocument();
     });
 
-    it('defaults to Enquiry selected', async () => {
-        renderComponent();
-        await waitFor(() => screen.getByText('Enquiry'));
-        // Enquiry card should have the yellow ring (border-tlb-yellow class)
-        const enquiryBtn = screen.getByText('Enquiry').closest('button');
-        expect(enquiryBtn?.className).toMatch(/border-tlb-yellow/);
-    });
-
-    it('can select Direct Booking type', async () => {
-        renderComponent();
-        const user = userEvent.setup();
-        await waitFor(() => screen.getByText('Direct Booking'));
-        await user.click(screen.getByText('Direct Booking'));
-        const bookingBtn = screen.getByText('Direct Booking').closest('button');
-        expect(bookingBtn?.className).toMatch(/border-tlb-yellow/);
-    });
-
-    it('pre-fills booking_type from existing draft', async () => {
-        sessionStorage.setItem('current_class_draft_id', CLASS_DRAFT_ID);
-        server.use(http.get(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/`, () =>
-            HttpResponse.json({ success: true, data: { ...mockClassDraft, booking_type: 'direct_booking' } })));
-        renderComponent();
-        await waitFor(() => {
-            const bookingBtn = screen.getByText('Direct Booking').closest('button');
-            expect(bookingBtn?.className).toMatch(/border-tlb-yellow/);
-        }, { timeout: 3000 });
-    });
-
-    it('includes booking_type in the PATCH payload', async () => {
+    it('defaults booking_type to "enquiry" in the PATCH payload', async () => {
         let patchBody: any = null;
         server.use(http.patch(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/`, async ({ request }) => {
             patchBody = await request.json();
@@ -178,8 +150,7 @@ describe('CreateClassIdentity — booking type', () => {
         const user = userEvent.setup();
         await waitFor(() => screen.getByPlaceholderText(/advanced robotics workshop/i));
         await user.type(screen.getByPlaceholderText(/advanced robotics workshop/i), 'My Class');
-        await user.click(screen.getByText('Direct Booking'));
         await user.click(screen.getByRole('button', { name: /next|continue/i }));
-        await waitFor(() => expect(patchBody?.booking_type).toBe('direct_booking'));
+        await waitFor(() => expect(patchBody?.booking_type).toBe('enquiry'));
     });
 });

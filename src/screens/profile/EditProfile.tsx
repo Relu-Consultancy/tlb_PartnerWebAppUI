@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { Screen } from '../../types';
 import { getBusinessProfile, getExtendedProfile, updateExtendedProfile, getPartnerMedia, uploadPartnerMedia, deletePartnerMedia } from '../../api/onboarding';
-import { Loader, toast } from '../../components/ui';
+import { SkeletonProfile, toast } from '../../components/ui';
 
 const Instagram = ({ size, className }: { size: number; className?: string }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -184,11 +184,7 @@ export const BrandProfile: React.FC<ProfileProps> = ({ onNavigate, onOpenSidebar
     };
 
     if (loading) {
-        return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <Loader />
-            </div>
-        );
+        return <SkeletonProfile />;
     }
 
     return (

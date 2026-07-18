@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Edit3, Rocket, MapPin, Users, Clock, Star, Loader2, AlertCircle, CheckCircle2, ShieldCheck, CalendarDays } from 'lucide-react';
+import { Rocket, Clock, Loader2, AlertCircle, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation } from '../../components/ui';
+import { WizardLayout, WizardNavigation, AppListingPreview } from '../../components/ui';
+import type { AppListingPreviewModel, PreviewFact } from '../../components/ui';
 import {
     getVenueListingDetail,
     submitVenueListing,
@@ -193,6 +194,38 @@ export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
     }
     const canSubmit = !!venue && missing.length === 0 && venue.status === 'draft';
 
+    const minPkg = packages.length ? Math.min(...packages.map(p => Number(p.price) || 0)) : undefined;
+    const firstSlot = slots[0];
+    const previewModel: AppListingPreviewModel | null = venue ? {
+        typeLabel: 'Venue',
+        title: venue.title || '',
+        coverUrl: cover ? resolveUrl(cover.url) : undefined,
+        gallery: gallery.map(g => resolveUrl(g.url)),
+        tags: [venue.category?.name, venue.subcategory?.name].filter(Boolean) as string[],
+        locationLine: [venue.area, venue.city].filter(Boolean).join(', ') || venue.address || undefined,
+        address: venue.address || [venue.area, venue.city].filter(Boolean).join(', ') || undefined,
+        dateLine: firstSlot ? `${fmtSlotDate(firstSlot.date)} · ${firstSlot.start_time}–${firstSlot.end_time}` : undefined,
+        description: venue.description || '',
+        aboutTitle: 'About Venue',
+        facts: [
+            (venue.min_capacity != null || venue.max_capacity != null) ? {
+                icon: 'capacity', label: 'Capacity',
+                value: venue.min_capacity != null && venue.max_capacity != null
+                    ? `${venue.min_capacity}–${venue.max_capacity} guests`
+                    : venue.max_capacity != null ? `Up to ${venue.max_capacity} guests` : `${venue.min_capacity}+ guests`,
+            } : null,
+            (venue.min_age != null || venue.max_age != null) ? {
+                icon: 'age', label: 'Age Group', value: `${venue.min_age ?? 0}–${venue.max_age ?? '∞'} yrs`,
+            } : null,
+            venue.occasions && venue.occasions.length ? {
+                icon: 'occasion', label: 'Best for', value: venue.occasions.slice(0, 3).map(o => o.name).join(', '),
+            } : null,
+            slots.length ? { icon: 'schedule', label: 'Availability', value: `${slots.length} slot${slots.length > 1 ? 's' : ''}` } : null,
+        ].filter(Boolean) as PreviewFact[],
+        priceLabel: minPkg != null ? `₹${minPkg.toLocaleString()}` : '—',
+        ctaLabel: 'Enquire Now',
+    } : null;
+
     const handleSubmit = async () => {
         if (!draftId || !canSubmit) return;
         setSubmitting(true);
@@ -219,7 +252,7 @@ export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
 
     if (loading) {
         return (
-            <WizardLayout title="Review Listing" stepText="Step 6 of 6" subtitle="Preview & Publish" progressPercentage={100} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_POLICIES')}>
+            <WizardLayout title="Review Listing" stepText="Step 7 of 7" subtitle="Preview & Publish" progressPercentage={100} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_POLICIES')}>
                 <div className="flex items-center justify-center gap-2 text-gray-400 text-xs font-bold py-12">
                     <Loader2 size={16} className="animate-spin" /> Loading preview…
                 </div>
@@ -229,7 +262,7 @@ export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
 
     if (loadError || !venue) {
         return (
-            <WizardLayout title="Review Listing" stepText="Step 6 of 6" subtitle="Preview & Publish" progressPercentage={100} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_POLICIES')}>
+            <WizardLayout title="Review Listing" stepText="Step 7 of 7" subtitle="Preview & Publish" progressPercentage={100} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_POLICIES')}>
                 <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-xs font-bold text-red-600">
                     {loadError || 'Could not load venue.'}
                 </div>
@@ -238,180 +271,13 @@ export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
     }
 
     return (
-        <WizardLayout title="Review Listing" stepText="Step 6 of 6" subtitle="Preview & Publish" progressPercentage={100} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_POLICIES')}>
+        <WizardLayout title="Review Listing" stepText="Step 7 of 7" subtitle="Preview & Publish" progressPercentage={100} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_POLICIES')}>
             <div className="text-center space-y-1">
                 <h2 className="text-2xl font-black">Preview Your Venue</h2>
                 <p className="text-sm text-gray-400">Review everything before submitting.</p>
             </div>
 
-            {/* Venue Card */}
-            <div className="bg-white rounded-3xl border-2 border-gray-200 overflow-hidden shadow-xl max-w-md mx-auto">
-                {/* Cover */}
-                <div className="h-52 relative bg-gray-100">
-                    {cover ? (
-                        <img src={resolveUrl(cover.url)} alt="Cover" className="w-full h-full object-cover" />
-                    ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center text-gray-300">
-                            <CalendarDays size={32} />
-                            <span className="text-xs font-bold mt-2">No cover image</span>
-                        </div>
-                    )}
-                    <div className="absolute top-3 left-3 bg-amber-500 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest flex items-center gap-1">
-                        <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> Venue
-                    </div>
-                    <div className={`absolute top-3 right-3 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest ${
-                        venue.status === 'draft' ? 'bg-gray-500' :
-                        venue.status === 'pending' ? 'bg-amber-500' :
-                        venue.status === 'published' ? 'bg-emerald-500' : 'bg-red-500'
-                    }`}>
-                        {venue.status}
-                    </div>
-                    <button onClick={() => onNavigate('CREATE_VENUE_DETAILS')} className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-sm p-2 rounded-xl shadow text-gray-600 hover:bg-white transition-colors" aria-label="Edit details">
-                        <Edit3 size={14} />
-                    </button>
-                </div>
-
-                <div className="p-5 space-y-5">
-                    {/* Title & Location */}
-                    <div className="flex items-start justify-between">
-                        <div>
-                            <h3 className="text-xl font-black text-gray-900">{venue.title || 'Untitled Venue'}</h3>
-                            {(venue.city || venue.area) && (
-                                <p className="text-sm text-gray-500 flex items-center gap-1.5 mt-1 font-medium">
-                                    <MapPin size={14} className="text-amber-500" />
-                                    {venue.city}{venue.area && `, ${venue.area}`}
-                                </p>
-                            )}
-                            {venue.category && (
-                                <p className="text-[10px] font-bold text-amber-500 uppercase tracking-widest mt-1">
-                                    {venue.category.name}{venue.subcategory && ` › ${venue.subcategory.name}`}
-                                </p>
-                            )}
-                        </div>
-                        <button onClick={() => onNavigate('CREATE_VENUE_DETAILS')} className="text-gray-400 hover:text-amber-500 p-1">
-                            <Edit3 size={14} />
-                        </button>
-                    </div>
-
-                    {/* Occasions */}
-                    {venue.occasions && venue.occasions.length > 0 && (
-                        <div className="flex items-center justify-between">
-                            <div className="flex flex-wrap gap-1.5">
-                                {venue.occasions.slice(0, 4).map(occ => (
-                                    <span key={occ.id} className="bg-amber-50 text-amber-700 text-[10px] font-bold px-2.5 py-1 rounded-full">🎉 {occ.name}</span>
-                                ))}
-                                {venue.occasions.length > 4 && (
-                                    <span className="bg-amber-50 text-amber-700 text-[10px] font-bold px-2.5 py-1 rounded-full">+{venue.occasions.length - 4} more</span>
-                                )}
-                            </div>
-                            <button onClick={() => onNavigate('CREATE_VENUE_OCCASIONS')} className="text-gray-400 hover:text-amber-500 p-1 shrink-0">
-                                <Edit3 size={12} />
-                            </button>
-                        </div>
-                    )}
-
-                    {/* Capacity & Slots stats */}
-                    <div className="grid grid-cols-2 gap-3">
-                        <div className="bg-amber-50 px-4 py-3 rounded-xl flex items-center gap-2.5">
-                            <Users size={16} className="text-amber-500" />
-                            <div>
-                                <p className="text-[10px] font-bold text-amber-900/50 uppercase tracking-widest">Capacity</p>
-                                <p className="text-sm font-black text-amber-900">
-                                    {venue.min_capacity != null && venue.max_capacity != null
-                                        ? `${venue.min_capacity} – ${venue.max_capacity}`
-                                        : venue.max_capacity != null ? `Up to ${venue.max_capacity}` : '—'} Guests
-                                </p>
-                            </div>
-                        </div>
-                        <div className="bg-blue-50 px-4 py-3 rounded-xl flex items-center gap-2.5">
-                            <Clock size={16} className="text-blue-500" />
-                            <div>
-                                <p className="text-[10px] font-bold text-blue-900/50 uppercase tracking-widest">Slots</p>
-                                <p className="text-sm font-black text-blue-900">{slots.length} Available</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Description */}
-                    {venue.description && (
-                        <div className="relative">
-                            <p className="text-sm text-gray-600 leading-relaxed">{venue.description}</p>
-                            <button onClick={() => onNavigate('CREATE_VENUE_DETAILS')} className="absolute -top-1 -right-1 text-gray-400 hover:text-amber-500 p-1">
-                                <Edit3 size={12} />
-                            </button>
-                        </div>
-                    )}
-
-                    {/* Availability */}
-                    {slots.length > 0 && (
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Availability</p>
-                                <button onClick={() => onNavigate('CREATE_VENUE_AVAILABILITY')} className="text-gray-400 hover:text-amber-500 p-1">
-                                    <Edit3 size={12} />
-                                </button>
-                            </div>
-                            <div className="flex gap-2 overflow-x-auto pb-1">
-                                {slots.slice(0, 5).map(slot => (
-                                    <div key={slot.id} className="shrink-0 text-center bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-                                        <p className="text-[9px] font-bold text-amber-500 uppercase">{fmtSlotDate(slot.date)}</p>
-                                        <p className="text-[10px] font-bold text-amber-900 mt-0.5">{slot.start_time}–{slot.end_time}</p>
-                                    </div>
-                                ))}
-                                {slots.length > 5 && (
-                                    <div className="shrink-0 flex items-center px-3 text-[10px] font-bold text-gray-400">+{slots.length - 5} more</div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Packages */}
-                    {packages.length > 0 && (
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Packages</p>
-                                <button onClick={() => onNavigate('CREATE_VENUE_PACKAGES')} className="text-gray-400 hover:text-amber-500 p-1">
-                                    <Edit3 size={12} />
-                                </button>
-                            </div>
-                            {packages.map(pkg => (
-                                <div key={pkg.id} className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="bg-amber-100 p-1.5 rounded-lg text-amber-600"><Star size={14} /></div>
-                                        <div>
-                                            <p className="text-sm font-bold text-gray-800">{pkg.name}</p>
-                                            {pkg.description && <p className="text-[11px] text-gray-400 line-clamp-1">{pkg.description}</p>}
-                                        </div>
-                                    </div>
-                                    <span className="font-black text-amber-600 text-sm whitespace-nowrap">
-                                        ₹{Number(pkg.price).toLocaleString()}
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
-                    {/* Gallery strip */}
-                    {gallery.length > 0 && (
-                        <div className="flex gap-2 overflow-x-auto pb-1">
-                            {gallery.map(g => (
-                                <div key={g.id} className="w-20 h-20 shrink-0 rounded-xl overflow-hidden">
-                                    <img src={resolveUrl(g.url)} alt="" className="w-full h-full object-cover" />
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
-                    <button className="w-full py-3 bg-gray-100 text-gray-400 rounded-2xl font-bold text-sm cursor-not-allowed">
-                        📩 Enquire Now (disabled in preview)
-                    </button>
-                </div>
-            </div>
-
-            {/* Edit shortcuts hint */}
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-center">
-                <p className="text-xs font-bold text-amber-700">✎ Tap any <Edit3 size={10} className="inline" /> icon above to jump back and edit that section</p>
-            </div>
+            {previewModel && <AppListingPreview model={previewModel} listingId={draftId || undefined} />}
 
             {/* Submission readiness */}
             {missing.length > 0 ? (

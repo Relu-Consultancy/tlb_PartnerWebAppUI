@@ -69,6 +69,55 @@ export const getVenueMetaOccasions = async () => {
     return response.json();
 };
 
+// ─── Venue Amenities ───────────────────────────────────────────────────────
+
+export interface AmenityItem {
+    id: number;
+    name: string;
+    slug: string;
+    group: string;
+    icon: string;
+}
+
+export interface AmenityGroup {
+    group: string;
+    label: string;
+    amenities: AmenityItem[];
+}
+
+export interface VenueAmenities {
+    amenities: AmenityItem[];
+    custom_amenities: string[];
+}
+
+export const getAmenityCatalog = async (): Promise<AmenityGroup[]> => {
+    const response = await apiClient('/api/v1/listings/venues/metadata/amenities/');
+    if (!response.ok) await handleError(response, 'Failed to load amenity catalog');
+    const json = await response.json();
+    return json?.data ?? json ?? [];
+};
+
+export const getVenueAmenities = async (listingId: string): Promise<VenueAmenities> => {
+    const response = await apiClient(`/api/v1/partner/listings/venues/${listingId}/amenities/`);
+    if (!response.ok) await handleError(response, 'Failed to load venue amenities');
+    const json = await response.json();
+    return (json?.data ?? json) as VenueAmenities;
+};
+
+export const updateVenueAmenities = async (
+    listingId: string,
+    amenityIds: number[],
+    customAmenities: string[],
+): Promise<VenueAmenities> => {
+    const response = await apiClient(`/api/v1/partner/listings/venues/${listingId}/amenities/`, {
+        method: 'PUT',
+        body: JSON.stringify({ amenity_ids: amenityIds, custom_amenities: customAmenities }),
+    });
+    if (!response.ok) await handleError(response, 'Failed to save venue amenities');
+    const json = await response.json();
+    return (json?.data ?? json) as VenueAmenities;
+};
+
 // ─── Event Listings ────────────────────────────────────────────────────────
 
 export const getEventListings = async (status?: string) => {
@@ -563,6 +612,42 @@ export const unlockClassEnquiry = async (enquiryId: string) => {
         method: 'POST',
     });
     if (!response.ok) await handleError(response, 'Failed to unlock class enquiry');
+    return response.json();
+};
+
+// ─── Venue Enquiries ───────────────────────────────────────────────────────
+// Mirrors the Class Enquiries CRM (flat endpoint + unlock + status/notes update).
+
+export const getVenueEnquiries = async (params?: { status?: string; listing_id?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.status) query.set('status', params.status);
+    if (params?.listing_id) query.set('listing_id', params.listing_id);
+    const qs = query.toString();
+    const response = await apiClient(`/api/v1/partner/listings/venues/enquiries/${qs ? `?${qs}` : ''}`);
+    if (!response.ok) await handleError(response, 'Failed to load venue enquiries');
+    return response.json();
+};
+
+export const getVenueEnquiryDetail = async (enquiryId: string) => {
+    const response = await apiClient(`/api/v1/partner/listings/venues/enquiries/${enquiryId}/`);
+    if (!response.ok) await handleError(response, 'Failed to load venue enquiry detail');
+    return response.json();
+};
+
+export const updateVenueEnquiry = async (enquiryId: string, data: Record<string, any>) => {
+    const response = await apiClient(`/api/v1/partner/listings/venues/enquiries/${enquiryId}/`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    });
+    if (!response.ok) await handleError(response, 'Failed to update venue enquiry');
+    return response.json();
+};
+
+export const unlockVenueEnquiry = async (enquiryId: string) => {
+    const response = await apiClient(`/api/v1/partner/listings/venues/enquiries/${enquiryId}/unlock/`, {
+        method: 'POST',
+    });
+    if (!response.ok) await handleError(response, 'Failed to unlock venue enquiry');
     return response.json();
 };
 

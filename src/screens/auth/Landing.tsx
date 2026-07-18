@@ -18,10 +18,10 @@ import {
     GraduationCap,
     Headphones,
     MapPin,
+    PenLine,
     Shield,
     Sparkles,
     Star,
-    Users,
 } from 'lucide-react';
 import { Screen } from '../../types';
 
@@ -88,9 +88,9 @@ const HeroCards: React.FC<{ rotateX?: MotionValue<number>; rotateY?: MotionValue
 }) => {
     const cards = [
         { icon: CalendarDays, title: 'Events', meta: '127 active', tint: 'bg-blue-50 text-blue-600', delay: 0 },
-        { icon: GraduationCap, title: 'Classes', meta: '54 batches', tint: 'bg-purple-50 text-purple-600', delay: 0.6 },
+        { icon: PenLine, title: 'Classes', meta: '54 batches', tint: 'bg-purple-50 text-purple-600', delay: 0.6 },
         { icon: Building2, title: 'Venues', meta: '12 spaces', tint: 'bg-amber-50 text-amber-600', delay: 1.2 },
-        { icon: Users, title: 'Programs', meta: '8 cohorts', tint: 'bg-emerald-50 text-emerald-600', delay: 1.8 },
+        { icon: GraduationCap, title: 'Programs', meta: '8 cohorts', tint: 'bg-emerald-50 text-emerald-600', delay: 1.8 },
     ];
     return (
         <motion.div

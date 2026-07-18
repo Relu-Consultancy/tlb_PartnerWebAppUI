@@ -4,6 +4,8 @@ import {
     Clock, BookOpen, CalendarDays, Ticket, Zap, Eye, Heart,
     DollarSign, MapPin, Percent, RefreshCw, LayoutGrid, Award,
     GraduationCap, Layers, Wallet, MessageSquare,
+    Lightbulb, Trophy, Flame, ShieldCheck, AlertTriangle, ThumbsUp,
+    BarChart3, PieChart, ArrowUpRight,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Screen } from '../../types';
@@ -48,7 +50,7 @@ const ACCENTS = {
 } as const;
 type AccentKey = keyof typeof ACCENTS;
 
-// ── Reusable stat tile (count-up + gradient icon + hover lift) ──
+// ── Reusable stat tile (count-up + gradient icon + hover lift + optional delta) ──
 const StatTile: React.FC<{
     icon: React.ElementType;
     label: string;
@@ -56,7 +58,9 @@ const StatTile: React.FC<{
     accent: AccentKey;
     format?: (n: number) => string;
     big?: boolean;
-}> = ({ icon: Icon, label, value, accent, format, big }) => {
+    delta?: number | null;
+    subtitle?: string;
+}> = ({ icon: Icon, label, value, accent, format, big, delta, subtitle }) => {
     const a = ACCENTS[accent];
     return (
         <motion.div
@@ -64,14 +68,18 @@ const StatTile: React.FC<{
             whileHover={{ y: -3 }}
             transition={{ type: 'spring', stiffness: 300, damping: 22 }}
         >
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: a.bg, color: a.fg }}>
-                <Icon size={17} />
+            <div className="flex items-center justify-between">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: a.bg, color: a.fg }}>
+                    <Icon size={17} />
+                </div>
+                {delta != null && delta !== 0 && <DeltaPill pct={delta} />}
             </div>
             <div>
                 <p className={`${big ? 'text-3xl' : 'text-2xl'} font-black leading-none text-gray-900`}>
                     {typeof value === 'number' ? <CountUp value={value} format={format} /> : value}
                 </p>
                 <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1.5">{label}</p>
+                {subtitle && <p className="text-[10px] text-gray-400 mt-0.5">{subtitle}</p>}
             </div>
         </motion.div>
     );
@@ -101,6 +109,140 @@ const DeltaPill: React.FC<{ pct: number }> = ({ pct }) => {
         <span className={`inline-flex items-center gap-1 text-[11px] font-black px-2 py-0.5 rounded-full ${up ? 'text-emerald-600 bg-emerald-50' : 'text-rose-500 bg-rose-50'}`}>
             {up ? <TrendingUp size={12} /> : <TrendingDown size={12} />}{Math.abs(pct).toFixed(1)}%
         </span>
+    );
+};
+
+// ── Performance Score ring ──
+const PerformanceScore: React.FC<{ score: number; label: string; factors: { name: string; value: number; max: number }[] }> = ({ score, label, factors }) => {
+    const color = score >= 80 ? '#10B981' : score >= 50 ? '#F59E0B' : '#F43F5E';
+    const circumference = 2 * Math.PI * 42;
+    const offset = circumference - (score / 100) * circumference;
+    return (
+        <div className="flex items-center gap-6">
+            <div className="relative w-28 h-28 shrink-0">
+                <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+                    <circle cx="50" cy="50" r="42" fill="none" stroke="#F3F4F6" strokeWidth="8" />
+                    <motion.circle
+                        cx="50" cy="50" r="42" fill="none" stroke={color} strokeWidth="8"
+                        strokeLinecap="round" strokeDasharray={circumference}
+                        initial={{ strokeDashoffset: circumference }}
+                        animate={{ strokeDashoffset: offset }}
+                        transition={{ duration: 1.2, ease: 'easeOut' }}
+                    />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <p className="text-2xl font-black" style={{ color }}>{score}</p>
+                    <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">{label}</p>
+                </div>
+            </div>
+            <div className="flex-1 space-y-2.5">
+                {factors.map(f => {
+                    const pct = f.max > 0 ? Math.round((f.value / f.max) * 100) : 0;
+                    const barColor = pct >= 70 ? '#10B981' : pct >= 40 ? '#F59E0B' : '#F43F5E';
+                    return (
+                        <div key={f.name}>
+                            <div className="flex justify-between text-[10px] font-bold mb-0.5">
+                                <span className="text-gray-500">{f.name}</span>
+                                <span className="text-gray-700">{pct}%</span>
+                            </div>
+                            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                <motion.div className="h-full rounded-full" style={{ background: barColor }}
+                                    initial={{ width: 0 }} animate={{ width: `${pct}%` }}
+                                    transition={{ duration: 0.8, ease: 'easeOut' }} />
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
+// ── Smart insight bullet ──
+interface Insight { icon: React.ElementType; text: string; type: 'positive' | 'warning' | 'neutral' }
+const InsightBullet: React.FC<Insight> = ({ icon: Icon, text, type }) => {
+    const colors = {
+        positive: 'bg-emerald-50 text-emerald-600',
+        warning: 'bg-amber-50 text-amber-600',
+        neutral: 'bg-blue-50 text-blue-600',
+    };
+    return (
+        <div className="flex items-start gap-3 py-2.5">
+            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${colors[type]}`}>
+                <Icon size={14} />
+            </div>
+            <p className="text-sm text-gray-600 leading-relaxed">{text}</p>
+        </div>
+    );
+};
+
+// ── Generate insights from data ──
+const generateInsights = (
+    overview: StatsOverview | null, events: StatsEvents | null, venues: StatsVenues | null,
+    enquiries: StatsEnquiries | null, revenue: StatsRevenue | null, reviews: StatsReviews | null,
+): Insight[] => {
+    const insights: Insight[] = [];
+    if (events) {
+        const growthPct = events.ticket_growth_pct ?? 0;
+        if (growthPct > 10) insights.push({ icon: TrendingUp, text: `Ticket sales are up ${growthPct.toFixed(0)}% this month — your marketing is paying off.`, type: 'positive' });
+        else if (growthPct < -10) insights.push({ icon: TrendingDown, text: `Ticket sales dropped ${Math.abs(growthPct).toFixed(0)}% — consider running a promotion or adjusting pricing.`, type: 'warning' });
+        const convRate = events.booking_conv_rate ?? 0;
+        if (convRate > 0 && convRate < 5) insights.push({ icon: AlertTriangle, text: `Your booking conversion rate is ${convRate.toFixed(1)}% — improving your listing descriptions or adding more photos could help.`, type: 'warning' });
+        else if (convRate >= 20) insights.push({ icon: Trophy, text: `Conversion rate of ${convRate.toFixed(1)}% is excellent — your listings are highly compelling.`, type: 'positive' });
+        const peakDay = events.weekly_ticket_sales?.reduce((best, d) => d.count > (best?.count ?? 0) ? d : best, events.weekly_ticket_sales[0]);
+        if (peakDay && peakDay.count > 0) insights.push({ icon: Flame, text: `${peakDay.day} was your best-selling day this week with ${peakDay.count} ticket${peakDay.count > 1 ? 's' : ''}.`, type: 'neutral' });
+    }
+    if (venues) {
+        const occ = venues.occupancy_rate ?? 0;
+        if (occ >= 80) insights.push({ icon: ShieldCheck, text: `Occupancy rate is at ${Math.round(occ)}% — your venues are in high demand. Consider adding more availability slots.`, type: 'positive' });
+        else if (occ > 0 && occ < 30) insights.push({ icon: AlertTriangle, text: `Occupancy rate is ${Math.round(occ)}% — try adjusting pricing or promoting off-peak slots.`, type: 'warning' });
+        if (venues.repeat_clients > 0) insights.push({ icon: Heart, text: `You have ${venues.repeat_clients} repeat client${venues.repeat_clients > 1 ? 's' : ''} — loyalty is building.`, type: 'positive' });
+    }
+    if (enquiries) {
+        const respH = enquiries.avg_response_hours;
+        if (respH != null && respH > 24) insights.push({ icon: Clock, text: `Average response time is ${respH.toFixed(0)}h — responding within 4 hours can increase conversion by 2×.`, type: 'warning' });
+        else if (respH != null && respH <= 4) insights.push({ icon: Zap, text: `Average response time of ${respH.toFixed(1)}h is outstanding — fast replies drive more conversions.`, type: 'positive' });
+        const retention = enquiries.student_retention_pct ?? 0;
+        if (retention >= 70) insights.push({ icon: ThumbsUp, text: `Student retention at ${Math.round(retention)}% shows strong class quality and engagement.`, type: 'positive' });
+    }
+    if (revenue) {
+        const growth = revenue.revenue_growth_pct ?? 0;
+        if (growth > 15) insights.push({ icon: DollarSign, text: `Revenue grew ${growth.toFixed(0)}% month-over-month — strong financial trajectory.`, type: 'positive' });
+        const aov = moneyToNumber(revenue.avg_order_value);
+        if (aov > 0) insights.push({ icon: BarChart3, text: `Average order value is ${fmtCurrency(aov)} — upselling packages or add-ons could increase this.`, type: 'neutral' });
+    }
+    if (reviews) {
+        const avg = reviews.avg_rating;
+        if (avg != null && avg >= 4.5) insights.push({ icon: Star, text: `Your average rating of ${avg.toFixed(1)}★ puts you in the top tier — keep up the quality.`, type: 'positive' });
+        else if (avg != null && avg < 3.5 && avg > 0) insights.push({ icon: AlertTriangle, text: `Average rating is ${avg.toFixed(1)}★ — review recent feedback and address recurring complaints.`, type: 'warning' });
+        if (reviews.reviews_this_month > reviews.reviews_prev_month && reviews.reviews_prev_month > 0) {
+            const reviewGrowth = Math.round(((reviews.reviews_this_month - reviews.reviews_prev_month) / reviews.reviews_prev_month) * 100);
+            insights.push({ icon: MessageSquare, text: `Reviews are up ${reviewGrowth}% this month — more customer feedback means more social proof.`, type: 'positive' });
+        }
+    }
+    if (overview && overview.profile_views > 0 && overview.followers > 0) {
+        const followRate = ((overview.followers / overview.profile_views) * 100);
+        if (followRate > 5) insights.push({ icon: Users, text: `${followRate.toFixed(1)}% of viewers follow your profile — strong brand appeal.`, type: 'positive' });
+    }
+    return insights.slice(0, 6);
+};
+
+// ── Highlight card (best performer / peak) ──
+const HighlightCard: React.FC<{
+    icon: React.ElementType; title: string; value: string; subtitle: string; accent: AccentKey;
+}> = ({ icon: Icon, title, value, subtitle, accent }) => {
+    const a = ACCENTS[accent];
+    return (
+        <div className="flex items-center gap-4 p-4 rounded-2xl" style={{ background: a.bg }}>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/80" style={{ color: a.fg }}>
+                <Icon size={20} />
+            </div>
+            <div className="flex-1 min-w-0">
+                <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: a.fg }}>{title}</p>
+                <p className="text-lg font-black text-gray-900 truncate">{value}</p>
+                <p className="text-[10px] text-gray-500">{subtitle}</p>
+            </div>
+        </div>
     );
 };
 
@@ -365,23 +507,103 @@ export const Statistics: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                                             {hasEvents && events && (
                                                 <>
-                                                    <StatTile icon={Ticket} label="Tickets Sold" value={events.tickets_sold} accent="purple" format={fmtCompact} />
-                                                    <StatTile icon={Target} label="Booking Conv." value={`${(events.booking_conv_rate ?? 0).toFixed(1)}%`} accent="emerald" />
+                                                    <StatTile icon={Ticket} label="Tickets Sold" value={events.tickets_sold} accent="purple" format={fmtCompact}
+                                                        delta={events.ticket_growth_pct} subtitle={`${events.this_month_tickets} this month`} />
+                                                    <StatTile icon={Target} label="Booking Conv." value={`${(events.booking_conv_rate ?? 0).toFixed(1)}%`} accent="emerald"
+                                                        subtitle={`${events.registrations} registrations`} />
                                                 </>
                                             )}
                                             {hasVenues && venues && (
                                                 <>
-                                                    <StatTile icon={DollarSign} label="Monthly Earnings" value={moneyToNumber(venues.monthly_earnings)} accent="amber" format={fmtCurrency} />
-                                                    <StatTile icon={Percent} label="Occupancy" value={`${occupancyRate}%`} accent="blue" />
+                                                    <StatTile icon={DollarSign} label="Monthly Earnings" value={moneyToNumber(venues.monthly_earnings)} accent="amber" format={fmtCurrency}
+                                                        delta={lastDelta(revenueTrend)} subtitle={`${venues.total_bookings} bookings`} />
+                                                    <StatTile icon={Percent} label="Occupancy" value={`${occupancyRate}%`} accent="blue"
+                                                        subtitle={`Avg. ${avgDurationLabel} per booking`} />
                                                 </>
                                             )}
                                             {hasClassOrProgram && enquiries && (
                                                 <>
-                                                    <StatTile icon={Award} label="Conversion" value={`${convRate}%`} accent="emerald" />
-                                                    <StatTile icon={Users} label="Retention" value={`${Math.round(enquiries.student_retention_pct ?? 0)}%`} accent="blue" />
+                                                    <StatTile icon={Award} label="Conversion" value={`${convRate}%`} accent="emerald"
+                                                        subtitle={`${enquiries.monthly_enrolments} enrolments/mo`} />
+                                                    <StatTile icon={Users} label="Retention" value={`${Math.round(enquiries.student_retention_pct ?? 0)}%`} accent="blue"
+                                                        subtitle={avgResponseHours != null ? `${avgResponseHours.toFixed(1)}h avg response` : undefined} />
                                                 </>
                                             )}
                                         </div>
+
+                                        {/* Performance Score + Smart Insights */}
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                            <Panel title="Performance Score" subtitle="Composite health score based on your key metrics"
+                                                right={<ShieldCheck size={16} className="text-gray-300" />}>
+                                                {(() => {
+                                                    const factors: { name: string; value: number; max: number }[] = [];
+                                                    if (hasEvents && events) {
+                                                        factors.push({ name: 'Ticket Growth', value: Math.max(0, Math.min(100, 50 + (events.ticket_growth_pct ?? 0))), max: 100 });
+                                                        factors.push({ name: 'Booking Conv.', value: Math.min(events.booking_conv_rate ?? 0, 50), max: 50 });
+                                                    }
+                                                    if (hasVenues && venues) {
+                                                        factors.push({ name: 'Occupancy', value: occupancyRate, max: 100 });
+                                                        factors.push({ name: 'Repeat Clients', value: Math.min(venues.repeat_clients * 10, 100), max: 100 });
+                                                    }
+                                                    if (hasClassOrProgram && enquiries) {
+                                                        factors.push({ name: 'Funnel Conv.', value: convRate, max: 100 });
+                                                        factors.push({ name: 'Student Retention', value: Math.round(enquiries.student_retention_pct ?? 0), max: 100 });
+                                                    }
+                                                    if (reviews && reviews.avg_rating != null) {
+                                                        factors.push({ name: 'Rating', value: Math.round((reviews.avg_rating / 5) * 100), max: 100 });
+                                                    }
+                                                    const composite = factors.length > 0
+                                                        ? Math.round(factors.reduce((s, f) => s + (f.max > 0 ? f.value / f.max : 0), 0) / factors.length * 100)
+                                                        : 0;
+                                                    return <PerformanceScore score={Math.min(composite, 100)} label="Score" factors={factors.slice(0, 5)} />;
+                                                })()}
+                                            </Panel>
+
+                                            <Panel title="Smart Insights" subtitle="AI-powered tips based on your data"
+                                                right={<Lightbulb size={16} className="text-amber-400" />}>
+                                                {(() => {
+                                                    const insights = generateInsights(overview, events, venues, enquiries, revenue, reviews);
+                                                    return insights.length > 0
+                                                        ? <div className="divide-y divide-gray-50">{insights.map((ins, i) => <InsightBullet key={i} {...ins} />)}</div>
+                                                        : <EmptyMini text="Add more listings to unlock insights" />;
+                                                })()}
+                                            </Panel>
+                                        </div>
+
+                                        {/* Peak highlights */}
+                                        {(() => {
+                                            const highlights: React.ReactNode[] = [];
+                                            if (events && events.weekly_ticket_sales?.length) {
+                                                const peak = events.weekly_ticket_sales.reduce((a, b) => b.count > a.count ? b : a, events.weekly_ticket_sales[0]);
+                                                if (peak.count > 0) highlights.push(
+                                                    <HighlightCard key="peak-day" icon={Flame} title="Best Day" value={peak.day}
+                                                        subtitle={`${peak.count} ticket${peak.count > 1 ? 's' : ''} sold`} accent="amber" />
+                                                );
+                                            }
+                                            if (events?.by_category?.length) {
+                                                const top = [...events.by_category].sort((a, b) => b.count - a.count)[0];
+                                                if (top.count > 0) highlights.push(
+                                                    <HighlightCard key="top-cat" icon={Trophy} title="Top Category" value={top.category}
+                                                        subtitle={`${top.count} bookings · ${fmtCurrency(moneyToNumber(top.amount))}`} accent="purple" />
+                                                );
+                                            }
+                                            if (revenue) {
+                                                const rpb = revenue.confirmed_bookings > 0 ? moneyToNumber(revenue.gross_revenue) / revenue.confirmed_bookings : 0;
+                                                if (rpb > 0) highlights.push(
+                                                    <HighlightCard key="rpb" icon={DollarSign} title="Revenue / Booking" value={fmtCurrency(rpb)}
+                                                        subtitle={`${revenue.confirmed_bookings} confirmed bookings`} accent="emerald" />
+                                                );
+                                                const gross = moneyToNumber(revenue.gross_revenue);
+                                                const net = moneyToNumber(revenue.net_earnings);
+                                                if (gross > 0) highlights.push(
+                                                    <HighlightCard key="margin" icon={PieChart} title="Net Margin" value={`${((net / gross) * 100).toFixed(1)}%`}
+                                                        subtitle={`${fmtCurrency(net)} of ${fmtCurrency(gross)}`} accent="blue" />
+                                                );
+                                            }
+                                            return highlights.length > 0 ? (
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">{highlights}</div>
+                                            ) : null;
+                                        })()}
 
                                         {/* Primary interactive trend */}
                                         <Panel
@@ -424,10 +646,37 @@ export const Statistics: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                     <motion.div key="events" {...fadeUp} className="space-y-6">
                                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                                             <StatTile icon={CalendarDays} label="Upcoming" value={events.upcoming} accent="blue" format={fmtCompact} />
-                                            <StatTile icon={Ticket} label="Tickets Sold" value={events.tickets_sold} accent="purple" format={fmtCompact} />
+                                            <StatTile icon={Ticket} label="Tickets Sold" value={events.tickets_sold} accent="purple" format={fmtCompact}
+                                                delta={events.ticket_growth_pct} subtitle={`${events.this_month_tickets} this month`} />
                                             <StatTile icon={Users} label="Registrations" value={events.registrations} accent="emerald" format={fmtCompact} />
                                             <StatTile icon={Zap} label="Event Reach" value={events.event_reach} accent="amber" format={fmtCompact} />
                                         </div>
+
+                                        {/* Peak highlights */}
+                                        {(() => {
+                                            const cards: React.ReactNode[] = [];
+                                            if (events.weekly_ticket_sales?.length) {
+                                                const peak = events.weekly_ticket_sales.reduce((a, b) => b.count > a.count ? b : a, events.weekly_ticket_sales[0]);
+                                                if (peak.count > 0) cards.push(
+                                                    <HighlightCard key="pd" icon={Flame} title="Peak Day" value={peak.day}
+                                                        subtitle={`${peak.count} tickets · ${peak.date ?? ''}`} accent="amber" />
+                                                );
+                                            }
+                                            if (events.by_category?.length) {
+                                                const top = [...events.by_category].sort((a, b) => b.count - a.count)[0];
+                                                if (top.count > 0) cards.push(
+                                                    <HighlightCard key="tc" icon={Trophy} title="Top Category" value={top.category}
+                                                        subtitle={`${top.count} bookings · ${fmtCurrency(moneyToNumber(top.amount))}`} accent="purple" />
+                                                );
+                                            }
+                                            if (events.registrations > 0) cards.push(
+                                                <HighlightCard key="reach" icon={Eye} title="Event Reach" value={fmtCompact(events.event_reach)}
+                                                    subtitle={`${events.registrations} registrations`} accent="blue" />
+                                            );
+                                            return cards.length > 0 ? (
+                                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">{cards}</div>
+                                            ) : null;
+                                        })()}
 
                                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                             <Panel title="Weekly Ticket Sales" subtitle="Last 7 days"
@@ -439,8 +688,10 @@ export const Statistics: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
 
                                             <div className="grid grid-cols-2 gap-3 sm:gap-4 content-start">
                                                 <StatTile icon={Activity} label="Engagement Rate" value={engagementRate != null ? `${engagementRate}%` : '—'} accent="blue" />
-                                                <StatTile icon={Target} label="Booking Conv." value={`${(events.booking_conv_rate ?? 0).toFixed(1)}%`} accent="emerald" />
-                                                <StatTile icon={TrendingUp} label="This Month" value={events.this_month_tickets} accent="amber" format={fmtCompact} />
+                                                <StatTile icon={Target} label="Booking Conv." value={`${(events.booking_conv_rate ?? 0).toFixed(1)}%`} accent="emerald"
+                                                    subtitle={events.registrations > 0 ? `${events.registrations} views → ${events.tickets_sold} sold` : undefined} />
+                                                <StatTile icon={TrendingUp} label="This Month" value={events.this_month_tickets} accent="amber" format={fmtCompact}
+                                                    delta={events.ticket_growth_pct} />
                                                 <StatTile icon={Clock} label="Prev Month" value={events.prev_month_tickets} accent="purple" format={fmtCompact} />
                                             </div>
                                         </div>
@@ -492,11 +743,30 @@ export const Statistics: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                             </Panel>
 
                                             <div className="grid grid-cols-2 gap-3 sm:gap-4 content-start">
-                                                <StatTile icon={MapPin} label="Bookings" value={venues.total_bookings} accent="blue" format={fmtCompact} />
-                                                <StatTile icon={CalendarDays} label="Upcoming" value={venues.upcoming} accent="amber" format={fmtCompact} />
-                                                <StatTile icon={Clock} label="Avg. Duration" value={avgDurationLabel} accent="purple" />
-                                                <StatTile icon={Star} label="Repeat Clients" value={venues.repeat_clients} accent="emerald" format={fmtCompact} />
+                                                <StatTile icon={MapPin} label="Bookings" value={venues.total_bookings} accent="blue" format={fmtCompact}
+                                                    subtitle={venues.upcoming > 0 ? `${venues.upcoming} upcoming` : undefined} />
+                                                <StatTile icon={DollarSign} label="Rev / Booking" value={venues.total_bookings > 0 ? fmtCurrency(moneyToNumber(venues.monthly_earnings) / venues.total_bookings) : '—'} accent="amber"
+                                                    subtitle="Avg. revenue per booking" />
+                                                <StatTile icon={Clock} label="Avg. Duration" value={avgDurationLabel} accent="purple"
+                                                    subtitle="Per booking session" />
+                                                <StatTile icon={Heart} label="Repeat Clients" value={venues.repeat_clients} accent="emerald" format={fmtCompact}
+                                                    subtitle={venues.total_bookings > 0 ? `${((venues.repeat_clients / venues.total_bookings) * 100).toFixed(0)}% repeat rate` : undefined} />
                                             </div>
+                                        </div>
+
+                                        {/* Venue highlight cards */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                                            <HighlightCard icon={Percent} title="Occupancy" value={`${occupancyRate}%`}
+                                                subtitle={occupancyRate >= 70 ? 'High demand — consider adding slots' : occupancyRate >= 40 ? 'Moderate — room to grow' : 'Low — try promotions'}
+                                                accent={occupancyRate >= 70 ? 'emerald' : occupancyRate >= 40 ? 'amber' : 'rose'} />
+                                            {venueEnquiryCount > 0 && (
+                                                <HighlightCard icon={ArrowUpRight} title="Enquiry Conversion" value={`${bookingStats.venueBookings > 0 ? ((bookingStats.venueBookings / venueEnquiryCount) * 100).toFixed(0) : 0}%`}
+                                                    subtitle={`${venueEnquiryCount} enquiries → ${bookingStats.venueBookings} booked`} accent="blue" />
+                                            )}
+                                            {avgDuration > 0 && (
+                                                <HighlightCard icon={Clock} title="Avg Session" value={avgDurationLabel}
+                                                    subtitle={`Across ${venues.total_bookings} bookings`} accent="purple" />
+                                            )}
                                         </div>
 
                                         <Panel title="Revenue Trend" subtitle="Monthly venue earnings"
@@ -538,10 +808,31 @@ export const Statistics: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
 
                                             <div className="grid grid-cols-2 gap-3 sm:gap-4 content-start">
                                                 <StatTile icon={BookOpen} label="Trial Requests" value={enquiries.trial_requests} accent="purple" format={fmtCompact} />
-                                                <StatTile icon={Clock} label="Avg. Response" value={avgResponseHours != null ? `${avgResponseHours.toFixed(1)}h` : '—'} accent="blue" />
-                                                <StatTile icon={Users} label="Retention" value={`${Math.round(enquiries.student_retention_pct ?? 0)}%`} accent="emerald" />
-                                                <StatTile icon={Target} label="Enrolments" value={enquiries.monthly_enrolments} accent="amber" format={fmtCompact} />
+                                                <StatTile icon={Clock} label="Avg. Response" value={avgResponseHours != null ? `${avgResponseHours.toFixed(1)}h` : '—'} accent="blue"
+                                                    subtitle={avgResponseHours != null ? (avgResponseHours <= 4 ? 'Excellent speed' : avgResponseHours <= 12 ? 'Good' : 'Needs improvement') : undefined} />
+                                                <StatTile icon={Users} label="Retention" value={`${Math.round(enquiries.student_retention_pct ?? 0)}%`} accent="emerald"
+                                                    delta={lastDelta(enquiryTrend)} subtitle="Student retention rate" />
+                                                <StatTile icon={Target} label="Enrolments" value={enquiries.monthly_enrolments} accent="amber" format={fmtCompact}
+                                                    subtitle="Monthly enrolments" />
                                             </div>
+                                        </div>
+
+                                        {/* Engagement highlight cards */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                                            {avgResponseHours != null && (
+                                                <HighlightCard icon={Zap} title="Response Speed"
+                                                    value={avgResponseHours <= 1 ? 'Lightning' : avgResponseHours <= 4 ? 'Fast' : avgResponseHours <= 12 ? 'Moderate' : 'Slow'}
+                                                    subtitle={`${avgResponseHours.toFixed(1)}h average response time`}
+                                                    accent={avgResponseHours <= 4 ? 'emerald' : avgResponseHours <= 12 ? 'amber' : 'rose'} />
+                                            )}
+                                            <HighlightCard icon={Award} title="Lead Quality" value={`${convRate}%`}
+                                                subtitle={`${funnel?.new_leads ?? 0} leads → ${funnel?.converted ?? 0} converted`} accent="purple" />
+                                            {enquiries.student_retention_pct != null && (
+                                                <HighlightCard icon={Heart} title="Student Loyalty"
+                                                    value={`${Math.round(enquiries.student_retention_pct)}%`}
+                                                    subtitle={enquiries.student_retention_pct >= 70 ? 'Strong retention' : 'Room for improvement'}
+                                                    accent={enquiries.student_retention_pct >= 70 ? 'emerald' : 'amber'} />
+                                            )}
                                         </div>
 
                                         <Panel title="Monthly Trend" subtitle={`${activeTab === 'programs' ? 'Program' : 'Class'} enquiries over recent months`}
@@ -582,12 +873,39 @@ export const Statistics: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
 
                                         {/* Revenue KPI tiles */}
                                         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                                            <StatTile icon={DollarSign} label="Gross Revenue" value={moneyToNumber(revenue.gross_revenue)} accent="emerald" format={fmtCurrency} big />
-                                            <StatTile icon={Wallet} label="Net Earnings" value={moneyToNumber(revenue.net_earnings)} accent="blue" format={fmtCurrency} big />
-                                            <StatTile icon={Percent} label="Platform Fees" value={moneyToNumber(revenue.platform_fees)} accent="amber" format={fmtCurrency} />
-                                            <StatTile icon={TrendingDown} label="Refunds" value={moneyToNumber(revenue.refunds)} accent="rose" format={fmtCurrency} />
-                                            <StatTile icon={Ticket} label="Confirmed Bookings" value={revenue.confirmed_bookings} accent="purple" format={fmtCompact} />
+                                            <StatTile icon={DollarSign} label="Gross Revenue" value={moneyToNumber(revenue.gross_revenue)} accent="emerald" format={fmtCurrency} big
+                                                delta={revenue.revenue_growth_pct} />
+                                            <StatTile icon={Wallet} label="Net Earnings" value={moneyToNumber(revenue.net_earnings)} accent="blue" format={fmtCurrency} big
+                                                subtitle={moneyToNumber(revenue.gross_revenue) > 0 ? `${((moneyToNumber(revenue.net_earnings) / moneyToNumber(revenue.gross_revenue)) * 100).toFixed(1)}% net margin` : undefined} />
+                                            <StatTile icon={Percent} label="Platform Fees" value={moneyToNumber(revenue.platform_fees)} accent="amber" format={fmtCurrency}
+                                                subtitle={moneyToNumber(revenue.gross_revenue) > 0 ? `${((moneyToNumber(revenue.platform_fees) / moneyToNumber(revenue.gross_revenue)) * 100).toFixed(1)}% of gross` : undefined} />
+                                            <StatTile icon={TrendingDown} label="Refunds" value={moneyToNumber(revenue.refunds)} accent="rose" format={fmtCurrency}
+                                                subtitle={moneyToNumber(revenue.gross_revenue) > 0 ? `${((moneyToNumber(revenue.refunds) / moneyToNumber(revenue.gross_revenue)) * 100).toFixed(1)}% refund rate` : undefined} />
+                                            <StatTile icon={Ticket} label="Confirmed Bookings" value={revenue.confirmed_bookings} accent="purple" format={fmtCompact}
+                                                subtitle={revenue.confirmed_bookings > 0 ? `${fmtCurrency(moneyToNumber(revenue.gross_revenue) / revenue.confirmed_bookings)} per booking` : undefined} />
                                             <StatTile icon={Target} label="Avg. Order Value" value={moneyToNumber(revenue.avg_order_value)} accent="amber" format={fmtCurrency} />
+                                        </div>
+
+                                        {/* Revenue highlights */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                                            {moneyToNumber(revenue.gross_revenue) > 0 && (
+                                                <HighlightCard icon={PieChart} title="Net Margin" value={`${((moneyToNumber(revenue.net_earnings) / moneyToNumber(revenue.gross_revenue)) * 100).toFixed(1)}%`}
+                                                    subtitle={`${fmtCurrency(moneyToNumber(revenue.net_earnings))} net of ${fmtCurrency(moneyToNumber(revenue.gross_revenue))}`} accent="emerald" />
+                                            )}
+                                            {revenue.confirmed_bookings > 0 && (
+                                                <HighlightCard icon={BarChart3} title="Rev / Booking" value={fmtCurrency(moneyToNumber(revenue.gross_revenue) / revenue.confirmed_bookings)}
+                                                    subtitle={`${revenue.confirmed_bookings} confirmed`} accent="blue" />
+                                            )}
+                                            {moneyToNumber(revenue.refunds) > 0 && (
+                                                <HighlightCard icon={AlertTriangle} title="Refund Rate" value={`${((moneyToNumber(revenue.refunds) / moneyToNumber(revenue.gross_revenue)) * 100).toFixed(1)}%`}
+                                                    subtitle={`${fmtCurrency(moneyToNumber(revenue.refunds))} refunded`} accent="rose" />
+                                            )}
+                                            {revenue.revenue_growth_pct !== 0 && (
+                                                <HighlightCard icon={revenue.revenue_growth_pct > 0 ? TrendingUp : TrendingDown}
+                                                    title="MoM Growth" value={`${revenue.revenue_growth_pct > 0 ? '+' : ''}${revenue.revenue_growth_pct.toFixed(1)}%`}
+                                                    subtitle={`${fmtCurrency(moneyToNumber(revenue.this_month))} this month`}
+                                                    accent={revenue.revenue_growth_pct > 0 ? 'emerald' : 'rose'} />
+                                            )}
                                         </div>
 
                                         {/* MoM growth */}
@@ -675,9 +993,51 @@ export const Statistics: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                                 <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1.5">Avg Rating</p>
                                             </motion.div>
                                             <StatTile icon={MessageSquare} label="Total Reviews" value={reviews.total_reviews} accent="purple" format={fmtCompact} />
-                                            <StatTile icon={TrendingUp} label="This Month" value={reviews.reviews_this_month} accent="emerald" format={fmtCompact} />
+                                            <StatTile icon={TrendingUp} label="This Month" value={reviews.reviews_this_month} accent="emerald" format={fmtCompact}
+                                                delta={reviews.reviews_prev_month > 0 ? ((reviews.reviews_this_month - reviews.reviews_prev_month) / reviews.reviews_prev_month) * 100 : null}
+                                                subtitle={`vs ${reviews.reviews_prev_month} last month`} />
                                             <StatTile icon={Clock} label="Prev Month" value={reviews.reviews_prev_month} accent="amber" format={fmtCompact} />
                                         </div>
+
+                                        {/* Sentiment gauge + highlights */}
+                                        {(() => {
+                                            const dist = reviews.rating_distribution;
+                                            const total = reviews.total_reviews || 1;
+                                            const positive = dist.filter(d => d.rating >= 4).reduce((s, d) => s + d.count, 0);
+                                            const neutral = dist.filter(d => d.rating === 3).reduce((s, d) => s + d.count, 0);
+                                            const negative = dist.filter(d => d.rating <= 2).reduce((s, d) => s + d.count, 0);
+                                            const posPct = Math.round((positive / total) * 100);
+                                            const neuPct = Math.round((neutral / total) * 100);
+                                            const negPct = Math.round((negative / total) * 100);
+                                            return (
+                                                <Panel title="Sentiment Breakdown" subtitle="Customer satisfaction at a glance">
+                                                    <div className="space-y-4">
+                                                        <div className="flex h-4 rounded-full overflow-hidden">
+                                                            {posPct > 0 && <motion.div className="bg-emerald-400" initial={{ width: 0 }} animate={{ width: `${posPct}%` }} transition={{ duration: 0.8 }} />}
+                                                            {neuPct > 0 && <motion.div className="bg-amber-300" initial={{ width: 0 }} animate={{ width: `${neuPct}%` }} transition={{ duration: 0.8, delay: 0.1 }} />}
+                                                            {negPct > 0 && <motion.div className="bg-rose-400" initial={{ width: 0 }} animate={{ width: `${negPct}%` }} transition={{ duration: 0.8, delay: 0.2 }} />}
+                                                        </div>
+                                                        <div className="flex items-center gap-6 flex-wrap text-xs">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="w-3 h-3 rounded-full bg-emerald-400" />
+                                                                <span className="font-bold text-gray-700">Positive ({posPct}%)</span>
+                                                                <span className="text-gray-400">{positive} reviews</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="w-3 h-3 rounded-full bg-amber-300" />
+                                                                <span className="font-bold text-gray-700">Neutral ({neuPct}%)</span>
+                                                                <span className="text-gray-400">{neutral} reviews</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="w-3 h-3 rounded-full bg-rose-400" />
+                                                                <span className="font-bold text-gray-700">Negative ({negPct}%)</span>
+                                                                <span className="text-gray-400">{negative} reviews</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </Panel>
+                                            );
+                                        })()}
 
                                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                             {/* Rating distribution */}
@@ -697,6 +1057,25 @@ export const Statistics: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                                     />
                                                 ) : <EmptyMini text="Not enough rating data yet" />}
                                             </Panel>
+                                        </div>
+
+                                        {/* Review velocity highlight */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                                            {reviews.avg_rating != null && (
+                                                <HighlightCard icon={Star} title="Rating Quality"
+                                                    value={reviews.avg_rating >= 4.5 ? 'Excellent' : reviews.avg_rating >= 3.5 ? 'Good' : reviews.avg_rating >= 2.5 ? 'Average' : 'Needs Work'}
+                                                    subtitle={`${reviews.avg_rating.toFixed(1)} out of 5 stars`}
+                                                    accent={reviews.avg_rating >= 4.5 ? 'emerald' : reviews.avg_rating >= 3.5 ? 'amber' : 'rose'} />
+                                            )}
+                                            <HighlightCard icon={BarChart3} title="Review Velocity"
+                                                value={`${reviews.reviews_this_month}/mo`}
+                                                subtitle={reviews.reviews_this_month > reviews.reviews_prev_month ? 'Trending up' : reviews.reviews_this_month === reviews.reviews_prev_month ? 'Steady' : 'Trending down'}
+                                                accent={reviews.reviews_this_month >= reviews.reviews_prev_month ? 'blue' : 'amber'} />
+                                            {reviews.total_reviews > 0 && (
+                                                <HighlightCard icon={ThumbsUp} title="Satisfaction"
+                                                    value={`${Math.round((reviews.rating_distribution.filter(d => d.rating >= 4).reduce((s, d) => s + d.count, 0) / reviews.total_reviews) * 100)}%`}
+                                                    subtitle="4+ star ratings" accent="emerald" />
+                                            )}
                                         </div>
 
                                         {/* Recent reviews */}

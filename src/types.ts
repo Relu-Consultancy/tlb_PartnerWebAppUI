@@ -54,8 +54,6 @@ export type Screen =
   | 'CREATE_PROGRAM_PREVIEW'
   // Other
   | 'ENQUIRIES'
-  | 'PROGRAM_ENQUIRIES'
-  | 'VENUE_ENQUIRIES'
   | 'PACKAGES'
   | 'ATTENDEES'
   | 'BOOKINGS'
@@ -64,7 +62,7 @@ export type Screen =
   | 'DOCUMENTS'
   | 'MESSAGES'
   | 'FINANCIAL_HUB'
-  | 'STATISTICS'
+
   | 'ANALYTICS'
   | 'ALL_COUPONS'
   | 'CREATE_COUPON'

@@ -33,14 +33,14 @@ const fadeUp = {
 // --------- Completion ring --------------------------------------------------
 
 const CompletionRing: React.FC<{ pct: number }> = ({ pct }) => {
-  const r = 34, circ = 2 * Math.PI * r;
+  const r = 24, circ = 2 * Math.PI * r;
   const color = pct >= 100 ? '#141414' : '#FACC15';
   return (
-    <div className="relative w-20 h-20 shrink-0">
-      <svg viewBox="0 0 80 80" className="w-20 h-20 -rotate-90">
-        <circle cx="40" cy="40" r={r} fill="none" stroke="#F3F4F6" strokeWidth="7" />
+    <div className="relative w-14 h-14 shrink-0">
+      <svg viewBox="0 0 60 60" className="w-14 h-14 -rotate-90">
+        <circle cx="30" cy="30" r={r} fill="none" stroke="#F3F4F6" strokeWidth="5" />
         <motion.circle
-          cx="40" cy="40" r={r} fill="none" stroke={color} strokeWidth="7" strokeLinecap="round"
+          cx="30" cy="30" r={r} fill="none" stroke={color} strokeWidth="5" strokeLinecap="round"
           strokeDasharray={circ}
           initial={{ strokeDashoffset: circ }}
           animate={{ strokeDashoffset: circ - (pct / 100) * circ }}
@@ -48,8 +48,7 @@ const CompletionRing: React.FC<{ pct: number }> = ({ pct }) => {
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-lg font-black text-gray-900 leading-none">{pct}%</span>
-        <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Done</span>
+        <span className="text-sm font-black text-gray-900 leading-none">{pct}%</span>
       </div>
     </div>
   );
@@ -370,26 +369,12 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
               </p>
 
               <div className="mt-auto pt-6 flex flex-wrap items-center gap-3">
-                <div className="flex-1 min-w-[180px]">
-                  <div className="flex justify-between text-xs mb-1.5">
-                    <span className="text-gray-500 font-medium">Profile completion</span>
-                    <span className="text-tlb-yellow font-black">{profileCompletion}%</span>
-                  </div>
-                  <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
-                    <motion.div
-                      className="h-full bg-tlb-yellow rounded-full"
-                      initial={{ width: 0 }}
-                      animate={{ width: `${profileCompletion}%` }}
-                      transition={{ duration: 0.8, ease: 'easeOut' }}
-                    />
-                  </div>
-                </div>
                 {profileCompletion < 100 ? (
-                  <button onClick={() => onNavigate('BRAND_PROFILE')} className="bg-tlb-yellow text-tlb-dark px-4 py-2.5 rounded-xl text-xs font-black shrink-0 hover:brightness-110 transition-all flex items-center gap-1.5">
-                    Complete Profile <ArrowRight size={14} />
+                  <button onClick={() => onNavigate('BRAND_PROFILE')} className="bg-tlb-yellow text-tlb-dark px-5 py-2.5 rounded-xl text-xs font-black shrink-0 hover:brightness-110 transition-all flex items-center gap-1.5">
+                    Complete Your Profile <ArrowRight size={14} />
                   </button>
                 ) : (
-                  <button onClick={() => onNavigate('ANALYTICS')} className="bg-white/10 hover:bg-white/20 text-white px-4 py-2.5 rounded-xl text-xs font-black shrink-0 transition-all flex items-center gap-1.5">
+                  <button onClick={() => onNavigate('ANALYTICS')} className="bg-white/10 hover:bg-white/20 text-white px-5 py-2.5 rounded-xl text-xs font-black shrink-0 transition-all flex items-center gap-1.5">
                     View Analytics <TrendingUp size={14} />
                   </button>
                 )}
@@ -398,39 +383,35 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
           </motion.section>
 
           {/* Profile completion card w/ checklist */}
-          <motion.section {...fadeUp} transition={{ duration: 0.3, delay: 0.05 }} className="bg-white rounded-3xl border border-gray-100 p-5 sm:p-6 flex flex-col">
+          <motion.section {...fadeUp} transition={{ duration: 0.3, delay: 0.05 }} className="bg-white rounded-3xl border border-gray-100 p-5 flex flex-col justify-center">
             <div className="flex items-center gap-4">
               <CompletionRing pct={profileCompletion} />
               <div className="min-w-0">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Your Profile</p>
-                <p className="text-sm font-black text-gray-900 mt-1">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Your Profile</p>
+                <p className="text-[13px] font-black text-gray-900 mt-0.5">
                   {profileCompletion >= 100 ? 'All set! 🎉' : profileCompletion >= 60 ? 'Almost there' : 'Getting started'}
                 </p>
-                <button onClick={() => onNavigate('BRAND_PROFILE')} className="text-[11px] font-black text-blue-500 hover:underline mt-1 flex items-center gap-1">
-                  Edit profile <ChevronRight size={12} />
-                </button>
+                {profileCompletion < 100 && (
+                  <button onClick={() => onNavigate('BRAND_PROFILE')} className="text-[10px] font-black text-blue-500 hover:underline mt-0.5 flex items-center gap-1">
+                    Edit profile <ChevronRight size={10} />
+                  </button>
+                )}
               </div>
             </div>
 
-            {pendingChecklist.length > 0 ? (
-              <div className="mt-5 pt-4 border-t border-gray-100 space-y-2">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Finish setting up</p>
+            {pendingChecklist.length > 0 && (
+              <div className="mt-4 pt-3 border-t border-gray-100 space-y-1.5">
                 {pendingChecklist.map(item => (
                   <button
                     key={item.label}
                     onClick={() => onNavigate('BRAND_PROFILE')}
-                    className="w-full flex items-center gap-2.5 text-left group"
+                    className="w-full flex items-center gap-2 text-left group py-0.5"
                   >
-                    <span className="w-4 h-4 rounded-full border-2 border-gray-200 group-hover:border-tlb-yellow transition-colors shrink-0" />
-                    <span className="text-xs font-medium text-gray-600 group-hover:text-gray-900 transition-colors flex-1">{item.label}</span>
-                    <ArrowRight size={13} className="text-gray-300 group-hover:text-tlb-yellow group-hover:translate-x-0.5 transition-all" />
+                    <span className="w-3 h-3 rounded-full border-2 border-gray-200 group-hover:border-tlb-yellow transition-colors shrink-0" />
+                    <span className="text-[11px] font-medium text-gray-500 group-hover:text-gray-900 transition-colors flex-1">{item.label}</span>
+                    <ArrowRight size={11} className="text-gray-300 group-hover:text-tlb-yellow group-hover:translate-x-0.5 transition-all" />
                   </button>
                 ))}
-              </div>
-            ) : (
-              <div className="mt-5 pt-4 border-t border-gray-100 flex items-center gap-2 text-emerald-600">
-                <CheckCircle2 size={16} />
-                <span className="text-xs font-bold">Your profile is complete</span>
               </div>
             )}
           </motion.section>

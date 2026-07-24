@@ -179,15 +179,7 @@ export const ProgramEnquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar })
     ];
 
     return (
-    <div className="min-h-screen bg-gray-50 pb-24">
-        <header className="bg-white/90 backdrop-blur-sm px-5 md:px-8 py-5 flex items-center gap-4 sticky top-0 z-30 border-b border-gray-100">
-            <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors"><Menu size={24} /></button>
-            <div className="flex-1">
-                <h1 className="tlb-page-title">Program Enquiries</h1>
-                <p className="tlb-page-sub">Manage leads &amp; enrol students</p>
-            </div>
-        </header>
-
+        <>
         <main className="p-5 md:p-6">
             <div className="max-w-6xl mx-auto space-y-6">
                 {/* Program selector */}
@@ -479,6 +471,6 @@ export const ProgramEnquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar })
             </>
         )}
         </AnimatePresence>
-    </div>
+        </>
     );
 };

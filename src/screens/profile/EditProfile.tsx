@@ -4,7 +4,7 @@ import {
     Edit3, Phone, Globe, CheckCircle2,
 } from 'lucide-react';
 import { Screen } from '../../types';
-import { getBusinessProfile, getExtendedProfile, updateExtendedProfile, getPartnerMedia, uploadPartnerMedia, deletePartnerMedia } from '../../api/onboarding';
+import { getBusinessProfile, getExtendedProfile, updateExtendedProfile, updateBusinessProfile, getPartnerMedia, uploadPartnerMedia, deletePartnerMedia } from '../../api/onboarding';
 import { SkeletonProfile, toast } from '../../components/ui';
 
 const Instagram = ({ size, className }: { size: number; className?: string }) => (
@@ -26,6 +26,7 @@ export const BrandProfile: React.FC<ProfileProps> = ({ onNavigate, onOpenSidebar
     // Profile data from API
     const [businessName, setBusinessName] = useState('');
     const [bio, setBio] = useState('');
+    const [initialProfileData, setInitialProfileData] = useState<any>(null);
     const [contactNumber, setContactNumber] = useState('');
     const [operatingCities, setOperatingCities] = useState<string[]>([]);
     const [instagramUrl, setInstagramUrl] = useState('');
@@ -57,6 +58,12 @@ export const BrandProfile: React.FC<ProfileProps> = ({ onNavigate, onOpenSidebar
                     setInstagramUrl(p.instagram_url || '');
                     setFacebookUrl(p.facebook_url || '');
                     setWebsiteUrl(p.website_url || '');
+                    setInitialProfileData({
+                        business_name: p.business_name || '',
+                        instagram_url: p.instagram_url || '',
+                        facebook_url: p.facebook_url || '',
+                        website_url: p.website_url || '',
+                    });
                 }
 
                 if (extRes.status === 'fulfilled') {
@@ -108,11 +115,43 @@ export const BrandProfile: React.FC<ProfileProps> = ({ onNavigate, onOpenSidebar
             const formData = new FormData();
             if (bio) formData.append('bio', bio);
             if (contactNumber) formData.append('contact_number', contactNumber);
+            if (address) formData.append('address', address);
             if (logoFile) formData.append('logo', logoFile);
             if (coverFile) formData.append('cover_image', coverFile);
             operatingCities.forEach(city => formData.append('operating_cities', city));
 
-            await updateExtendedProfile(formData);
+            const profileData = {
+                business_name: businessName,
+                instagram_url: instagramUrl,
+                facebook_url: facebookUrl,
+                website_url: websiteUrl
+            };
+            
+            const profileChanged = !initialProfileData || 
+                initialProfileData.business_name !== profileData.business_name ||
+                initialProfileData.instagram_url !== profileData.instagram_url ||
+                initialProfileData.facebook_url !== profileData.facebook_url ||
+                initialProfileData.website_url !== profileData.website_url;
+
+            const promises: Promise<any>[] = [updateExtendedProfile(formData)];
+            
+            if (profileChanged) {
+                promises.push(
+                    updateBusinessProfile(profileData).catch(err => {
+                        if (err.message?.toLowerCase().includes('locked')) {
+                            toast.warning('Core brand details (name/socials) are locked after verification, but other changes were saved.');
+                        } else {
+                            throw err;
+                        }
+                    })
+                );
+            }
+
+            await Promise.all(promises);
+            // Refresh initial data so subsequent saves don't think it changed if we bypassed it
+            if (profileChanged) {
+                setInitialProfileData(profileData);
+            }
             setIsEditing(false);
         } catch (err) {
             console.error('Save error', err);

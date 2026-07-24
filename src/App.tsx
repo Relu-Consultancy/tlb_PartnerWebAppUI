@@ -106,13 +106,10 @@ const CreateVenueAmenities = lazyImport(() => import('./screens/venues'), 'Creat
 const CreateVenuePolicies = lazyImport(() => import('./screens/venues'), 'CreateVenuePolicies');
 const CreateVenuePreview = lazyImport(() => import('./screens/venues'), 'CreateVenuePreview');
 
-// Enquiries & Packages
-const Enquiries = lazyImport(() => import('./screens/enquiries'), 'Enquiries');
-const ProgramEnquiries = lazyImport(() => import('./screens/enquiries'), 'ProgramEnquiries');
-const VenueEnquiries = lazyImport(() => import('./screens/enquiries'), 'VenueEnquiries');
+// Enquiries
+const EnquiriesHub = lazyImport(() => import('./screens/enquiries'), 'EnquiriesHub');
 
 // Statistics
-const StatisticsScreen = lazyImport(() => import('./screens/statistics'), 'Statistics');
 
 // Analytics (audience & growth)
 const Analytics = lazy(() => import('./screens/analytics'));
@@ -147,7 +144,7 @@ const SCREEN_CHUNKS = [
   () => import('./screens/programs'),
   () => import('./screens/venues'),
   () => import('./screens/enquiries'),
-  () => import('./screens/statistics'),
+
   () => import('./screens/analytics'),
   () => import('./screens/coupons'),
   () => import('./screens/support'),
@@ -226,10 +223,8 @@ const routes: Record<Screen, RouteConfig> = {
   CREATE_PROGRAM_POLICIES: { component: CreateProgramPolicies, hasSidebar: true },
   CREATE_PROGRAM_PREVIEW: { component: CreateProgramPreview, hasSidebar: false },
 
-  // Enquiries — restricted to Classes/Programs partners
-  ENQUIRIES: { component: Enquiries, hasSidebar: true, requiresEntities: ['Classes'] },
-  PROGRAM_ENQUIRIES: { component: ProgramEnquiries, hasSidebar: true, requiresEntities: ['Programs'] },
-  VENUE_ENQUIRIES: { component: VenueEnquiries, hasSidebar: true, requiresEntities: ['Venues'] },
+  // Enquiries — accessible if partner has any of Classes/Programs/Venues
+  ENQUIRIES: { component: EnquiriesHub, hasSidebar: true },
 
   // Other
   ATTENDEES: { component: Attendees, hasSidebar: true },
@@ -240,7 +235,7 @@ const routes: Record<Screen, RouteConfig> = {
   MESSAGES: { component: Messages, hasSidebar: true },
   PACKAGES: { component: Packages, hasSidebar: true },
   FINANCIAL_HUB: { component: FinancialHub, hasSidebar: true },
-  STATISTICS: { component: StatisticsScreen, hasSidebar: true },
+
   ANALYTICS: { component: Analytics, hasSidebar: true },
   ALL_COUPONS: { component: AllCoupons, hasSidebar: true },
   CREATE_COUPON: { component: CreateCoupon, hasSidebar: true },

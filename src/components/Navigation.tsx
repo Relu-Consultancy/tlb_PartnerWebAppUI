@@ -57,7 +57,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen
   const menuItems = [
     { id: 'HOME', label: 'Dashboard', icon: Home, visible: true },
     { id: 'MESSAGES', label: 'Messages', icon: Bell, visible: true },
-    { id: 'STATISTICS', label: 'Statistics', icon: BarChart3, visible: true },
     { id: 'ANALYTICS', label: 'Analytics', icon: LineChart, visible: true },
     { id: 'BRAND_PROFILE', label: 'Brand Profile', icon: UserCircle, visible: true },
     { id: 'DOCUMENTS', label: 'Documents', icon: FileText, visible: true },
@@ -66,9 +65,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen
     { id: 'ATTENDEES', label: 'Attendees', icon: Users, visible: true },
     { id: 'REVIEWS', label: 'Reviews', icon: Star, visible: true },
     { id: 'FOLLOWERS', label: 'Followers', icon: Heart, visible: true },
-    { id: 'ENQUIRIES', label: 'Class Enquiries', icon: Inbox, visible: hasClasses },
-    { id: 'PROGRAM_ENQUIRIES', label: 'Program Enquiries', icon: Inbox, visible: hasPrograms },
-    { id: 'VENUE_ENQUIRIES', label: 'Venue Enquiries', icon: Inbox, visible: hasVenues },
+    { id: 'ENQUIRIES', label: 'Enquiries', icon: Inbox, visible: hasClasses || hasPrograms || hasVenues },
     { id: 'PACKAGES', label: 'Packages', icon: Package, visible: false },
     { id: 'ALL_COUPONS', label: 'Coupons', icon: Ticket, visible: true },
     { id: 'PARTNER_NETWORK', label: 'Partner Network', icon: Network, visible: true },

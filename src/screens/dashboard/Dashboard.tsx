@@ -1,21 +1,27 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
 import {
-  Menu, UserCircle, CheckCircle2, ArrowRight, ChevronRight,
-  Inbox, Eye, BarChart3, CreditCard, CalendarDays, LineChart,
-  Ticket, DollarSign, MapPin, Percent, Edit3, LogOut,
-  Heart, TrendingUp,
+  Menu, UserCircle, CheckCircle2, ArrowRight,
+  Inbox, Eye, BarChart3, CalendarDays, LineChart,
+  Ticket, MapPin, Edit3, LogOut,
+  Heart, Activity, IndianRupee, Star, MessageSquare,
+  ClipboardList, Megaphone, RotateCcw, Bell, ExternalLink,
+  BookOpen, GraduationCap,
 } from 'lucide-react';
 import { Screen } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
 import { EntityPickerSheet } from '../../components/EntityPickerSheet';
 import { NotificationCenter } from '../../components/NotificationCenter';
-import { SkeletonDashboard, AreaSparkline, TrendBadge, fmtCurrency, trendPct, BookingsCalendar, LatestListings } from '../../components/ui';
+import { SkeletonDashboard, fmtCurrency, BookingsCalendar, LatestListings } from '../../components/ui';
 import {
   getPartnerDashboard, getCurrentPartner, getBusinessProfile,
   getExtendedProfile, getPartnerMedia, getPartnerFollowerCount
 } from '../../api/onboarding';
-import { getStatsOverview, StatsOverview } from '../../api/stats';
+import {
+  getStatsOverview, getStatsRevenue, getStatsReviews, getStatsEvents, getStatsVenues,
+  StatsOverview, StatsRevenue, StatsReviews, StatsEvents, StatsVenues,
+} from '../../api/stats';
+import { listNotifications, markNotificationRead, InAppNotification } from '../../api/notifications';
 
 // --------- Types / Constants -----------------------------------------------
 
@@ -30,25 +36,66 @@ const fadeUp = {
   animate: { opacity: 1, y: 0 },
 };
 
+const RECENT_LIMIT = 6;
+
+// Soft icon-tint palette shared by Activity Summary + Recent Activity rows.
+const TINT: Record<string, string> = {
+  emerald: 'bg-emerald-50 text-emerald-600',
+  blue: 'bg-blue-50 text-blue-600',
+  amber: 'bg-amber-50 text-amber-600',
+  purple: 'bg-purple-50 text-purple-600',
+  rose: 'bg-rose-50 text-rose-600',
+  yellow: 'bg-yellow-50 text-yellow-600',
+  gray: 'bg-gray-100 text-gray-500',
+};
+
+const moneyToNum = (v: unknown): number => {
+  const n = parseFloat(String(v ?? '0'));
+  return Number.isFinite(n) ? n : 0;
+};
+
+const timeAgo = (iso: string): string => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const s = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (s < 60) return 'just now';
+  const m = Math.floor(s / 60); if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60); if (h < 24) return `${h}h ago`;
+  const days = Math.floor(h / 24); if (days < 7) return `${days}d ago`;
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+};
+
+// Map a notification_type to an icon + tint for the Recent Activity feed.
+const activityMeta = (type: string): { icon: React.ElementType; tint: string } => {
+  const t = (type || '').toLowerCase();
+  if (t.includes('booking')) return { icon: Ticket, tint: 'emerald' };
+  if (t.includes('payment') || t.includes('payout') || t.includes('refund')) return { icon: IndianRupee, tint: 'amber' };
+  if (t.includes('enquiry') || t.includes('lead')) return { icon: MessageSquare, tint: 'blue' };
+  if (t.includes('follower')) return { icon: Heart, tint: 'rose' };
+  if (t.includes('listing')) return { icon: ClipboardList, tint: 'purple' };
+  if (t === 'broadcast') return { icon: Megaphone, tint: 'blue' };
+  return { icon: Bell, tint: 'gray' };
+};
+
 // --------- Completion ring --------------------------------------------------
 
-const CompletionRing: React.FC<{ pct: number }> = ({ pct }) => {
+const CompletionRing: React.FC<{ pct: number; size?: number }> = ({ pct, size = 56 }) => {
   const r = 24, circ = 2 * Math.PI * r;
   const color = pct >= 100 ? '#141414' : '#FACC15';
   return (
-    <div className="relative w-14 h-14 shrink-0">
-      <svg viewBox="0 0 60 60" className="w-14 h-14 -rotate-90">
-        <circle cx="30" cy="30" r={r} fill="none" stroke="#F3F4F6" strokeWidth="5" />
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg viewBox="0 0 60 60" className="-rotate-90" style={{ width: size, height: size }}>
+        <circle cx="30" cy="30" r={r} fill="none" stroke="#F3F4F6" strokeWidth="6" />
         <motion.circle
-          cx="30" cy="30" r={r} fill="none" stroke={color} strokeWidth="5" strokeLinecap="round"
+          cx="30" cy="30" r={r} fill="none" stroke={color} strokeWidth="6" strokeLinecap="round"
           strokeDasharray={circ}
           initial={{ strokeDashoffset: circ }}
           animate={{ strokeDashoffset: circ - (pct / 100) * circ }}
           transition={{ duration: 1, ease: 'easeOut' }}
         />
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-sm font-black text-gray-900 leading-none">{pct}%</span>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className={`font-black text-gray-900 leading-none ${size < 50 ? 'text-[11px]' : 'text-sm'}`}>{pct}%</span>
       </div>
     </div>
   );
@@ -69,6 +116,12 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
   // Canonical source for profile_views / followers / new_enquiries / active_batches.
   // Falls back to legacy `dashboardData` if /stats/overview/ is unavailable.
   const [overviewData, setOverviewData] = useState<StatsOverview | null>(null);
+  // Aggregate sources for the Activity Summary + the Recent Activity feed.
+  const [revenueData, setRevenueData] = useState<StatsRevenue | null>(null);
+  const [reviewsData, setReviewsData] = useState<StatsReviews | null>(null);
+  const [eventsData, setEventsData] = useState<StatsEvents | null>(null);
+  const [venuesData, setVenuesData] = useState<StatsVenues | null>(null);
+  const [activity, setActivity] = useState<InAppNotification[]>([]);
   const [profileData, setProfileData] = useState<any>(null);
   const [extendedData, setExtendedData] = useState<any>(null);
   const [mediaItems, setMediaItems] = useState<any[]>([]);
@@ -78,9 +131,14 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [partnerRes, dashboardRes, overviewRes, profileRes, extRes, mediaRes] = await Promise.allSettled([
+        const [
+          partnerRes, dashboardRes, overviewRes, profileRes, extRes, mediaRes,
+          revenueRes, reviewsRes, eventsRes, venuesRes, activityRes,
+        ] = await Promise.allSettled([
           getCurrentPartner(), getPartnerDashboard(), getStatsOverview(), getBusinessProfile(),
           getExtendedProfile(), getPartnerMedia(),
+          getStatsRevenue('all'), getStatsReviews(), getStatsEvents(), getStatsVenues(),
+          listNotifications({ page_size: RECENT_LIMIT }),
         ]);
         if (partnerRes.status === 'fulfilled') {
           const pData = partnerRes.value.data || partnerRes.value;
@@ -108,6 +166,11 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
           const m = mediaRes.value.data || mediaRes.value;
           setMediaItems(Array.isArray(m) ? m : []);
         }
+        if (revenueRes.status === 'fulfilled') setRevenueData(revenueRes.value);
+        if (reviewsRes.status === 'fulfilled') setReviewsData(reviewsRes.value);
+        if (eventsRes.status === 'fulfilled') setEventsData(eventsRes.value);
+        if (venuesRes.status === 'fulfilled') setVenuesData(venuesRes.value);
+        if (activityRes.status === 'fulfilled') setActivity(activityRes.value.results || []);
       } catch (err) { console.error('Dashboard fetch error', err); }
       finally { setLoading(false); }
     };
@@ -152,7 +215,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
       return dashboardData?.profile_completion ?? partnerData?.profile_completion ?? 0;
     return Math.round((filled / checklist.length) * 100);
   })();
-  const pendingChecklist = checklist.filter(c => !c.done).slice(0, 4);
+  const checklistDone = checklist.filter(c => c.done).length;
 
   const businessName = partnerData?.business_name || partnerData?.business_profile?.business_name || 'Partner';
 
@@ -165,64 +228,66 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // ------ KPI data ------
+  // ------ Derived stat sources (canonical: /stats/*, legacy dashboard as fallback) ------
   const d = dashboardData || {};
-  const upcomingEvents = d.upcoming_events ?? 0;
-  const ticketsSold = d.tickets_sold ?? 0;
-  const venueBookings = d.venue_bookings ?? 0;
-  const occupancyRate = d.occupancy_rate ?? 0;
-  const monthlyEarnings = d.monthly_earnings ?? 0;
-
-  // /stats/overview/ is the canonical source for these three; fall back to the
-  // legacy dashboard endpoint if the new one hasn't returned (or fails).
+  const ticketsSold = eventsData?.tickets_sold ?? d.tickets_sold ?? 0;
+  const venueBookings = venuesData?.total_bookings ?? d.venue_bookings ?? 0;
   const profileViews = overviewData?.profile_views ?? d.profile_views ?? 0;
   const newEnquiries = overviewData?.new_enquiries ?? d.new_enquiries ?? 0;
   const activeBatches = overviewData?.active_batches ?? d.active_batches ?? 0;
 
-  const kpiMetrics = (() => {
-    if (hasClassOrProgram) {
-      const enqSpark: number[] = d.weekly_enquiries || [0, 0, 0, 0, 0, 0, 0];
-      const batchSpark: number[] = d.weekly_batches || [0, 0, 0, 0, 0, 0, 0];
-      const viewsSpark: number[] = d.weekly_views || [0, 0, 0, 0, 0, 0, 0];
-      return [
-        { label: 'New Enquiries', value: newEnquiries.toString(), icon: Inbox, color: 'text-blue-500', bg: 'bg-blue-50', hex: '#3B82F6', sparkId: 'enq', spark: enqSpark },
-        { label: 'Active Batches', value: activeBatches.toString(), icon: BarChart3, color: 'text-emerald-500', bg: 'bg-emerald-50', hex: '#10B981', sparkId: 'bat', spark: batchSpark },
-        { label: 'Profile Views', value: profileViews.toString(), icon: Eye, color: 'text-purple-500', bg: 'bg-purple-50', hex: '#8B5CF6', sparkId: 'vw', spark: viewsSpark },
-        { label: 'Followers', value: (followerCount ?? 0).toString(), icon: Heart, color: 'text-rose-500', bg: 'bg-rose-50', hex: '#F43F5E', sparkId: 'flw', spark: viewsSpark },
-      ];
-    }
-    if (hasEvents) {
-      const tktSpark: number[] = d.weekly_tickets || [0, 0, 0, 0, 0, 0, 0];
-      const regSpark: number[] = d.weekly_registrations || [0, 0, 0, 0, 0, 0, 0];
-      const viewsSpark: number[] = d.weekly_views || [0, 0, 0, 0, 0, 0, 0];
-      const rvnSpark: number[] = d.weekly_revenue || [0, 0, 0, 0, 0, 0, 0];
-      return [
-        { label: 'Upcoming Events', value: upcomingEvents.toString(), icon: CalendarDays, color: 'text-blue-500', bg: 'bg-blue-50', hex: '#3B82F6', sparkId: 'upe', spark: tktSpark },
-        { label: 'Tickets Sold', value: ticketsSold.toString(), icon: Ticket, color: 'text-purple-500', bg: 'bg-purple-50', hex: '#8B5CF6', sparkId: 'tkt', spark: regSpark },
-        { label: 'Profile Views', value: profileViews.toString(), icon: Eye, color: 'text-emerald-500', bg: 'bg-emerald-50', hex: '#10B981', sparkId: 'evw', spark: viewsSpark },
-        { label: 'Total Revenue', value: fmtCurrency(d.total_revenue || 0), icon: DollarSign, color: 'text-amber-500', bg: 'bg-amber-50', hex: '#F59E0B', sparkId: 'rev', spark: rvnSpark },
-      ];
-    }
-    if (hasVenues) {
-      const bkSpark: number[] = d.weekly_bookings || [0, 0, 0, 0, 0, 0, 0];
-      const viewsSpark: number[] = d.weekly_views || [0, 0, 0, 0, 0, 0, 0];
-      const rvnSpark: number[] = d.weekly_revenue || [0, 0, 0, 0, 0, 0, 0];
-      return [
-        { label: 'Venue Bookings', value: venueBookings.toString(), icon: MapPin, color: 'text-blue-500', bg: 'bg-blue-50', hex: '#3B82F6', sparkId: 'vbk', spark: bkSpark },
-        { label: 'Occupancy Rate', value: `${occupancyRate}%`, icon: Percent, color: 'text-emerald-500', bg: 'bg-emerald-50', hex: '#10B981', sparkId: 'occ', spark: viewsSpark },
-        { label: 'Profile Views', value: profileViews.toString(), icon: Eye, color: 'text-purple-500', bg: 'bg-purple-50', hex: '#8B5CF6', sparkId: 'vvw', spark: viewsSpark },
-        { label: 'Monthly Earnings', value: fmtCurrency(monthlyEarnings), icon: CreditCard, color: 'text-amber-500', bg: 'bg-amber-50', hex: '#F59E0B', sparkId: 'mea', spark: rvnSpark },
-      ];
-    }
-    return [
-      { label: 'New Enquiries', value: newEnquiries.toString(), icon: Inbox, color: 'text-blue-500', bg: 'bg-blue-50', hex: '#3B82F6', sparkId: 'genq', spark: [0, 0, 0, 0, 0, 0, 0] as number[] },
-      { label: 'Active Batches', value: activeBatches.toString(), icon: BarChart3, color: 'text-emerald-500', bg: 'bg-emerald-50', hex: '#10B981', sparkId: 'gbat', spark: [0, 0, 0, 0, 0, 0, 0] as number[] },
-      { label: 'Profile Views', value: profileViews.toString(), icon: Eye, color: 'text-purple-500', bg: 'bg-purple-50', hex: '#8B5CF6', sparkId: 'gvw', spark: [0, 0, 0, 0, 0, 0, 0] as number[] },
-      { label: 'Followers', value: (followerCount ?? 0).toString(), icon: Heart, color: 'text-rose-500', bg: 'bg-rose-50', hex: '#F43F5E', sparkId: 'gflw', spark: [0, 0, 0, 0, 0, 0, 0] as number[] },
-    ];
+  const greeting = new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening';
+
+  // ------ Activity Summary rows (partner-scoped, since launch) ------
+  const followersTotal = followerCount ?? overviewData?.followers ?? 0;
+  const summaryRows: { icon: React.ElementType; tint: string; label: string; value: string }[] = (() => {
+    const rows: { icon: React.ElementType; tint: string; label: string; value: string }[] = [];
+    rows.push({ icon: CheckCircle2, tint: 'emerald', label: 'Bookings confirmed', value: (revenueData?.confirmed_bookings ?? 0).toLocaleString('en-IN') });
+    if (hasEvents) rows.push({ icon: Ticket, tint: 'blue', label: 'Tickets sold', value: (eventsData?.tickets_sold ?? ticketsSold).toLocaleString('en-IN') });
+    if (hasVenues) rows.push({ icon: MapPin, tint: 'amber', label: 'Venue bookings', value: (venuesData?.total_bookings ?? venueBookings).toLocaleString('en-IN') });
+    rows.push({ icon: MessageSquare, tint: 'blue', label: 'New enquiries', value: newEnquiries.toLocaleString('en-IN') });
+    rows.push({ icon: IndianRupee, tint: 'amber', label: 'Revenue collected', value: fmtCurrency(moneyToNum(revenueData?.gross_revenue)) });
+    if (moneyToNum(revenueData?.refunds) > 0) rows.push({ icon: RotateCcw, tint: 'rose', label: 'Refunds processed', value: fmtCurrency(moneyToNum(revenueData?.refunds)) });
+    rows.push({ icon: Eye, tint: 'purple', label: 'Profile views', value: profileViews.toLocaleString('en-IN') });
+    rows.push({ icon: Heart, tint: 'rose', label: 'Followers', value: followersTotal.toLocaleString('en-IN') });
+    rows.push({
+      icon: Star, tint: 'yellow', label: 'Reviews received',
+      value: (reviewsData?.total_reviews ?? 0).toLocaleString('en-IN') + (reviewsData?.avg_rating ? ` · ${reviewsData.avg_rating.toFixed(1)}★` : ''),
+    });
+    if (hasClassOrProgram) rows.push({ icon: BarChart3, tint: 'emerald', label: 'Active batches', value: activeBatches.toLocaleString('en-IN') });
+    return rows;
   })();
 
-  const greeting = new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening';
+  // ------ Primary KPIs (since launch) — the top stat grid ------
+  const primaryKpis: { label: string; value: string; sub: string; icon: React.ElementType; hex: string; highlight?: boolean; nav: Screen }[] = [
+    { label: 'Bookings Confirmed', value: (revenueData?.confirmed_bookings ?? 0).toLocaleString('en-IN'), sub: 'Since launch total', icon: CheckCircle2, hex: '#10B981', nav: 'BOOKINGS' },
+    { label: 'New Enquiries', value: newEnquiries.toLocaleString('en-IN'), sub: 'Awaiting your response', icon: MessageSquare, hex: '#3B82F6', nav: hasClassOrProgram ? 'ENQUIRIES' : 'BOOKINGS' },
+    { label: 'Profile Views', value: profileViews.toLocaleString('en-IN'), sub: 'Since launch total', icon: Eye, hex: '#8B5CF6', nav: 'ANALYTICS' },
+    { label: 'Followers', value: followersTotal.toLocaleString('en-IN'), sub: 'Across your brand', icon: Heart, hex: '#F43F5E', nav: 'FOLLOWERS' },
+    { label: 'Reviews', value: (reviewsData?.total_reviews ?? 0).toLocaleString('en-IN'), sub: reviewsData?.avg_rating ? `${reviewsData.avg_rating.toFixed(1)}★ average rating` : 'No reviews yet', icon: Star, hex: '#F59E0B', nav: 'REVIEWS' },
+    { label: 'Revenue Collected', value: fmtCurrency(moneyToNum(revenueData?.gross_revenue)), sub: 'View breakdown', icon: IndianRupee, hex: '#141414', highlight: true, nav: 'ANALYTICS' },
+  ];
+
+  // ------ At-a-glance, one card per active offering ------
+  type OfferingCard = { entity: string; icon: React.ElementType; hex: string; tag: string; stats: [string, string | number][]; nav: Screen };
+  const offeringCards: OfferingCard[] = allowedEntities.map((entity): OfferingCard | null => {
+    switch (entity) {
+      case 'Events': return { entity, icon: CalendarDays, hex: '#3B82F6', tag: 'Ticketing', stats: [['Tickets sold', ticketsSold], ['Upcoming', eventsData?.upcoming ?? 0]], nav: 'SERVICE_LISTINGS' };
+      case 'Classes': return { entity, icon: BookOpen, hex: '#8B5CF6', tag: 'Enquiry', stats: [['Active batches', activeBatches], ['Enquiries', newEnquiries]], nav: 'ENQUIRIES' };
+      case 'Programs': return { entity, icon: GraduationCap, hex: '#10B981', tag: 'Enquiry', stats: [['Active batches', activeBatches], ['Enquiries', newEnquiries]], nav: 'ENQUIRIES' };
+      case 'Venues': return { entity, icon: MapPin, hex: '#F59E0B', tag: 'Hybrid', stats: [['Bookings', venueBookings], ['Occupancy', `${venuesData?.occupancy_rate ?? 0}%`]], nav: 'SERVICE_LISTINGS' };
+      default: return null;
+    }
+  }).filter((c): c is OfferingCard => c !== null);
+
+  const handleActivityClick = (n: InAppNotification) => {
+    if (!n.is_read) {
+      markNotificationRead(n.id).catch(() => { /* non-fatal */ });
+      setActivity(prev => prev.map(x => x.id === n.id ? { ...x, is_read: true } : x));
+    }
+    if (n.action_url) window.open(n.action_url, '_blank', 'noopener,noreferrer');
+    else onNavigate('MESSAGES');
+  };
 
   if (loading) {
     return <SkeletonDashboard />;
@@ -317,7 +382,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
         </div>
       </header>
 
-      <main className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
+      <main className="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
 
         {/* Onboarding Tracker */}
         {isActive && !isVerified && (
@@ -351,115 +416,198 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
           </section>
         )}
 
-        {/* Hero + profile completion */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Welcome hero */}
-          <motion.section
-            {...fadeUp}
-            transition={{ duration: 0.3 }}
-            className="lg:col-span-2 relative overflow-hidden rounded-3xl bg-gradient-to-br from-tlb-dark via-gray-900 to-black p-6 sm:p-8 text-white"
-          >
-            <div className="absolute -right-10 -top-10 w-52 h-52 bg-tlb-yellow/10 rounded-full blur-3xl" />
-            <div className="absolute -right-16 bottom-0 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl" />
-            <div className="relative z-10 flex flex-col h-full">
-              <p className="text-sm text-gray-400 font-medium">Good {greeting},</p>
-              <h2 className="text-2xl sm:text-3xl font-black mt-1">{businessName}</h2>
-              <p className="text-sm text-gray-400 mt-2 max-w-md">
-                Here's how your brand is doing today. Track your reach, manage listings, and grow your audience — all from one place.
-              </p>
+        {/* Intro + profile spotlight */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-stretch">
+          <motion.div {...fadeUp} transition={{ duration: 0.3 }} className="lg:col-span-2 flex flex-col justify-center">
+            <p className="text-xs text-gray-400 font-medium">Good {greeting}, {businessName}</p>
+            <h2 className="text-2xl font-black text-gray-900 tracking-tight mt-1">Your Overview</h2>
+            <p className="text-[13px] text-gray-500 mt-1.5 max-w-md leading-relaxed">
+              A cross-vertical snapshot of your brand — reach, bookings, and revenue in one place.
+            </p>
+            <div className="flex flex-wrap items-center gap-2 mt-3">
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-gray-500 bg-white border border-gray-200 rounded-full px-3 py-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Showing: Since launch
+              </span>
+              {allowedEntities.length > 0 && (
+                <span className="text-[11px] font-bold text-gray-400">
+                  {allowedEntities.length} offering{allowedEntities.length > 1 ? 's' : ''} active
+                </span>
+              )}
+            </div>
+          </motion.div>
 
-              <div className="mt-auto pt-6 flex flex-wrap items-center gap-3">
-                {profileCompletion < 100 ? (
-                  <button onClick={() => onNavigate('BRAND_PROFILE')} className="bg-tlb-yellow text-tlb-dark px-5 py-2.5 rounded-xl text-xs font-black shrink-0 hover:brightness-110 transition-all flex items-center gap-1.5">
-                    Complete Your Profile <ArrowRight size={14} />
-                  </button>
-                ) : (
-                  <button onClick={() => onNavigate('ANALYTICS')} className="bg-white/10 hover:bg-white/20 text-white px-5 py-2.5 rounded-xl text-xs font-black shrink-0 transition-all flex items-center gap-1.5">
-                    View Analytics <TrendingUp size={14} />
-                  </button>
-                )}
+          {/* Profile spotlight — the top-right focal card */}
+          <motion.section {...fadeUp} transition={{ duration: 0.3, delay: 0.05 }} className="relative overflow-hidden rounded-2xl bg-tlb-dark text-white p-5">
+            <div className="absolute -right-8 -top-8 w-28 h-28 bg-tlb-yellow/10 rounded-full blur-2xl" />
+            <div className="relative flex items-center gap-4">
+              <CompletionRing pct={profileCompletion} size={52} />
+              <div className="min-w-0 flex-1">
+                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Your Profile</p>
+                <p className="text-sm font-black mt-0.5">
+                  {profileCompletion >= 100 ? 'All set 🎉' : profileCompletion >= 60 ? 'Almost there' : 'Getting started'}
+                </p>
+                <p className="text-[11px] text-gray-400 mt-0.5">{checklistDone} of {checklist.length} steps done</p>
               </div>
+            </div>
+            <button
+              onClick={() => onNavigate(profileCompletion < 100 ? 'BRAND_PROFILE' : 'ANALYTICS')}
+              className="relative mt-4 w-full bg-tlb-yellow text-tlb-dark rounded-lg py-2 text-xs font-black flex items-center justify-center gap-1.5 hover:brightness-110 transition-all"
+            >
+              {profileCompletion < 100 ? 'Complete Your Profile' : 'View Analytics'} <ArrowRight size={13} />
+            </button>
+          </motion.section>
+        </div>
+
+        {/* Primary KPI grid — 6 headline stats (F-pattern, revenue highlighted) */}
+        <motion.section className="grid grid-cols-2 lg:grid-cols-3 gap-4" variants={stagger} initial="initial" animate="animate">
+          {primaryKpis.map(k => (
+            <motion.button
+              key={k.label}
+              variants={fadeUp}
+              whileHover={{ y: -4 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 22 }}
+              onClick={() => onNavigate(k.nav)}
+              className={`group relative text-left rounded-2xl border p-5 overflow-hidden transition-shadow ${k.highlight ? 'bg-gradient-to-br from-tlb-yellow/20 to-tlb-yellow/5 border-tlb-yellow/40 hover:shadow-lg' : 'bg-white border-gray-100 hover:shadow-lg'}`}
+            >
+              <div className="pointer-events-none absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-0 group-hover:opacity-15 transition-opacity duration-500" style={{ background: k.hex }} />
+              <div className="relative flex items-center justify-between mb-3">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{k.label}</p>
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center transition-transform duration-300 group-hover:scale-110" style={{ backgroundColor: `${k.hex}14`, color: k.hex }}>
+                  <k.icon size={14} />
+                </div>
+              </div>
+              <p className={`relative text-3xl font-black leading-none ${k.highlight ? 'text-tlb-dark' : 'text-gray-900'}`}>{k.value}</p>
+              <p className={`relative text-[11px] font-bold mt-2 flex items-center gap-1 ${k.highlight ? 'text-amber-700' : 'text-gray-400'}`}>
+                {k.sub}
+                {k.highlight && <ArrowRight size={11} className="group-hover:translate-x-0.5 transition-transform" />}
+              </p>
+            </motion.button>
+          ))}
+        </motion.section>
+
+        {/* At a glance — one card per active offering */}
+        {offeringCards.length > 0 && (
+          <section>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-base font-black text-gray-900 tracking-tight">At a glance — by offering</h3>
+              <button onClick={() => onNavigate('SERVICE_LISTINGS')} className="text-[11px] font-black text-blue-500 hover:underline flex items-center gap-1 shrink-0">
+                All listings <ArrowRight size={11} />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {offeringCards.map((c, idx) => (
+                <motion.button
+                  key={c.entity}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.25, delay: Math.min(idx * 0.05, 0.2) }}
+                  whileHover={{ y: -3 }}
+                  onClick={() => onNavigate(c.nav)}
+                  className="group text-left bg-white rounded-2xl border border-gray-100 p-4 hover:shadow-lg transition-shadow"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105" style={{ backgroundColor: `${c.hex}14`, color: c.hex }}>
+                      <c.icon size={17} />
+                    </div>
+                    <span className="text-[9px] font-black uppercase tracking-wide px-2 py-0.5 rounded-md" style={{ backgroundColor: `${c.hex}14`, color: c.hex }}>{c.tag}</span>
+                  </div>
+                  <p className="text-sm font-black text-gray-900 mt-3">{c.entity}</p>
+                  <div className="flex items-center gap-5 mt-2">
+                    {c.stats.map(([label, value]) => (
+                      <div key={label}>
+                        <p className="text-lg font-black text-gray-900 leading-none">{value}</p>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mt-0.5">{label}</p>
+                      </div>
+                    ))}
+                  </div>
+                </motion.button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Activity Summary + Recent Activity */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          {/* Activity Summary */}
+          <motion.section {...fadeUp} transition={{ duration: 0.3 }} className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-tlb-dark text-tlb-yellow flex items-center justify-center">
+                  <Activity size={16} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-gray-900 tracking-tight leading-none">Activity Summary</h3>
+                  <p className="text-[11px] font-medium text-gray-400 mt-0.5">Your performance since launch</p>
+                </div>
+              </div>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-x-6 gap-y-0">
+              {summaryRows.map((r, i) => (
+                <motion.div
+                  key={r.label}
+                  initial={{ opacity: 0, x: -6 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.2, delay: Math.min(i * 0.03, 0.24) }}
+                  className="flex items-center gap-2.5 py-2 border-b border-gray-50 last:border-0"
+                >
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${TINT[r.tint]}`}>
+                    <r.icon size={15} />
+                  </div>
+                  <span className="text-[13px] font-medium text-gray-600 flex-1 min-w-0 truncate">{r.label}</span>
+                  <span className="text-sm font-black text-gray-900 shrink-0">{r.value}</span>
+                </motion.div>
+              ))}
             </div>
           </motion.section>
 
-          {/* Profile completion card w/ checklist */}
-          <motion.section {...fadeUp} transition={{ duration: 0.3, delay: 0.05 }} className="bg-white rounded-3xl border border-gray-100 p-5 flex flex-col justify-center">
-            <div className="flex items-center gap-4">
-              <CompletionRing pct={profileCompletion} />
-              <div className="min-w-0">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Your Profile</p>
-                <p className="text-[13px] font-black text-gray-900 mt-0.5">
-                  {profileCompletion >= 100 ? 'All set! 🎉' : profileCompletion >= 60 ? 'Almost there' : 'Getting started'}
-                </p>
-                {profileCompletion < 100 && (
-                  <button onClick={() => onNavigate('BRAND_PROFILE')} className="text-[10px] font-black text-blue-500 hover:underline mt-0.5 flex items-center gap-1">
-                    Edit profile <ChevronRight size={10} />
-                  </button>
-                )}
-              </div>
+          {/* Recent Activity */}
+          <motion.section {...fadeUp} transition={{ duration: 0.3, delay: 0.05 }} className="bg-white rounded-2xl border border-gray-100 p-5 flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-black text-gray-900 tracking-tight">Recent Activity</h3>
+              <button onClick={() => onNavigate('MESSAGES')} className="text-[11px] font-black text-blue-500 hover:underline flex items-center gap-1 shrink-0">
+                View all <ArrowRight size={11} />
+              </button>
             </div>
-
-            {pendingChecklist.length > 0 && (
-              <div className="mt-4 pt-3 border-t border-gray-100 space-y-1.5">
-                {pendingChecklist.map(item => (
-                  <button
-                    key={item.label}
-                    onClick={() => onNavigate('BRAND_PROFILE')}
-                    className="w-full flex items-center gap-2 text-left group py-0.5"
-                  >
-                    <span className="w-3 h-3 rounded-full border-2 border-gray-200 group-hover:border-tlb-yellow transition-colors shrink-0" />
-                    <span className="text-[11px] font-medium text-gray-500 group-hover:text-gray-900 transition-colors flex-1">{item.label}</span>
-                    <ArrowRight size={11} className="text-gray-300 group-hover:text-tlb-yellow group-hover:translate-x-0.5 transition-all" />
-                  </button>
-                ))}
+            {activity.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center gap-2 py-10 text-center">
+                <Inbox size={30} className="text-gray-200" />
+                <p className="text-xs font-bold text-gray-400">No activity yet</p>
+                <p className="text-[11px] text-gray-400">Bookings, enquiries &amp; alerts will show up here.</p>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {activity.map((n, i) => {
+                  const meta = activityMeta(n.notification_type);
+                  return (
+                    <motion.button
+                      key={n.id}
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.2, delay: Math.min(i * 0.04, 0.24) }}
+                      onClick={() => handleActivityClick(n)}
+                      className="w-full text-left flex items-start gap-3 py-2.5 px-2 -mx-2 rounded-xl hover:bg-gray-50 transition-colors group"
+                    >
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${TINT[meta.tint]}`}>
+                        <meta.icon size={14} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className={`text-[13px] leading-snug truncate ${n.is_read ? 'font-bold text-gray-700' : 'font-black text-gray-900'}`}>{n.title}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          {!n.is_read && <span className="w-1.5 h-1.5 rounded-full bg-tlb-yellow shrink-0" />}
+                          <span className="text-[10px] font-bold text-gray-400">{timeAgo(n.created_at)}</span>
+                          {n.action_url && <ExternalLink size={10} className="text-gray-300 group-hover:text-blue-500 transition-colors" />}
+                        </div>
+                      </div>
+                    </motion.button>
+                  );
+                })}
               </div>
             )}
           </motion.section>
         </div>
 
-        {/* KPI Cards */}
-        <motion.section
-          className="grid grid-cols-2 lg:grid-cols-4 gap-4"
-          variants={stagger}
-          initial="initial"
-          animate="animate"
-        >
-          {kpiMetrics.map((m, i) => {
-            const sparkHasData = m.spark.some(v => v > 0);
-            const trend = trendPct(m.spark);
-            // Brand rhythm: the lead KPI is a solid black card, the rest are
-            // white cards with a black badge + yellow glyph. Sparklines follow.
-            const dark = i === 0;
-            return (
-              <motion.div
-                key={m.label}
-                variants={fadeUp}
-                whileHover={{ y: -4 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 22 }}
-                className={`rounded-2xl border p-5 flex flex-col gap-3 overflow-hidden transition-shadow ${dark ? 'bg-tlb-dark border-tlb-dark text-white hover:shadow-lg' : 'bg-white border-gray-100 hover:shadow-md'}`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${dark ? 'bg-tlb-yellow text-tlb-dark' : 'bg-tlb-dark text-tlb-yellow'}`}>
-                    <m.icon size={16} />
-                  </div>
-                  <TrendBadge pct={trend} />
-                </div>
-                <div>
-                  <p className={`text-2xl font-black leading-none ${dark ? 'text-white' : 'text-gray-900'}`}>{m.value}</p>
-                  <p className="text-[10px] font-bold uppercase tracking-widest mt-1 text-gray-400">{m.label}</p>
-                </div>
-                {sparkHasData && (
-                  <div className="h-10 -mx-1 mt-auto">
-                    <AreaSparkline data={m.spark} color={dark ? '#FACC15' : '#141414'} id={m.sparkId} />
-                  </div>
-                )}
-              </motion.div>
-            );
-          })}
-        </motion.section>
-
         {/* Latest listings + Bookings calendar (functional widgets) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           <motion.div {...fadeUp} transition={{ duration: 0.3 }}>
             <LatestListings onViewAll={() => onNavigate('SERVICE_LISTINGS')} />
           </motion.div>

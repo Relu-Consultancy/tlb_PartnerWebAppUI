@@ -22,6 +22,7 @@ export type Screen =
   | 'BANK_SETUP'
   | 'ONBOARDING_COMPLETE'
   // Core App
+  | 'ACCOUNTS'
   | 'HOME'
   | 'BRAND_PROFILE'
   | 'PREVIEW_PROFILE'

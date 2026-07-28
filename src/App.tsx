@@ -3,12 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, Suspense, lazy, useCallback, Component } from 'react';
+import React, { useState, useEffect, useRef, Suspense, lazy, useCallback, Component } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import { motion } from 'motion/react';
 import { Screen, EntityType } from './types';
 import { PartnerProvider, usePartner } from './context/PartnerContext';
-import { SkeletonPage, Toaster } from './components/ui';
+import { SkeletonPage, Toaster, NoInternetState } from './components/ui';
 
 // ---------------------------------------------------------------------------
 // Error boundary — stops a single screen crash from blanking the whole app.
@@ -72,6 +72,7 @@ const Documents = lazy(() => import('./screens/documents'));
 const Messages = lazy(() => import('./screens/messages'));
 const Packages = lazy(() => import('./screens/packages'));
 const FinancialHub = lazy(() => import('./screens/financial'));
+const Accounts = lazyImport(() => import('./screens/account'), 'Accounts');
 const BrandProfile = lazyImport(() => import('./screens/profile'), 'BrandProfile');
 const PreviewProfile = lazyImport(() => import('./screens/profile'), 'PreviewProfile');
 
@@ -130,6 +131,7 @@ const SCREEN_CHUNKS = [
   () => import('./screens/auth'),
   () => import('./screens/onboarding'),
   () => import('./screens/dashboard'),
+  () => import('./screens/account'),
   () => import('./screens/attendees'),
   () => import('./screens/reviews'),
   () => import('./screens/followers'),
@@ -188,6 +190,7 @@ const routes: Record<Screen, RouteConfig> = {
   ONBOARDING_COMPLETE: { component: OnboardingComplete, hasSidebar: false },
 
   // Core App — has sidebar
+  ACCOUNTS: { component: Accounts, hasSidebar: true },
   HOME: { component: Dashboard, hasSidebar: true },
   BRAND_PROFILE: { component: BrandProfile, hasSidebar: true },
   PREVIEW_PROFILE: { component: PreviewProfile, hasSidebar: true },
@@ -249,10 +252,27 @@ const routes: Record<Screen, RouteConfig> = {
 function AppInner() {
   const { allowedEntities, setAllowedEntities } = usePartner();
   const [currentScreen, setCurrentScreen] = useState<Screen>('LANDING');
+  // The screen we navigated from — lets a child (e.g. PreviewProfile) return to
+  // its actual entry point (Accounts vs Brand Profile) instead of a hardcoded one.
+  const [previousScreen, setPreviousScreen] = useState<Screen | null>(null);
+  const currentScreenRef = useRef<Screen>('LANDING');
+  useEffect(() => { currentScreenRef.current = currentScreen; }, [currentScreen]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
   const [authData, setAuthData] = useState<{ value: string; type: 'email' | 'phone' } | null>(null);
   const [initializing, setInitializing] = useState(true);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // ── Prefetch all screen chunks once the browser is idle after first paint ──
   // so reopening / switching slides loads instantly instead of flashing a blank
@@ -362,6 +382,8 @@ function AppInner() {
 
   // Route guard: redirect restricted screens to HOME
   const guardedNavigate = useCallback((screen: Screen) => {
+    // Remember where we came from so children can offer an accurate "back".
+    if (screen !== currentScreenRef.current) setPreviousScreen(currentScreenRef.current);
     const targetRoute = routes[screen];
     if (targetRoute?.requiresEntities) {
       const hasAccess = targetRoute.requiresEntities.some(e => allowedEntities.includes(e));
@@ -388,6 +410,7 @@ function AppInner() {
 
   return (
     <div className="font-sans text-tlb-dark">
+      {isOffline && <NoInternetState />}
       {route.hasSidebar && (
         <Sidebar
           isOpen={isSidebarOpen}
@@ -411,6 +434,7 @@ function AppInner() {
             <ScreenErrorBoundary>
               <Component
                 onNavigate={guardedNavigate}
+                previousScreen={previousScreen}
                 authData={authData}
                 setAuthData={setAuthData}
                 {...(route.hasSidebar ? { onOpenSidebar: () => { setDesktopSidebarOpen(true); setIsSidebarOpen(true); } } : {})}

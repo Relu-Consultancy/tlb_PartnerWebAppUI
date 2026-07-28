@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Menu, Plus, Search, Filter, Users, Edit3, CalendarDays, BarChart3, MapPin, Layers, Clock, X, Check, SlidersHorizontal, Play, Pause, Archive, ArchiveRestore, Ticket, Tag, LayoutGrid, Grid3X3, List, LayoutList, Sparkles, CircleDot, FileEdit } from 'lucide-react';
+import { Menu, Plus, Search, Filter, Users, Edit3, CalendarDays, BarChart3, MapPin, Layers, Clock, X, Check, SlidersHorizontal, Play, Pause, Archive, ArchiveRestore, Ticket, Tag, LayoutGrid, Grid3X3, List, LayoutList, Sparkles, CircleDot, FileEdit, MessageSquare, ArrowRight } from 'lucide-react';
 import { SkeletonListings, toast, Select, SelectOption } from '../../components/ui';
 import { Screen, EntityType } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
@@ -67,6 +67,28 @@ const fmtStart = (iso?: string) => {
         return new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
     } catch { return ''; }
 };
+
+// Navigation card surfacing a related management screen (Bookings / Enquiries)
+// from within the Listings hub.
+const QuickAccessCard: React.FC<{
+    title: string; subtitle: string; icon: React.ElementType; hex: string; onClick: () => void;
+}> = ({ title, subtitle, icon: Icon, hex, onClick }) => (
+    <motion.button
+        whileHover={{ y: -3 }}
+        whileTap={{ scale: 0.98 }}
+        onClick={onClick}
+        className="group flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-4 text-left hover:shadow-md transition-shadow"
+    >
+        <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105" style={{ backgroundColor: `${hex}14`, color: hex }}>
+            <Icon size={20} />
+        </div>
+        <div className="min-w-0 flex-1">
+            <p className="text-sm font-black text-gray-900">{title}</p>
+            <p className="text-[11px] text-gray-400 font-medium truncate">{subtitle}</p>
+        </div>
+        <ArrowRight size={16} className="text-gray-300 group-hover:text-gray-700 group-hover:translate-x-0.5 transition-all shrink-0" />
+    </motion.button>
+);
 
 type SortOption = 'newest' | 'oldest' | 'a-z' | 'z-a';
 type ViewMode = 'comfortable' | 'compact' | 'list';
@@ -327,6 +349,14 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
 
     const tabs: (EntityType | 'All')[] = ['All', ...allowedEntities];
 
+    // Single hub for post-listing operations. Inside, each listing opens its
+    // bookings + attendee check-in (booking listings) or enquiries + attendees
+    // (enquiry listings) — see the Bookings & Enquiries screen.
+    const quickAccess: { title: string; subtitle: string; icon: React.ElementType; hex: string; nav: Screen }[] = [
+        { title: 'Bookings & Enquiries', subtitle: 'Track bookings, leads & attendance per listing', icon: MessageSquare, hex: '#3B82F6', nav: 'BOOKINGS' },
+        { title: 'Coupons', subtitle: 'Create & manage discount coupons', icon: Tag, hex: '#8B5CF6', nav: 'ALL_COUPONS' },
+    ];
+
     // Interactive status quick-filters (drive filterStatuses)
     const statusCounts = {
         published: listings.filter(l => l.status === 'published').length,
@@ -487,6 +517,20 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                             </motion.button>
                         );
                     })}
+                </div>
+
+                {/* Quick access — related management surfaces (Bookings / Enquiries) */}
+                <div className={`grid gap-3 ${quickAccess.length > 1 ? 'sm:grid-cols-2' : 'grid-cols-1'}`}>
+                    {quickAccess.map(q => (
+                        <QuickAccessCard
+                            key={q.title}
+                            title={q.title}
+                            subtitle={q.subtitle}
+                            icon={q.icon}
+                            hex={q.hex}
+                            onClick={() => onNavigate(q.nav)}
+                        />
+                    ))}
                 </div>
 
                 {/* Search + Filter + Tabs row */}

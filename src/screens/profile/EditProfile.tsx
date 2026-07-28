@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     ArrowLeft, Camera, Link2, Save, MapPin, Eye, Upload, Play, Trash2,
-    Edit3, Phone, Globe, CheckCircle2,
+    Edit3, Phone, Globe, CheckCircle2, Building2, Share2, Images, X,
 } from 'lucide-react';
 import { Screen } from '../../types';
 import { getBusinessProfile, getExtendedProfile, updateExtendedProfile, updateBusinessProfile, getPartnerMedia, uploadPartnerMedia, deletePartnerMedia } from '../../api/onboarding';
@@ -11,6 +11,25 @@ const Instagram = ({ size, className }: { size: number; className?: string }) =>
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
         <rect width="20" height="20" x="2" y="2" rx="5" ry="5" /><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" /><line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
     </svg>
+);
+
+// A single contact/link row in the view-mode "Contact & Links" card.
+const DetailRow = ({ icon, value }: { icon: React.ReactNode; value: string }) => (
+    <div className="flex items-center gap-3 px-5 py-3">
+        <span className="shrink-0">{icon}</span>
+        <span className="text-sm text-gray-700 truncate">{value}</span>
+    </div>
+);
+
+// Section header (icon tile + title + subtitle) for the edit-mode form cards.
+const SectionHead = ({ icon, title, sub }: { icon: React.ReactNode; title: string; sub: string }) => (
+    <div className="flex items-center gap-3">
+        <div className="w-9 h-9 rounded-xl bg-tlb-yellow/10 text-tlb-yellow flex items-center justify-center shrink-0">{icon}</div>
+        <div>
+            <h3 className="text-base font-black text-gray-900 leading-none">{title}</h3>
+            <p className="text-[11px] text-gray-400 font-medium mt-0.5">{sub}</p>
+        </div>
+    </div>
 );
 
 interface ProfileProps {
@@ -108,6 +127,25 @@ export const BrandProfile: React.FC<ProfileProps> = ({ onNavigate, onOpenSidebar
     ];
     const completedCount = profileFields.filter(Boolean).length;
     const progressPercent = Math.round((completedCount / profileFields.length) * 100);
+    const remaining = profileFields.length - completedCount;
+
+    // Shared profile-completion card (used by both view + edit sidebars)
+    const completionCard = (
+        <div className="bg-white rounded-2xl border border-gray-100 p-5">
+            <div className="flex justify-between items-center mb-3">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Profile Completion</span>
+                <span className="text-sm font-black text-gray-900">{progressPercent}%</span>
+            </div>
+            <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-full bg-tlb-yellow rounded-full transition-all duration-700" style={{ width: `${progressPercent}%` }} />
+            </div>
+            <p className="text-[11px] text-gray-400 mt-2 leading-relaxed">
+                {progressPercent === 100
+                    ? <span className="text-emerald-500 font-bold">All set — your profile is 100% complete 🎉</span>
+                    : `${remaining} field${remaining !== 1 ? 's' : ''} left to complete your brand profile.`}
+            </p>
+        </div>
+    );
 
     const handleSave = async () => {
         setSaving(true);
@@ -228,291 +266,299 @@ export const BrandProfile: React.FC<ProfileProps> = ({ onNavigate, onOpenSidebar
 
     return (
         <div className="min-h-screen bg-[#FDFCF8] pb-8">
-            <header className="bg-white p-4 sm:p-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
-                <button
-                    onClick={() => isEditing ? setIsEditing(false) : onNavigate('HOME')}
-                    className="p-2 -ml-2"
-                >
-                    <ArrowLeft size={24} />
-                </button>
-                <h1 className="tlb-page-title">{isEditing ? 'Edit Profile' : 'Brand Profile'}</h1>
-                <button onClick={() => onNavigate('PREVIEW_PROFILE')} className="flex items-center gap-1.5 text-tlb-yellow font-black text-sm uppercase tracking-widest">
-                    <Eye size={16} /> Preview
-                </button>
+            <header className="bg-white/95 backdrop-blur-sm px-4 sm:px-6 py-4 flex items-center justify-between gap-3 sticky top-0 z-30 border-b border-gray-100">
+                <div className="flex items-center gap-3 min-w-0">
+                    <button
+                        onClick={() => isEditing ? setIsEditing(false) : onNavigate('HOME')}
+                        className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors shrink-0"
+                    >
+                        <ArrowLeft size={22} />
+                    </button>
+                    <div className="min-w-0">
+                        <h1 className="tlb-page-title truncate">{isEditing ? 'Edit Profile' : 'Brand Profile'}</h1>
+                        <p className="tlb-page-sub hidden sm:block">{isEditing ? 'Update how customers see your brand' : 'Your public-facing brand identity'}</p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                    <button onClick={() => onNavigate('PREVIEW_PROFILE')} className="flex items-center gap-1.5 text-gray-600 hover:text-gray-900 font-bold text-xs px-3 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors">
+                        <Eye size={15} /> <span className="hidden sm:inline">Preview</span>
+                    </button>
+                    {!isEditing ? (
+                        <button onClick={() => setIsEditing(true)} className="tlb-button px-4 py-2 text-xs gap-1.5">
+                            <Edit3 size={15} /> Edit
+                        </button>
+                    ) : (
+                        <button onClick={handleSave} disabled={saving} className={`tlb-button px-4 py-2 text-xs gap-1.5 ${saving ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                            <Save size={15} /> {saving ? 'Saving…' : 'Save'}
+                        </button>
+                    )}
+                </div>
             </header>
 
-            <main className="px-4 sm:px-6 py-6">
+            <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
                 {!isEditing ? (
                     /* ── VIEW MODE ── */
-                    <div className="space-y-6">
-                        {/* Profile Card */}
-                        <div className="bg-white rounded-3xl overflow-hidden border border-gray-100 shadow-sm">
-                            <div className="h-36 bg-gray-100 relative">
-                                {coverPreview ? (
-                                    <img src={coverPreview} alt="Cover" className="w-full h-full object-cover" />
-                                ) : (
-                                    <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-                                        <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">No Cover Photo</span>
-                                    </div>
-                                )}
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-                            </div>
-                            <div className="px-6 pb-6">
-                                <div className="w-16 h-16 rounded-2xl overflow-hidden border-4 border-white shadow-xl -mt-8 relative z-10 bg-white">
-                                    {logoPreview ? (
-                                        <img src={logoPreview} alt="Logo" className="w-full h-full object-cover" />
+                    <div className="grid lg:grid-cols-3 gap-6">
+                        {/* Main column */}
+                        <div className="lg:col-span-2 space-y-6">
+                            {/* Hero card */}
+                            <div className="bg-white rounded-2xl overflow-hidden border border-gray-100">
+                                <div className="h-40 sm:h-52 relative">
+                                    {coverPreview ? (
+                                        <img src={coverPreview} alt="Cover" className="w-full h-full object-cover" />
                                     ) : (
-                                        <div className="w-full h-full bg-tlb-yellow/10 flex items-center justify-center text-tlb-yellow font-black text-2xl">
-                                            {businessName.charAt(0) || '?'}
+                                        <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                                            <span className="text-gray-400 text-xs font-bold uppercase tracking-widest">No Cover Photo</span>
                                         </div>
                                     )}
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
                                 </div>
-                                <div className="mt-3 flex items-center gap-2">
-                                    <h2 className="text-xl font-black">{businessName || 'Your Business Name'}</h2>
-                                    {businessName && <CheckCircle2 size={16} className="text-tlb-yellow fill-tlb-yellow shrink-0" />}
-                                </div>
-                                {bio && <p className="text-sm text-gray-500 mt-2 leading-relaxed line-clamp-3">{bio}</p>}
-                            </div>
-                        </div>
-
-                        {/* Profile Details */}
-                        <div className="space-y-2">
-                            {contactNumber && (
-                                <div className="bg-white rounded-2xl p-4 border border-gray-100 flex items-center gap-3">
-                                    <Phone size={16} className="text-gray-400 shrink-0" />
-                                    <span className="text-sm text-gray-700">{contactNumber}</span>
-                                </div>
-                            )}
-                            {instagramUrl && (
-                                <div className="bg-white rounded-2xl p-4 border border-gray-100 flex items-center gap-3">
-                                    <Instagram size={16} className="text-pink-500 shrink-0" />
-                                    <span className="text-sm text-gray-700 truncate">{instagramUrl}</span>
-                                </div>
-                            )}
-                            {facebookUrl && (
-                                <div className="bg-white rounded-2xl p-4 border border-gray-100 flex items-center gap-3">
-                                    <Link2 size={16} className="text-blue-500 shrink-0" />
-                                    <span className="text-sm text-gray-700 truncate">{facebookUrl}</span>
-                                </div>
-                            )}
-                            {websiteUrl && (
-                                <div className="bg-white rounded-2xl p-4 border border-gray-100 flex items-center gap-3">
-                                    <Globe size={16} className="text-gray-400 shrink-0" />
-                                    <span className="text-sm text-gray-700 truncate">{websiteUrl}</span>
-                                </div>
-                            )}
-                            {address && (
-                                <div className="bg-white rounded-2xl p-4 border border-gray-100 flex items-start gap-3">
-                                    <MapPin size={16} className="text-tlb-yellow shrink-0 mt-0.5" />
-                                    <span className="text-sm text-gray-700">{address}</span>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Gallery Preview */}
-                        {mediaImages.length > 0 && (
-                            <div>
-                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Gallery</p>
-                                <div className="flex gap-2 overflow-x-auto pb-2">
-                                    {mediaImages.slice(0, 6).map((img) => (
-                                        <div key={img.id} className="w-20 h-20 shrink-0 rounded-xl overflow-hidden">
-                                            <img src={img.file_url || img.file} alt="Gallery" className="w-full h-full object-cover" />
-                                        </div>
-                                    ))}
-                                    {mediaImages.length > 6 && (
-                                        <div className="w-20 h-20 shrink-0 rounded-xl bg-gray-100 flex items-center justify-center text-gray-400 text-xs font-bold">
-                                            +{mediaImages.length - 6}
+                                <div className="px-5 sm:px-6 pb-6">
+                                    <div className="w-20 h-20 rounded-2xl overflow-hidden border-4 border-white shadow-xl -mt-10 relative z-10 bg-white">
+                                        {logoPreview ? (
+                                            <img src={logoPreview} alt="Logo" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <div className="w-full h-full bg-tlb-yellow/10 flex items-center justify-center text-tlb-yellow font-black text-3xl">
+                                                {businessName.charAt(0) || '?'}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="mt-3 flex items-center gap-2">
+                                        <h2 className="text-2xl font-black text-gray-900">{businessName || 'Your Business Name'}</h2>
+                                        {businessName && <CheckCircle2 size={18} className="text-tlb-yellow fill-tlb-yellow shrink-0" />}
+                                    </div>
+                                    {bio ? (
+                                        <p className="text-sm text-gray-500 mt-2 leading-relaxed max-w-2xl">{bio}</p>
+                                    ) : (
+                                        <p className="text-sm text-gray-300 mt-2 italic">No bio yet — add one so customers know your story.</p>
+                                    )}
+                                    {operatingCities.length > 0 && (
+                                        <div className="flex flex-wrap gap-1.5 mt-4">
+                                            {operatingCities.map(city => (
+                                                <span key={city} className="inline-flex items-center gap-1 text-[11px] font-bold text-gray-600 bg-gray-50 border border-gray-100 rounded-full px-2.5 py-1">
+                                                    <MapPin size={11} className="text-tlb-yellow" /> {city}
+                                                </span>
+                                            ))}
                                         </div>
                                     )}
                                 </div>
                             </div>
-                        )}
 
-                        {/* Edit Profile Button */}
-                        <button
-                            onClick={() => setIsEditing(true)}
-                            className="tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20 text-base gap-3"
-                        >
-                            <Edit3 size={20} /> Edit Profile
-                        </button>
-
-                        {/* Profile Completion Progress Bar */}
-                        <div className="bg-white rounded-2xl p-5 border border-gray-100">
-                            <div className="flex justify-between items-center mb-3">
-                                <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Profile Completion</span>
-                                <span className="text-sm font-black text-tlb-yellow">{progressPercent}%</span>
-                            </div>
-                            <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                                <div
-                                    className="h-full bg-tlb-yellow rounded-full transition-all duration-700"
-                                    style={{ width: `${progressPercent}%` }}
-                                />
-                            </div>
-                            {progressPercent < 100 && (
-                                <p className="text-xs text-gray-400 mt-2">
-                                    {profileFields.length - completedCount} field{profileFields.length - completedCount !== 1 ? 's' : ''} remaining — click Edit Profile to complete.
-                                </p>
-                            )}
-                            {progressPercent === 100 && (
-                                <p className="text-xs text-emerald-500 font-bold mt-2">Your profile is 100% complete!</p>
+                            {/* Gallery */}
+                            {mediaImages.length > 0 && (
+                                <div className="bg-white rounded-2xl border border-gray-100 p-5 sm:p-6">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <Images size={16} className="text-gray-400" />
+                                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Gallery</p>
+                                        <span className="text-[11px] font-bold text-gray-300">{mediaImages.length}</span>
+                                    </div>
+                                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                                        {mediaImages.map((img) => (
+                                            <div key={img.id} className="aspect-square rounded-xl overflow-hidden bg-gray-50">
+                                                <img src={img.file_url || img.file} alt="Gallery" className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                             )}
                         </div>
+
+                        {/* Sidebar */}
+                        <aside className="space-y-4 lg:sticky lg:top-24 h-fit">
+                            {completionCard}
+
+                            {/* Contact & links */}
+                            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                                <div className="px-5 py-3.5 border-b border-gray-100">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Contact &amp; Links</p>
+                                </div>
+                                {(contactNumber || instagramUrl || facebookUrl || websiteUrl || address) ? (
+                                    <div className="divide-y divide-gray-50">
+                                        {contactNumber && <DetailRow icon={<Phone size={15} className="text-gray-400" />} value={contactNumber} />}
+                                        {instagramUrl && <DetailRow icon={<Instagram size={15} className="text-pink-500" />} value={instagramUrl} />}
+                                        {facebookUrl && <DetailRow icon={<Link2 size={15} className="text-blue-500" />} value={facebookUrl} />}
+                                        {websiteUrl && <DetailRow icon={<Globe size={15} className="text-gray-400" />} value={websiteUrl} />}
+                                        {address && <DetailRow icon={<MapPin size={15} className="text-tlb-yellow" />} value={address} />}
+                                    </div>
+                                ) : (
+                                    <button onClick={() => setIsEditing(true)} className="w-full px-5 py-6 text-center text-xs font-bold text-gray-400 hover:text-gray-600 transition-colors">
+                                        No contact details yet — add them
+                                    </button>
+                                )}
+                            </div>
+                        </aside>
                     </div>
                 ) : (
                     /* ── EDIT MODE ── */
-                    <div className="space-y-8">
-                        {/* Visual Assets */}
-                        <section className="space-y-5">
-                            <div className="flex items-center gap-2">
-                                <span className="text-xl">🎨</span>
-                                <h3 className="font-black text-xl">Visual Assets</h3>
-                            </div>
+                    <div className="grid lg:grid-cols-3 gap-6">
+                        {/* Form column */}
+                        <div className="lg:col-span-2 space-y-6">
+                            {/* Visual Assets */}
+                            <section className="bg-white rounded-2xl border border-gray-100 p-5 sm:p-6 space-y-5">
+                                <SectionHead icon={<Camera size={18} />} title="Visual Assets" sub="Cover, logo & portfolio gallery" />
 
-                            {/* Cover Photo */}
-                            <label className="relative rounded-2xl overflow-hidden h-48 bg-gray-100 border-2 border-dashed border-gray-200 group cursor-pointer block">
-                                {coverPreview ? (
-                                    <img src={coverPreview} alt="Cover" className="w-full h-full object-cover" />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-gray-300">
-                                        <Upload size={32} />
-                                    </div>
-                                )}
-                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                    <div className="bg-white/90 px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-bold">
-                                        <Upload size={16} /> Change Cover Photo
-                                    </div>
-                                </div>
-                                <input type="file" accept="image/*" className="hidden" onChange={(e) => {
-                                    if (e.target.files?.[0]) {
-                                        setCoverFile(e.target.files[0]);
-                                        setCoverPreview(URL.createObjectURL(e.target.files[0]));
-                                    }
-                                }} />
-                            </label>
-
-                            {/* Logo */}
-                            <div className="flex items-center gap-4">
-                                <label className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-dashed border-tlb-yellow/30 bg-tlb-yellow/5 flex items-center justify-center relative group cursor-pointer">
-                                    {logoPreview ? (
-                                        <img src={logoPreview} alt="Logo" className="w-full h-full object-cover" />
+                                {/* Cover Photo */}
+                                <label className="relative rounded-xl overflow-hidden h-40 sm:h-48 bg-gray-50 border-2 border-dashed border-gray-200 hover:border-tlb-yellow/40 group cursor-pointer block transition-colors">
+                                    {coverPreview ? (
+                                        <img src={coverPreview} alt="Cover" className="w-full h-full object-cover" />
                                     ) : (
-                                        <Camera size={24} className="text-tlb-yellow" />
+                                        <div className="w-full h-full flex flex-col items-center justify-center text-gray-300 gap-1">
+                                            <Upload size={28} />
+                                            <span className="text-[11px] font-bold">Upload cover photo</span>
+                                        </div>
                                     )}
                                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                        <Camera size={20} className="text-white" />
+                                        <div className="bg-white/90 px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-bold">
+                                            <Upload size={16} /> Change Cover
+                                        </div>
                                     </div>
                                     <input type="file" accept="image/*" className="hidden" onChange={(e) => {
                                         if (e.target.files?.[0]) {
-                                            setLogoFile(e.target.files[0]);
-                                            setLogoPreview(URL.createObjectURL(e.target.files[0]));
+                                            setCoverFile(e.target.files[0]);
+                                            setCoverPreview(URL.createObjectURL(e.target.files[0]));
                                         }
                                     }} />
                                 </label>
-                                <div>
-                                    <p className="font-bold text-sm">Studio Logo</p>
-                                    <p className="text-xs text-gray-400">Square image, min 200×200px</p>
-                                </div>
-                            </div>
 
-                            {/* Portfolio Gallery */}
-                            <div>
-                                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">Portfolio Gallery</label>
-                                <div className="flex gap-3 overflow-x-auto pb-2">
-                                    <label className={`w-28 h-28 shrink-0 bg-tlb-yellow/10 rounded-2xl border-2 border-dashed border-tlb-yellow/30 flex flex-col items-center justify-center text-tlb-yellow cursor-pointer hover:bg-tlb-yellow/20 transition-colors ${uploadingMedia ? 'opacity-50' : ''}`}>
-                                        <Camera size={22} />
-                                        <span className="text-[10px] font-bold mt-1">Add Photo</span>
-                                        <input type="file" multiple accept="image/png,image/jpeg" className="hidden" onChange={handleAddImage} disabled={uploadingMedia} />
+                                {/* Logo */}
+                                <div className="flex items-center gap-4">
+                                    <label className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-dashed border-tlb-yellow/30 bg-tlb-yellow/5 flex items-center justify-center relative group cursor-pointer shrink-0">
+                                        {logoPreview ? (
+                                            <img src={logoPreview} alt="Logo" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <Camera size={24} className="text-tlb-yellow" />
+                                        )}
+                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                            <Camera size={20} className="text-white" />
+                                        </div>
+                                        <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                                            if (e.target.files?.[0]) {
+                                                setLogoFile(e.target.files[0]);
+                                                setLogoPreview(URL.createObjectURL(e.target.files[0]));
+                                            }
+                                        }} />
                                     </label>
-                                    {!mediaVideo && (
-                                        <label className={`w-28 h-28 shrink-0 bg-tlb-yellow/10 rounded-2xl border-2 border-dashed border-tlb-yellow/30 flex flex-col items-center justify-center text-tlb-yellow cursor-pointer hover:bg-tlb-yellow/20 transition-colors ${uploadingMedia ? 'opacity-50' : ''}`}>
-                                            <Play size={22} />
-                                            <span className="text-[10px] font-bold mt-1">Add Video</span>
-                                            <input type="file" accept="video/mp4,video/quicktime" className="hidden" onChange={handleAddVideo} disabled={uploadingMedia} />
+                                    <div>
+                                        <p className="font-bold text-sm text-gray-900">Studio Logo</p>
+                                        <p className="text-xs text-gray-400">Square image, min 200×200px</p>
+                                    </div>
+                                </div>
+
+                                {/* Portfolio Gallery */}
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 block">Portfolio Gallery</label>
+                                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                                        <label className={`aspect-square bg-tlb-yellow/10 rounded-xl border-2 border-dashed border-tlb-yellow/30 flex flex-col items-center justify-center text-tlb-yellow cursor-pointer hover:bg-tlb-yellow/20 transition-colors ${uploadingMedia ? 'opacity-50' : ''}`}>
+                                            <Camera size={20} />
+                                            <span className="text-[10px] font-bold mt-1">Add Photo</span>
+                                            <input type="file" multiple accept="image/png,image/jpeg" className="hidden" onChange={handleAddImage} disabled={uploadingMedia} />
                                         </label>
-                                    )}
-                                    {mediaImages.map((img) => (
-                                        <div key={img.id} className="w-28 h-28 shrink-0 rounded-2xl overflow-hidden shadow-sm relative group">
-                                            <img src={img.file_url || img.file} alt="Gallery" className="w-full h-full object-cover" />
-                                            <button onClick={() => handleDeleteMedia(img.id, 'image')} className="absolute top-1 right-1 bg-white/80 p-1 rounded-lg text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <Trash2 size={12} />
-                                            </button>
-                                        </div>
-                                    ))}
-                                    {mediaVideo && (
-                                        <div className="w-28 h-28 shrink-0 rounded-2xl overflow-hidden shadow-sm relative group bg-gray-900 flex items-center justify-center">
-                                            <Play size={24} className="text-white" />
-                                            <button onClick={() => handleDeleteMedia(mediaVideo.id, 'video')} className="absolute top-1 right-1 bg-white/80 p-1 rounded-lg text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <Trash2 size={12} />
-                                            </button>
-                                        </div>
-                                    )}
+                                        {!mediaVideo && (
+                                            <label className={`aspect-square bg-tlb-yellow/10 rounded-xl border-2 border-dashed border-tlb-yellow/30 flex flex-col items-center justify-center text-tlb-yellow cursor-pointer hover:bg-tlb-yellow/20 transition-colors ${uploadingMedia ? 'opacity-50' : ''}`}>
+                                                <Play size={20} />
+                                                <span className="text-[10px] font-bold mt-1">Add Video</span>
+                                                <input type="file" accept="video/mp4,video/quicktime" className="hidden" onChange={handleAddVideo} disabled={uploadingMedia} />
+                                            </label>
+                                        )}
+                                        {mediaImages.map((img) => (
+                                            <div key={img.id} className="aspect-square rounded-xl overflow-hidden relative group bg-gray-50">
+                                                <img src={img.file_url || img.file} alt="Gallery" className="w-full h-full object-cover" />
+                                                <button onClick={() => handleDeleteMedia(img.id, 'image')} className="absolute top-1 right-1 bg-white/90 p-1 rounded-lg text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <Trash2 size={12} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                        {mediaVideo && (
+                                            <div className="aspect-square rounded-xl overflow-hidden relative group bg-gray-900 flex items-center justify-center">
+                                                <Play size={24} className="text-white" />
+                                                <button onClick={() => handleDeleteMedia(mediaVideo.id, 'video')} className="absolute top-1 right-1 bg-white/90 p-1 rounded-lg text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <Trash2 size={12} />
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </section>
+
+                            {/* Business Info */}
+                            <section className="bg-white rounded-2xl border border-gray-100 p-5 sm:p-6 space-y-5">
+                                <SectionHead icon={<Building2 size={18} />} title="Business Info" sub="Name, story & contact number" />
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 block">Studio / Brand Name</label>
+                                    <input className="tlb-input w-full" value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Your brand name" />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 block">About Us</label>
+                                    <textarea className="tlb-input w-full min-h-[140px] resize-y" value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Tell your story — what makes your studio special?"></textarea>
+                                    <p className="text-xs text-gray-300 mt-1">This will be visible on your public profile page.</p>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 block">Contact Number</label>
+                                    <input className="tlb-input w-full" value={contactNumber} onChange={(e) => setContactNumber(e.target.value)} placeholder="+91 98765 43210" />
+                                </div>
+                            </section>
+
+                            {/* Digital Reach */}
+                            <section className="bg-white rounded-2xl border border-gray-100 p-5 sm:p-6 space-y-5">
+                                <SectionHead icon={<Share2 size={18} />} title="Digital Reach" sub="Where customers find you online" />
+                                <div className="space-y-3">
+                                    <div className="flex items-center gap-3 border border-gray-200 bg-gray-50 rounded-xl px-4 py-3 focus-within:border-tlb-yellow focus-within:bg-white transition-colors">
+                                        <Instagram size={18} className="text-pink-500 shrink-0" />
+                                        <input className="bg-transparent flex-1 text-sm outline-none" placeholder="Instagram URL" value={instagramUrl} onChange={(e) => setInstagramUrl(e.target.value)} />
+                                    </div>
+                                    <div className="flex items-center gap-3 border border-gray-200 bg-gray-50 rounded-xl px-4 py-3 focus-within:border-tlb-yellow focus-within:bg-white transition-colors">
+                                        <Link2 size={18} className="text-blue-500 shrink-0" />
+                                        <input className="bg-transparent flex-1 text-sm outline-none" placeholder="Facebook Page" value={facebookUrl} onChange={(e) => setFacebookUrl(e.target.value)} />
+                                    </div>
+                                    <div className="flex items-center gap-3 border border-gray-200 bg-gray-50 rounded-xl px-4 py-3 focus-within:border-tlb-yellow focus-within:bg-white transition-colors">
+                                        <Globe size={18} className="text-gray-400 shrink-0" />
+                                        <input className="bg-transparent flex-1 text-sm outline-none" placeholder="Website" value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} />
+                                    </div>
+                                </div>
+                            </section>
+
+                            {/* Location */}
+                            <section className="bg-white rounded-2xl border border-gray-100 p-5 sm:p-6 space-y-5">
+                                <SectionHead icon={<MapPin size={18} />} title="Location" sub="Where your studio is based" />
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 block">Written Address</label>
+                                    <textarea className="tlb-input w-full min-h-[80px] resize-y" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Full address of your studio or teaching space..."></textarea>
+                                </div>
+                            </section>
+                        </div>
+
+                        {/* Sidebar: live preview + completion + actions */}
+                        <aside className="space-y-4 lg:sticky lg:top-24 h-fit">
+                            {/* Live preview */}
+                            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                                <div className="px-5 py-3 border-b border-gray-100">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Live Preview</p>
+                                </div>
+                                <div className="h-20 bg-gradient-to-br from-gray-100 to-gray-200 relative">
+                                    {coverPreview && <img src={coverPreview} className="w-full h-full object-cover" alt="" />}
+                                </div>
+                                <div className="px-4 pb-4">
+                                    <div className="w-12 h-12 rounded-xl overflow-hidden border-2 border-white shadow -mt-6 relative bg-white">
+                                        {logoPreview
+                                            ? <img src={logoPreview} className="w-full h-full object-cover" alt="" />
+                                            : <div className="w-full h-full bg-tlb-yellow/10 flex items-center justify-center text-tlb-yellow font-black">{businessName.charAt(0) || '?'}</div>}
+                                    </div>
+                                    <p className="font-black text-sm mt-2 text-gray-900 truncate">{businessName || 'Your Business Name'}</p>
+                                    <p className="text-[11px] text-gray-400 line-clamp-2 mt-0.5">{bio || 'Your bio will appear here.'}</p>
                                 </div>
                             </div>
-                        </section>
 
-                        {/* Business Info */}
-                        <section className="space-y-5">
-                            <div className="flex items-center gap-2">
-                                <span className="text-xl">📝</span>
-                                <h3 className="font-black text-xl">Business Info</h3>
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Studio / Brand Name</label>
-                                <input className="tlb-input w-full" value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Your brand name" />
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">About Us</label>
-                                <textarea className="tlb-input w-full min-h-[140px] resize-y" value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Tell your story — what makes your studio special?"></textarea>
-                                <p className="text-xs text-gray-300 mt-1">This will be visible on your public profile page.</p>
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Contact Number</label>
-                                <input className="tlb-input w-full" value={contactNumber} onChange={(e) => setContactNumber(e.target.value)} placeholder="+91 98765 43210" />
-                            </div>
-                        </section>
+                            {completionCard}
 
-                        {/* Digital Reach */}
-                        <section className="space-y-5">
-                            <div className="flex items-center gap-2">
-                                <span className="text-xl">🔗</span>
-                                <h3 className="font-black text-xl">Digital Reach</h3>
+                            <div className="flex flex-col gap-2">
+                                <button onClick={handleSave} disabled={saving} className={`tlb-button w-full py-3 ${saving ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                    <Save size={18} /> {saving ? 'Saving…' : 'Save Profile'}
+                                </button>
+                                <button onClick={() => setIsEditing(false)} className="w-full py-2.5 text-xs font-bold text-gray-500 hover:text-gray-900 flex items-center justify-center gap-1.5 transition-colors">
+                                    <X size={14} /> Cancel
+                                </button>
                             </div>
-                            <div className="space-y-3">
-                                <div className="flex items-center gap-3 border border-gray-100 bg-white rounded-2xl px-4 py-3">
-                                    <Link2 size={18} className="text-gray-300" />
-                                    <input className="bg-transparent flex-1 text-sm outline-none" placeholder="Instagram URL" value={instagramUrl} onChange={(e) => setInstagramUrl(e.target.value)} />
-                                </div>
-                                <div className="flex items-center gap-3 border border-gray-100 bg-white rounded-2xl px-4 py-3">
-                                    <Link2 size={18} className="text-gray-300" />
-                                    <input className="bg-transparent flex-1 text-sm outline-none" placeholder="Facebook Page" value={facebookUrl} onChange={(e) => setFacebookUrl(e.target.value)} />
-                                </div>
-                                <div className="flex items-center gap-3 border border-gray-100 bg-white rounded-2xl px-4 py-3">
-                                    <Link2 size={18} className="text-gray-300" />
-                                    <input className="bg-transparent flex-1 text-sm outline-none" placeholder="Website" value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} />
-                                </div>
-                            </div>
-                        </section>
-
-                        {/* Location */}
-                        <section className="space-y-5">
-                            <div className="flex items-center gap-2">
-                                <span className="text-xl">📍</span>
-                                <h3 className="font-black text-xl">Location</h3>
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Written Address</label>
-                                <textarea className="tlb-input w-full min-h-[80px] resize-y" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Full address of your studio or teaching space..."></textarea>
-                            </div>
-                        </section>
-
-                        {/* Save Button */}
-                        <button onClick={handleSave} disabled={saving} className={`tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20 ${saving ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                            <Save size={20} /> {saving ? 'Saving...' : 'Save Profile'}
-                        </button>
-
-                        <p className="text-center text-gray-300 text-[10px] font-bold tracking-widest uppercase">
-                            TLB Partner Portal V3.0
-                        </p>
+                        </aside>
                     </div>
                 )}
             </main>

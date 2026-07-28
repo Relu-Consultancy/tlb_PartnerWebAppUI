@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-    Menu, Search, Filter, Lock, Phone, MessageCircle, X, StickyNote, Inbox, Loader2,
+    Search, Filter, Lock, Phone, MessageCircle, X, StickyNote, Inbox, Loader2,
     Users, Sparkles, CheckCircle2, CalendarClock, Check, Mail, Clock,
     IndianRupee, ClipboardList, Calendar, MapPin,
 } from 'lucide-react';
@@ -119,7 +119,7 @@ const parseLead = (item: any): Lead => ({
     projectDetails: item.project_details || undefined,
 });
 
-export const VenueEnquiries: React.FC<Props> = ({ onOpenSidebar }) => {
+export const VenueEnquiries: React.FC<Props> = () => {
     const [leads, setLeads] = useState<Lead[]>([]);
     const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
     const [detailLoading, setDetailLoading] = useState(false);

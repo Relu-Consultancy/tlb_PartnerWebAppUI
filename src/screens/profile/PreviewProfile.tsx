@@ -26,9 +26,11 @@ const resolveUrl = (url?: string) => {
 interface ProfileProps {
     onNavigate: (screen: Screen) => void;
     onOpenSidebar: () => void;
+    /** Screen the user came from — back returns here (Accounts vs Brand Profile). */
+    previousScreen?: Screen | null;
 }
 
-export const PreviewProfile: React.FC<ProfileProps> = ({ onNavigate }) => {
+export const PreviewProfile: React.FC<ProfileProps> = ({ onNavigate, previousScreen }) => {
     const { allowedEntities } = usePartner();
     const [loading, setLoading] = useState(true);
 
@@ -142,8 +144,8 @@ export const PreviewProfile: React.FC<ProfileProps> = ({ onNavigate }) => {
                         ) : (
                             <div className="w-full h-full bg-gradient-to-br from-[#FFDE81] to-[#FFF4D9]" />
                         )}
-                        <button 
-                            onClick={() => onNavigate('BRAND_PROFILE')} 
+                        <button
+                            onClick={() => onNavigate(previousScreen || 'BRAND_PROFILE')}
                             className="absolute top-7 left-4 w-9 h-9 rounded-full bg-white shadow flex items-center justify-center text-gray-800 transition-transform active:scale-95 z-20 hover:bg-gray-50"
                         >
                             <ArrowLeft size={18} />

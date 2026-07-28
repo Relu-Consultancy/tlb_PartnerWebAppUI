@@ -1,1 +1,1 @@
-export { EnquiriesHub as default } from './EnquiriesHub';
+export { EnquiriesHub, EnquiriesHub as default } from './EnquiriesHub';

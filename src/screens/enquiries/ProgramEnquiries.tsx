@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-    Menu, Search, Phone, MessageCircle, X, StickyNote, Inbox, Loader2,
+    Search, Phone, MessageCircle, X, StickyNote, Inbox, Loader2,
     Users, Sparkles, CheckCircle2, GraduationCap, Mail, Check,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -64,7 +64,7 @@ const avatarTint = (name: string) => {
     return palette[h % palette.length];
 };
 
-export const ProgramEnquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
+export const ProgramEnquiries: React.FC<Props> = () => {
     const [programs, setPrograms] = useState<ProgramOption[]>([]);
     const [selectedProgramId, setSelectedProgramId] = useState<string | null>(null);
     const [leads, setLeads] = useState<ProgramLead[]>([]);

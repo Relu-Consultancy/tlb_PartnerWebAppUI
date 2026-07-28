@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-    Menu, Search, Filter, Lock, Phone, MessageCircle, X, StickyNote, Inbox, Loader2,
+    Search, Filter, Lock, Phone, MessageCircle, X, StickyNote,
     Users, Sparkles, CheckCircle2, CalendarClock, Check,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Screen, EnquiryStatus } from '../../types';
-import { toast, Select } from '../../components/ui';
+import { toast, Select, LoadingState, ErrorState, EmptyState, NoSearchResultState } from '../../components/ui';
 import { getClassEnquiries, updateClassEnquiry, unlockClassEnquiry } from '../../api/listings';
 
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
@@ -63,13 +63,14 @@ const avatarTint = (name: string) => {
     return palette[h % palette.length];
 };
 
-export const Enquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
+export const Enquiries: React.FC<Props> = () => {
     const [leads, setLeads] = useState<Lead[]>([]);
     const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<EnquiryStatus | ''>('');
     const [showFilter, setShowFilter] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const [hasError, setHasError] = useState(false);
 
     useEffect(() => {
         loadEnquiries();
@@ -79,6 +80,7 @@ export const Enquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
     const loadEnquiries = async () => {
         try {
             setIsLoading(true);
+            setHasError(false);
             const res = await getClassEnquiries();
             const raw: any[] = Array.isArray(res) ? res : (res.data || []);
             const formattedData: Lead[] = raw.map((item: any) => ({
@@ -99,6 +101,7 @@ export const Enquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
             setLeads(formattedData);
         } catch (e) {
             console.error('Failed to load enquiries', e);
+            setHasError(true);
         } finally {
             setIsLoading(false);
         }
@@ -169,6 +172,17 @@ export const Enquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
         { key: 'trial_booked',label: 'Trial Booked', icon: CalendarClock,fg: STATUS_META.trial_booked.fg, bg: STATUS_META.trial_booked.bg },
         { key: 'closed',      label: 'Closed',       icon: CheckCircle2, fg: STATUS_META.closed.fg,       bg: STATUS_META.closed.bg },
     ];
+
+    if (isLoading) return <LoadingState msg="Loading class enquiries..." />;
+    if (hasError) return <ErrorState onRetry={loadEnquiries} />;
+    if (!isLoading && !hasError && leads.length === 0) {
+        return (
+            <EmptyState 
+                title="No Class Enquiries" 
+                desc="When students enquire about your classes, they will appear here. Keep your profile updated to attract more leads!" 
+            />
+        );
+    }
 
     return (
         <>
@@ -255,25 +269,13 @@ export const Enquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
-                                {isLoading ? (
+                                {filtered.length === 0 ? (
                                     <tr>
-                                        <td colSpan={6} className="px-6 py-16 text-center">
-                                            <div className="flex flex-col items-center justify-center text-gray-400">
-                                                <Loader2 size={32} className="animate-spin mb-3" />
-                                                <p className="text-sm font-bold">Loading enquiries...</p>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ) : filtered.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-16 text-center">
-                                            <div className="flex flex-col items-center gap-3 text-gray-300">
-                                                <Inbox size={36} />
-                                                <p className="text-sm font-bold">No enquiries yet</p>
-                                                {(search || statusFilter) && (
-                                                    <button onClick={() => { setSearch(''); setStatusFilter(''); }} className="text-xs font-black text-tlb-yellow hover:underline">Clear filters</button>
-                                                )}
-                                            </div>
+                                        <td colSpan={6} className="p-0">
+                                            <NoSearchResultState 
+                                                query={search || statusFilter || 'filters'} 
+                                                onClear={() => { setSearch(''); setStatusFilter(''); }} 
+                                            />
                                         </td>
                                     </tr>
                                 ) : filtered.map((lead, i) => (

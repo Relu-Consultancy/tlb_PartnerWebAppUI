@@ -2,17 +2,22 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
 import {
   Menu, UserCircle, CheckCircle2, ArrowRight,
-  Inbox, Eye, BarChart3, CalendarDays, LineChart,
+  Inbox, Eye, CalendarDays, LineChart,
   Ticket, MapPin, Edit3, LogOut,
   Heart, Activity, IndianRupee, Star, MessageSquare,
-  ClipboardList, Megaphone, RotateCcw, Bell, ExternalLink,
-  BookOpen, GraduationCap,
+  ClipboardList, Megaphone, Bell, ExternalLink,
+  BookOpen, GraduationCap, TrendingUp, TrendingDown,
+  ChevronRight,
 } from 'lucide-react';
 import { Screen } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
 import { EntityPickerSheet } from '../../components/EntityPickerSheet';
 import { NotificationCenter } from '../../components/NotificationCenter';
-import { SkeletonDashboard, fmtCurrency, BookingsCalendar, LatestListings } from '../../components/ui';
+import {
+  SkeletonDashboard, fmtCurrency,
+  BookingsCalendar, LatestListings,
+  AreaSparkline, TrendAreaChart, DonutChart,
+} from '../../components/ui';
 import {
   getPartnerDashboard, getCurrentPartner, getBusinessProfile,
   getExtendedProfile, getPartnerMedia, getPartnerFollowerCount
@@ -38,7 +43,6 @@ const fadeUp = {
 
 const RECENT_LIMIT = 6;
 
-// Soft icon-tint palette shared by Activity Summary + Recent Activity rows.
 const TINT: Record<string, string> = {
   emerald: 'bg-emerald-50 text-emerald-600',
   blue: 'bg-blue-50 text-blue-600',
@@ -65,7 +69,6 @@ const timeAgo = (iso: string): string => {
   return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 };
 
-// Map a notification_type to an icon + tint for the Recent Activity feed.
 const activityMeta = (type: string): { icon: React.ElementType; tint: string } => {
   const t = (type || '').toLowerCase();
   if (t.includes('booking')) return { icon: Ticket, tint: 'emerald' };
@@ -77,27 +80,76 @@ const activityMeta = (type: string): { icon: React.ElementType; tint: string } =
   return { icon: Bell, tint: 'gray' };
 };
 
+// --------- Count-up animation hook ------------------------------------------
+
+const useCountUp = (target: number, duration = 1200): number => {
+  const [val, setVal] = useState(0);
+  const rafRef = useRef(0);
+  useEffect(() => {
+    if (target === 0) { setVal(0); return; }
+    const start = performance.now();
+    const tick = (now: number) => {
+      const elapsed = now - start;
+      const progress = Math.min(elapsed / duration, 1);
+      // ease-out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setVal(Math.round(eased * target));
+      if (progress < 1) rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [target, duration]);
+  return val;
+};
+
+// --------- Animated number display ------------------------------------------
+
+const CountUpValue: React.FC<{ value: number; prefix?: string; suffix?: string; className?: string }> = ({ value, prefix = '', suffix = '', className = '' }) => {
+  const animated = useCountUp(value);
+  return <span className={className}>{prefix}{animated.toLocaleString('en-IN')}{suffix}</span>;
+};
+
+// Formatted currency with count-up
+const CountUpCurrency: React.FC<{ value: number; className?: string }> = ({ value, className = '' }) => {
+  const animated = useCountUp(value);
+  return <span className={className}>{fmtCurrency(animated)}</span>;
+};
+
 // --------- Completion ring --------------------------------------------------
 
-const CompletionRing: React.FC<{ pct: number; size?: number }> = ({ pct, size = 56 }) => {
+const CompletionRing: React.FC<{ pct: number; size?: number; trackColor?: string; strokeColor?: string }> = ({
+  pct, size = 56, trackColor = 'rgba(255,255,255,0.1)', strokeColor,
+}) => {
   const r = 24, circ = 2 * Math.PI * r;
-  const color = pct >= 100 ? '#141414' : '#FACC15';
+  const color = strokeColor || (pct >= 100 ? '#10B981' : '#FACC15');
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
       <svg viewBox="0 0 60 60" className="-rotate-90" style={{ width: size, height: size }}>
-        <circle cx="30" cy="30" r={r} fill="none" stroke="#F3F4F6" strokeWidth="6" />
+        <circle cx="30" cy="30" r={r} fill="none" stroke={trackColor} strokeWidth="5" />
         <motion.circle
-          cx="30" cy="30" r={r} fill="none" stroke={color} strokeWidth="6" strokeLinecap="round"
+          cx="30" cy="30" r={r} fill="none" stroke={color} strokeWidth="5" strokeLinecap="round"
           strokeDasharray={circ}
           initial={{ strokeDashoffset: circ }}
           animate={{ strokeDashoffset: circ - (pct / 100) * circ }}
-          transition={{ duration: 1, ease: 'easeOut' }}
+          transition={{ duration: 1.2, ease: 'easeOut' }}
         />
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">
-        <span className={`font-black text-gray-900 leading-none ${size < 50 ? 'text-[11px]' : 'text-sm'}`}>{pct}%</span>
+        <span className={`font-black leading-none ${size < 50 ? 'text-[11px]' : 'text-sm'}`} style={{ color }}>{pct}%</span>
       </div>
     </div>
+  );
+};
+
+// --------- Trend Badge ------------------------------------------------------
+
+const TrendBadge: React.FC<{ pct: number; className?: string }> = ({ pct, className = '' }) => {
+  if (pct === 0) return <span className={`inline-flex items-center gap-1 text-[10px] font-bold text-gray-400 ${className}`}>— flat</span>;
+  const up = pct > 0;
+  return (
+    <span className={`inline-flex items-center gap-0.5 text-[10px] font-black ${up ? 'text-emerald-500' : 'text-red-400'} ${className}`}>
+      {up ? <TrendingUp size={11} /> : <TrendingDown size={11} />} {Math.abs(pct)}%
+    </span>
   );
 };
 
@@ -113,10 +165,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
 
   const [partnerData, setPartnerData] = useState<any>(null);
   const [dashboardData, setDashboardData] = useState<any>(null);
-  // Canonical source for profile_views / followers / new_enquiries / active_batches.
-  // Falls back to legacy `dashboardData` if /stats/overview/ is unavailable.
   const [overviewData, setOverviewData] = useState<StatsOverview | null>(null);
-  // Aggregate sources for the Activity Summary + the Recent Activity feed.
   const [revenueData, setRevenueData] = useState<StatsRevenue | null>(null);
   const [reviewsData, setReviewsData] = useState<StatsReviews | null>(null);
   const [eventsData, setEventsData] = useState<StatsEvents | null>(null);
@@ -155,9 +204,6 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
         if (overviewRes.status === 'fulfilled') {
           const o = overviewRes.value;
           setOverviewData(o);
-          // Prefer /stats/overview/'s follower count when available — it's the canonical
-          // source per the new API. The separate getPartnerFollowerCount() call above
-          // still runs as a fallback in case /stats/overview/ fails.
           if (typeof o?.followers === 'number') setFollowerCount(o.followers);
         }
         if (profileRes.status === 'fulfilled') setProfileData(profileRes.value.data || profileRes.value);
@@ -180,8 +226,6 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
   const hasClasses = allowedEntities.includes('Classes');
   const hasPrograms = allowedEntities.includes('Programs');
   const hasClassOrProgram = hasClasses || hasPrograms;
-  const hasEvents = allowedEntities.includes('Events');
-  const hasVenues = allowedEntities.includes('Venues');
 
   const partnerStatus = partnerData?.status || '';
   const isActive = partnerData?.is_active === true || ACTIVE_STATUSES.has(partnerStatus);
@@ -228,47 +272,71 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // ------ Derived stat sources (canonical: /stats/*, legacy dashboard as fallback) ------
+  // ------ Derived stat sources ------
   const d = dashboardData || {};
   const ticketsSold = eventsData?.tickets_sold ?? d.tickets_sold ?? 0;
   const venueBookings = venuesData?.total_bookings ?? d.venue_bookings ?? 0;
   const profileViews = overviewData?.profile_views ?? d.profile_views ?? 0;
   const newEnquiries = overviewData?.new_enquiries ?? d.new_enquiries ?? 0;
   const activeBatches = overviewData?.active_batches ?? d.active_batches ?? 0;
+  const followersTotal = followerCount ?? overviewData?.followers ?? 0;
 
   const greeting = new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening';
+  const todayStr = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
-  // ------ Activity Summary rows (partner-scoped, since launch) ------
-  const followersTotal = followerCount ?? overviewData?.followers ?? 0;
-  const summaryRows: { icon: React.ElementType; tint: string; label: string; value: string }[] = (() => {
-    const rows: { icon: React.ElementType; tint: string; label: string; value: string }[] = [];
-    rows.push({ icon: CheckCircle2, tint: 'emerald', label: 'Bookings confirmed', value: (revenueData?.confirmed_bookings ?? 0).toLocaleString('en-IN') });
-    if (hasEvents) rows.push({ icon: Ticket, tint: 'blue', label: 'Tickets sold', value: (eventsData?.tickets_sold ?? ticketsSold).toLocaleString('en-IN') });
-    if (hasVenues) rows.push({ icon: MapPin, tint: 'amber', label: 'Venue bookings', value: (venuesData?.total_bookings ?? venueBookings).toLocaleString('en-IN') });
-    rows.push({ icon: MessageSquare, tint: 'blue', label: 'New enquiries', value: newEnquiries.toLocaleString('en-IN') });
-    rows.push({ icon: IndianRupee, tint: 'amber', label: 'Revenue collected', value: fmtCurrency(moneyToNum(revenueData?.gross_revenue)) });
-    if (moneyToNum(revenueData?.refunds) > 0) rows.push({ icon: RotateCcw, tint: 'rose', label: 'Refunds processed', value: fmtCurrency(moneyToNum(revenueData?.refunds)) });
-    rows.push({ icon: Eye, tint: 'purple', label: 'Profile views', value: profileViews.toLocaleString('en-IN') });
-    rows.push({ icon: Heart, tint: 'rose', label: 'Followers', value: followersTotal.toLocaleString('en-IN') });
-    rows.push({
-      icon: Star, tint: 'yellow', label: 'Reviews received',
-      value: (reviewsData?.total_reviews ?? 0).toLocaleString('en-IN') + (reviewsData?.avg_rating ? ` · ${reviewsData.avg_rating.toFixed(1)}★` : ''),
-    });
-    if (hasClassOrProgram) rows.push({ icon: BarChart3, tint: 'emerald', label: 'Active batches', value: activeBatches.toLocaleString('en-IN') });
-    return rows;
-  })();
+  // ------ Revenue helpers ------
+  const grossRevenue = moneyToNum(revenueData?.gross_revenue);
+  const netEarnings = moneyToNum(revenueData?.net_earnings);
+  const revenueGrowth = revenueData?.revenue_growth_pct ?? 0;
+  const revenueTrendData = (revenueData?.revenue_trend || []).map(b => moneyToNum(b.earnings));
+  const revenueTrendLabels = (revenueData?.revenue_trend || []).map(b => b.month);
+  const revenueByType = (revenueData?.revenue_by_type || []).map(t => ({
+    value: moneyToNum(t.amount), color: t.type === 'event' ? '#3B82F6' : t.type === 'class' ? '#8B5CF6' : t.type === 'program' ? '#10B981' : t.type === 'venue' ? '#F59E0B' : '#6B7280', label: t.type,
+  }));
 
-  // ------ Primary KPIs (since launch) — the top stat grid ------
-  const primaryKpis: { label: string; value: string; sub: string; icon: React.ElementType; hex: string; highlight?: boolean; nav: Screen }[] = [
-    { label: 'Bookings Confirmed', value: (revenueData?.confirmed_bookings ?? 0).toLocaleString('en-IN'), sub: 'Since launch total', icon: CheckCircle2, hex: '#10B981', nav: 'BOOKINGS' },
-    { label: 'New Enquiries', value: newEnquiries.toLocaleString('en-IN'), sub: 'Awaiting your response', icon: MessageSquare, hex: '#3B82F6', nav: hasClassOrProgram ? 'ENQUIRIES' : 'BOOKINGS' },
-    { label: 'Profile Views', value: profileViews.toLocaleString('en-IN'), sub: 'Since launch total', icon: Eye, hex: '#8B5CF6', nav: 'ANALYTICS' },
-    { label: 'Followers', value: followersTotal.toLocaleString('en-IN'), sub: 'Across your brand', icon: Heart, hex: '#F43F5E', nav: 'FOLLOWERS' },
-    { label: 'Reviews', value: (reviewsData?.total_reviews ?? 0).toLocaleString('en-IN'), sub: reviewsData?.avg_rating ? `${reviewsData.avg_rating.toFixed(1)}★ average rating` : 'No reviews yet', icon: Star, hex: '#F59E0B', nav: 'REVIEWS' },
-    { label: 'Revenue Collected', value: fmtCurrency(moneyToNum(revenueData?.gross_revenue)), sub: 'View breakdown', icon: IndianRupee, hex: '#141414', highlight: true, nav: 'ANALYTICS' },
+  // ------ KPI cards ------
+  type KpiItem = {
+    label: string; rawValue: number; formatted: string; sub: string;
+    icon: React.ElementType; hex: string; trendPct?: number;
+    sparkData?: number[]; highlight?: boolean; nav: Screen; isCurrency?: boolean;
+  };
+  const primaryKpis: KpiItem[] = [
+    {
+      label: 'Bookings Confirmed', rawValue: revenueData?.confirmed_bookings ?? 0,
+      formatted: (revenueData?.confirmed_bookings ?? 0).toLocaleString('en-IN'), sub: 'Since launch',
+      icon: CheckCircle2, hex: '#10B981', nav: 'BOOKINGS',
+    },
+    {
+      label: 'New Enquiries', rawValue: newEnquiries,
+      formatted: newEnquiries.toLocaleString('en-IN'), sub: 'Awaiting response',
+      icon: MessageSquare, hex: '#3B82F6', nav: hasClassOrProgram ? 'ENQUIRIES' : 'BOOKINGS',
+    },
+    {
+      label: 'Profile Views', rawValue: profileViews,
+      formatted: profileViews.toLocaleString('en-IN'), sub: 'Total reach',
+      icon: Eye, hex: '#8B5CF6', nav: 'ANALYTICS',
+    },
+    {
+      label: 'Followers', rawValue: followersTotal,
+      formatted: followersTotal.toLocaleString('en-IN'), sub: 'Brand followers',
+      icon: Heart, hex: '#F43F5E', nav: 'FOLLOWERS',
+    },
+    {
+      label: 'Reviews', rawValue: reviewsData?.total_reviews ?? 0,
+      formatted: (reviewsData?.total_reviews ?? 0).toLocaleString('en-IN'),
+      sub: reviewsData?.avg_rating ? `${reviewsData.avg_rating.toFixed(1)}★ avg` : 'No reviews yet',
+      icon: Star, hex: '#F59E0B', nav: 'REVIEWS',
+    },
+    {
+      label: 'Revenue', rawValue: grossRevenue, isCurrency: true,
+      formatted: fmtCurrency(grossRevenue), sub: 'Gross collected',
+      icon: IndianRupee, hex: '#141414', highlight: true, nav: 'ANALYTICS',
+      trendPct: revenueGrowth,
+      sparkData: revenueTrendData.length >= 2 ? revenueTrendData : undefined,
+    },
   ];
 
-  // ------ At-a-glance, one card per active offering ------
+  // ------ Offering cards ------
   type OfferingCard = { entity: string; icon: React.ElementType; hex: string; tag: string; stats: [string, string | number][]; nav: Screen };
   const offeringCards: OfferingCard[] = allowedEntities.map((entity): OfferingCard | null => {
     switch (entity) {
@@ -294,100 +362,165 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white/90 backdrop-blur-sm px-6 md:px-8 py-4 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
-        <div className="flex items-center gap-4">
-          <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors"><Menu size={22} /></button>
-          <div>
-            <h1 className="text-xl font-black text-gray-900 tracking-tight">Dashboard</h1>
-            <p className="text-xs font-medium text-gray-400 hidden sm:block">Welcome back, {businessName}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => onNavigate('ANALYTICS')}
-            className="h-9 px-3 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors flex items-center gap-2"
-            title="Analytics"
-          >
-            <LineChart size={18} />
-            <span className="text-sm font-bold hidden md:inline">Analytics</span>
-          </button>
-          {/* Notifications */}
-          <NotificationCenter variant="light" onNavigate={onNavigate} />
-          {/* Profile */}
-          <div className="relative" ref={profilePopupRef}>
-            <button onClick={() => setShowProfilePopup(!showProfilePopup)} className="w-9 h-9 rounded-full bg-tlb-yellow/10 text-tlb-yellow flex items-center justify-center hover:bg-tlb-yellow/20 transition-colors">
-              {extendedData?.logo ? <img src={extendedData.logo} alt="" className="w-9 h-9 rounded-full object-cover" /> : <UserCircle size={20} />}
+    <div className="min-h-screen bg-[#F8FAFC]">
+      {/* ─── Header ─── */}
+      <header className="sticky top-0 z-30 bg-white/70 backdrop-blur-xl border-b border-gray-200/60">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-100 rounded-xl transition-colors lg:hidden">
+              <Menu size={20} />
             </button>
-            {showProfilePopup && (
-              <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-50">
-                {/* Dark header */}
-                <div className="bg-gradient-to-br from-gray-900 to-gray-800 px-5 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center text-white shrink-0 ring-2 ring-white/20 overflow-hidden">
-                      {extendedData?.logo
-                        ? <img src={extendedData.logo} alt="logo" className="w-12 h-12 object-cover" />
-                        : <UserCircle size={26} />
-                      }
+            <div>
+              <h1 className="text-lg font-black text-gray-900 tracking-tight leading-none">Dashboard</h1>
+              <p className="text-[11px] font-medium text-gray-400 mt-0.5 hidden sm:block">{todayStr}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Command bar hint */}
+            <button
+              onClick={() => onNavigate('ANALYTICS')}
+              className="hidden md:flex items-center gap-2 h-9 px-3.5 rounded-xl bg-gray-50 border border-gray-200/80 text-gray-400 hover:text-gray-600 hover:border-gray-300 transition-all"
+            >
+              <LineChart size={15} />
+              <span className="text-xs font-semibold">Analytics</span>
+            </button>
+            <NotificationCenter variant="light" onNavigate={onNavigate} />
+            {/* Profile avatar */}
+            <div className="relative" ref={profilePopupRef}>
+              <button
+                onClick={() => setShowProfilePopup(!showProfilePopup)}
+                className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors overflow-hidden ring-2 ring-transparent hover:ring-gray-300"
+              >
+                {extendedData?.logo
+                  ? <img src={extendedData.logo} alt="" className="w-9 h-9 rounded-xl object-cover" />
+                  : <UserCircle size={20} className="text-gray-500" />
+                }
+              </button>
+              {showProfilePopup && (
+                <div className="absolute right-0 mt-2 w-[320px] bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl shadow-black/10 border border-gray-200/60 overflow-hidden z-50">
+                  {/* Dark header */}
+                  <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-5 py-5 overflow-hidden">
+                    <div className="absolute -right-6 -top-6 w-24 h-24 bg-yellow-400/10 rounded-full blur-2xl" />
+                    <div className="absolute -left-4 -bottom-4 w-16 h-16 bg-blue-400/10 rounded-full blur-2xl" />
+                    <div className="relative flex items-center gap-3.5">
+                      <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center text-white shrink-0 ring-2 ring-white/20 overflow-hidden">
+                        {extendedData?.logo
+                          ? <img src={extendedData.logo} alt="logo" className="w-12 h-12 object-cover" />
+                          : <UserCircle size={26} />
+                        }
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-black text-sm text-white truncate">{profileData?.business_name || partnerData?.business_name || 'Your Business'}</p>
+                        <p className="text-[11px] text-gray-400 truncate mt-0.5">{partnerData?.email || partnerData?.phone || ''}</p>
+                      </div>
+                      <span className={`shrink-0 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wide ${
+                        isVerified ? 'bg-emerald-500/20 text-emerald-400' :
+                        verificationSubmitted ? 'bg-blue-500/20 text-blue-400' :
+                        isActive ? 'bg-amber-500/20 text-amber-400' :
+                        'bg-white/10 text-gray-400'
+                      }`}>
+                        {isVerified ? 'Verified' : verificationSubmitted ? 'In Review' : isActive ? 'Active' : 'Pending'}
+                      </span>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-black text-sm text-white truncate">{profileData?.business_name || partnerData?.business_name || 'Your Business'}</p>
-                      <p className="text-[11px] text-gray-400 truncate mt-0.5">{partnerData?.email || partnerData?.phone || ''}</p>
+                  </div>
+                  {/* Stats */}
+                  <div className="grid grid-cols-3 divide-x divide-gray-100">
+                    <div className="px-3 py-3 text-center">
+                      <p className="text-base font-black text-gray-900">{profileCompletion}%</p>
+                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Profile</p>
                     </div>
-                    <span className={`shrink-0 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide ${
-                      isVerified ? 'bg-emerald-500/20 text-emerald-400' :
-                      verificationSubmitted ? 'bg-blue-500/20 text-blue-400' :
-                      isActive ? 'bg-amber-500/20 text-amber-400' :
-                      'bg-white/10 text-gray-400'
-                    }`}>
-                      {isVerified ? 'Verified' : verificationSubmitted ? 'In Review' : isActive ? 'Active' : 'Pending'}
-                    </span>
+                    <div className="px-3 py-3 text-center">
+                      <p className="text-base font-black text-gray-900">{allowedEntities.length}</p>
+                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Services</p>
+                    </div>
+                    <div className="px-3 py-3 text-center">
+                      <p className="text-base font-black text-gray-900">{followerCount === null ? '-' : followerCount.toLocaleString('en-IN')}</p>
+                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Followers</p>
+                    </div>
+                  </div>
+                  {/* Entity chips */}
+                  {allowedEntities.length > 0 && (
+                    <div className="px-4 py-3 flex flex-wrap gap-1.5 border-t border-gray-100">
+                      {allowedEntities.map(e => {
+                        const c = e === 'Events' ? 'bg-blue-50 text-blue-600' : e === 'Classes' ? 'bg-purple-50 text-purple-600' : e === 'Programs' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600';
+                        return <span key={e} className={`text-[9px] font-black uppercase tracking-wide px-2.5 py-1 rounded-md ${c}`}>{e}</span>;
+                      })}
+                    </div>
+                  )}
+                  {/* Actions */}
+                  <div className="p-2 border-t border-gray-100">
+                    <button onClick={() => { setShowProfilePopup(false); onNavigate('BRAND_PROFILE'); }} className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2.5 transition-colors"><Edit3 size={14} className="text-gray-400" />Edit Profile</button>
+                    <button onClick={() => { setShowProfilePopup(false); onNavigate('PREVIEW_PROFILE'); }} className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2.5 transition-colors"><Eye size={14} className="text-gray-400" />Preview Profile</button>
+                    <div className="my-1 border-t border-gray-100" />
+                    <button onClick={() => { setShowProfilePopup(false); onNavigate('LANDING'); }} className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 flex items-center gap-2.5 transition-colors"><LogOut size={14} />Sign Out</button>
                   </div>
                 </div>
-                {/* Stats */}
-                <div className="grid grid-cols-3 divide-x divide-gray-100 border-b border-gray-100">
-                  <div className="px-3 py-3 text-center">
-                    <p className="text-base font-black text-gray-900">{profileCompletion}%</p>
-                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Profile</p>
-                  </div>
-                  <div className="px-3 py-3 text-center">
-                    <p className="text-base font-black text-gray-900">{allowedEntities.length}</p>
-                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Services</p>
-                  </div>
-                  <div className="px-3 py-3 text-center">
-                    <p className="text-base font-black text-gray-900">{followerCount === null ? '-' : followerCount.toLocaleString('en-IN')}</p>
-                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Followers</p>
-                  </div>
-                </div>
-                {/* Entity chips */}
-                {allowedEntities.length > 0 && (
-                  <div className="px-4 py-3 flex flex-wrap gap-1.5 border-b border-gray-100">
-                    {allowedEntities.map(e => {
-                      const c = e === 'Events' ? 'bg-blue-50 text-blue-600' : e === 'Classes' ? 'bg-purple-50 text-purple-600' : e === 'Programs' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600';
-                      return <span key={e} className={`text-[9px] font-black uppercase tracking-wide px-2.5 py-1 rounded-md ${c}`}>{e}</span>;
-                    })}
-                  </div>
-                )}
-                {/* Actions */}
-                <div className="p-2">
-                  <button onClick={() => { setShowProfilePopup(false); onNavigate('BRAND_PROFILE'); }} className="w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2.5 transition-colors"><Edit3 size={14} className="text-gray-400" />Edit Profile</button>
-                  <button onClick={() => { setShowProfilePopup(false); onNavigate('PREVIEW_PROFILE'); }} className="w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2.5 transition-colors"><Eye size={14} className="text-gray-400" />Preview Profile</button>
-                  <div className="my-1 border-t border-gray-100" />
-                  <button onClick={() => { setShowProfilePopup(false); onNavigate('LANDING'); }} className="w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium text-red-500 hover:bg-red-50 flex items-center gap-2.5 transition-colors"><LogOut size={14} />Sign Out</button>
-                </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </header>
 
-      <main className="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
+      <main className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-5 space-y-5">
 
-        {/* Onboarding Tracker */}
+        {/* ─── Welcome Hero ─── */}
+        <motion.section
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-4 sm:p-5"
+        >
+          {/* Decorative elements */}
+          <div className="absolute -right-16 -top-16 w-64 h-64 bg-yellow-400/[0.06] rounded-full blur-3xl" />
+          <div className="absolute -left-10 -bottom-10 w-48 h-48 bg-blue-400/[0.06] rounded-full blur-3xl" />
+
+          <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex-1 min-w-0 flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center shrink-0 ring-2 ring-white/5">
+                {extendedData?.logo ? <img src={extendedData.logo} alt="" className="w-10 h-10 rounded-full object-cover" /> : <UserCircle size={22} className="text-white/70" />}
+              </div>
+              <div>
+                <h2 className="text-lg sm:text-xl font-black tracking-tight leading-tight">
+                  Good {greeting}, {businessName}
+                </h2>
+                <div className="flex flex-wrap items-center gap-2 mt-1">
+                  <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-gray-300">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Showing: Since launch
+                  </span>
+                  {allowedEntities.length > 0 && (
+                    <span className="text-[10px] font-bold text-gray-500 border-l border-gray-600 pl-2">
+                      {allowedEntities.length} offering{allowedEntities.length > 1 ? 's' : ''} active
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Profile completion ring */}
+            <div className="shrink-0 flex items-center gap-3 bg-white/[0.05] backdrop-blur-sm rounded-xl p-2.5 border border-white/[0.08]">
+              <CompletionRing pct={profileCompletion} size={42} />
+              <div className="min-w-0 pr-2">
+                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{profileCompletion >= 100 ? 'All set 🎉' : 'Profile Progress'}</p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <p className="text-[11px] font-bold text-white">{checklistDone} / {checklist.length} steps</p>
+                  <button
+                    onClick={() => onNavigate(profileCompletion < 100 ? 'BRAND_PROFILE' : 'ANALYTICS')}
+                    className="flex items-center gap-1 text-[10px] font-black text-yellow-400 hover:text-yellow-300 transition-colors bg-white/5 hover:bg-white/10 px-2 py-0.5 rounded-md"
+                  >
+                    {profileCompletion < 100 ? 'Complete' : 'Analytics'} <ArrowRight size={10} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </motion.section>
+
+        {/* ─── Onboarding Tracker ─── */}
         {isActive && !isVerified && (
-          <section className="bg-white border border-gray-200 rounded-2xl p-5 sm:p-6">
-            <h2 className="font-bold text-sm text-gray-900 mb-4">Onboarding Progress</h2>
+          <motion.section {...fadeUp} transition={{ duration: 0.3 }} className="bg-white rounded-2xl border border-gray-200/60 p-5 sm:p-6 shadow-sm">
+            <h2 className="font-bold text-sm text-gray-900 mb-4 flex items-center gap-2">
+              <Activity size={16} className="text-amber-500" /> Onboarding Progress
+            </h2>
             <div className="space-y-0 relative">
               <div className="absolute left-[15px] top-5 bottom-5 w-px bg-gray-200 z-0" />
               {[
@@ -405,7 +538,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
                       {step.note && <p className="text-[11px] text-gray-400 mt-0.5">{step.note}</p>}
                     </div>
                     {!step.done && step.action && (
-                      <button onClick={step.action} className="bg-tlb-yellow text-tlb-dark px-4 py-2 rounded-lg text-xs font-bold shrink-0">
+                      <button onClick={step.action} className="bg-tlb-yellow text-tlb-dark px-4 py-2 rounded-lg text-xs font-bold shrink-0 hover:brightness-110 transition-all">
                         {step.actionLabel}
                       </button>
                     )}
@@ -413,112 +546,240 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
                 </div>
               ))}
             </div>
-          </section>
+          </motion.section>
         )}
 
-        {/* Intro + profile spotlight */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-stretch">
-          <motion.div {...fadeUp} transition={{ duration: 0.3 }} className="lg:col-span-2 flex flex-col justify-center">
-            <p className="text-xs text-gray-400 font-medium">Good {greeting}, {businessName}</p>
-            <h2 className="text-2xl font-black text-gray-900 tracking-tight mt-1">Your Overview</h2>
-            <p className="text-[13px] text-gray-500 mt-1.5 max-w-md leading-relaxed">
-              A cross-vertical snapshot of your brand — reach, bookings, and revenue in one place.
-            </p>
-            <div className="flex flex-wrap items-center gap-2 mt-3">
-              <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-gray-500 bg-white border border-gray-200 rounded-full px-3 py-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Showing: Since launch
-              </span>
-              {allowedEntities.length > 0 && (
-                <span className="text-[11px] font-bold text-gray-400">
-                  {allowedEntities.length} offering{allowedEntities.length > 1 ? 's' : ''} active
-                </span>
-              )}
-            </div>
-          </motion.div>
-
-          {/* Profile spotlight — the top-right focal card */}
-          <motion.section {...fadeUp} transition={{ duration: 0.3, delay: 0.05 }} className="relative overflow-hidden rounded-2xl bg-tlb-dark text-white p-5">
-            <div className="absolute -right-8 -top-8 w-28 h-28 bg-tlb-yellow/10 rounded-full blur-2xl" />
-            <div className="relative flex items-center gap-4">
-              <CompletionRing pct={profileCompletion} size={52} />
-              <div className="min-w-0 flex-1">
-                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Your Profile</p>
-                <p className="text-sm font-black mt-0.5">
-                  {profileCompletion >= 100 ? 'All set 🎉' : profileCompletion >= 60 ? 'Almost there' : 'Getting started'}
-                </p>
-                <p className="text-[11px] text-gray-400 mt-0.5">{checklistDone} of {checklist.length} steps done</p>
-              </div>
-            </div>
-            <button
-              onClick={() => onNavigate(profileCompletion < 100 ? 'BRAND_PROFILE' : 'ANALYTICS')}
-              className="relative mt-4 w-full bg-tlb-yellow text-tlb-dark rounded-lg py-2 text-xs font-black flex items-center justify-center gap-1.5 hover:brightness-110 transition-all"
-            >
-              {profileCompletion < 100 ? 'Complete Your Profile' : 'View Analytics'} <ArrowRight size={13} />
-            </button>
-          </motion.section>
-        </div>
-
-        {/* Primary KPI grid — 6 headline stats (F-pattern, revenue highlighted) */}
-        <motion.section className="grid grid-cols-2 lg:grid-cols-3 gap-4" variants={stagger} initial="initial" animate="animate">
+        {/* ─── KPI Grid ─── */}
+        <motion.section className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3" variants={stagger} initial="initial" animate="animate">
           {primaryKpis.map(k => (
             <motion.button
               key={k.label}
               variants={fadeUp}
-              whileHover={{ y: -4 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 22 }}
+              whileHover={{ y: -3, transition: { type: 'spring', stiffness: 400, damping: 20 } }}
               onClick={() => onNavigate(k.nav)}
-              className={`group relative text-left rounded-2xl border p-5 overflow-hidden transition-shadow ${k.highlight ? 'bg-gradient-to-br from-tlb-yellow/20 to-tlb-yellow/5 border-tlb-yellow/40 hover:shadow-lg' : 'bg-white border-gray-100 hover:shadow-lg'}`}
+              className={`group relative text-left rounded-2xl border overflow-hidden transition-all duration-200 ${
+                k.highlight
+                  ? 'bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700 text-white hover:shadow-xl hover:shadow-gray-900/20'
+                  : 'bg-white border-gray-200/60 hover:shadow-lg hover:shadow-gray-200/60 hover:border-gray-300'
+              }`}
             >
-              <div className="pointer-events-none absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-0 group-hover:opacity-15 transition-opacity duration-500" style={{ background: k.hex }} />
-              <div className="relative flex items-center justify-between mb-3">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{k.label}</p>
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center transition-transform duration-300 group-hover:scale-110" style={{ backgroundColor: `${k.hex}14`, color: k.hex }}>
-                  <k.icon size={14} />
+              {/* Sparkline background */}
+              {k.sparkData && (
+                <div className="absolute bottom-0 left-0 right-0 h-12 opacity-20 pointer-events-none">
+                  <AreaSparkline data={k.sparkData} color={k.highlight ? '#FACC15' : k.hex} id={`kpi-${k.label.replace(/\s/g,'')}`} />
+                </div>
+              )}
+              <div className="relative p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <p className={`text-[10px] font-bold uppercase tracking-widest ${k.highlight ? 'text-gray-400' : 'text-gray-400'}`}>
+                    {k.label}
+                  </p>
+                  <div
+                    className="w-7 h-7 rounded-lg flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
+                    style={{ backgroundColor: k.highlight ? 'rgba(250,204,21,0.15)' : `${k.hex}14`, color: k.highlight ? '#FACC15' : k.hex }}
+                  >
+                    <k.icon size={14} />
+                  </div>
+                </div>
+                <div>
+                  {k.isCurrency
+                    ? <CountUpCurrency value={k.rawValue} className={`text-2xl xl:text-[22px] font-black leading-none ${k.highlight ? 'text-white' : 'text-gray-900'}`} />
+                    : <CountUpValue value={k.rawValue} className={`text-2xl xl:text-[22px] font-black leading-none ${k.highlight ? 'text-white' : 'text-gray-900'}`} />
+                  }
+                </div>
+                <div className="mt-2 flex items-center gap-2">
+                  <p className={`text-[11px] font-medium ${k.highlight ? 'text-gray-400' : 'text-gray-400'}`}>{k.sub}</p>
+                  {k.trendPct !== undefined && <TrendBadge pct={k.trendPct} />}
                 </div>
               </div>
-              <p className={`relative text-3xl font-black leading-none ${k.highlight ? 'text-tlb-dark' : 'text-gray-900'}`}>{k.value}</p>
-              <p className={`relative text-[11px] font-bold mt-2 flex items-center gap-1 ${k.highlight ? 'text-amber-700' : 'text-gray-400'}`}>
-                {k.sub}
-                {k.highlight && <ArrowRight size={11} className="group-hover:translate-x-0.5 transition-transform" />}
-              </p>
             </motion.button>
           ))}
         </motion.section>
 
-        {/* At a glance — one card per active offering */}
+        {/* ─── Revenue Overview + Recent Activity ─── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          {/* Revenue Overview — 2/3 */}
+          <motion.section {...fadeUp} transition={{ duration: 0.35 }} className="lg:col-span-2 bg-white rounded-2xl border border-gray-200/60 shadow-sm overflow-hidden">
+            <div className="p-5 sm:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gray-900 text-yellow-400 flex items-center justify-center">
+                    <IndianRupee size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-gray-900 tracking-tight leading-none">Revenue Overview</h3>
+                    <p className="text-[11px] font-medium text-gray-400 mt-0.5">All-time performance</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {revenueGrowth !== 0 && (
+                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-black ${revenueGrowth > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'}`}>
+                      {revenueGrowth > 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                      {Math.abs(revenueGrowth)}% MoM
+                    </span>
+                  )}
+                  <button onClick={() => onNavigate('ANALYTICS')} className="text-[11px] font-black text-blue-500 hover:text-blue-600 flex items-center gap-1 transition-colors">
+                    Details <ArrowRight size={11} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Revenue figures */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Gross Revenue</p>
+                  <p className="text-xl font-black text-gray-900">{fmtCurrency(grossRevenue)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Net Earnings</p>
+                  <p className="text-xl font-black text-gray-900">{fmtCurrency(netEarnings)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Avg Order</p>
+                  <p className="text-xl font-black text-gray-900">{fmtCurrency(moneyToNum(revenueData?.avg_order_value))}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Refunds</p>
+                  <p className="text-xl font-black text-gray-900">{fmtCurrency(moneyToNum(revenueData?.refunds))}</p>
+                </div>
+              </div>
+
+              {/* Revenue trend chart + donut side by side */}
+              <div className="flex flex-col md:flex-row gap-6">
+                {/* Trend chart */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">Revenue Trend</p>
+                  {revenueTrendData.length >= 2 ? (
+                    <TrendAreaChart data={revenueTrendData} labels={revenueTrendLabels} color="#141414" id="rev-trend" />
+                  ) : (
+                    <div className="h-20 flex items-center justify-center">
+                      <p className="text-[11px] text-gray-300 font-bold">Not enough data yet</p>
+                    </div>
+                  )}
+                </div>
+                {/* Donut breakdown */}
+                <div className="w-full md:w-40 shrink-0 flex flex-col items-center">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">By Type</p>
+                  <div className="w-28 h-28">
+                    <DonutChart
+                      segments={revenueByType.length > 0 ? revenueByType : [{ value: 1, color: '#E5E7EB', label: 'None' }]}
+                      centerLabel={fmtCurrency(grossRevenue)}
+                      centerSub="Total"
+                    />
+                  </div>
+                  {revenueByType.length > 0 && (
+                    <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 mt-2">
+                      {revenueByType.map(s => (
+                        <span key={s.label} className="flex items-center gap-1 text-[10px] font-bold text-gray-500">
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
+                          {s.label}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </motion.section>
+
+          {/* Recent Activity — 1/3 */}
+          <motion.section {...fadeUp} transition={{ duration: 0.35, delay: 0.05 }} className="bg-white rounded-2xl border border-gray-200/60 shadow-sm flex flex-col">
+            <div className="p-5 flex items-center justify-between border-b border-gray-100">
+              <h3 className="text-base font-black text-gray-900 tracking-tight">Recent Activity</h3>
+              <button onClick={() => onNavigate('MESSAGES')} className="text-[11px] font-black text-blue-500 hover:text-blue-600 flex items-center gap-1 transition-colors">
+                View all <ArrowRight size={11} />
+              </button>
+            </div>
+            <div className="p-4 flex-1 overflow-y-auto" style={{ maxHeight: 420 }}>
+              {activity.length === 0 ? (
+                <div className="flex-1 flex flex-col items-center justify-center gap-2.5 py-12 text-center">
+                  <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center">
+                    <Inbox size={22} className="text-gray-300" />
+                  </div>
+                  <p className="text-sm font-bold text-gray-400">No activity yet</p>
+                  <p className="text-[11px] text-gray-400 max-w-[200px]">Bookings, enquiries &amp; alerts will appear here.</p>
+                </div>
+              ) : (
+                <div className="space-y-0.5">
+                  {activity.map((n, i) => {
+                    const meta = activityMeta(n.notification_type);
+                    return (
+                      <motion.button
+                        key={n.id}
+                        initial={{ opacity: 0, x: 8 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.2, delay: Math.min(i * 0.04, 0.24) }}
+                        onClick={() => handleActivityClick(n)}
+                        className="w-full text-left flex items-start gap-3 py-3 px-3 -mx-1 rounded-xl hover:bg-gray-50 transition-colors group"
+                      >
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${TINT[meta.tint]}`}>
+                          <meta.icon size={15} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className={`text-[13px] leading-snug ${n.is_read ? 'font-semibold text-gray-600' : 'font-bold text-gray-900'}`}>
+                            {n.title}
+                          </p>
+                          {n.body && (
+                            <p className="text-[11px] text-gray-400 truncate mt-0.5">{n.body}</p>
+                          )}
+                          <div className="flex items-center gap-1.5 mt-1">
+                            {!n.is_read && <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 shrink-0" />}
+                            <span className="text-[10px] font-semibold text-gray-400">{timeAgo(n.created_at)}</span>
+                            {n.action_url && <ExternalLink size={10} className="text-gray-300 group-hover:text-blue-500 transition-colors" />}
+                          </div>
+                        </div>
+                      </motion.button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </motion.section>
+        </div>
+
+        {/* ─── At a Glance — Offering Cards ─── */}
         {offeringCards.length > 0 && (
           <section>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-base font-black text-gray-900 tracking-tight">At a glance — by offering</h3>
-              <button onClick={() => onNavigate('SERVICE_LISTINGS')} className="text-[11px] font-black text-blue-500 hover:underline flex items-center gap-1 shrink-0">
+              <button onClick={() => onNavigate('SERVICE_LISTINGS')} className="text-[11px] font-black text-blue-500 hover:text-blue-600 flex items-center gap-1 shrink-0 transition-colors">
                 All listings <ArrowRight size={11} />
               </button>
             </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {offeringCards.map((c, idx) => (
                 <motion.button
                   key={c.entity}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.25, delay: Math.min(idx * 0.05, 0.2) }}
-                  whileHover={{ y: -3 }}
+                  whileHover={{ y: -3, transition: { type: 'spring', stiffness: 400, damping: 20 } }}
                   onClick={() => onNavigate(c.nav)}
-                  className="group text-left bg-white rounded-2xl border border-gray-100 p-4 hover:shadow-lg transition-shadow"
+                  className="group text-left bg-white rounded-2xl border border-gray-200/60 overflow-hidden hover:shadow-lg transition-all duration-200"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="w-9 h-9 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105" style={{ backgroundColor: `${c.hex}14`, color: c.hex }}>
-                      <c.icon size={17} />
-                    </div>
-                    <span className="text-[9px] font-black uppercase tracking-wide px-2 py-0.5 rounded-md" style={{ backgroundColor: `${c.hex}14`, color: c.hex }}>{c.tag}</span>
-                  </div>
-                  <p className="text-sm font-black text-gray-900 mt-3">{c.entity}</p>
-                  <div className="flex items-center gap-5 mt-2">
-                    {c.stats.map(([label, value]) => (
-                      <div key={label}>
-                        <p className="text-lg font-black text-gray-900 leading-none">{value}</p>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mt-0.5">{label}</p>
+                  {/* Colored top accent */}
+                  <div className="h-1" style={{ backgroundColor: c.hex }} />
+                  <div className="p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105" style={{ backgroundColor: `${c.hex}12`, color: c.hex }}>
+                          <c.icon size={17} />
+                        </div>
+                        <p className="text-sm font-black text-gray-900">{c.entity}</p>
                       </div>
-                    ))}
+                      <span className="text-[9px] font-black uppercase tracking-wide px-2 py-0.5 rounded-md" style={{ backgroundColor: `${c.hex}12`, color: c.hex }}>{c.tag}</span>
+                    </div>
+                    <div className="flex items-center gap-5">
+                      {c.stats.map(([label, value]) => (
+                        <div key={label}>
+                          <p className="text-lg font-black text-gray-900 leading-none">{value}</p>
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mt-0.5">{label}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-1 text-[11px] font-semibold text-gray-400 group-hover:text-gray-600 transition-colors">
+                      View details <ChevronRight size={12} className="group-hover:translate-x-0.5 transition-transform" />
+                    </div>
                   </div>
                 </motion.button>
               ))}
@@ -526,87 +787,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
           </section>
         )}
 
-        {/* Activity Summary + Recent Activity */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          {/* Activity Summary */}
-          <motion.section {...fadeUp} transition={{ duration: 0.3 }} className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-tlb-dark text-tlb-yellow flex items-center justify-center">
-                  <Activity size={16} />
-                </div>
-                <div>
-                  <h3 className="text-base font-black text-gray-900 tracking-tight leading-none">Activity Summary</h3>
-                  <p className="text-[11px] font-medium text-gray-400 mt-0.5">Your performance since launch</p>
-                </div>
-              </div>
-            </div>
-            <div className="grid sm:grid-cols-2 gap-x-6 gap-y-0">
-              {summaryRows.map((r, i) => (
-                <motion.div
-                  key={r.label}
-                  initial={{ opacity: 0, x: -6 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.2, delay: Math.min(i * 0.03, 0.24) }}
-                  className="flex items-center gap-2.5 py-2 border-b border-gray-50 last:border-0"
-                >
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${TINT[r.tint]}`}>
-                    <r.icon size={15} />
-                  </div>
-                  <span className="text-[13px] font-medium text-gray-600 flex-1 min-w-0 truncate">{r.label}</span>
-                  <span className="text-sm font-black text-gray-900 shrink-0">{r.value}</span>
-                </motion.div>
-              ))}
-            </div>
-          </motion.section>
-
-          {/* Recent Activity */}
-          <motion.section {...fadeUp} transition={{ duration: 0.3, delay: 0.05 }} className="bg-white rounded-2xl border border-gray-100 p-5 flex flex-col">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-black text-gray-900 tracking-tight">Recent Activity</h3>
-              <button onClick={() => onNavigate('MESSAGES')} className="text-[11px] font-black text-blue-500 hover:underline flex items-center gap-1 shrink-0">
-                View all <ArrowRight size={11} />
-              </button>
-            </div>
-            {activity.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center gap-2 py-10 text-center">
-                <Inbox size={30} className="text-gray-200" />
-                <p className="text-xs font-bold text-gray-400">No activity yet</p>
-                <p className="text-[11px] text-gray-400">Bookings, enquiries &amp; alerts will show up here.</p>
-              </div>
-            ) : (
-              <div className="space-y-1">
-                {activity.map((n, i) => {
-                  const meta = activityMeta(n.notification_type);
-                  return (
-                    <motion.button
-                      key={n.id}
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.2, delay: Math.min(i * 0.04, 0.24) }}
-                      onClick={() => handleActivityClick(n)}
-                      className="w-full text-left flex items-start gap-3 py-2.5 px-2 -mx-2 rounded-xl hover:bg-gray-50 transition-colors group"
-                    >
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${TINT[meta.tint]}`}>
-                        <meta.icon size={14} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className={`text-[13px] leading-snug truncate ${n.is_read ? 'font-bold text-gray-700' : 'font-black text-gray-900'}`}>{n.title}</p>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          {!n.is_read && <span className="w-1.5 h-1.5 rounded-full bg-tlb-yellow shrink-0" />}
-                          <span className="text-[10px] font-bold text-gray-400">{timeAgo(n.created_at)}</span>
-                          {n.action_url && <ExternalLink size={10} className="text-gray-300 group-hover:text-blue-500 transition-colors" />}
-                        </div>
-                      </div>
-                    </motion.button>
-                  );
-                })}
-              </div>
-            )}
-          </motion.section>
-        </div>
-
-        {/* Latest listings + Bookings calendar (functional widgets) */}
+        {/* ─── Latest Listings + Bookings Calendar ─── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           <motion.div {...fadeUp} transition={{ duration: 0.3 }}>
             <LatestListings onViewAll={() => onNavigate('SERVICE_LISTINGS')} />

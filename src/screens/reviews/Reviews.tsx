@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { motion } from 'motion/react';
 import {
-    Menu, Star, RefreshCw, AlertCircle, Inbox,
-    MessageSquare, CalendarDays, GraduationCap, Layers, MapPin, User, BarChart2
+    Menu, Star, RefreshCw, AlertCircle, Inbox, Quote, TrendingUp,
+    CalendarDays, GraduationCap, Layers, MapPin,
 } from 'lucide-react';
 import { Screen, EntityType } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
@@ -28,10 +29,15 @@ interface LCard { id: string; title: string; type: BType; }
 
 const fmtDate = (iso: string) => iso ? new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
 
-const Stars: React.FC<{ value: number; size?: number }> = ({ value, size = 14 }) => (
+const initials = (name: string) =>
+    (name || '').split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase() || 'U';
+
+const Stars: React.FC<{ value: number; size?: number; filled?: string; empty?: string }> = ({
+    value, size = 14, filled = 'text-amber-400', empty = 'text-gray-200',
+}) => (
     <span className="inline-flex items-center gap-0.5">
         {[1, 2, 3, 4, 5].map(i => (
-            <Star key={i} size={size} className={i <= Math.round(value) ? 'text-amber-400' : 'text-gray-200'} fill="currentColor" />
+            <Star key={i} size={size} className={i <= Math.round(value) ? filled : empty} fill="currentColor" />
         ))}
     </span>
 );
@@ -114,6 +120,11 @@ const Reviews: React.FC<Props> = ({ onOpenSidebar }) => {
     const overall = stats?.avg_rating || 0;
     const totalReviews = stats?.total_reviews || 0;
     const reviewsThisMonth = stats?.reviews_this_month || 0;
+    const reviewsPrevMonth = stats?.reviews_prev_month || 0;
+    const monthDelta = reviewsThisMonth - reviewsPrevMonth;
+    const distMap: Record<number, number> = {};
+    (stats?.rating_distribution || []).forEach(b => { distMap[b.rating] = b.count; });
+    const distMax = Math.max(1, ...[5, 4, 3, 2, 1].map(s => distMap[s] || 0));
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -130,30 +141,67 @@ const Reviews: React.FC<Props> = ({ onOpenSidebar }) => {
                 </header>
 
                 <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-6">
-                    {/* Summary */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4">
-                            <div className="text-center shrink-0">
-                                <p className="text-3xl font-black text-gray-900 leading-none">{overall ? overall.toFixed(1) : '—'}</p>
-                                <div className="mt-1.5"><Stars value={overall} size={13} /></div>
+                    {/* Rating hero */}
+                    <motion.section
+                        initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
+                        className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-amber-400 via-yellow-500 to-orange-500 text-white p-6 sm:p-8 shadow-lg shadow-amber-500/20"
+                    >
+                        <div className="absolute -right-12 -top-16 w-60 h-60 bg-white/10 rounded-full blur-2xl" />
+                        <Star size={190} className="absolute -right-8 -bottom-16 text-white/10 rotate-12" fill="currentColor" />
+                        <div className="relative grid lg:grid-cols-[auto_1fr] gap-6 lg:gap-10 items-center">
+                            {/* Big score */}
+                            <div className="lg:pr-8 lg:border-r lg:border-white/20">
+                                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/70">Overall Rating</p>
+                                <div className="flex items-end gap-3 mt-1.5">
+                                    <motion.p
+                                        key={overall}
+                                        initial={{ scale: 0.85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                                        transition={{ type: 'spring', stiffness: 220, damping: 18 }}
+                                        className="text-6xl font-black leading-none tracking-tight"
+                                    >
+                                        {overall ? overall.toFixed(1) : '—'}
+                                    </motion.p>
+                                    <div className="mb-1.5">
+                                        <Stars value={overall} size={18} filled="text-white" empty="text-white/30" />
+                                        <p className="text-xs font-medium text-white/80 mt-1">based on {totalReviews.toLocaleString('en-IN')} review{totalReviews === 1 ? '' : 's'}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 mt-4">
+                                    <span className="inline-flex items-center gap-1.5 bg-white/15 backdrop-blur rounded-full px-3 py-1.5 text-xs font-black">
+                                        {reviewsThisMonth} this month
+                                    </span>
+                                    {monthDelta !== 0 && (
+                                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-black ${monthDelta > 0 ? 'bg-white/20' : 'bg-black/10'}`}>
+                                            <TrendingUp size={12} className={monthDelta > 0 ? '' : 'rotate-180'} /> {monthDelta > 0 ? '+' : ''}{monthDelta} vs last
+                                        </span>
+                                    )}
+                                </div>
                             </div>
-                            <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Overall Rating</p>
-                        </div>
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-3">
-                            <div className="w-11 h-11 rounded-xl bg-tlb-yellow/15 flex items-center justify-center shrink-0"><MessageSquare size={20} className="text-tlb-dark" /></div>
-                            <div>
-                                <p className="text-2xl font-black text-gray-900 leading-none">{totalReviews}</p>
-                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">Total Reviews</p>
+                            {/* Distribution bars */}
+                            <div className="space-y-2 min-w-0">
+                                {[5, 4, 3, 2, 1].map(star => {
+                                    const count = distMap[star] || 0;
+                                    const pct = totalReviews ? Math.round((count / totalReviews) * 100) : 0;
+                                    return (
+                                        <div key={star} className="flex items-center gap-3">
+                                            <span className="flex items-center gap-1 text-xs font-black text-white/90 w-8 shrink-0">
+                                                {star} <Star size={11} fill="currentColor" />
+                                            </span>
+                                            <div className="flex-1 h-2.5 rounded-full bg-white/20 overflow-hidden">
+                                                <motion.div
+                                                    className="h-full rounded-full bg-white"
+                                                    initial={{ width: 0 }}
+                                                    animate={{ width: `${totalReviews ? (count / distMax) * 100 : 0}%` }}
+                                                    transition={{ duration: 0.6, ease: 'easeOut', delay: 0.1 + (5 - star) * 0.06 }}
+                                                />
+                                            </div>
+                                            <span className="text-[11px] font-bold text-white/80 w-12 text-right shrink-0 tabular-nums">{count} · {pct}%</span>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-3">
-                            <div className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><BarChart2 size={20} className="text-blue-600" /></div>
-                            <div>
-                                <p className="text-2xl font-black text-gray-900 leading-none">{reviewsThisMonth}</p>
-                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">Reviews This Month</p>
-                            </div>
-                        </div>
-                    </div>
+                    </motion.section>
 
                     {/* Filters */}
                     <div className="flex flex-wrap items-center gap-3 bg-white p-3 rounded-2xl border border-gray-100 shadow-sm">
@@ -214,32 +262,42 @@ const Reviews: React.FC<Props> = ({ onOpenSidebar }) => {
                             <p className="text-sm font-bold text-gray-400">No reviews found</p>
                         </div>
                     ) : (
-                        <div className="space-y-4">
+                        <div className="grid grid-cols-1 gap-4">
                             {/* Review Feed */}
-                            {reviews.map(r => {
+                            {reviews.map((r, i) => {
                                 const meta = TYPE_META[r.listing_type as BType] || TYPE_META.event;
                                 return (
-                                    <div key={r.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6">
-                                        <div className="flex items-start justify-between gap-4">
-                                            <div className="flex items-center gap-3.5">
-                                                <div className="w-11 h-11 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
-                                                    <User size={18} className="text-gray-400" />
+                                    <motion.div
+                                        key={r.id}
+                                        initial={{ opacity: 0, y: 14 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ duration: 0.28, delay: Math.min(i * 0.04, 0.4) }}
+                                        whileHover={{ y: -3 }}
+                                        className="group relative overflow-hidden bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6 hover:shadow-xl hover:shadow-amber-500/5 hover:border-amber-100 transition-all"
+                                    >
+                                        <Quote size={72} className="absolute -right-2 -top-3 text-amber-50 rotate-6" fill="currentColor" />
+                                        <div className="relative flex items-start justify-between gap-4">
+                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                <div className="shrink-0 p-[2px] rounded-full bg-gradient-to-br from-amber-300 to-orange-400">
+                                                    <div className="w-11 h-11 rounded-full bg-white flex items-center justify-center font-black text-sm text-amber-600">
+                                                        {initials(r.reviewer_name)}
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <p className="font-bold text-sm text-gray-900">{r.reviewer_name}</p>
+                                                <div className="min-w-0">
+                                                    <p className="font-black text-[15px] text-gray-900 truncate">{r.reviewer_name}</p>
                                                     <div className="flex items-center gap-2 mt-1">
-                                                        <Stars value={r.rating} size={13} />
+                                                        <Stars value={r.rating} size={14} />
                                                         {r.created_at && <span className="text-[11px] text-gray-400 font-medium">· {fmtDate(r.created_at)}</span>}
                                                     </div>
                                                 </div>
                                             </div>
-                                            <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg ${meta.badge}`}>
-                                                <meta.icon size={14} />
+                                            <div className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg shrink-0 ${meta.badge}`}>
+                                                <meta.icon size={13} />
                                                 <span className="text-[10px] font-black uppercase tracking-wider truncate max-w-[200px]">{r.listing_title || 'Listing'}</span>
                                             </div>
                                         </div>
                                         {r.comment && (
-                                            <p className="text-sm text-gray-700 leading-relaxed mt-4 bg-gray-50/50 p-4 rounded-xl border border-gray-50">
+                                            <p className="relative text-sm text-gray-700 leading-relaxed mt-4 pl-4 border-l-2 border-amber-200">
                                                 {r.comment}
                                             </p>
                                         )}
@@ -248,7 +306,7 @@ const Reviews: React.FC<Props> = ({ onOpenSidebar }) => {
                                             <meta.icon size={12} />
                                             <span className="text-[9px] font-black uppercase tracking-wider truncate max-w-[200px]">{r.listing_title || 'Listing'}</span>
                                         </div>
-                                    </div>
+                                    </motion.div>
                                 );
                             })}
                             

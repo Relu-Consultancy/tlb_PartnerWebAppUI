@@ -139,6 +139,7 @@ const Followers: React.FC<Props> = ({ onOpenSidebar }) => {
     const cutoff = Date.now() - 30 * 86400000;
     return f.followed_at && Date.parse(f.followed_at) >= cutoff;
   }).length;
+  const uniqueCities = new Set(followers.map(f => f.city).filter(Boolean)).size;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -161,28 +162,65 @@ const Followers: React.FC<Props> = ({ onOpenSidebar }) => {
         </header>
 
         <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-6">
-          {/* Summary cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
-            <div className="relative overflow-hidden bg-gradient-to-br from-rose-500 to-pink-600 rounded-2xl shadow-sm p-5 flex items-center gap-4 text-white">
-              <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
-                <Heart size={22} fill="currentColor" />
-              </div>
+          {/* Community hero */}
+          <motion.section
+            initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
+            className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-rose-500 via-pink-600 to-fuchsia-600 text-white p-6 sm:p-8 shadow-lg shadow-pink-500/20"
+          >
+            <div className="absolute -right-12 -top-16 w-60 h-60 bg-white/10 rounded-full blur-2xl" />
+            <div className="absolute -left-10 bottom-0 w-44 h-44 bg-fuchsia-400/20 rounded-full blur-2xl" />
+            <Heart size={170} className="absolute -right-6 -bottom-14 text-white/10 rotate-12" fill="currentColor" />
+            <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
               <div>
-                <p className="text-3xl font-black leading-none">{totalCount.toLocaleString('en-IN')}</p>
-                <p className="text-[10px] font-black uppercase tracking-widest mt-1.5 text-white/80">Total Followers</p>
+                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/70">Your community</p>
+                <div className="flex items-end gap-2.5 mt-1.5">
+                  <motion.p
+                    key={totalCount}
+                    initial={{ scale: 0.85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                    transition={{ type: 'spring', stiffness: 220, damping: 18 }}
+                    className="text-5xl sm:text-6xl font-black leading-none tracking-tight"
+                  >
+                    {totalCount.toLocaleString('en-IN')}
+                  </motion.p>
+                  <p className="text-sm font-bold text-white/80 mb-1.5">followers</p>
+                </div>
+                {followers.length > 0 && (
+                  <div className="flex items-center gap-3 mt-5">
+                    <div className="flex -space-x-3">
+                      {followers.slice(0, 6).map((f, i) => (
+                        <motion.div
+                          key={f.user_id}
+                          initial={{ scale: 0, x: -6 }} animate={{ scale: 1, x: 0 }}
+                          transition={{ delay: 0.1 + i * 0.05, type: 'spring', stiffness: 300, damping: 20 }}
+                          className={`w-9 h-9 rounded-full ring-2 ring-white/80 flex items-center justify-center text-[11px] font-black ${tintFor(f.user_id)}`}
+                        >
+                          {initials(f.full_name)}
+                        </motion.div>
+                      ))}
+                      {totalCount > Math.min(followers.length, 6) && (
+                        <div className="w-9 h-9 rounded-full ring-2 ring-white/80 bg-white/20 backdrop-blur flex items-center justify-center text-[10px] font-black text-white">
+                          +{totalCount - Math.min(followers.length, 6)}
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-xs font-medium text-white/70 hidden sm:inline">people who love your brand</span>
+                  </div>
+                )}
               </div>
-              <Heart size={90} className="absolute -right-4 -bottom-5 text-white/10" fill="currentColor" />
+              <div className="flex gap-3 shrink-0">
+                <div className="bg-white/15 backdrop-blur rounded-2xl px-5 py-4 text-center min-w-[92px]">
+                  <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center mx-auto mb-2"><UserPlus size={16} /></div>
+                  <p className="text-2xl font-black leading-none">{recentCount}</p>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-white/70 mt-1.5">New · 30d</p>
+                </div>
+                <div className="bg-white/15 backdrop-blur rounded-2xl px-5 py-4 text-center min-w-[92px]">
+                  <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center mx-auto mb-2"><MapPin size={16} /></div>
+                  <p className="text-2xl font-black leading-none">{uniqueCities}</p>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-white/70 mt-1.5">Cities</p>
+                </div>
+              </div>
             </div>
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center shrink-0">
-                <UserPlus size={22} className="text-emerald-600" />
-              </div>
-              <div>
-                <p className="text-3xl font-black text-gray-900 leading-none">{recentCount}</p>
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1.5">New on this page · 30 days</p>
-              </div>
-            </div>
-          </div>
+          </motion.section>
 
           {/* Search & filters bar */}
           <div className="flex flex-col sm:flex-row gap-3">
@@ -190,7 +228,7 @@ const Followers: React.FC<Props> = ({ onOpenSidebar }) => {
               <Search size={16} className="text-gray-400 shrink-0" />
               <input
                 className="flex-1 bg-transparent border-none focus:outline-none text-sm font-bold placeholder:text-gray-300"
-                placeholder="Search by name or email..."
+                placeholder="Search followers by name or email…"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
@@ -255,8 +293,16 @@ const Followers: React.FC<Props> = ({ onOpenSidebar }) => {
 
           {/* Content */}
           {loading ? (
-            <div className="flex items-center justify-center py-24">
-              <RefreshCw size={26} className="text-gray-300 animate-spin" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3.5 animate-pulse">
+                  <div className="w-12 h-12 rounded-full bg-gray-100 shrink-0" />
+                  <div className="flex-1 space-y-2.5">
+                    <div className="h-3.5 w-1/2 bg-gray-100 rounded-full" />
+                    <div className="h-2.5 w-3/4 bg-gray-50 rounded-full" />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : error ? (
             <div className="flex flex-col items-center gap-3 py-24 text-center">
@@ -286,43 +332,61 @@ const Followers: React.FC<Props> = ({ onOpenSidebar }) => {
               </p>
 
               {/* Follower cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {followers.map((f, i) => (
-                  <motion.button
-                    key={f.user_id}
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.25, delay: Math.min(i * 0.03, 0.4) }}
-                    whileHover={{ y: -2 }}
-                    onClick={() => openDetail(f.user_id)}
-                    className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3.5 hover:shadow-md hover:border-gray-200 transition-shadow text-left w-full"
-                  >
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 font-black text-sm ${tintFor(f.user_id)}`}>
-                      {initials(f.full_name)}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-bold text-sm text-gray-900 truncate">{f.full_name}</p>
-                      <div className="flex items-center gap-3 mt-1 text-[11px] text-gray-400 font-medium flex-wrap">
-                        {f.city && (
-                          <span className="inline-flex items-center gap-1 min-w-0">
-                            <MapPin size={11} className="shrink-0" /> <span className="truncate">{f.city}</span>
-                          </span>
-                        )}
-                        {f.gender && (
-                          <span className="inline-flex items-center gap-1">
-                            <User size={11} className="shrink-0" /> {GENDER_LABELS[f.gender] || f.gender}
-                          </span>
-                        )}
-                        {f.followed_at && (
-                          <span className="inline-flex items-center gap-1 shrink-0">
-                            <Calendar size={11} /> {fmtRelative(f.followed_at)}
-                          </span>
-                        )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {followers.map((f, i) => {
+                  const isNew = !!f.followed_at && (Date.now() - Date.parse(f.followed_at)) < 7 * 86400000;
+                  const tintText = tintFor(f.user_id).split(' ')[1] || 'text-rose-600';
+                  return (
+                    <motion.button
+                      key={f.user_id}
+                      initial={{ opacity: 0, y: 14 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.28, delay: Math.min(i * 0.04, 0.4) }}
+                      whileHover={{ y: -4 }}
+                      onClick={() => openDetail(f.user_id)}
+                      className="group relative overflow-hidden bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-xl hover:shadow-rose-500/5 hover:border-rose-100 transition-all text-left w-full"
+                    >
+                      {/* soft rose wash on hover */}
+                      <div className="pointer-events-none absolute -right-8 -top-8 w-28 h-28 rounded-full bg-rose-400 blur-2xl opacity-0 group-hover:opacity-10 transition-opacity duration-500" />
+                      <div className="relative flex items-center gap-4">
+                        {/* gradient-ring avatar */}
+                        <div className="relative shrink-0 p-[2px] rounded-full bg-gradient-to-br from-rose-300 to-pink-500 transition-transform duration-300 group-hover:scale-105">
+                          <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center">
+                            <span className={`font-black text-base ${tintText}`}>{initials(f.full_name)}</span>
+                          </div>
+                          {isNew && <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 ring-2 ring-white" />}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-black text-[15px] text-gray-900 truncate">{f.full_name}</p>
+                            {isNew && <span className="shrink-0 text-[9px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600">New</span>}
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                            {f.city && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-500 bg-gray-50 rounded-full px-2 py-1 min-w-0">
+                                <MapPin size={10} className="shrink-0 text-gray-400" /> <span className="truncate max-w-[90px]">{f.city}</span>
+                              </span>
+                            )}
+                            {f.gender && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-500 bg-gray-50 rounded-full px-2 py-1">
+                                <User size={10} className="shrink-0 text-gray-400" /> {GENDER_LABELS[f.gender] || f.gender}
+                              </span>
+                            )}
+                            {f.followed_at && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-500 bg-gray-50 rounded-full px-2 py-1 shrink-0">
+                                <Calendar size={10} className="text-gray-400" /> {fmtRelative(f.followed_at)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        {/* hover-reveal view affordance */}
+                        <div className="shrink-0 flex items-center justify-center w-9 h-9 rounded-full bg-gray-50 text-gray-300 group-hover:bg-rose-500 group-hover:text-white transition-colors">
+                          <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
+                        </div>
                       </div>
-                    </div>
-                    <ChevronRight size={16} className="text-gray-300 shrink-0" />
-                  </motion.button>
-                ))}
+                    </motion.button>
+                  );
+                })}
               </div>
 
               {/* Pagination */}

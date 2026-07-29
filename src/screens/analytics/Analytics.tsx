@@ -64,22 +64,27 @@ const StatTile: React.FC<{
     const a = ACCENTS[accent];
     return (
         <motion.div
-            className="tlb-card p-4 sm:p-5 flex flex-col gap-3"
-            whileHover={{ y: -3 }}
+            className="relative overflow-hidden bg-white p-5 rounded-2xl border border-gray-200/60 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.02)] flex flex-col justify-between h-full"
+            whileHover={{ y: -3, boxShadow: "0 12px 24px -8px rgba(0,0,0,0.06)" }}
             transition={{ type: 'spring', stiffness: 300, damping: 22 }}
         >
-            <div className="flex items-center justify-between">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: a.bg, color: a.fg }}>
-                    <Icon size={17} />
-                </div>
-                {delta != null && delta !== 0 && <DeltaPill pct={delta} />}
+            <div className="absolute -right-4 -top-4 opacity-[0.03] text-gray-900 transform rotate-12">
+                <Icon size={100} />
             </div>
             <div>
-                <p className={`${big ? 'text-3xl' : 'text-2xl'} font-black leading-none text-gray-900`}>
-                    {typeof value === 'number' ? <CountUp value={value} format={format} /> : value}
-                </p>
-                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1.5">{label}</p>
-                {subtitle && <p className="text-[10px] text-gray-400 mt-0.5">{subtitle}</p>}
+                <div className="flex items-center justify-between mb-4 relative z-10">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm" style={{ background: a.bg, color: a.fg, border: `1px solid ${a.fg}20` }}>
+                        <Icon size={18} />
+                    </div>
+                    {delta != null && delta !== 0 && <DeltaPill pct={delta} />}
+                </div>
+                <div className="relative z-10 mt-auto">
+                    <p className={`${big ? 'text-4xl' : 'text-3xl'} font-black leading-none tracking-tight text-gray-900`}>
+                        {typeof value === 'number' ? <CountUp value={value} format={format} /> : value}
+                    </p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-2">{label}</p>
+                    {subtitle && <p className="text-[11px] font-medium text-gray-500 mt-1">{subtitle}</p>}
+                </div>
             </div>
         </motion.div>
     );
@@ -89,15 +94,17 @@ const StatTile: React.FC<{
 const Panel: React.FC<{
     title: string; subtitle?: string; right?: React.ReactNode; children: React.ReactNode; className?: string;
 }> = ({ title, subtitle, right, children, className = '' }) => (
-    <div className={`tlb-card p-5 sm:p-6 ${className}`}>
-        <div className="flex items-start justify-between mb-5 gap-3">
+    <div className={`bg-white rounded-2xl border border-gray-200/60 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.02)] p-6 flex flex-col ${className}`}>
+        <div className="flex items-start justify-between mb-6 gap-3 shrink-0">
             <div>
-                <h3 className="font-black text-gray-900">{title}</h3>
-                {subtitle && <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>}
+                <h3 className="font-black text-gray-900 text-lg tracking-tight">{title}</h3>
+                {subtitle && <p className="text-[13px] text-gray-500 mt-0.5 leading-relaxed">{subtitle}</p>}
             </div>
-            {right}
+            {right && <div className="shrink-0">{right}</div>}
         </div>
-        {children}
+        <div className="flex-1 min-h-0">
+            {children}
+        </div>
     </div>
 );
 
@@ -106,8 +113,8 @@ const DeltaPill: React.FC<{ pct: number }> = ({ pct }) => {
     if (!pct) return <span className="text-[10px] font-bold text-gray-300">—</span>;
     const up = pct > 0;
     return (
-        <span className={`inline-flex items-center gap-1 text-[11px] font-black px-2 py-0.5 rounded-full ${up ? 'text-emerald-600 bg-emerald-50' : 'text-rose-500 bg-rose-50'}`}>
-            {up ? <TrendingUp size={12} /> : <TrendingDown size={12} />}{Math.abs(pct).toFixed(1)}%
+        <span className={`inline-flex items-center gap-1.5 text-[11px] font-black px-2.5 py-1 rounded-full border ${up ? 'text-emerald-700 bg-emerald-50 border-emerald-200/50' : 'text-rose-600 bg-rose-50 border-rose-200/50'}`}>
+            {up ? <TrendingUp size={13} /> : <TrendingDown size={13} />}{Math.abs(pct).toFixed(1)}%
         </span>
     );
 };
@@ -118,37 +125,40 @@ const PerformanceScore: React.FC<{ score: number; label: string; factors: { name
     const circumference = 2 * Math.PI * 42;
     const offset = circumference - (score / 100) * circumference;
     return (
-        <div className="flex items-center gap-6">
-            <div className="relative w-28 h-28 shrink-0">
-                <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                    <circle cx="50" cy="50" r="42" fill="none" stroke="#F3F4F6" strokeWidth="8" />
+        <div className="flex flex-col sm:flex-row items-center gap-8 bg-slate-900 text-white rounded-2xl p-6 relative overflow-hidden h-full shadow-lg border border-slate-800">
+            {/* Subtle glow effect behind ring */}
+            <div className="absolute top-1/2 left-12 w-24 h-24 rounded-full blur-3xl opacity-20 -translate-y-1/2 pointer-events-none" style={{ background: color }} />
+            
+            <div className="relative w-32 h-32 shrink-0">
+                <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90 drop-shadow-md">
+                    <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="10" />
                     <motion.circle
-                        cx="50" cy="50" r="42" fill="none" stroke={color} strokeWidth="8"
+                        cx="50" cy="50" r="42" fill="none" stroke={color} strokeWidth="10"
                         strokeLinecap="round" strokeDasharray={circumference}
                         initial={{ strokeDashoffset: circumference }}
                         animate={{ strokeDashoffset: offset }}
-                        transition={{ duration: 1.2, ease: 'easeOut' }}
+                        transition={{ duration: 1.2, ease: 'easeOut', delay: 0.2 }}
                     />
                 </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <p className="text-2xl font-black" style={{ color }}>{score}</p>
-                    <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">{label}</p>
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                    <p className="text-3xl font-black tracking-tighter drop-shadow-sm" style={{ color }}><CountUp value={score} /></p>
+                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">{label}</p>
                 </div>
             </div>
-            <div className="flex-1 space-y-2.5">
-                {factors.map(f => {
+            <div className="flex-1 w-full space-y-4">
+                {factors.map((f, i) => {
                     const pct = f.max > 0 ? Math.round((f.value / f.max) * 100) : 0;
                     const barColor = pct >= 70 ? '#10B981' : pct >= 40 ? '#F59E0B' : '#F43F5E';
                     return (
                         <div key={f.name}>
-                            <div className="flex justify-between text-[10px] font-bold mb-0.5">
-                                <span className="text-gray-500">{f.name}</span>
-                                <span className="text-gray-700">{pct}%</span>
+                            <div className="flex justify-between items-end text-xs mb-1.5">
+                                <span className="text-gray-300 font-medium">{f.name}</span>
+                                <span className="font-bold text-white">{pct}%</span>
                             </div>
-                            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="h-1.5 bg-white/10 rounded-full overflow-hidden border border-white/5 shadow-inner">
                                 <motion.div className="h-full rounded-full" style={{ background: barColor }}
                                     initial={{ width: 0 }} animate={{ width: `${pct}%` }}
-                                    transition={{ duration: 0.8, ease: 'easeOut' }} />
+                                    transition={{ duration: 0.8, ease: 'easeOut', delay: 0.3 + (i * 0.1) }} />
                             </div>
                         </div>
                     );
@@ -162,16 +172,16 @@ const PerformanceScore: React.FC<{ score: number; label: string; factors: { name
 interface Insight { icon: React.ElementType; text: string; type: 'positive' | 'warning' | 'neutral' }
 const InsightBullet: React.FC<Insight> = ({ icon: Icon, text, type }) => {
     const colors = {
-        positive: 'bg-emerald-50 text-emerald-600',
-        warning: 'bg-amber-50 text-amber-600',
-        neutral: 'bg-blue-50 text-blue-600',
+        positive: 'bg-emerald-50 text-emerald-700 border-emerald-100/50',
+        warning: 'bg-amber-50 text-amber-700 border-amber-100/50',
+        neutral: 'bg-blue-50 text-blue-700 border-blue-100/50',
     };
     return (
-        <div className="flex items-start gap-3 py-2.5">
-            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${colors[type]}`}>
-                <Icon size={14} />
+        <div className="flex items-start gap-4 py-3.5 group">
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border ${colors[type]} transition-transform group-hover:scale-110`}>
+                <Icon size={15} />
             </div>
-            <p className="text-sm text-gray-600 leading-relaxed">{text}</p>
+            <p className="text-[13px] text-gray-600 leading-relaxed font-medium">{text}</p>
         </div>
     );
 };
@@ -233,14 +243,15 @@ const HighlightCard: React.FC<{
 }> = ({ icon: Icon, title, value, subtitle, accent }) => {
     const a = ACCENTS[accent];
     return (
-        <div className="flex items-center gap-4 p-4 rounded-2xl" style={{ background: a.bg }}>
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/80" style={{ color: a.fg }}>
-                <Icon size={20} />
+        <div className="flex items-center gap-4 p-5 rounded-2xl bg-white border border-gray-200/60 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.02)] relative overflow-hidden">
+            <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ background: a.solid }} />
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 border" style={{ background: a.bg, color: a.fg, borderColor: `${a.fg}20` }}>
+                <Icon size={22} />
             </div>
             <div className="flex-1 min-w-0">
-                <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: a.fg }}>{title}</p>
-                <p className="text-lg font-black text-gray-900 truncate">{value}</p>
-                <p className="text-[10px] text-gray-500">{subtitle}</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-0.5">{title}</p>
+                <p className="text-xl font-black tracking-tight text-gray-900 truncate leading-none mb-1">{value}</p>
+                <p className="text-[11px] font-medium text-gray-500 truncate">{subtitle}</p>
             </div>
         </div>
     );
@@ -410,47 +421,53 @@ export const Analytics: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
     return (
         <div className="min-h-screen bg-gray-50">
             {/* Header */}
-            <header className="bg-white/90 backdrop-blur-sm px-6 md:px-10 py-5 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
+            {/* Header */}
+            <header className="bg-white/80 backdrop-blur-xl px-6 md:px-10 py-5 flex items-center justify-between sticky top-0 z-30 border-b border-gray-200/60 shadow-sm">
                 <div className="flex items-center gap-4">
-                    <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors">
+                    <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-500 hover:text-gray-900">
                         <Menu size={24} />
                     </button>
                     <div>
                         <h1 className="tlb-page-title">Analytics</h1>
-                        <p className="tlb-page-sub">Performance, revenue & detailed insights</p>
+                        <p className="tlb-page-sub text-gray-500 mt-0.5">Performance, revenue & detailed insights</p>
                     </div>
                 </div>
                 <button
                     onClick={load}
                     disabled={loading}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-800 disabled:opacity-40 text-xs font-bold"
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-50 border border-gray-200/60 hover:bg-gray-100 hover:border-gray-300 transition-all text-gray-600 hover:text-gray-900 disabled:opacity-40 text-xs font-bold shadow-sm"
                     title="Refresh"
                 >
                     <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
-                    <span className="hidden sm:inline">Refresh</span>
+                    <span className="hidden sm:inline">Refresh Data</span>
                 </button>
             </header>
 
-            <main className="p-5 sm:p-6">
-                <div className="max-w-6xl mx-auto space-y-6">
+            <main className="p-5 sm:p-6 lg:p-8">
+                <div className="max-w-[1440px] mx-auto space-y-6">
 
                     {loading && noData ? (
-                        <div className="flex items-center justify-center py-28">
-                            <RefreshCw size={28} className="text-gray-300 animate-spin" />
+                        <div className="flex items-center justify-center py-32">
+                            <RefreshCw size={32} className="text-gray-300 animate-spin" />
                         </div>
                     ) : error ? (
-                        <div className="flex flex-col items-center gap-4 py-28 text-center">
-                            <p className="text-sm font-bold text-gray-400">Could not load analytics data.</p>
-                            <button onClick={load} className="tlb-button text-sm">Try again</button>
+                        <div className="flex flex-col items-center gap-4 py-32 text-center">
+                            <div className="w-16 h-16 rounded-full bg-rose-50 flex items-center justify-center text-rose-500 mb-2">
+                                <AlertTriangle size={32} />
+                            </div>
+                            <p className="text-sm font-bold text-gray-600">Could not load analytics data.</p>
+                            <button onClick={load} className="tlb-button text-sm px-6">Try again</button>
                         </div>
                     ) : noEntities ? (
-                        <div className="flex flex-col items-center gap-3 py-20 text-center">
-                            <div className="w-14 h-14 rounded-2xl bg-yellow-50 flex items-center justify-center text-tlb-yellow">
-                                <Activity size={26} />
+                        <div className="flex flex-col items-center gap-4 py-24 text-center">
+                            <div className="w-20 h-20 rounded-3xl bg-yellow-50 flex items-center justify-center text-tlb-yellow shadow-sm border border-yellow-100">
+                                <Activity size={36} />
                             </div>
-                            <p className="text-sm font-bold text-gray-500">No analytics yet</p>
-                            <p className="text-xs text-gray-400 max-w-xs">Create your first listing to start tracking views, bookings, and revenue.</p>
-                            <button onClick={() => onNavigate('SERVICE_LISTINGS')} className="mt-2 tlb-button text-sm">
+                            <div>
+                                <p className="text-base font-black text-gray-900">No analytics yet</p>
+                                <p className="text-sm text-gray-500 max-w-sm mx-auto mt-1 leading-relaxed">Create your first listing to start tracking views, bookings, and revenue across your business.</p>
+                            </div>
+                            <button onClick={() => onNavigate('SERVICE_LISTINGS')} className="mt-2 tlb-button text-sm px-6">
                                 Go to My Listings <ArrowRight size={15} />
                             </button>
                         </div>
@@ -459,7 +476,7 @@ export const Analytics: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                             {/* ── Overview KPI hero strip (always) ── */}
                             {overview && (
                                 <motion.section
-                                    className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4"
+                                    className="grid grid-cols-2 lg:grid-cols-4 gap-4"
                                     initial="initial" animate="animate"
                                     variants={{ animate: { transition: { staggerChildren: 0.06 } } }}
                                 >
@@ -476,25 +493,31 @@ export const Analytics: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                 </motion.section>
                             )}
 
-                            {/* ── Tab switcher (sliding pill) ── */}
+                            {/* ── Tab switcher (Linear/Vercel style) ── */}
                             {tabs.length > 1 && (
-                                <div className="flex gap-1 p-1 bg-gray-100 rounded-2xl w-full sm:w-fit overflow-x-auto">
-                                    {tabs.map(t => {
-                                        const active = activeTab === t.key;
-                                        return (
-                                            <button
-                                                key={t.key}
-                                                onClick={() => setActiveTab(t.key)}
-                                                className={`relative flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors ${active ? 'text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
-                                            >
-                                                {active && (
-                                                    <motion.div layoutId="stat-tab-pill" className="absolute inset-0 bg-white rounded-xl shadow-sm" transition={{ type: 'spring', stiffness: 400, damping: 32 }} />
-                                                )}
-                                                <t.icon size={15} className="relative z-10" />
-                                                <span className="relative z-10">{t.label}</span>
-                                            </button>
-                                        );
-                                    })}
+                                <div className="border-b border-gray-200/80 mb-6">
+                                    <div className="flex gap-6 overflow-x-auto no-scrollbar px-1">
+                                        {tabs.map(t => {
+                                            const active = activeTab === t.key;
+                                            return (
+                                                <button
+                                                    key={t.key}
+                                                    onClick={() => setActiveTab(t.key)}
+                                                    className={`relative flex items-center gap-2 py-4 text-sm font-bold whitespace-nowrap transition-colors ${active ? 'text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
+                                                >
+                                                    <t.icon size={16} />
+                                                    <span>{t.label}</span>
+                                                    {active && (
+                                                        <motion.div
+                                                            layoutId="stat-tab-line"
+                                                            className="absolute bottom-[-1px] left-0 right-0 h-0.5 bg-gray-900 rounded-t-full"
+                                                            transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+                                                        />
+                                                    )}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                             )}
 
@@ -1206,27 +1229,27 @@ const RatioCard: React.FC<{
     const pct = fromValue > 0 ? Math.round((toValue / fromValue) * 100) : 0;
     return (
         <Panel title={title} subtitle={subtitle}>
-            <div className="flex items-center gap-5">
+            <div className="flex items-center gap-6 mt-2">
                 <AnimatedDonut
                     segments={[
                         { value: pct, color: a.solid, label: toLabel },
-                        { value: Math.max(0, 100 - pct), color: '#F3F4F6', label: 'Rest' },
+                        { value: Math.max(0, 100 - pct), color: '#F8FAFC', label: 'Rest' },
                     ]}
                     centerLabel={`${pct}%`}
-                    centerSub="rate"
+                    centerSub="conv. rate"
                 />
-                <div className="flex-1 space-y-3">
-                    <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-gray-300" />
-                        <span className="text-xs text-gray-500 flex-1">{fromLabel}</span>
-                        <span className="text-sm font-black text-gray-900"><CountUp value={fromValue} /></span>
+                <div className="flex-1 space-y-4">
+                    <div className="flex items-center gap-3">
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-gray-200" />
+                        <span className="text-sm font-medium text-gray-500 flex-1">{fromLabel}</span>
+                        <span className="text-base font-black text-gray-900"><CountUp value={fromValue} /></span>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: a.solid }} />
-                        <span className="text-xs text-gray-500 flex-1">{toLabel}</span>
-                        <span className="text-sm font-black text-gray-900"><CountUp value={toValue} /></span>
+                    <div className="flex items-center gap-3">
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0 shadow-[0_0_8px_rgba(0,0,0,0.15)]" style={{ background: a.solid, shadowColor: a.solid }} />
+                        <span className="text-sm font-medium text-gray-900 flex-1">{toLabel}</span>
+                        <span className="text-base font-black text-gray-900"><CountUp value={toValue} /></span>
                     </div>
-                    <div className="pt-2 border-t border-gray-100 text-[11px] font-bold text-gray-400">
+                    <div className="pt-3 mt-1 border-t border-gray-100 text-[11px] font-bold text-gray-400">
                         {toValue} of {fromValue} {fromLabel.toLowerCase()} &rarr; {toLabel.toLowerCase()}
                     </div>
                 </div>

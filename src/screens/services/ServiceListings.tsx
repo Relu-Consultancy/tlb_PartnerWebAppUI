@@ -32,9 +32,27 @@ interface Listing {
     status: ListingStatus;
     coverUrl?: string;
     startDateTime?: string;
+    createdAt?: string;
     isLive?: boolean;
     coupon?: ListingCoupon | null;
 }
+
+// A listing's display date — its scheduled/happening date, else when it was created.
+const listingDate = (l: { startDateTime?: string; createdAt?: string }) => l.startDateTime || l.createdAt;
+
+// Normalize a timestamp to a YYYY-MM-DD key for date-range comparisons.
+const dateKey = (iso?: string): string => {
+    if (!iso) return '';
+    if (/^\d{4}-\d{2}-\d{2}/.test(iso)) return iso.slice(0, 10);
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+};
+
+const fmtDate = (iso?: string): string => {
+    if (!iso) return '—';
+    try { return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }); }
+    catch { return '—'; }
+};
 
 const couponDiscountLabel = (c: { discount_type: string; discount_value: number }) =>
     c.discount_type === 'percent' ? `${c.discount_value}% off` : `₹${c.discount_value} off`;
@@ -60,13 +78,6 @@ const statusBadge: Record<ListingStatus, { label: string; bg: string; color: str
     archived:  { label: 'Archived',  bg: 'bg-gray-200',    color: 'text-gray-600' },
 };
 
-
-const fmtStart = (iso?: string) => {
-    if (!iso) return '';
-    try {
-        return new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-    } catch { return ''; }
-};
 
 // Navigation card surfacing a related management screen (Bookings / Enquiries)
 // from within the Listings hub.
@@ -114,11 +125,15 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
     const [filterStatuses, setFilterStatuses] = useState<ListingStatus[]>([]);
     const [filterTypes, setFilterTypes] = useState<EntityType[]>([]);
     const [sortBy, setSortBy] = useState<SortOption>('newest');
+    const [filterDateFrom, setFilterDateFrom] = useState('');
+    const [filterDateTo, setFilterDateTo] = useState('');
 
     // Temp state (inside dialog before Apply)
     const [tmpStatuses, setTmpStatuses] = useState<ListingStatus[]>([]);
     const [tmpTypes, setTmpTypes] = useState<EntityType[]>([]);
     const [tmpSort, setTmpSort] = useState<SortOption>('newest');
+    const [tmpDateFrom, setTmpDateFrom] = useState('');
+    const [tmpDateTo, setTmpDateTo] = useState('');
 
     // Coupon attach/remove
     const [couponList, setCouponList] = useState<CouponListItem[]>([]);
@@ -164,6 +179,8 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
         setTmpStatuses([...filterStatuses]);
         setTmpTypes([...filterTypes]);
         setTmpSort(sortBy);
+        setTmpDateFrom(filterDateFrom);
+        setTmpDateTo(filterDateTo);
         setShowFilter(true);
     };
 
@@ -171,6 +188,8 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
         setFilterStatuses(tmpStatuses);
         setFilterTypes(tmpTypes);
         setSortBy(tmpSort);
+        setFilterDateFrom(tmpDateFrom);
+        setFilterDateTo(tmpDateTo);
         setShowFilter(false);
     };
 
@@ -178,6 +197,8 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
         setTmpStatuses([]);
         setTmpTypes([]);
         setTmpSort('newest');
+        setTmpDateFrom('');
+        setTmpDateTo('');
     };
 
     const toggleTmpStatus = (s: ListingStatus) =>
@@ -186,7 +207,7 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
     const toggleTmpType = (t: EntityType) =>
         setTmpTypes(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
 
-    const activeFilterCount = filterStatuses.length + filterTypes.length + (sortBy !== 'newest' ? 1 : 0);
+    const activeFilterCount = filterStatuses.length + filterTypes.length + (sortBy !== 'newest' ? 1 : 0) + (filterDateFrom || filterDateTo ? 1 : 0);
 
     useEffect(() => {
         const fetchListings = async () => {
@@ -239,7 +260,9 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                         listingType: item.listing_type || '',
                         status: (item.status as ListingStatus) || 'draft',
                         coverUrl: item.cover_url || item.cover,
-                        startDateTime: item.start_datetime,
+                        startDateTime: item.start_datetime || item.start_date || item.next_session_at
+                            || item.next_batch_start || item.next_occurrence || item.starts_at || item.event_date || undefined,
+                        createdAt: item.created_at || item.created || undefined,
                         // Pause/Live state comes from `is_paused` (the flag the
                         // pause/resume endpoints actually toggle). `is_live` is a
                         // separate, unmaintained field and must NOT be used here —
@@ -330,9 +353,21 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
 
     const filtered = listings
         .filter(s => activeTab === 'All' || s.entityType === activeTab)
-        .filter(s => s.title.toLowerCase().includes(searchQuery.toLowerCase()))
+        .filter(s => {
+            const q = searchQuery.trim().toLowerCase();
+            if (!q) return true;
+            return s.title.toLowerCase().includes(q) || s.id.toLowerCase().includes(q);
+        })
         .filter(s => filterStatuses.length === 0 || filterStatuses.includes(s.status))
         .filter(s => filterTypes.length === 0 || filterTypes.includes(s.entityType))
+        .filter(s => {
+            if (!filterDateFrom && !filterDateTo) return true;
+            const k = dateKey(listingDate(s));
+            if (!k) return false;
+            if (filterDateFrom && k < filterDateFrom) return false;
+            if (filterDateTo && k > filterDateTo) return false;
+            return true;
+        })
         .sort((a, b) => {
             if (sortBy === 'a-z') return a.title.localeCompare(b.title);
             if (sortBy === 'z-a') return b.title.localeCompare(a.title);
@@ -432,8 +467,16 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                 {/* Body */}
                 <div className={`flex-1 flex flex-col ${compact ? 'p-3' : 'p-4'}`}>
                     <p className="font-bold text-sm text-gray-900 truncate">{listing.title}</p>
+                    {!compact && (
+                        <p className="font-mono text-[10px] text-gray-400 truncate mt-0.5" title={listing.id}>ID: {listing.id}</p>
+                    )}
                     {!compact && listing.category && (
                         <p className="text-[11px] text-gray-400 font-medium mt-0.5 truncate">{listing.category}</p>
+                    )}
+                    {listingDate(listing) && (
+                        <p className="text-[11px] text-gray-400 font-medium mt-1 flex items-center gap-1">
+                            <Clock size={10} className="text-gray-300" /> {fmtDate(listingDate(listing))}
+                        </p>
                     )}
                     {listing.coupon && (
                         <span className="inline-flex w-max items-center gap-1 mt-2 px-2 py-0.5 rounded-md bg-tlb-yellow/15 text-tlb-dark text-[10px] font-black">
@@ -540,7 +583,7 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                             <Search size={16} className="text-gray-400" />
                             <input
                                 className="bg-transparent flex-1 text-sm outline-none placeholder:text-gray-400"
-                                placeholder="Search listings..."
+                                placeholder="Search listings by name or ID…"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                             />
@@ -609,7 +652,7 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                             <table className="w-full text-left">
                                 <thead>
                                     <tr className="bg-gray-50/80 border-b border-gray-100">
-                                        {['Listing', 'Type', 'Category', 'Status', 'Actions'].map(h => (
+                                        {['Listing', 'Type', 'Category', 'Date', 'Status', 'Actions'].map(h => (
                                             <th key={h} className={`px-5 py-3.5 text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap ${h === 'Actions' ? 'text-right' : ''}`}>
                                                 {h}
                                             </th>
@@ -642,11 +685,7 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                                                         )}
                                                         <div className="min-w-0">
                                                             <p className="font-bold text-sm text-gray-900 truncate max-w-[260px]">{listing.title}</p>
-                                                            {listing.startDateTime && (
-                                                                <p className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-1">
-                                                                    <Clock size={10} /> {fmtStart(listing.startDateTime)}
-                                                                </p>
-                                                            )}
+                                                            <p className="font-mono text-[10px] text-gray-400 truncate max-w-[260px]" title={listing.id}>ID: {listing.id}</p>
                                                             {listing.coupon && (
                                                                 <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-md bg-tlb-yellow/15 text-tlb-dark text-[10px] font-black">
                                                                     <Tag size={9} /> {listing.coupon.code} · {couponDiscountLabel(listing.coupon)}
@@ -662,6 +701,11 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                                                 </td>
                                                 <td className="px-5 py-4">
                                                     <span className="text-xs font-medium text-gray-500">{listing.category || '-'}</span>
+                                                </td>
+                                                <td className="px-5 py-4">
+                                                    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 whitespace-nowrap">
+                                                        <Clock size={11} className="text-gray-300" /> {fmtDate(listingDate(listing))}
+                                                    </span>
                                                 </td>
                                                 <td className="px-5 py-4">
                                                     <span className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-700">
@@ -740,8 +784,14 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                                                     </span>
                                                 </div>
                                                 <p className="font-bold text-sm text-gray-900 truncate">{listing.title}</p>
+                                                <p className="font-mono text-[10px] text-gray-400 truncate mt-0.5" title={listing.id}>ID: {listing.id}</p>
                                                 {listing.category && (
                                                     <p className="text-[10px] text-gray-400 font-medium mt-0.5">{listing.category}</p>
+                                                )}
+                                                {listingDate(listing) && (
+                                                    <p className="text-[10px] text-gray-400 font-medium mt-0.5 flex items-center gap-1">
+                                                        <Clock size={9} className="text-gray-300" /> {fmtDate(listingDate(listing))}
+                                                    </p>
                                                 )}
                                                 {listing.coupon && (
                                                     <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-md bg-tlb-yellow/15 text-tlb-dark text-[10px] font-black">
@@ -927,6 +977,38 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                                             </button>
                                         );
                                     })}
+                            </div>
+                        </div>
+
+                        {/* Date range */}
+                        <div>
+                            <div className="flex items-center justify-between mb-3">
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Date Range</p>
+                                {(tmpDateFrom || tmpDateTo) && (
+                                    <button onClick={() => { setTmpDateFrom(''); setTmpDateTo(''); }} className="text-[10px] font-black text-gray-400 hover:text-red-500 transition-colors">Clear</button>
+                                )}
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">From</label>
+                                    <input
+                                        type="date"
+                                        value={tmpDateFrom}
+                                        max={tmpDateTo || undefined}
+                                        onChange={e => setTmpDateFrom(e.target.value)}
+                                        className="w-full bg-white border-2 border-gray-100 rounded-xl px-3 py-2.5 text-sm font-bold text-gray-700 focus:border-tlb-yellow outline-none transition-colors"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">To</label>
+                                    <input
+                                        type="date"
+                                        value={tmpDateTo}
+                                        min={tmpDateFrom || undefined}
+                                        onChange={e => setTmpDateTo(e.target.value)}
+                                        className="w-full bg-white border-2 border-gray-100 rounded-xl px-3 py-2.5 text-sm font-bold text-gray-700 focus:border-tlb-yellow outline-none transition-colors"
+                                    />
+                                </div>
                             </div>
                         </div>
 

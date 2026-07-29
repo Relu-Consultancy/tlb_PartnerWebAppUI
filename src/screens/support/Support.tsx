@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import {
     Menu, ArrowLeft, Plus, LifeBuoy, Search, RefreshCw, AlertCircle,
     Send, CheckCircle2, MessageSquare, Clock, Lock, Ticket as TicketIcon,
-    Share2,
+    Share2, ChevronRight,
 } from 'lucide-react';
 import { Screen } from '../../types';
 import { Select, SelectOption, toast } from '../../components/ui';
@@ -60,6 +60,7 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
     const [loadingList, setLoadingList] = useState(true);
     const [listError, setListError] = useState<string | null>(null);
     const [query, setQuery] = useState('');
+    const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'in_progress' | 'resolved' | 'closed'>('all');
 
     const [categories, setCategories] = useState<TicketCategory[]>([]);
     const [bookingOptions, setBookingOptions] = useState<SelectOption[]>([]);
@@ -389,11 +390,22 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
     };
 
     // ── Filters ──
+    const matchesStatus = (s: string) => {
+        if (statusFilter === 'all') return true;
+        if (statusFilter === 'open') return s === 'open' || s === 'pending';
+        return s === statusFilter;
+    };
     const filtered = tickets.filter(t => {
+        if (!matchesStatus(t.status)) return false;
         const q = query.trim().toLowerCase();
         if (!q) return true;
         return t.subject.toLowerCase().includes(q) || ticketCategoryLabel(t.category).toLowerCase().includes(q);
     });
+
+    // KPI counts across all my tickets
+    const activeCount = tickets.filter(t => !isClosed(t.status)).length;
+    const resolvedCount = tickets.filter(t => t.status === 'resolved').length;
+    const closedCount = tickets.filter(t => t.status === 'closed').length;
 
     const filteredShared = sharedTickets.filter(t => {
         const q = sharedQuery.trim().toLowerCase();
@@ -403,7 +415,6 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
             || (t.booking_reference || '').toLowerCase().includes(q);
     });
 
-    const openCount = tickets.filter(t => !isClosed(t.status)).length;
     const sharedUnread = sharedTickets.reduce((s, t) => s + toCount(t.unread_count), 0);
 
     const isInDetail = activeTab === 'my' ? !!selectedId : !!sharedSelectedId;
@@ -464,7 +475,7 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
     // -----------------------------------------------------------------------
     const tabBar = !creating && !isInDetail && (
         <div className="bg-white border-b border-gray-100 px-5 md:px-8">
-            <div className="max-w-4xl mx-auto flex gap-1">
+            <div className="max-w-5xl mx-auto flex gap-1">
                 {([
                     { key: 'my' as Tab, label: 'My Tickets', icon: <TicketIcon size={14} />, badge: 0 },
                     { key: 'shared' as Tab, label: 'Shared Queries', icon: <Share2 size={14} />, badge: sharedUnread },
@@ -774,28 +785,89 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
         <div className="min-h-screen bg-gray-50 pb-24">
             {header}
             {tabBar}
-            <main className="p-5 md:p-6">
-                <div className="max-w-4xl mx-auto space-y-6">
+            <main className="p-4 md:p-8">
+                <div className="max-w-5xl mx-auto space-y-6">
                     {activeTab === 'my' ? (
                         <>
-                            <div className="flex flex-col md:flex-row md:items-center gap-3 justify-between">
-                                <p className="text-sm font-bold text-gray-500">
-                                    {tickets.length} ticket{tickets.length === 1 ? '' : 's'}
-                                    {openCount > 0 && <span className="text-gray-400"> · {openCount} open</span>}
-                                </p>
-                                <div className="relative md:w-72">
-                                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                                    <input
-                                        type="text" value={query} onChange={e => setQuery(e.target.value)}
-                                        placeholder="Search tickets"
-                                        className="tlb-input !pl-9 !py-2.5"
-                                    />
+                            {/* Support hero */}
+                            <motion.section
+                                initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}
+                                className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-tlb-dark via-gray-900 to-black text-white p-6 sm:p-8"
+                            >
+                                <div className="absolute -right-12 -top-16 w-60 h-60 bg-tlb-yellow/10 rounded-full blur-3xl" />
+                                <LifeBuoy size={150} className="absolute -right-8 -bottom-14 text-white/5" />
+                                <div className="relative">
+                                    <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/60">We're here to help</p>
+                                    <h2 className="text-2xl font-black mt-1.5">How can we help you today?</h2>
+                                    <p className="text-sm text-gray-400 mt-1.5 max-w-md">Raise a ticket and the TLB team will get back to you — usually within a few hours.</p>
+                                    <div className="mt-5 flex flex-col sm:flex-row gap-3 max-w-2xl">
+                                        <div className="flex-1 flex items-center gap-3 bg-white rounded-xl px-4 py-3">
+                                            <Search size={18} className="text-gray-400 shrink-0" />
+                                            <input
+                                                type="text" value={query} onChange={e => setQuery(e.target.value)}
+                                                placeholder="Search your tickets…"
+                                                className="flex-1 bg-transparent text-sm font-bold text-gray-800 placeholder:text-gray-300 outline-none"
+                                            />
+                                        </div>
+                                        <button onClick={openNew} className="bg-tlb-yellow text-tlb-dark rounded-xl px-5 py-3 text-sm font-black flex items-center justify-center gap-1.5 hover:brightness-105 active:scale-95 transition-all shrink-0">
+                                            <Plus size={18} /> New Ticket
+                                        </button>
+                                    </div>
+                                    <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-[11px] text-white/60 font-medium">
+                                        <span className="inline-flex items-center gap-1.5"><Clock size={12} /> Avg response in a few hours</span>
+                                        <span className="inline-flex items-center gap-1.5"><MessageSquare size={12} /> Chat-based support</span>
+                                    </div>
                                 </div>
+                            </motion.section>
+
+                            {/* KPI cards */}
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                                {([
+                                    { label: 'Total Tickets', value: tickets.length, icon: TicketIcon, tint: 'bg-tlb-yellow/15 text-tlb-dark' },
+                                    { label: 'Open', value: activeCount, icon: MessageSquare, tint: 'bg-blue-50 text-blue-600' },
+                                    { label: 'Resolved', value: resolvedCount, icon: CheckCircle2, tint: 'bg-emerald-50 text-emerald-600' },
+                                    { label: 'Closed', value: closedCount, icon: Lock, tint: 'bg-gray-100 text-gray-500' },
+                                ]).map(s => (
+                                    <div key={s.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
+                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${s.tint}`}><s.icon size={18} /></div>
+                                        <div>
+                                            <p className="text-2xl font-black text-gray-900 leading-none">{s.value}</p>
+                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-1">{s.label}</p>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
 
+                            {/* Status filter chips */}
+                            <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                                {([
+                                    { key: 'all' as const, label: 'All' },
+                                    { key: 'open' as const, label: 'Open' },
+                                    { key: 'in_progress' as const, label: 'In Progress' },
+                                    { key: 'resolved' as const, label: 'Resolved' },
+                                    { key: 'closed' as const, label: 'Closed' },
+                                ]).map(c => (
+                                    <button
+                                        key={c.key}
+                                        onClick={() => setStatusFilter(c.key)}
+                                        className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold transition-colors ${
+                                            statusFilter === c.key ? 'bg-tlb-dark text-white' : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-300'
+                                        }`}
+                                    >
+                                        {c.label}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* List */}
                             {loadingList ? (
-                                <div className="flex items-center justify-center py-24">
-                                    <RefreshCw size={26} className="text-gray-300 animate-spin" />
+                                <div className="space-y-3">
+                                    {Array.from({ length: 4 }).map((_, i) => (
+                                        <div key={i} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-4 animate-pulse">
+                                            <div className="w-11 h-11 rounded-xl bg-gray-100 shrink-0" />
+                                            <div className="flex-1 space-y-2.5"><div className="h-3.5 w-1/3 bg-gray-100 rounded-full" /><div className="h-2.5 w-1/2 bg-gray-50 rounded-full" /></div>
+                                        </div>
+                                    ))}
                                 </div>
                             ) : listError ? (
                                 <div className="tlb-card flex flex-col items-center justify-center text-center py-16">
@@ -805,48 +877,46 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                 </div>
                             ) : filtered.length === 0 ? (
                                 <div className="tlb-card flex flex-col items-center justify-center text-center py-16">
-                                    <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
-                                        <LifeBuoy size={28} className="text-gray-400" />
+                                    <div className="w-16 h-16 rounded-2xl bg-tlb-yellow/10 flex items-center justify-center mb-4">
+                                        <LifeBuoy size={28} className="text-tlb-yellow" />
                                     </div>
-                                    <h3 className="tlb-h3">{query ? 'No tickets match your search' : 'No support tickets yet'}</h3>
+                                    <h3 className="tlb-h3">{query || statusFilter !== 'all' ? 'No tickets match your filters' : 'No support tickets yet'}</h3>
                                     <p className="text-sm text-gray-500 mt-1 max-w-xs">
-                                        {query ? 'Try a different search term.' : 'Raise a ticket and our team will get back to you here.'}
+                                        {query || statusFilter !== 'all' ? 'Try a different search or status.' : 'Raise a ticket and our team will get back to you here.'}
                                     </p>
-                                    {!query && (
+                                    {!query && statusFilter === 'all' && (
                                         <button onClick={openNew} className="tlb-button mt-5"><Plus size={18} /> Raise your first ticket</button>
                                     )}
                                 </div>
                             ) : (
                                 <div className="space-y-3">
+                                    <p className="text-xs font-bold text-gray-400 px-1">{filtered.length} ticket{filtered.length === 1 ? '' : 's'}</p>
                                     {filtered.map((t, i) => {
                                         const st = statusStyle(t.status);
                                         const unread = toCount(t.unread_count);
                                         return (
                                             <motion.button
                                                 key={t.id}
-                                                initial={{ opacity: 0, y: 8 }}
-                                                animate={{ opacity: 1, y: 0 }}
+                                                initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                                                 transition={{ duration: 0.2, delay: Math.min(i * 0.03, 0.2) }}
                                                 onClick={() => openTicket(t.id)}
-                                                className="w-full text-left tlb-card !p-4 flex items-center gap-4 hover:shadow-md hover:border-gray-200 transition-all"
+                                                className="group w-full text-left bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 flex items-center gap-4 hover:shadow-md hover:border-gray-200 transition-all"
                                             >
-                                                <div className="w-11 h-11 rounded-2xl bg-tlb-yellow/15 flex items-center justify-center shrink-0">
-                                                    <TicketIcon size={20} className="text-tlb-dark" />
-                                                </div>
+                                                <div className="w-11 h-11 rounded-xl bg-tlb-yellow/15 flex items-center justify-center shrink-0 text-tlb-dark"><TicketIcon size={20} /></div>
                                                 <div className="min-w-0 flex-1">
                                                     <div className="flex items-center gap-2">
-                                                        <p className="font-bold text-gray-900 truncate">{t.subject}</p>
-                                                        {unread > 0 && (
-                                                            <span className="shrink-0 text-[10px] font-black text-white bg-red-500 rounded-full px-1.5 py-0.5">{unread}</span>
-                                                        )}
+                                                        <p className="font-bold text-[15px] text-gray-900 truncate">{t.subject}</p>
+                                                        {unread > 0 && <span className="shrink-0 text-[10px] font-black text-white bg-red-500 rounded-full px-1.5 py-0.5">{unread}</span>}
                                                     </div>
-                                                    <p className="text-xs text-gray-400 font-medium mt-0.5 truncate">
-                                                        {ticketCategoryLabel(t.category)} · Updated {fmtDate(t.updated_at)}
-                                                    </p>
+                                                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-500 bg-gray-50 rounded-full px-2 py-0.5">{ticketCategoryLabel(t.category)}</span>
+                                                        <span className="text-[11px] text-gray-400 font-medium">Updated {fmtDate(t.updated_at)}</span>
+                                                    </div>
                                                 </div>
                                                 <span className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${st.cls}`}>
                                                     <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} /> {st.label}
                                                 </span>
+                                                <ChevronRight size={16} className="hidden sm:block text-gray-300 shrink-0 group-hover:text-gray-600 group-hover:translate-x-0.5 transition-all" />
                                             </motion.button>
                                         );
                                     })}
@@ -902,7 +972,7 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                                 animate={{ opacity: 1, y: 0 }}
                                                 transition={{ duration: 0.2, delay: Math.min(i * 0.03, 0.2) }}
                                                 onClick={() => openSharedTicket(t.id)}
-                                                className="w-full text-left tlb-card !p-4 flex items-center gap-4 hover:shadow-md hover:border-gray-200 transition-all"
+                                                className="group w-full text-left tlb-card !p-4 flex items-center gap-4 hover:shadow-md hover:border-gray-200 transition-all"
                                             >
                                                 <div className="w-11 h-11 rounded-2xl bg-purple-100 flex items-center justify-center shrink-0">
                                                     <Share2 size={18} className="text-purple-600" />
@@ -924,6 +994,7 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                                 <span className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${st.cls}`}>
                                                     <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} /> {st.label}
                                                 </span>
+                                                <ChevronRight size={16} className="hidden sm:block text-gray-300 shrink-0 group-hover:text-gray-600 group-hover:translate-x-0.5 transition-all" />
                                             </motion.button>
                                         );
                                     })}

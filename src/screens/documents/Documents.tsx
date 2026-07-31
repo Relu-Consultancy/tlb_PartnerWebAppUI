@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import {
-    Menu, ShieldCheck, Clock, AlertCircle, Loader2, CheckCircle2, RefreshCw,
+    ShieldCheck, Clock, AlertCircle, Loader2, CheckCircle2, RefreshCw,
     Image as ImageIcon, UploadCloud, Trash2, FileText, Landmark, BadgeCheck,
 } from 'lucide-react';
 import { Screen } from '../../types';
@@ -123,7 +123,7 @@ const Documents: React.FC<Props> = ({ onOpenSidebar }) => {
     return (
         <div className="min-h-screen bg-gray-50">
             <header className="bg-white px-6 md:px-10 py-5 flex items-center gap-4 sticky top-0 z-30 border-b border-gray-100">
-                <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors"><Menu size={24} /></button>
+                
                 <div>
                     <h1 className="tlb-page-title">Documents</h1>
                     <p className="tlb-page-sub">View &amp; update your verification documents</p>

@@ -32,6 +32,7 @@ export interface NetworkPartnerDetail extends NetworkPartner {
     facebook_url: string | null;
     website_url: string | null;
     cover_image: string | null;
+    cover_image_url?: string | null;
     operating_cities: string | null;
     /** May arrive as an array or a JSON string depending on backend serialization. */
     listings: NetworkListing[] | string | null;

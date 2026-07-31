@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Screen, EnquiryStatus } from '../../types';
-import { toast, Select, LoadingState, ErrorState, EmptyState, NoSearchResultState } from '../../components/ui';
+import { toast, Select, LoadingState, ErrorState, EmptyState, NoSearchResultState, Pagination } from '../../components/ui';
 import { getClassEnquiries, updateClassEnquiry, unlockClassEnquiry } from '../../api/listings';
 
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
@@ -71,6 +71,8 @@ export const Enquiries: React.FC<Props> = () => {
     const [showFilter, setShowFilter] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [hasError, setHasError] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 10;
 
     useEffect(() => {
         loadEnquiries();
@@ -158,12 +160,16 @@ export const Enquiries: React.FC<Props> = () => {
         return c;
     }, [leads]);
 
-    // Status filter + client-side search
     const filtered = leads.filter(l =>
         (statusFilter === '' || l.status === statusFilter) &&
         (l.studentName.toLowerCase().includes(search.toLowerCase()) ||
          l.classTitle.toLowerCase().includes(search.toLowerCase()))
     );
+
+    useEffect(() => { setCurrentPage(1); }, [search, statusFilter]);
+
+    const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+    const paginatedLeads = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
     const kpiCards: { key: EnquiryStatus | ''; label: string; icon: React.ElementType; fg: string; bg: string }[] = [
         { key: '',            label: 'Total Leads',  icon: Users,        fg: '#CA8A04', bg: '#FEFCE8' },
@@ -269,7 +275,7 @@ export const Enquiries: React.FC<Props> = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
-                                {filtered.length === 0 ? (
+                                {paginatedLeads.length === 0 ? (
                                     <tr>
                                         <td colSpan={6} className="p-0">
                                             <NoSearchResultState 
@@ -278,7 +284,7 @@ export const Enquiries: React.FC<Props> = () => {
                                             />
                                         </td>
                                     </tr>
-                                ) : filtered.map((lead, i) => (
+                                ) : paginatedLeads.map((lead, i) => (
                                     <motion.tr
                                         key={lead.id}
                                         initial={{ opacity: 0, y: 6 }}
@@ -349,6 +355,14 @@ export const Enquiries: React.FC<Props> = () => {
                             </tbody>
                         </table>
                     </div>
+                    
+                    <Pagination 
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        totalItems={filtered.length}
+                        itemsPerPage={ITEMS_PER_PAGE}
+                        onPageChange={setCurrentPage}
+                    />
                 </div>
             </div>
         </main>

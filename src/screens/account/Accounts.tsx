@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { Menu, UserCircle, FileText, ArrowRight, ShieldCheck, Eye } from 'lucide-react';
+import { UserCircle, FileText, ArrowRight, ShieldCheck, Eye } from 'lucide-react';
 import { Screen } from '../../types';
 import { getCurrentPartner } from '../../api/onboarding';
 
@@ -22,6 +22,7 @@ export const Accounts: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
 
     const businessName = partner?.business_name || partner?.business_profile?.business_name || 'Your Business';
     const contact = partner?.email || partner?.phone || '';
+    const partnerId = partner?.id || partner?.partner_id || partner?.partner?.id || partner?.business_profile?.id || '';
     const status = partner?.status || '';
     const isVerified = partner?.is_verified === true || status === 'approved';
     const underReview = status === 'under_review';
@@ -35,7 +36,7 @@ export const Accounts: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
         <div className="min-h-screen bg-gray-50">
             {/* Header */}
             <header className="bg-white px-6 md:px-8 py-5 flex items-center gap-4 sticky top-0 z-30 border-b border-gray-100">
-                <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors"><Menu size={22} /></button>
+                
                 <div>
                     <h1 className="tlb-page-title">Accounts</h1>
                     <p className="tlb-page-sub hidden sm:block">Manage your brand identity &amp; verification</p>
@@ -53,6 +54,11 @@ export const Accounts: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                         <div className="min-w-0 flex-1">
                             <p className="text-lg font-black truncate">{businessName}</p>
                             {contact && <p className="text-[13px] text-gray-400 truncate mt-0.5">{contact}</p>}
+                            {partnerId && (
+                                <p className="text-[11px] font-mono text-gray-500 truncate mt-1" title={String(partnerId)}>
+                                    ID: {partnerId}
+                                </p>
+                            )}
                         </div>
                         <span className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wide ${
                             isVerified ? 'bg-emerald-500/20 text-emerald-300' :

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-    Menu, ArrowRight, Activity, Users, Target, Star, TrendingUp, TrendingDown,
+    ArrowRight, Activity, Users, Target, Star, TrendingUp, TrendingDown,
     Clock, BookOpen, CalendarDays, Ticket, Zap, Eye, Heart,
     DollarSign, MapPin, Percent, RefreshCw, LayoutGrid, Award,
     GraduationCap, Layers, Wallet, MessageSquare,
@@ -424,9 +424,7 @@ export const Analytics: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
             {/* Header */}
             <header className="bg-white/80 backdrop-blur-xl px-6 md:px-10 py-5 flex items-center justify-between sticky top-0 z-30 border-b border-gray-200/60 shadow-sm">
                 <div className="flex items-center gap-4">
-                    <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-500 hover:text-gray-900">
-                        <Menu size={24} />
-                    </button>
+                    
                     <div>
                         <h1 className="tlb-page-title">Analytics</h1>
                         <p className="tlb-page-sub text-gray-500 mt-0.5">Performance, revenue & detailed insights</p>

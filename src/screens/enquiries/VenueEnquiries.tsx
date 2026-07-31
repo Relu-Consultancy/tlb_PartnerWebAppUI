@@ -7,6 +7,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { Screen } from '../../types';
 import { toast, Select } from '../../components/ui';
+import { Pagination } from '../../components/ui/Pagination';
 import { getVenueEnquiries, getVenueEnquiryDetail, updateVenueEnquiry, unlockVenueEnquiry } from '../../api/listings';
 
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
@@ -205,6 +206,13 @@ export const VenueEnquiries: React.FC<Props> = () => {
          l.venueTitle.toLowerCase().includes(search.toLowerCase()))
     );
 
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 10;
+    useEffect(() => { setCurrentPage(1); }, [search, statusFilter]);
+
+    const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+    const paginatedLeads = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
     const kpiCards: { key: VenueEnquiryStatus | ''; label: string; icon: React.ElementType; fg: string; bg: string }[] = [
         { key: '',                     label: 'Total Leads',  icon: Users,         fg: '#B45309', bg: '#FFFBEB' },
         { key: 'new',                  label: 'New',          icon: Sparkles,      fg: STATUS_META.new.fg,                  bg: STATUS_META.new.bg },
@@ -310,7 +318,7 @@ export const VenueEnquiries: React.FC<Props> = () => {
                                             </div>
                                         </td>
                                     </tr>
-                                ) : filtered.length === 0 ? (
+                                ) : paginatedLeads.length === 0 ? (
                                     <tr>
                                         <td colSpan={6} className="px-6 py-16 text-center">
                                             <div className="flex flex-col items-center gap-3 text-gray-300">
@@ -322,7 +330,7 @@ export const VenueEnquiries: React.FC<Props> = () => {
                                             </div>
                                         </td>
                                     </tr>
-                                ) : filtered.map((lead, i) => (
+                                ) : paginatedLeads.map((lead, i) => (
                                     <motion.tr
                                         key={lead.id}
                                         initial={{ opacity: 0, y: 6 }}
@@ -393,6 +401,14 @@ export const VenueEnquiries: React.FC<Props> = () => {
                             </tbody>
                         </table>
                     </div>
+
+                    <Pagination 
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        totalItems={filtered.length}
+                        itemsPerPage={ITEMS_PER_PAGE}
+                        onPageChange={setCurrentPage}
+                    />
                 </div>
             </div>
         </main>

@@ -91,8 +91,9 @@ export const BrandProfile: React.FC<ProfileProps> = ({ onNavigate, onOpenSidebar
                     setContactNumber(e.contact_number || '');
                     setOperatingCities(e.operating_cities || []);
                     setAddress(e.address || '');
-                    if (e.logo) setLogoPreview(e.logo);
-                    if (e.cover_image) setCoverPreview(e.cover_image);
+                    if (e.logo || e.logo_url) setLogoPreview(e.logo || e.logo_url);
+                    const coverSrc = e.cover_image || e.cover_image_url || e.cover || e.cover_photo || e.cover_url;
+                    if (coverSrc) setCoverPreview(coverSrc);
                 }
 
                 if (mediaRes.status === 'fulfilled') {
@@ -191,9 +192,9 @@ export const BrandProfile: React.FC<ProfileProps> = ({ onNavigate, onOpenSidebar
                 setInitialProfileData(profileData);
             }
             setIsEditing(false);
-        } catch (err) {
+        } catch (err: any) {
             console.error('Save error', err);
-            toast.error('Failed to save profile.');
+            toast.error(`Failed to save profile: ${err.message || err}`);
         } finally {
             setSaving(false);
         }

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import {
-    Menu, ArrowLeft, Plus, LifeBuoy, Search, RefreshCw, AlertCircle,
+    ArrowLeft, Plus, LifeBuoy, Search, RefreshCw, AlertCircle,
     Send, CheckCircle2, MessageSquare, Clock, Lock, Ticket as TicketIcon,
     Share2, ChevronRight,
 } from 'lucide-react';
@@ -442,7 +442,7 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
 
     const header = (
         <header className="bg-white/90 backdrop-blur-sm px-5 md:px-8 py-5 flex items-center gap-4 sticky top-0 z-30 border-b border-gray-100">
-            {(creating || isInDetail) ? (
+            {(creating || isInDetail) && (
                 <button
                     onClick={() => {
                         if (creating) setCreating(false);
@@ -455,8 +455,6 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                     <ArrowLeft size={20} />
                     <span className="hidden sm:inline text-sm font-bold">Support</span>
                 </button>
-            ) : (
-                <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors"><Menu size={24} /></button>
             )}
             <div className="flex-1 min-w-0">
                 <h1 className="tlb-page-title truncate">{headerTitle()}</h1>

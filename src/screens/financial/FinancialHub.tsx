@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Menu, DollarSign, ShieldCheck, AlertCircle, Building2, X, Loader2,
+  DollarSign, ShieldCheck, AlertCircle, Building2, X, Loader2,
   Inbox, Clock, Eye, XCircle, CheckCircle, Upload, FileText, RefreshCw,
 } from 'lucide-react';
 import { Screen } from '../../types';
@@ -111,7 +111,7 @@ const FinancialHub: React.FC<Props> = ({ onOpenSidebar }) => {
       <main className="flex-1 w-full md:w-auto h-screen overflow-y-auto">
         <header className="bg-white p-6 md:p-10 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
           <div className="flex items-center gap-4">
-            <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors"><Menu size={24} /></button>
+            
             <div>
               <h1 className="tlb-page-title">Pay-outs & Finance</h1>
               <p className="tlb-page-sub">Manage your payout bank account</p>

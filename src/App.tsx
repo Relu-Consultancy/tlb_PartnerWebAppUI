@@ -158,6 +158,7 @@ const prefetchScreens = () => {
 };
 
 import { Sidebar } from './components/Navigation';
+import { TopHeader } from './components/TopHeader';
 import { getAuthToken, getRefreshToken, setAuthToken, clearTokens } from './api/client';
 import { getCurrentPartner } from './api/onboarding';
 
@@ -421,7 +422,13 @@ function AppInner() {
           onToggleDesktop={() => setDesktopSidebarOpen(prev => !prev)}
         />
       )}
-      <div className={route.hasSidebar && desktopSidebarOpen ? 'lg:ml-60' : ''}>
+      <div className={`flex flex-col min-h-screen ${route.hasSidebar && desktopSidebarOpen ? 'lg:ml-60' : ''}`}>
+        {route.hasSidebar && (
+          <TopHeader 
+            onOpenSidebar={() => { setDesktopSidebarOpen(true); setIsSidebarOpen(true); }}
+            onNavigate={guardedNavigate}
+          />
+        )}
         <Suspense fallback={<SkeletonPage />}>
           {/* Enter-only fade — no `mode="wait"` exit gap, so the new screen mounts
               immediately instead of leaving a blank window while the old one exits. */}

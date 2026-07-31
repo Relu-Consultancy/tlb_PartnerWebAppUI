@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import {
-    Menu, ArrowLeft, ArrowRight, Search, RefreshCw, AlertCircle, Inbox, Send, Check, X,
+    ArrowLeft, ArrowRight, Search, RefreshCw, AlertCircle, Inbox, Send, Check, X,
     MapPin, BadgeCheck, Ban, Layers, Building2, Globe, Instagram, Facebook, Phone, Mail,
+    Users, ShieldCheck, Sparkles,
 } from 'lucide-react';
 import { Screen } from '../../types';
 import { Select, SelectOption, toast } from '../../components/ui';
@@ -17,6 +18,54 @@ interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => voi
 
 const initials = (name: string) => (name || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase()).join('');
 
+// Deterministic brand gradient so each partner gets a stable, distinct banner.
+const GRADIENTS = [
+    'from-violet-500 to-purple-600',
+    'from-blue-500 to-cyan-500',
+    'from-emerald-500 to-teal-600',
+    'from-amber-500 to-orange-500',
+    'from-rose-500 to-pink-600',
+    'from-indigo-500 to-blue-600',
+    'from-fuchsia-500 to-purple-600',
+    'from-sky-500 to-indigo-500',
+];
+// Solid initial colour that matches each gradient (same index) — used for the
+// logo-less avatar tile. A solid colour renders reliably; `bg-clip-text`
+// gradient text does not (it comes out invisible in this Tailwind setup).
+const INITIAL_COLORS = [
+    'text-violet-600',
+    'text-blue-600',
+    'text-emerald-600',
+    'text-orange-600',
+    'text-rose-600',
+    'text-indigo-600',
+    'text-fuchsia-600',
+    'text-sky-600',
+];
+const brandIndex = (seed: string): number => {
+    let h = 0;
+    for (let i = 0; i < (seed || '').length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+    return h % GRADIENTS.length;
+};
+const brandGradient = (seed: string): string => GRADIENTS[brandIndex(seed)];
+const brandInitialColor = (seed: string): string => INITIAL_COLORS[brandIndex(seed)];
+
+// `categories` may arrive as a comma-string, a JSON array, or a real array
+// depending on backend serialization — normalise all shapes to the first label.
+const firstCategory = (categories: unknown): string => {
+    if (!categories) return '';
+    if (Array.isArray(categories)) {
+        const first = categories[0];
+        return (typeof first === 'string' ? first : (first as any)?.name ?? '').toString().trim();
+    }
+    if (typeof categories === 'string') {
+        const s = categories.trim();
+        if (s.startsWith('[')) { try { return firstCategory(JSON.parse(s)); } catch { /* fall through */ } }
+        return s.split(',')[0]?.trim() || '';
+    }
+    return '';
+};
+
 const otherPartnerId = (c: Conversation): string =>
     typeof c.other_partner === 'object' ? String(c.other_partner?.id || '') : '';
 
@@ -25,6 +74,8 @@ const parseListings = (l: NetworkPartnerDetail['listings']): NetworkListing[] =>
     if (typeof l === 'string') { try { const p = JSON.parse(l); return Array.isArray(p) ? p : []; } catch { return []; } }
     return [];
 };
+
+type QuickFilter = 'all' | 'verified' | 'pinged';
 
 export const PartnerNetwork: React.FC<Props> = ({ onOpenSidebar }) => {
     const [ownName, setOwnName] = useState('');
@@ -38,6 +89,7 @@ export const PartnerNetwork: React.FC<Props> = ({ onOpenSidebar }) => {
     const [search, setSearch] = useState('');
     const [categoryId, setCategoryId] = useState('');
     const [categories, setCategories] = useState<SelectOption[]>([]);
+    const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
 
     // Profile
     const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -92,6 +144,15 @@ export const PartnerNetwork: React.FC<Props> = ({ onOpenSidebar }) => {
         return () => clearTimeout(t);
     }, [search, categoryId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+    // ── Derived stats + client-side quick filter ──
+    const verifiedCount = useMemo(() => partners.filter(p => p.is_verified).length, [partners]);
+    const inNetworkCount = useMemo(() => partners.filter(p => pingedIds.has(p.id)).length, [partners, pingedIds]);
+    const visiblePartners = useMemo(() => partners.filter(p => {
+        if (quickFilter === 'verified') return p.is_verified;
+        if (quickFilter === 'pinged') return pingedIds.has(p.id);
+        return true;
+    }), [partners, quickFilter, pingedIds]);
+
     // ── Profile ──
     const openProfile = async (id: string) => {
         setSelectedId(id);
@@ -144,12 +205,10 @@ export const PartnerNetwork: React.FC<Props> = ({ onOpenSidebar }) => {
 
     const header = (
         <header className="bg-white px-5 md:px-8 py-5 flex items-center gap-4 sticky top-0 z-30 border-b border-gray-100">
-            {selectedId ? (
+            {selectedId && (
                 <button onClick={back} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors flex items-center gap-1.5 text-gray-500 hover:text-gray-900">
                     <ArrowLeft size={20} /><span className="hidden sm:inline text-sm font-bold">Back</span>
                 </button>
-            ) : (
-                <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors"><Menu size={24} /></button>
             )}
             <div className="flex-1 min-w-0">
                 <h1 className="tlb-page-title truncate">{profile ? profile.business_name : 'Partner Network'}</h1>
@@ -165,11 +224,17 @@ export const PartnerNetwork: React.FC<Props> = ({ onOpenSidebar }) => {
         const isBlocked = profile ? blockedIds.has(profile.id) : false;
         const alreadyPinged = profile ? pingedIds.has(profile.id) : false;
         const listings = profile ? parseListings(profile.listings) : [];
+        const grad = profile ? brandGradient(profile.business_name || profile.id) : GRADIENTS[0];
         const socials = profile ? [
             { url: profile.website_url, icon: Globe, label: 'Website' },
             { url: profile.instagram_url, icon: Instagram, label: 'Instagram' },
             { url: profile.facebook_url, icon: Facebook, label: 'Facebook' },
         ].filter(s => s.url) : [];
+        const stats = profile ? [
+            { label: 'Listings', value: String(profile.published_listing_count || listings.length) },
+            { label: 'Base City', value: profile.base_city || '—' },
+            { label: 'Status', value: profile.is_verified ? 'Verified' : 'Partner' },
+        ] : [];
         return (
             <div className="min-h-screen bg-gray-50">
                 {header}
@@ -178,28 +243,46 @@ export const PartnerNetwork: React.FC<Props> = ({ onOpenSidebar }) => {
                 ) : (
                     <main className="p-5 md:p-8 max-w-4xl mx-auto space-y-6">
                         {/* Profile card */}
-                        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                            <div className="h-24 bg-gradient-to-br from-slate-700 to-slate-900">
-                                {profile.cover_image && <img src={profile.cover_image} alt="" className="w-full h-full object-cover" />}
+                        <motion.div
+                            initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+                            className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                            <div className={`h-28 bg-gradient-to-br ${grad} relative overflow-hidden`}>
+                                {(profile.cover_image || profile.cover_image_url)
+                                    ? <img src={profile.cover_image || profile.cover_image_url} alt="" className="w-full h-full object-cover" />
+                                    : <span className="absolute -right-4 -top-6 text-white/15 font-black text-[9rem] leading-none select-none">{initials(profile.business_name)}</span>}
                             </div>
                             <div className="px-6 pb-6">
-                                <div className="w-20 h-20 -mt-10 rounded-2xl bg-white shadow-md ring-4 ring-white overflow-hidden flex items-center justify-center">
+                                <div className="relative z-10 w-24 h-24 -mt-12 rounded-3xl bg-white shadow-md ring-4 ring-white overflow-hidden flex items-center justify-center">
                                     {profile.logo
                                         ? <img src={profile.logo} alt="" className="w-full h-full object-cover" />
-                                        : <span className="text-2xl font-black text-gray-300">{initials(profile.business_name)}</span>}
+                                        : <span className={`text-3xl font-black ${brandInitialColor(profile.business_name || profile.id)}`}>{initials(profile.business_name)}</span>}
                                 </div>
                                 <div className="mt-3">
                                     <div className="flex items-center gap-2">
-                                        <h2 className="text-xl font-black text-gray-900 truncate">{profile.business_name}</h2>
-                                        {profile.is_verified && <BadgeCheck size={18} className="text-blue-500 shrink-0" />}
+                                        <h2 className="text-2xl font-black text-gray-900 truncate">{profile.business_name}</h2>
+                                        {profile.is_verified && <BadgeCheck size={20} className="text-blue-500 shrink-0" />}
                                     </div>
-                                    {profile.base_city && <p className="text-sm text-gray-400 font-medium flex items-center gap-1 mt-0.5"><MapPin size={13} /> {profile.base_city}</p>}
+                                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+                                        {profile.base_city && <p className="text-sm text-gray-400 font-medium flex items-center gap-1"><MapPin size={13} /> {profile.base_city}</p>}
+                                        {firstCategory(profile.categories) && (
+                                            <span className="text-[11px] font-black uppercase tracking-wide px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600">{firstCategory(profile.categories)}</span>
+                                        )}
+                                    </div>
                                 </div>
 
                                 {profile.bio && <p className="text-sm text-gray-600 leading-relaxed mt-4">{profile.bio}</p>}
 
-                                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-4 text-xs font-bold text-gray-500">
-                                    <span className="flex items-center gap-1.5"><Layers size={13} className="text-gray-400" /> {profile.published_listing_count || listings.length} listings</span>
+                                {/* Stat pills */}
+                                <div className="grid grid-cols-3 gap-3 mt-5">
+                                    {stats.map(s => (
+                                        <div key={s.label} className="rounded-2xl bg-gray-50 border border-gray-100 px-3 py-3 text-center">
+                                            <p className="text-sm font-black text-gray-900 truncate" title={s.value}>{s.value}</p>
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{s.label}</p>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-5 text-xs font-bold text-gray-500">
                                     {profile.contact_number && <span className="flex items-center gap-1.5"><Phone size={13} className="text-gray-400" /> {profile.contact_number}</span>}
                                     {profile.email && <span className="flex items-center gap-1.5"><Mail size={13} className="text-gray-400" /> {profile.email}</span>}
                                     {profile.operating_cities && <span className="flex items-center gap-1.5"><Building2 size={13} className="text-gray-400" /> {profile.operating_cities}</span>}
@@ -238,7 +321,7 @@ export const PartnerNetwork: React.FC<Props> = ({ onOpenSidebar }) => {
                                     </p>
                                 )}
                             </div>
-                        </div>
+                        </motion.div>
 
                         {/* Published listings */}
                         <div>
@@ -250,8 +333,8 @@ export const PartnerNetwork: React.FC<Props> = ({ onOpenSidebar }) => {
                             ) : (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                                     {listings.map((l, i) => (
-                                        <div key={l.id || i} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                                            <div className="h-24 bg-gray-100">
+                                        <div key={l.id || i} className="group bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-lg transition-shadow">
+                                            <div className={`h-24 bg-gradient-to-br ${brandGradient(String(l.title || l.id || i))}`}>
                                                 {l.cover_url && <img src={l.cover_url} alt="" className="w-full h-full object-cover" />}
                                             </div>
                                             <div className="p-4">
@@ -312,16 +395,54 @@ export const PartnerNetwork: React.FC<Props> = ({ onOpenSidebar }) => {
     // =======================================================================
     // Directory
     // =======================================================================
+    const chips: { key: QuickFilter; label: string; count: number }[] = [
+        { key: 'all', label: 'All partners', count: partners.length },
+        { key: 'verified', label: 'Verified', count: verifiedCount },
+        { key: 'pinged', label: 'In your network', count: inNetworkCount },
+    ];
+
     return (
         <div className="min-h-screen bg-gray-50">
             {header}
             <main className="p-5 md:p-8 max-w-6xl mx-auto space-y-6">
-                {/* Filters */}
+                {/* Community hero */}
+                <motion.section
+                    initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}
+                    className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-tlb-dark via-gray-900 to-black p-6 md:p-8 text-white">
+                    <div className="pointer-events-none absolute -right-16 -top-16 w-64 h-64 bg-tlb-yellow/15 rounded-full blur-3xl" />
+                    <div className="pointer-events-none absolute -left-10 -bottom-16 w-52 h-52 bg-blue-500/10 rounded-full blur-3xl" />
+                    <div className="relative">
+                        <div className="inline-flex items-center gap-1.5 text-tlb-yellow text-[11px] font-black uppercase tracking-widest">
+                            <Sparkles size={13} /> Partner Community
+                        </div>
+                        <h2 className="text-2xl md:text-3xl font-black mt-2 leading-tight">Grow together with fellow partners</h2>
+                        <p className="text-sm text-gray-400 font-medium mt-1.5 max-w-lg">Discover businesses across TLB, explore their listings, and send a one-time collaboration message.</p>
+
+                        <div className="grid grid-cols-3 gap-3 mt-6 max-w-lg">
+                            {[
+                                { icon: Users, value: partners.length, label: 'Partners' },
+                                { icon: ShieldCheck, value: verifiedCount, label: 'Verified' },
+                                { icon: Sparkles, value: inNetworkCount, label: 'In network' },
+                            ].map(s => (
+                                <div key={s.label} className="rounded-2xl bg-white/10 ring-1 ring-white/10 px-3 py-3">
+                                    <s.icon size={16} className="text-tlb-yellow" />
+                                    <p className="text-xl font-black mt-1.5 tabular-nums">{loadingPartners ? '—' : s.value}</p>
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{s.label}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </motion.section>
+
+                {/* Toolbar: search + category */}
                 <div className="flex flex-col md:flex-row gap-3">
-                    <div className="flex-1 flex items-center gap-3 bg-white rounded-2xl px-4 py-3 border border-gray-100 shadow-sm">
+                    <div className="flex-1 flex items-center gap-3 bg-white rounded-2xl px-4 py-3 border border-gray-100 shadow-sm focus-within:border-tlb-yellow/60 focus-within:ring-2 focus-within:ring-tlb-yellow/20 transition">
                         <Search size={16} className="text-gray-400 shrink-0" />
                         <input className="flex-1 bg-transparent border-none focus:outline-none text-sm font-bold placeholder:text-gray-300"
                             placeholder="Search by business name or city…" value={search} onChange={e => setSearch(e.target.value)} />
+                        {search && (
+                            <button onClick={() => setSearch('')} className="text-gray-300 hover:text-gray-500 transition-colors" aria-label="Clear search"><X size={15} /></button>
+                        )}
                     </div>
                     {categories.length > 0 && (
                         <div className="md:w-56">
@@ -332,64 +453,109 @@ export const PartnerNetwork: React.FC<Props> = ({ onOpenSidebar }) => {
                     )}
                 </div>
 
+                {/* Quick filter chips */}
+                <div className="flex flex-wrap items-center gap-2">
+                    {chips.map(c => {
+                        const active = quickFilter === c.key;
+                        return (
+                            <button key={c.key} onClick={() => setQuickFilter(c.key)}
+                                className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-black transition-colors ${
+                                    active ? 'bg-tlb-dark text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}>
+                                {c.label}
+                                <span className={`min-w-[18px] px-1 rounded-full text-[10px] leading-4 text-center ${active ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'}`}>{c.count}</span>
+                            </button>
+                        );
+                    })}
+                </div>
+
                 {loadingPartners ? (
-                    <div className="flex items-center justify-center py-24"><RefreshCw size={26} className="text-gray-300 animate-spin" /></div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5">
+                        {Array.from({ length: 6 }).map((_, i) => (
+                            <div key={i} className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                                <div className="h-20 bg-gray-100 animate-pulse" />
+                                <div className="px-5 pb-5">
+                                    <div className="relative z-10 w-16 h-16 -mt-10 rounded-2xl bg-gray-200 ring-4 ring-white animate-pulse" />
+                                    <div className="h-3.5 w-2/3 bg-gray-200 rounded-full animate-pulse mt-3" />
+                                    <div className="h-2.5 w-1/3 bg-gray-100 rounded-full animate-pulse mt-2" />
+                                    <div className="h-2.5 w-full bg-gray-100 rounded-full animate-pulse mt-4" />
+                                    <div className="h-2.5 w-4/5 bg-gray-100 rounded-full animate-pulse mt-2" />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 ) : partnersError ? (
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm text-center py-16">
                         <AlertCircle size={32} className="text-red-300 mx-auto mb-3" />
                         <p className="text-sm font-bold text-gray-500">{partnersError}</p>
                         <button onClick={loadPartners} className="text-xs font-black text-blue-500 hover:underline mt-3">Try again</button>
                     </div>
-                ) : partners.length === 0 ? (
+                ) : visiblePartners.length === 0 ? (
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm text-center py-16">
                         <Inbox size={32} className="text-gray-200 mx-auto mb-3" />
-                        <p className="text-sm font-bold text-gray-400">No partners found.</p>
+                        <p className="text-sm font-bold text-gray-400">
+                            {partners.length === 0 ? 'No partners found.' : 'No partners match this filter.'}
+                        </p>
+                        {quickFilter !== 'all' && partners.length > 0 && (
+                            <button onClick={() => setQuickFilter('all')} className="text-xs font-black text-blue-500 hover:underline mt-3">Show all partners</button>
+                        )}
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5">
-                        {partners.map((p, i) => (
-                            <motion.button key={p.id}
-                                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.22, delay: Math.min(i * 0.03, 0.25) }}
-                                whileHover={{ y: -5 }}
-                                whileTap={{ scale: 0.985 }}
-                                onClick={() => openProfile(p.id)}
-                                className="group relative overflow-hidden text-left bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-2xl hover:shadow-tlb-yellow/10 hover:border-tlb-yellow/50 transition-[box-shadow,border-color] duration-300 p-5">
-                                {/* Hover glow */}
-                                <div className="pointer-events-none absolute -right-12 -top-12 w-36 h-36 rounded-full bg-tlb-yellow/25 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                                {/* Top accent wipe */}
-                                <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-tlb-yellow to-amber-400 origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-300 ease-out" />
-
-                                <div className="relative flex items-center gap-3">
-                                    <div className="w-12 h-12 rounded-2xl bg-gray-100 overflow-hidden shrink-0 flex items-center justify-center ring-2 ring-transparent group-hover:ring-tlb-yellow/40 group-hover:scale-105 transition-all duration-300">
-                                        {p.logo
-                                            ? <img src={p.logo} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ease-out" />
-                                            : <span className="font-black text-gray-300 group-hover:text-tlb-yellow transition-colors duration-300">{initials(p.business_name)}</span>}
+                        {visiblePartners.map((p, i) => {
+                            const grad = brandGradient(p.business_name || p.id);
+                            const isBlocked = blockedIds.has(p.id);
+                            const isPinged = pingedIds.has(p.id);
+                            const cat = firstCategory(p.categories);
+                            return (
+                                <motion.button key={p.id}
+                                    initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.22, delay: Math.min(i * 0.03, 0.25) }}
+                                    whileHover={{ y: -5 }}
+                                    whileTap={{ scale: 0.985 }}
+                                    onClick={() => openProfile(p.id)}
+                                    className="group relative flex flex-col text-left bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-xl hover:border-gray-200 transition-all duration-300 overflow-hidden">
+                                    {/* Brand banner — fixed height, never stretches */}
+                                    <div className={`relative h-20 shrink-0 overflow-hidden bg-gradient-to-br ${grad}`}>
+                                        <span className="absolute right-2 top-0 text-white/20 font-black text-5xl leading-none select-none">{initials(p.business_name)}</span>
+                                        {(isBlocked || isPinged) && (
+                                            <span className={`absolute top-2.5 right-2.5 inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wide backdrop-blur ${
+                                                isBlocked ? 'bg-black/40 text-red-200' : 'bg-black/30 text-emerald-200'}`}>
+                                                {isBlocked ? <><Ban size={10} /> Blocked</> : <><Check size={10} /> Pinged</>}
+                                            </span>
+                                        )}
                                     </div>
-                                    <div className="min-w-0 flex-1">
-                                        <div className="flex items-center gap-1.5">
+
+                                    <div className="px-5 pb-5 flex flex-col flex-1">
+                                        {/* Avatar overlaps the banner — relative z-10 so it paints ABOVE the positioned banner */}
+                                        <div className="relative z-10 w-16 h-16 -mt-10 rounded-2xl bg-white ring-4 ring-white shadow-md overflow-hidden flex items-center justify-center shrink-0">
+                                            {p.logo
+                                                ? <img src={p.logo} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out" />
+                                                : <span className={`text-2xl font-black ${brandInitialColor(p.business_name || p.id)}`}>{initials(p.business_name)}</span>}
+                                        </div>
+
+                                        <div className="mt-3 flex items-center gap-1.5">
                                             <p className="font-black text-gray-900 truncate">{p.business_name}</p>
                                             {p.is_verified && <BadgeCheck size={15} className="text-blue-500 shrink-0" />}
                                         </div>
-                                        {p.base_city && <p className="text-xs text-gray-400 font-medium flex items-center gap-1 truncate"><MapPin size={11} /> {p.base_city}</p>}
+                                        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 mt-1">
+                                            {p.base_city && <p className="text-xs text-gray-400 font-medium flex items-center gap-1 truncate"><MapPin size={11} /> {p.base_city}</p>}
+                                            {cat && <span className="text-[10px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">{cat}</span>}
+                                        </div>
+
+                                        <p className="text-xs text-gray-500 mt-3 line-clamp-2 leading-snug min-h-[2rem]">{p.bio || ''}</p>
+
+                                        {/* Footer pinned to the bottom for a uniform grid */}
+                                        <div className="flex items-center justify-between mt-auto pt-4 border-t border-gray-50">
+                                            <span className="text-[11px] font-bold text-gray-500 flex items-center gap-1.5"><Layers size={12} className="text-gray-400" /> {p.published_listing_count} listings</span>
+                                            <span className="text-[11px] font-black text-gray-400 group-hover:text-tlb-dark inline-flex items-center gap-1 transition-colors duration-300">
+                                                View profile
+                                                <ArrowRight size={13} className="group-hover:translate-x-1 transition-transform duration-300" />
+                                            </span>
+                                        </div>
                                     </div>
-                                </div>
-                                {p.bio && <p className="relative text-xs text-gray-500 mt-3 line-clamp-2 leading-snug">{p.bio}</p>}
-                                <div className="relative flex items-center justify-between mt-3 pt-3 border-t border-gray-50 group-hover:border-tlb-yellow/20 transition-colors duration-300">
-                                    <span className="text-[11px] font-bold text-gray-500 flex items-center gap-1.5"><Layers size={12} className="text-gray-400" /> {p.published_listing_count} listings</span>
-                                    {blockedIds.has(p.id)
-                                        ? <span className="text-[10px] font-black text-red-500 uppercase tracking-wider">Blocked</span>
-                                        : pingedIds.has(p.id)
-                                            ? <span className="text-[10px] font-black text-emerald-500 uppercase tracking-wider flex items-center gap-1"><Check size={11} /> Pinged</span>
-                                            : (
-                                                <span className="text-[11px] font-black text-gray-400 group-hover:text-tlb-dark inline-flex items-center gap-1 transition-colors duration-300">
-                                                    View
-                                                    <ArrowRight size={13} className="group-hover:translate-x-1 transition-transform duration-300" />
-                                                </span>
-                                            )}
-                                </div>
-                            </motion.button>
-                        ))}
+                                </motion.button>
+                            );
+                        })}
                     </div>
                 )}
             </main>

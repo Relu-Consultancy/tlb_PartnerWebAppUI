@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, BookOpen, GraduationCap, MapPin, ArrowLeft } from 'lucide-react';
+import { BookOpen, GraduationCap, MapPin, ArrowLeft } from 'lucide-react';
 import { Screen } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
 import { motion, AnimatePresence } from 'motion/react';
@@ -41,7 +41,7 @@ export const EnquiriesHub: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => 
         return (
             <div className="min-h-screen bg-gray-50 pb-24">
                 <header className="bg-white/90 backdrop-blur-sm px-5 md:px-8 py-5 flex items-center gap-4 sticky top-0 z-30 border-b border-gray-100">
-                    <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors"><Menu size={24} /></button>
+                    
                     <div className="flex-1">
                         <h1 className="tlb-page-title">Enquiries</h1>
                     </div>
@@ -56,9 +56,7 @@ export const EnquiriesHub: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => 
     return (
         <div className="min-h-screen bg-gray-50 pb-24 flex flex-col">
             <header className="bg-white/90 backdrop-blur-sm px-5 md:px-8 py-5 flex items-center gap-4 sticky top-0 z-30 border-b border-gray-100">
-                <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors">
-                    <Menu size={24} />
-                </button>
+                
                 <div className="flex-1 min-w-0">
                     <h1 className="tlb-page-title">Enquiries Hub</h1>
                     <p className="tlb-page-sub">Manage leads across your categories</p>

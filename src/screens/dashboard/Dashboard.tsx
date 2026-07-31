@@ -1,18 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
 import {
-  Menu, UserCircle, CheckCircle2, ArrowRight,
-  Inbox, Eye, CalendarDays, LineChart,
-  Ticket, MapPin, Edit3, LogOut,
+  UserCircle, CheckCircle2, ArrowRight,
+  Inbox, Eye, CalendarDays,
+  Ticket, MapPin,
   Heart, Activity, IndianRupee, Star, MessageSquare,
   ClipboardList, Megaphone, Bell, ExternalLink,
   BookOpen, GraduationCap, TrendingUp, TrendingDown,
-  ChevronRight,
+  ChevronRight, Clock, FileText, PauseCircle, Archive, X,
 } from 'lucide-react';
-import { Screen } from '../../types';
+import { Screen, EntityType } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
 import { EntityPickerSheet } from '../../components/EntityPickerSheet';
-import { NotificationCenter } from '../../components/NotificationCenter';
 import {
   SkeletonDashboard, fmtCurrency,
   BookingsCalendar, LatestListings,
@@ -27,6 +26,7 @@ import {
   StatsOverview, StatsRevenue, StatsReviews, StatsEvents, StatsVenues,
 } from '../../api/stats';
 import { listNotifications, markNotificationRead, InAppNotification } from '../../api/notifications';
+import { getEventListings, getClassListings, getProgramListings, getVenueListings } from '../../api/listings';
 
 // --------- Types / Constants -----------------------------------------------
 
@@ -68,6 +68,23 @@ const timeAgo = (iso: string): string => {
   const days = Math.floor(h / 24); if (days < 7) return `${days}d ago`;
   return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 };
+
+// A listing that has been through admin review (approved → published, or rejected).
+type ReviewedListing = {
+  id: string; title: string; entityType: EntityType;
+  status: 'published' | 'rejected'; coverUrl?: string; reviewedAt?: string; message: string;
+};
+
+// The backend field carrying the admin's approval/rejection note isn't formally
+// typed yet, so probe the likely names and fall back to empty.
+const reviewMessage = (it: any): string =>
+  it?.review_message || it?.review_note || it?.review_comment || it?.admin_message ||
+  it?.admin_note || it?.admin_remarks || it?.rejection_reason || it?.status_reason ||
+  it?.status_message || it?.moderation_note || it?.moderation_reason ||
+  it?.remarks || it?.feedback || '';
+
+const entityIcon = (t: EntityType): React.ElementType =>
+  t === 'Events' ? Ticket : t === 'Classes' ? BookOpen : t === 'Programs' ? GraduationCap : MapPin;
 
 const activityMeta = (type: string): { icon: React.ElementType; tint: string } => {
   const t = (type || '').toLowerCase();
@@ -160,8 +177,6 @@ interface HomeProps { onNavigate: (screen: Screen) => void; onOpenSidebar: () =>
 export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
   const { allowedEntities, setAllowedEntities } = usePartner();
   const [showEntityPicker, setShowEntityPicker] = useState(false);
-  const [showProfilePopup, setShowProfilePopup] = useState(false);
-  const profilePopupRef = useRef<HTMLDivElement>(null);
 
   const [partnerData, setPartnerData] = useState<any>(null);
   const [dashboardData, setDashboardData] = useState<any>(null);
@@ -175,6 +190,10 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
   const [extendedData, setExtendedData] = useState<any>(null);
   const [mediaItems, setMediaItems] = useState<any[]>([]);
   const [followerCount, setFollowerCount] = useState<number | null>(null);
+  const [listingCounts, setListingCounts] = useState<{ total: number; live: number; paused: number; pending: number; draft: number; archived: number } | null>(null);
+  const [reviewedListings, setReviewedListings] = useState<ReviewedListing[]>([]);
+  const [reviewTab, setReviewTab] = useState<'published' | 'rejected'>('published');
+  const [reviewPopup, setReviewPopup] = useState<ReviewedListing | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -223,6 +242,53 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
     fetchData();
   }, []);
 
+  // ------ Listing status counts + admin-reviewed listings ------
+  useEffect(() => {
+    const types = allowedEntities;
+    const jobs: { p: Promise<any>; type: EntityType }[] = [];
+    if (!types.length || types.includes('Events')) jobs.push({ p: getEventListings(), type: 'Events' });
+    if (!types.length || types.includes('Classes')) jobs.push({ p: getClassListings(), type: 'Classes' });
+    if (!types.length || types.includes('Programs')) jobs.push({ p: getProgramListings(), type: 'Programs' });
+    if (!types.length || types.includes('Venues')) jobs.push({ p: getVenueListings(), type: 'Venues' });
+    Promise.allSettled(jobs.map(j => j.p)).then(results => {
+      const items: { it: any; type: EntityType }[] = [];
+      results.forEach((r, idx) => {
+        if (r.status === 'fulfilled') {
+          const data = r.value?.data ?? r.value;
+          if (Array.isArray(data)) data.forEach((it: any) => items.push({ it, type: jobs[idx].type }));
+        }
+      });
+      const c = { total: items.length, live: 0, paused: 0, pending: 0, draft: 0, archived: 0 };
+      const reviewed: ReviewedListing[] = [];
+      for (const { it, type } of items) {
+        const status = it?.status || 'draft';
+        // Pause/Live state comes from `is_paused` (see My Listings note); `is_live` is a legacy fallback.
+        const isLive = it?.is_paused != null ? !it.is_paused : (it?.is_live !== false);
+        if (status === 'published') { isLive ? c.live++ : c.paused++; }
+        else if (status === 'pending') c.pending++;
+        else if (status === 'archived') c.archived++;
+        else c.draft++;
+
+        if (status === 'published' || status === 'rejected') {
+          reviewed.push({
+            id: String(it?.id || ''),
+            title: it?.title || 'Untitled',
+            entityType: type,
+            status,
+            coverUrl: it?.cover_url || it?.cover,
+            reviewedAt: it?.reviewed_at || it?.approved_at || it?.rejected_at || it?.status_changed_at || it?.updated_at || it?.updated,
+            message: reviewMessage(it),
+          });
+        }
+      }
+      reviewed.sort((a, b) => new Date(b.reviewedAt || 0).getTime() - new Date(a.reviewedAt || 0).getTime());
+      setListingCounts(c);
+      setReviewedListings(reviewed);
+      // Default the tab to whichever bucket has items, preferring rejected (more actionable).
+      if (reviewed.some(r => r.status === 'rejected')) setReviewTab('rejected');
+    });
+  }, [allowedEntities]);
+
   const hasClasses = allowedEntities.includes('Classes');
   const hasPrograms = allowedEntities.includes('Programs');
   const hasClassOrProgram = hasClasses || hasPrograms;
@@ -242,7 +308,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
   // ------ Profile completion + actionable checklist ------
   const galleryImages = mediaItems.filter((m: any) => m.media_type === 'image');
   const checklist = [
-    { label: 'Add a cover image', done: !!extendedData?.cover_image },
+    { label: 'Upload a cover photo', done: !!(extendedData?.cover_image || extendedData?.cover_image_url) },
     { label: 'Add your logo', done: !!extendedData?.logo },
     { label: 'Upload gallery photos', done: galleryImages.length > 0 },
     { label: 'Write your bio', done: !!extendedData?.bio },
@@ -262,15 +328,6 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
   const checklistDone = checklist.filter(c => c.done).length;
 
   const businessName = partnerData?.business_name || partnerData?.business_profile?.business_name || 'Partner';
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (profilePopupRef.current && !profilePopupRef.current.contains(event.target as Node))
-        setShowProfilePopup(false);
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   // ------ Derived stat sources ------
   const d = dashboardData || {};
@@ -367,95 +424,10 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
       <header className="sticky top-0 z-30 bg-white/70 backdrop-blur-xl border-b border-gray-200/60">
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-100 rounded-xl transition-colors lg:hidden">
-              <Menu size={20} />
-            </button>
+            
             <div>
               <h1 className="text-lg font-black text-gray-900 tracking-tight leading-none">Dashboard</h1>
               <p className="text-[11px] font-medium text-gray-400 mt-0.5 hidden sm:block">{todayStr}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {/* Command bar hint */}
-            <button
-              onClick={() => onNavigate('ANALYTICS')}
-              className="hidden md:flex items-center gap-2 h-9 px-3.5 rounded-xl bg-gray-50 border border-gray-200/80 text-gray-400 hover:text-gray-600 hover:border-gray-300 transition-all"
-            >
-              <LineChart size={15} />
-              <span className="text-xs font-semibold">Analytics</span>
-            </button>
-            <NotificationCenter variant="light" onNavigate={onNavigate} />
-            {/* Profile avatar */}
-            <div className="relative" ref={profilePopupRef}>
-              <button
-                onClick={() => setShowProfilePopup(!showProfilePopup)}
-                className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors overflow-hidden ring-2 ring-transparent hover:ring-gray-300"
-              >
-                {extendedData?.logo
-                  ? <img src={extendedData.logo} alt="" className="w-9 h-9 rounded-xl object-cover" />
-                  : <UserCircle size={20} className="text-gray-500" />
-                }
-              </button>
-              {showProfilePopup && (
-                <div className="absolute right-0 mt-2 w-[320px] bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl shadow-black/10 border border-gray-200/60 overflow-hidden z-50">
-                  {/* Dark header */}
-                  <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-5 py-5 overflow-hidden">
-                    <div className="absolute -right-6 -top-6 w-24 h-24 bg-yellow-400/10 rounded-full blur-2xl" />
-                    <div className="absolute -left-4 -bottom-4 w-16 h-16 bg-blue-400/10 rounded-full blur-2xl" />
-                    <div className="relative flex items-center gap-3.5">
-                      <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center text-white shrink-0 ring-2 ring-white/20 overflow-hidden">
-                        {extendedData?.logo
-                          ? <img src={extendedData.logo} alt="logo" className="w-12 h-12 object-cover" />
-                          : <UserCircle size={26} />
-                        }
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-black text-sm text-white truncate">{profileData?.business_name || partnerData?.business_name || 'Your Business'}</p>
-                        <p className="text-[11px] text-gray-400 truncate mt-0.5">{partnerData?.email || partnerData?.phone || ''}</p>
-                      </div>
-                      <span className={`shrink-0 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wide ${
-                        isVerified ? 'bg-emerald-500/20 text-emerald-400' :
-                        verificationSubmitted ? 'bg-blue-500/20 text-blue-400' :
-                        isActive ? 'bg-amber-500/20 text-amber-400' :
-                        'bg-white/10 text-gray-400'
-                      }`}>
-                        {isVerified ? 'Verified' : verificationSubmitted ? 'In Review' : isActive ? 'Active' : 'Pending'}
-                      </span>
-                    </div>
-                  </div>
-                  {/* Stats */}
-                  <div className="grid grid-cols-3 divide-x divide-gray-100">
-                    <div className="px-3 py-3 text-center">
-                      <p className="text-base font-black text-gray-900">{profileCompletion}%</p>
-                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Profile</p>
-                    </div>
-                    <div className="px-3 py-3 text-center">
-                      <p className="text-base font-black text-gray-900">{allowedEntities.length}</p>
-                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Services</p>
-                    </div>
-                    <div className="px-3 py-3 text-center">
-                      <p className="text-base font-black text-gray-900">{followerCount === null ? '-' : followerCount.toLocaleString('en-IN')}</p>
-                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Followers</p>
-                    </div>
-                  </div>
-                  {/* Entity chips */}
-                  {allowedEntities.length > 0 && (
-                    <div className="px-4 py-3 flex flex-wrap gap-1.5 border-t border-gray-100">
-                      {allowedEntities.map(e => {
-                        const c = e === 'Events' ? 'bg-blue-50 text-blue-600' : e === 'Classes' ? 'bg-purple-50 text-purple-600' : e === 'Programs' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600';
-                        return <span key={e} className={`text-[9px] font-black uppercase tracking-wide px-2.5 py-1 rounded-md ${c}`}>{e}</span>;
-                      })}
-                    </div>
-                  )}
-                  {/* Actions */}
-                  <div className="p-2 border-t border-gray-100">
-                    <button onClick={() => { setShowProfilePopup(false); onNavigate('BRAND_PROFILE'); }} className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2.5 transition-colors"><Edit3 size={14} className="text-gray-400" />Edit Profile</button>
-                    <button onClick={() => { setShowProfilePopup(false); onNavigate('PREVIEW_PROFILE'); }} className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2.5 transition-colors"><Eye size={14} className="text-gray-400" />Preview Profile</button>
-                    <div className="my-1 border-t border-gray-100" />
-                    <button onClick={() => { setShowProfilePopup(false); onNavigate('LANDING'); }} className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 flex items-center gap-2.5 transition-colors"><LogOut size={14} />Sign Out</button>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -595,6 +567,112 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
             </motion.button>
           ))}
         </motion.section>
+
+        {/* ─── Listings overview ─── */}
+        <motion.section {...fadeUp} transition={{ duration: 0.3 }} className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-baseline gap-2">
+              <h3 className="text-sm font-black text-gray-900">Listings overview</h3>
+              {listingCounts && <span className="text-[11px] font-bold text-gray-400">{listingCounts.total} total</span>}
+            </div>
+            <button onClick={() => onNavigate('SERVICE_LISTINGS')} className="text-xs font-black text-gray-400 hover:text-gray-900 inline-flex items-center gap-1 transition-colors">
+              Manage <ArrowRight size={13} />
+            </button>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
+            {[
+              { label: 'Total Listings', value: listingCounts?.total, icon: ClipboardList, hex: '#141414' },
+              { label: 'Live', value: listingCounts?.live, icon: CheckCircle2, hex: '#10B981' },
+              { label: 'Pending', value: listingCounts?.pending, icon: Clock, hex: '#F59E0B' },
+              { label: 'Draft', value: listingCounts?.draft, icon: FileText, hex: '#6B7280' },
+              { label: 'Paused', value: listingCounts?.paused, icon: PauseCircle, hex: '#F97316' },
+              { label: 'Archived', value: listingCounts?.archived, icon: Archive, hex: '#9CA3AF' },
+            ].map(c => (
+              <button
+                key={c.label}
+                onClick={() => onNavigate('SERVICE_LISTINGS')}
+                className="group text-left bg-white rounded-2xl border border-gray-200/60 hover:shadow-lg hover:shadow-gray-200/60 hover:border-gray-300 transition-all duration-200 p-4"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{c.label}</p>
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center transition-transform duration-300 group-hover:scale-110" style={{ backgroundColor: `${c.hex}14`, color: c.hex }}>
+                    <c.icon size={14} />
+                  </div>
+                </div>
+                {listingCounts
+                  ? <CountUpValue value={c.value ?? 0} className="text-2xl xl:text-[22px] font-black leading-none text-gray-900" />
+                  : <span className="text-2xl xl:text-[22px] font-black leading-none text-gray-200">—</span>}
+              </button>
+            ))}
+          </div>
+        </motion.section>
+
+        {/* ─── Admin review (approved / rejected listings) ─── */}
+        {reviewedListings.length > 0 && (
+          <motion.section {...fadeUp} transition={{ duration: 0.3 }} className="bg-white rounded-2xl border border-gray-200/60 shadow-sm overflow-hidden">
+            <div className="p-5 sm:p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gray-900 text-yellow-400 flex items-center justify-center"><ClipboardList size={18} /></div>
+                  <div>
+                    <h3 className="text-sm font-black text-gray-900">Admin review</h3>
+                    <p className="text-[11px] text-gray-400 font-medium">Listings approved or rejected by the TLB team</p>
+                  </div>
+                </div>
+                <button onClick={() => onNavigate('SERVICE_LISTINGS')} className="text-xs font-black text-gray-400 hover:text-gray-900 inline-flex items-center gap-1 transition-colors">
+                  View all <ArrowRight size={13} />
+                </button>
+              </div>
+
+              {/* Tabs */}
+              <div className="inline-flex rounded-xl bg-gray-100 p-1 mb-4">
+                {([['published', 'Approved'], ['rejected', 'Rejected']] as const).map(([key, label]) => {
+                  const count = reviewedListings.filter(r => r.status === key).length;
+                  const active = reviewTab === key;
+                  return (
+                    <button key={key} onClick={() => setReviewTab(key)}
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-colors inline-flex items-center gap-1.5 ${active ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
+                      {label}
+                      <span className={`min-w-[18px] px-1 rounded-full text-[10px] leading-4 text-center ${key === 'rejected' ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}`}>{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* List */}
+              {(() => {
+                const filtered = reviewedListings.filter(r => r.status === reviewTab);
+                if (filtered.length === 0) {
+                  return <div className="text-center py-8 text-xs font-bold text-gray-400">No {reviewTab === 'rejected' ? 'rejected' : 'approved'} listings.</div>;
+                }
+                return (
+                  <div className="space-y-2">
+                    {filtered.slice(0, 5).map(r => {
+                      const EIcon = entityIcon(r.entityType);
+                      return (
+                        <button key={r.id} onClick={() => setReviewPopup(r)}
+                          className="w-full text-left flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:border-gray-200 hover:bg-gray-50/60 transition-colors">
+                          <div className="w-9 h-9 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center shrink-0">
+                            {r.coverUrl ? <img src={r.coverUrl} alt="" className="w-full h-full object-cover" /> : <EIcon size={15} className="text-gray-400" />}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-bold text-gray-900 truncate">{r.title}</p>
+                            <p className="text-[11px] text-gray-400 font-medium">{r.entityType}{r.reviewedAt ? ` · ${timeAgo(r.reviewedAt)}` : ''}</p>
+                          </div>
+                          {r.message && <MessageSquare size={13} className="text-gray-300 shrink-0" />}
+                          <span className={`shrink-0 text-[10px] font-black uppercase tracking-wide px-2 py-1 rounded-full ${r.status === 'rejected' ? 'bg-red-50 text-red-500' : 'bg-emerald-50 text-emerald-600'}`}>
+                            {r.status === 'rejected' ? 'Rejected' : 'Approved'}
+                          </span>
+                          <ChevronRight size={15} className="text-gray-300 shrink-0" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+          </motion.section>
+        )}
 
         {/* ─── Revenue Overview + Recent Activity ─── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -798,6 +876,39 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
         </div>
 
       </main>
+
+      {/* Admin review-message popup */}
+      {reviewPopup && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setReviewPopup(null)}>
+          <motion.div initial={{ opacity: 0, scale: 0.96, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className={`px-5 py-4 flex items-start gap-3 ${reviewPopup.status === 'rejected' ? 'bg-red-50' : 'bg-emerald-50'}`}>
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${reviewPopup.status === 'rejected' ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                {reviewPopup.status === 'rejected' ? <TrendingDown size={18} /> : <CheckCircle2 size={18} />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className={`text-[10px] font-black uppercase tracking-widest ${reviewPopup.status === 'rejected' ? 'text-red-500' : 'text-emerald-600'}`}>
+                  {reviewPopup.status === 'rejected' ? 'Rejected by admin' : 'Approved by admin'}
+                </p>
+                <p className="font-black text-gray-900 truncate">{reviewPopup.title}</p>
+                <p className="text-[11px] text-gray-400 font-medium mt-0.5">{reviewPopup.entityType}{reviewPopup.reviewedAt ? ` · ${timeAgo(reviewPopup.reviewedAt)}` : ''}</p>
+              </div>
+              <button onClick={() => setReviewPopup(null)} className="p-1.5 rounded-lg hover:bg-black/5 text-gray-400 shrink-0" aria-label="Close"><X size={18} /></button>
+            </div>
+            <div className="p-5">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Reviewer's message</p>
+              {reviewPopup.message
+                ? <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap bg-gray-50 rounded-xl p-4 border border-gray-100">{reviewPopup.message}</p>
+                : <p className="text-sm text-gray-400 italic bg-gray-50 rounded-xl p-4 border border-gray-100">The reviewer didn’t leave a message.</p>}
+              <div className="flex justify-end mt-4">
+                <button onClick={() => { setReviewPopup(null); onNavigate('SERVICE_LISTINGS'); }} className="tlb-button px-5 py-2.5">
+                  Open in My Listings <ArrowRight size={15} />
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       <EntityPickerSheet
         isOpen={showEntityPicker}

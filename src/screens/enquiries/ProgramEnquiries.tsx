@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Screen, EnquiryStatus } from '../../types';
+import { Pagination } from '../../components/ui/Pagination';
 import { getProgramListings, getProgramEnquiries, updateProgramEnquiry } from '../../api/listings';
 import { Select } from '../../components/ui';
 
@@ -168,6 +169,13 @@ export const ProgramEnquiries: React.FC<Props> = () => {
         .sort((a, b) => (a.status === 'new' ? -1 : 1) - (b.status === 'new' ? -1 : 1)),
         [leads, statusFilter, search]);
 
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 10;
+    useEffect(() => { setCurrentPage(1); }, [search, statusFilter]);
+
+    const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+    const paginatedLeads = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
     const isLoading = loadingPrograms || loadingEnquiries;
 
     const kpiCards: { key: EnquiryStatus | ''; label: string; icon: React.ElementType; fg: string; bg: string }[] = [
@@ -263,7 +271,7 @@ export const ProgramEnquiries: React.FC<Props> = () => {
                                             </div>
                                         </td>
                                     </tr>
-                                ) : filtered.length === 0 ? (
+                                ) : paginatedLeads.length === 0 ? (
                                     <tr>
                                         <td colSpan={6} className="px-6 py-16 text-center">
                                             <div className="flex flex-col items-center gap-3 text-gray-300">
@@ -275,7 +283,7 @@ export const ProgramEnquiries: React.FC<Props> = () => {
                                             </div>
                                         </td>
                                     </tr>
-                                ) : filtered.map((lead, i) => (
+                                ) : paginatedLeads.map((lead, i) => (
                                     <motion.tr
                                         key={lead.id}
                                         initial={{ opacity: 0, y: 6 }}
@@ -343,6 +351,14 @@ export const ProgramEnquiries: React.FC<Props> = () => {
                             </tbody>
                         </table>
                     </div>
+
+                    <Pagination 
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        totalItems={filtered.length}
+                        itemsPerPage={ITEMS_PER_PAGE}
+                        onPageChange={setCurrentPage}
+                    />
                 </div>
             </div>
         </main>

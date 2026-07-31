@@ -102,7 +102,7 @@ export const PreviewProfile: React.FC<ProfileProps> = ({ onNavigate, previousScr
 
     const businessName = profile.business_name || 'Your Business';
     const bio = extProfile.bio || 'No bio added yet. Edit your profile to add a description.';
-    const coverImage = resolveUrl(extProfile.cover_image);
+    const coverImage = resolveUrl(extProfile.cover_image || extProfile.cover_image_url);
     const logoImage = resolveUrl(extProfile.logo);
 
     if (loading) {

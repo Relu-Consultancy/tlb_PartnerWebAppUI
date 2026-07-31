@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, CreditCard, Check, AlertTriangle, Zap, Crown, Shield } from 'lucide-react';
+import { CreditCard, Check, AlertTriangle, Zap, Crown, Shield } from 'lucide-react';
 import { Screen, PackagePlan, BillingRecord } from '../../types';
 
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
@@ -28,7 +28,7 @@ export const Packages: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
     return (
     <div className="min-h-screen bg-gray-50 pb-24">
         <header className="bg-white p-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
-            <button onClick={onOpenSidebar} className="p-2 -ml-2"><Menu size={24} /></button>
+            
             <h1 className="tlb-page-title">Packages</h1>
             <div className="w-10" />
         </header>

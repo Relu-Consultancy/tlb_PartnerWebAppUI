@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-    Menu, Search, X, ArrowLeft, ChevronRight,
+    Search, X, ArrowLeft, ChevronRight,
     User, CreditCard, Users, CheckCircle,
     Inbox, RefreshCw, Phone, Mail, Wallet, MessageCircle,
     FileText, AlertCircle, CalendarDays, GraduationCap, Layers, MapPin,
@@ -9,11 +9,11 @@ import {
 } from 'lucide-react';
 import { Screen, EntityType } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
-import { toast } from '../../components/ui';
+import { toast, Pagination } from '../../components/ui';
 import {
     getBookings, getBookingDetail, markBookingAttended, getBookingPaymentDetail,
     getEventListings, getClassListings, getProgramListings, getVenueListings,
-    getClassEnquiries, getVenueEnquiries, getProgramEnquiries,
+    getClassEnquiries, getVenueEnquiries, getProgramEnquiries, getPartnerListings,
 } from '../../api/listings';
 
 type ScreenVariant = 'attendees' | 'bookings';
@@ -764,6 +764,13 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
         );
     };
     const filtered = tabFiltered.filter(matchesSearch);
+
+    const [bookingPage, setBookingPage] = useState(1);
+    const ITEMS_PER_PAGE = 10;
+    useEffect(() => { setBookingPage(1); }, [searchQuery, activeTab]);
+    const totalBookingPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+    const paginatedBookings = filtered.slice((bookingPage - 1) * ITEMS_PER_PAGE, bookingPage * ITEMS_PER_PAGE);
+
     // Attendee check-in roster: confirmed (to check in) + already-attended guests.
     const attendeeRoster = listingBookings
         .filter(b => b.status === 'confirmed' || b.status === 'attended')
@@ -860,14 +867,10 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
                 {/* Header */}
                 <header className="bg-white px-6 md:px-10 py-5 flex items-center justify-between gap-4 sticky top-0 z-30 border-b border-gray-100">
                     <div className="flex items-center gap-4 min-w-0">
-                        {selected ? (
+                        {selected && (
                             <button onClick={backToListings} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors flex items-center gap-1.5 text-gray-500 hover:text-gray-900">
                                 <ArrowLeft size={22} />
                                 <span className="hidden sm:inline text-sm font-bold">Back</span>
-                            </button>
-                        ) : (
-                            <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors">
-                                <Menu size={24} />
                             </button>
                         )}
                         <div className="min-w-0">
@@ -1185,7 +1188,7 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-gray-50">
-                                                    {filtered.map(b => (
+                                                    {paginatedBookings.map(b => (
                                                         <tr key={b.id} className="hover:bg-gray-50/40 transition-colors cursor-pointer" onClick={() => handleViewDetail(b.id)}>
                                                             <td className="px-5 py-4">
                                                                 <span className="font-mono text-xs font-bold text-gray-700 bg-gray-100 px-2 py-1 rounded-lg whitespace-nowrap">
@@ -1232,6 +1235,13 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
                                                 </tbody>
                                             </table>
                                         )}
+                                        <Pagination 
+                                            currentPage={bookingPage}
+                                            totalPages={totalBookingPages}
+                                            totalItems={filtered.length}
+                                            itemsPerPage={ITEMS_PER_PAGE}
+                                            onPageChange={setBookingPage}
+                                        />
                                     </div>
                                 </>
                             ) : groupView === 'enquiries' ? (

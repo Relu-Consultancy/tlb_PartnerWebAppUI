@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Menu, Search, X, RefreshCw, AlertCircle, Users, Heart, MapPin,
+  Search, X, RefreshCw, AlertCircle, Users, Heart, MapPin,
   Calendar, UserPlus, ChevronLeft, ChevronRight, Mail, Phone, User,
   Loader2, ShoppingBag, Clock, SlidersHorizontal, ArrowUpDown,
 } from 'lucide-react';
@@ -146,9 +146,7 @@ const Followers: React.FC<Props> = ({ onOpenSidebar }) => {
       <main className="flex-1 w-full">
         {/* Header */}
         <header className="bg-white px-6 md:px-10 py-5 flex items-center gap-4 sticky top-0 z-30 border-b border-gray-100">
-          <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors">
-            <Menu size={24} />
-          </button>
+          
           <div className="min-w-0 flex-1">
             <h1 className="tlb-page-title truncate">Followers</h1>
             <p className="tlb-page-sub">People following your brand on TLB</p>

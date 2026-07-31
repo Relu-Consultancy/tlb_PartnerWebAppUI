@@ -47,7 +47,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen
   const menuItems = [
     { id: 'ACCOUNTS', label: 'Accounts', icon: UserCircle, visible: true },
     { id: 'HOME', label: 'Dashboard', icon: Home, visible: true },
-    { id: 'MESSAGES', label: 'Messages', icon: Bell, visible: true },
+    { id: 'MESSAGES', label: 'Messages', icon: Bell, visible: false },
     { id: 'ANALYTICS', label: 'Analytics', icon: LineChart, visible: true },
     { id: 'SERVICE_LISTINGS', label: listingsLabel, icon: CalendarDays, visible: true },
     { id: 'REVIEWS', label: 'Reviews', icon: Star, visible: true },

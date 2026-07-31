@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, Trash2, Loader2, HelpCircle, FileText, Save, Check, X, Upload } from 'lucide-react';
-import { getListingTerms, setListingTerms, deleteListingTerms } from '../../api/listings';
+import { getListingTerms, setListingTerms, deleteListingTerms, getListingFaqDoc, setListingFaqDoc, deleteListingFaqDoc } from '../../api/listings';
 import { toast } from './Toast';
 
 export interface FaqApi {
@@ -41,8 +41,14 @@ export const FaqTermsEditor: React.FC<Props> = ({ listingId, faqApi, accent = 'b
     const [savingTerms, setSavingTerms] = useState(false);
     const [hasTerms, setHasTerms] = useState(false);
 
+    const [faqDocUrl, setFaqDocUrl] = useState<string | null>(null);
+    const [faqFile, setFaqFile] = useState<File | null>(null);
+    const [faqDocLoaded, setFaqDocLoaded] = useState(false);
+    const [savingFaqDoc, setSavingFaqDoc] = useState(false);
+    const [hasFaqDoc, setHasFaqDoc] = useState(false);
+
     useEffect(() => {
-        if (!listingId) { setLoadingFaqs(false); setTermsLoaded(true); return; }
+        if (!listingId) { setLoadingFaqs(false); setTermsLoaded(true); setFaqDocLoaded(true); return; }
         let alive = true;
         (async () => {
             try {
@@ -62,6 +68,16 @@ export const FaqTermsEditor: React.FC<Props> = ({ listingId, faqApi, accent = 'b
                     setHasTerms(true);
                 }
             } catch { /* ignore */ } finally { if (alive) setTermsLoaded(true); }
+        })();
+        (async () => {
+            try {
+                const res = await getListingFaqDoc(listingId);
+                const d = res?.data ?? res;
+                if (alive && d) {
+                    setFaqDocUrl(d.document_url || null);
+                    if (d.document_url) setHasFaqDoc(true);
+                }
+            } catch { /* ignore */ } finally { if (alive) setFaqDocLoaded(true); }
         })();
         return () => { alive = false; };
     }, [listingId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -100,6 +116,42 @@ export const FaqTermsEditor: React.FC<Props> = ({ listingId, faqApi, accent = 'b
             catch (e: any) { toast.error(e?.message || 'Failed to delete FAQ.'); return; }
         }
         setFaqs(prev => prev.filter((_, i) => i !== idx));
+    };
+
+    const pickFaqDoc = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (file.size > MAX_DOC) { toast.warning('Document must be under 10 MB.'); e.target.value = ''; return; }
+        setFaqFile(file);
+    };
+
+    const saveFaqDoc = async () => {
+        if (!faqFile) return;
+        setSavingFaqDoc(true);
+        try {
+            const res = await setListingFaqDoc(listingId, { document: faqFile });
+            const d = res?.data ?? res;
+            setFaqDocUrl(d?.document_url || faqDocUrl);
+            setFaqFile(null);
+            setHasFaqDoc(true);
+            toast.success('FAQ document saved.');
+        } catch (e: any) {
+            toast.error(e?.message || 'Failed to save FAQ document.');
+        } finally {
+            setSavingFaqDoc(false);
+        }
+    };
+
+    const removeFaqDoc = async () => {
+        try {
+            await deleteListingFaqDoc(listingId);
+            setFaqDocUrl(null);
+            setFaqFile(null);
+            setHasFaqDoc(false);
+            toast.success('FAQ document removed.');
+        } catch (e: any) {
+            toast.error(e?.message || 'Failed to remove FAQ document.');
+        }
     };
 
     // ── Terms handlers ──
@@ -207,6 +259,49 @@ export const FaqTermsEditor: React.FC<Props> = ({ listingId, faqApi, accent = 'b
                         >
                             <Plus size={16} /> Add FAQ
                         </button>
+                        
+                        {/* FAQ Document Upload */}
+                        <div className="pt-4 border-t border-gray-100 mt-6">
+                            <p className="text-sm font-bold text-gray-700 mb-2">Or upload an FAQ document</p>
+                            {!faqDocLoaded ? (
+                                <div className="flex items-center gap-2 text-gray-400 text-xs font-bold py-2"><Loader2 size={14} className="animate-spin" /> Loading…</div>
+                            ) : (
+                                <div className="space-y-3">
+                                    <div className="flex flex-wrap items-center gap-3">
+                                        <label className="inline-flex items-center gap-2 text-sm font-bold text-gray-600 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl px-3.5 py-2.5 cursor-pointer transition-colors">
+                                            <Upload size={15} /> {faqFile ? 'Change document' : 'Attach FAQ document'}
+                                            <input type="file" accept=".pdf,.doc,.docx" className="hidden" onChange={pickFaqDoc} />
+                                        </label>
+                                        {faqFile && (
+                                            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-600">
+                                                {faqFile.name}
+                                                <button onClick={() => setFaqFile(null)} className="text-gray-400 hover:text-red-500"><X size={13} /></button>
+                                            </span>
+                                        )}
+                                        {!faqFile && faqDocUrl && (
+                                            <a href={faqDocUrl} target="_blank" rel="noreferrer" className={`text-xs font-bold underline ${a.text}`}>
+                                                View current document
+                                            </a>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            onClick={saveFaqDoc}
+                                            disabled={savingFaqDoc || !faqFile}
+                                            className={`inline-flex items-center gap-1.5 text-white text-sm font-bold px-4 py-2.5 rounded-xl transition-colors disabled:opacity-50 ${a.btn}`}
+                                        >
+                                            {savingFaqDoc ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Save Document
+                                        </button>
+                                        {hasFaqDoc && (
+                                            <button onClick={removeFaqDoc} className="inline-flex items-center gap-1.5 text-sm font-bold text-red-500 hover:text-red-600 px-3 py-2.5">
+                                                <Trash2 size={15} /> Remove
+                                            </button>
+                                        )}
+                                    </div>
+                                    <p className="text-[10px] text-gray-400">PDF/DOC · Max 10 MB.</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
             </section>

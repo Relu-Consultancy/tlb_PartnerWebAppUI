@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-    Menu, CheckCheck, RefreshCw, Inbox, ExternalLink, Megaphone, Bell, Check,
+    CheckCheck, RefreshCw, Inbox, ExternalLink, Megaphone, Bell, Check,
     Ticket, IndianRupee, MessageSquare, Heart, ClipboardList,
 } from 'lucide-react';
 import { Screen } from '../../types';
@@ -186,7 +186,7 @@ const Messages: React.FC<Props> = ({ onOpenSidebar }) => {
         <div className="min-h-screen bg-gray-50">
             {/* Header */}
             <header className="bg-white px-6 md:px-10 py-5 flex items-center gap-4 sticky top-0 z-30 border-b border-gray-100">
-                <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors"><Menu size={24} /></button>
+                
                 <div className="flex-1 min-w-0">
                     <h1 className="tlb-page-title flex items-center gap-2">
                         Messages

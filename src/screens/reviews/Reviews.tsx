@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { motion } from 'motion/react';
 import {
-    Menu, Star, RefreshCw, AlertCircle, Inbox, Quote, TrendingUp,
+    Star, RefreshCw, AlertCircle, Inbox, Quote, TrendingUp,
     CalendarDays, GraduationCap, Layers, MapPin,
 } from 'lucide-react';
 import { Screen, EntityType } from '../../types';
@@ -9,6 +9,7 @@ import { usePartner } from '../../context/PartnerContext';
 import { getEventListings, getClassListings, getProgramListings, getVenueListings } from '../../api/listings';
 import { getPartnerReviews, PartnerReview } from '../../api/reviews';
 import { getStatsReviews, StatsReviews } from '../../api/stats';
+import { Select } from '../../components/ui/Select';
 
 interface Props { onNavigate: (s: Screen) => void; onOpenSidebar: () => void; }
 
@@ -131,9 +132,7 @@ const Reviews: React.FC<Props> = ({ onOpenSidebar }) => {
             <main className="flex-1 w-full">
                 {/* Header */}
                 <header className="bg-white px-6 md:px-10 py-5 flex items-center gap-4 sticky top-0 z-30 border-b border-gray-100">
-                    <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors">
-                        <Menu size={24} />
-                    </button>
+                    
                     <div className="min-w-0">
                         <h1 className="tlb-page-title truncate">Reviews</h1>
                         <p className="tlb-page-sub">Ratings &amp; feedback customers left on your listings</p>
@@ -205,47 +204,55 @@ const Reviews: React.FC<Props> = ({ onOpenSidebar }) => {
 
                     {/* Filters */}
                     <div className="flex flex-wrap items-center gap-3 bg-white p-3 rounded-2xl border border-gray-100 shadow-sm">
-                        <select 
-                            className="bg-gray-50 border border-gray-100 text-sm font-bold text-gray-600 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-tlb-yellow/30" 
-                            value={ratingFilter} 
-                            onChange={e => { setRatingFilter(e.target.value ? Number(e.target.value) : ''); setPage(1); }}
-                        >
-                            <option value="">All Ratings</option>
-                            <option value="5">5 Stars</option>
-                            <option value="4">4 Stars</option>
-                            <option value="3">3 Stars</option>
-                            <option value="2">2 Stars</option>
-                            <option value="1">1 Star</option>
-                        </select>
-                        <select 
-                            className="bg-gray-50 border border-gray-100 text-sm font-bold text-gray-600 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-tlb-yellow/30" 
+                        <Select 
+                            value={String(ratingFilter)} 
+                            onChange={v => { setRatingFilter(v ? Number(v) : ''); setPage(1); }}
+                            options={[
+                                { value: '', label: 'All Ratings' },
+                                { value: '5', label: '5 Stars' },
+                                { value: '4', label: '4 Stars' },
+                                { value: '3', label: '3 Stars' },
+                                { value: '2', label: '2 Stars' },
+                                { value: '1', label: '1 Star' },
+                            ]}
+                            buttonClassName="bg-gray-50 border border-gray-100 text-sm font-bold text-gray-600 rounded-xl px-4 py-2.5 hover:bg-gray-100 transition-colors flex items-center justify-between gap-2 w-full text-left"
+                            className="min-w-[140px] flex-1 sm:flex-none"
+                        />
+                        <Select 
                             value={typeFilter} 
-                            onChange={e => { setTypeFilter(e.target.value); setPage(1); }}
-                        >
-                            <option value="all">All Types</option>
-                            <option value="event">Events</option>
-                            <option value="class">Classes</option>
-                            <option value="program">Programs</option>
-                            <option value="venue">Venues</option>
-                        </select>
-                        <select 
-                            className="bg-gray-50 border border-gray-100 text-sm font-bold text-gray-600 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-tlb-yellow/30 flex-1 min-w-[180px]" 
+                            onChange={v => { setTypeFilter(v); setPage(1); }}
+                            options={[
+                                { value: 'all', label: 'All Types' },
+                                { value: 'event', label: 'Events' },
+                                { value: 'class', label: 'Classes' },
+                                { value: 'program', label: 'Programs' },
+                                { value: 'venue', label: 'Venues' },
+                            ]}
+                            buttonClassName="bg-gray-50 border border-gray-100 text-sm font-bold text-gray-600 rounded-xl px-4 py-2.5 hover:bg-gray-100 transition-colors flex items-center justify-between gap-2 w-full text-left"
+                            className="min-w-[140px] flex-1 sm:flex-none"
+                        />
+                        <Select 
                             value={listingFilter} 
-                            onChange={e => { setListingFilter(e.target.value); setPage(1); }}
-                        >
-                            <option value="all">All Listings</option>
-                            {listings.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
-                        </select>
-                        <select 
-                            className="bg-gray-50 border border-gray-100 text-sm font-bold text-gray-600 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-tlb-yellow/30" 
+                            onChange={v => { setListingFilter(v); setPage(1); }}
+                            options={[
+                                { value: 'all', label: 'All Listings' },
+                                ...listings.map(l => ({ value: l.id, label: l.title }))
+                            ]}
+                            buttonClassName="bg-gray-50 border border-gray-100 text-sm font-bold text-gray-600 rounded-xl px-4 py-2.5 hover:bg-gray-100 transition-colors flex items-center justify-between gap-2 w-full text-left"
+                            className="min-w-[180px] flex-1"
+                        />
+                        <Select 
                             value={ordering} 
-                            onChange={e => { setOrdering(e.target.value); setPage(1); }}
-                        >
-                            <option value="newest">Newest First</option>
-                            <option value="oldest">Oldest First</option>
-                            <option value="highest">Highest Rating</option>
-                            <option value="lowest">Lowest Rating</option>
-                        </select>
+                            onChange={v => { setOrdering(v); setPage(1); }}
+                            options={[
+                                { value: 'newest', label: 'Newest First' },
+                                { value: 'oldest', label: 'Oldest First' },
+                                { value: 'highest', label: 'Highest Rating' },
+                                { value: 'lowest', label: 'Lowest Rating' },
+                            ]}
+                            buttonClassName="bg-gray-50 border border-gray-100 text-sm font-bold text-gray-600 rounded-xl px-4 py-2.5 hover:bg-gray-100 transition-colors flex items-center justify-between gap-2 w-full text-left"
+                            className="min-w-[160px] flex-1 sm:flex-none"
+                        />
                     </div>
 
                     {loading ? (

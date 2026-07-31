@@ -902,6 +902,26 @@ export const deleteListingTerms = async (listingId: string) => {
     return {};
 };
 
+// ─── FAQ Document (generic — works for all listing types) ─────────────────────
+export const getListingFaqDoc = async (listingId: string) => {
+    const response = await apiClient(`/api/v1/partner/listings/${listingId}/faq-document/`);
+    if (response.status === 404) return null; // FAQ_DOC_NOT_FOUND
+    if (!response.ok) await handleError(response, 'Failed to load FAQ document');
+    return response.json();
+};
+export const setListingFaqDoc = async (listingId: string, data: { document: File }) => {
+    const fd = new FormData();
+    fd.append('document', data.document);
+    const response = await apiClient(`/api/v1/partner/listings/${listingId}/faq-document/`, { method: 'PUT', body: fd });
+    if (!response.ok) await handleError(response, 'Failed to save FAQ document');
+    return response.json();
+};
+export const deleteListingFaqDoc = async (listingId: string) => {
+    const response = await apiClient(`/api/v1/partner/listings/${listingId}/faq-document/`, { method: 'DELETE' });
+    if (!response.ok) await handleError(response, 'Failed to delete FAQ document');
+    return {};
+};
+
 // ─── Program Media ─────────────────────────────────────────────────────────
 
 export const getProgramMedia = async (listingId: string) => {

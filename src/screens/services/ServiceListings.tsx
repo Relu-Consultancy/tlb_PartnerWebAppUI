@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Menu, Plus, Search, Filter, Users, Edit3, CalendarDays, BarChart3, MapPin, Layers, Clock, X, Check, SlidersHorizontal, Play, Pause, Archive, ArchiveRestore, Ticket, Tag, LayoutGrid, Grid3X3, List, LayoutList, Sparkles, CircleDot, FileEdit, MessageSquare, ArrowRight } from 'lucide-react';
+import { Plus, Search, Filter, Users, Edit3, CalendarDays, BarChart3, MapPin, Layers, Clock, X, Check, SlidersHorizontal, Play, Pause, Archive, ArchiveRestore, Ticket, Tag, LayoutGrid, Grid3X3, List, LayoutList, Sparkles, CircleDot, FileEdit, MessageSquare, ArrowRight, XCircle } from 'lucide-react';
 import { SkeletonListings, toast, Select, SelectOption } from '../../components/ui';
 import { Screen, EntityType } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
 import { EntityPickerSheet } from '../../components/EntityPickerSheet';
+import { Pagination } from '../../components/ui';
 import { getEventListings, getVenueListings, getClassListings, getProgramListings, setCurrentDraftId, clearCurrentDraftId, setCurrentVenueDraftId, clearCurrentVenueDraftId, setCurrentClassDraftId, clearCurrentClassDraftId, setCurrentProgramDraftId, clearCurrentProgramDraftId, pauseListing, resumeListing, archiveListing, unarchiveListing, updateListing, updateVenueListing, updateClassListing, updateProgramListing } from '../../api/listings';
 import { getCoupons, CouponListItem } from '../../api/coupons';
 
@@ -134,6 +135,14 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
     const [tmpSort, setTmpSort] = useState<SortOption>('newest');
     const [tmpDateFrom, setTmpDateFrom] = useState('');
     const [tmpDateTo, setTmpDateTo] = useState('');
+
+    // Pagination
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 5;
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, activeTab, filterStatuses, filterTypes, filterDateFrom, filterDateTo, sortBy]);
 
     // Coupon attach/remove
     const [couponList, setCouponList] = useState<CouponListItem[]>([]);
@@ -375,6 +384,9 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
             return (a.startDateTime || a.id) > (b.startDateTime || b.id) ? -1 : 1; // newest
         });
 
+    const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+    const paginatedListings = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
     const tabCounts = {
         All: listings.length,
         ...Object.fromEntries(
@@ -398,11 +410,13 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
         pending: listings.filter(l => l.status === 'pending').length,
         draft: listings.filter(l => l.status === 'draft').length,
         archived: listings.filter(l => l.status === 'archived').length,
+        rejected: listings.filter(l => l.status === 'rejected').length,
     };
     const STAT_CHIPS: { key: ListingStatus | 'all'; label: string; count: number; icon: any; fg: string; bg: string }[] = [
         { key: 'all', label: 'All Listings', count: listings.length, icon: LayoutList, fg: '#CA8A04', bg: '#FEFCE8' },
         { key: 'published', label: 'Live', count: statusCounts.published, icon: Sparkles, fg: '#059669', bg: '#ECFDF5' },
         { key: 'pending', label: 'In Review', count: statusCounts.pending, icon: CircleDot, fg: '#D97706', bg: '#FFFBEB' },
+        { key: 'rejected', label: 'Rejected', count: statusCounts.rejected, icon: XCircle, fg: '#DC2626', bg: '#FEF2F2' },
         { key: 'draft', label: 'Drafts', count: statusCounts.draft, icon: FileEdit, fg: '#4B5563', bg: '#F3F4F6' },
         { key: 'archived', label: 'Archived', count: statusCounts.archived, icon: Archive, fg: '#6B7280', bg: '#F3F4F6' },
     ];
@@ -519,7 +533,7 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
             {/* Header */}
             <header className="bg-white px-6 md:px-8 py-5 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
                 <div className="flex items-center gap-4">
-                    <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors"><Menu size={22} /></button>
+                    
                     <div>
                         <h1 className="text-xl font-black text-gray-900 tracking-tight">Listings</h1>
                         <p className="text-xs font-medium text-gray-400 mt-0.5 hidden sm:block">Manage all your services</p>
@@ -561,6 +575,41 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                         );
                     })}
                 </div>
+
+                {/* Action Required: Review & Rejected Listings */}
+                {(statusCounts.pending > 0 || statusCounts.rejected > 0) && (
+                    <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm space-y-4">
+                        <div className="flex items-center gap-2">
+                            <CircleDot size={18} className="text-amber-500" />
+                            <h2 className="text-sm font-black text-gray-900">Attention Required</h2>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                            {listings.filter(l => l.status === 'pending' || l.status === 'rejected').map(listing => (
+                                <div key={`attention-${listing.id}`} className={`flex items-start gap-3 p-4 rounded-xl border ${listing.status === 'rejected' ? 'bg-red-50 border-red-100' : 'bg-amber-50 border-amber-100'}`}>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center justify-between gap-2 mb-1">
+                                            <span className={`inline-flex items-center text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-widest ${listing.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                                                {listing.status === 'rejected' ? 'Rejected' : 'In Review'}
+                                            </span>
+                                            <span className="text-[10px] font-bold text-gray-400 truncate">{listing.entityType}</span>
+                                        </div>
+                                        <p className="text-sm font-bold text-gray-900 truncate" title={listing.title}>{listing.title}</p>
+                                        <p className="text-[11px] text-gray-500 mt-1 line-clamp-2">
+                                            {listing.status === 'rejected'
+                                                ? 'This listing was rejected by the admin team. Please review and edit the details before re-submitting.'
+                                                : 'This listing is currently under review by our team. You will be notified once it is approved and goes live.'}
+                                        </p>
+                                        <div className="mt-3 flex justify-end">
+                                            <button onClick={() => handleEdit(listing)} className={`text-xs font-bold transition-colors ${listing.status === 'rejected' ? 'text-red-600 hover:text-red-700' : 'text-amber-600 hover:text-amber-700'}`}>
+                                                View / Edit Details <ArrowRight size={12} className="inline ml-1 -mt-0.5" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {/* Quick access — related management surfaces (Bookings / Enquiries) */}
                 <div className={`grid gap-3 ${quickAccess.length > 1 ? 'sm:grid-cols-2' : 'grid-cols-1'}`}>
@@ -641,9 +690,10 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
 
                 {/* Table / Cards */}
                 {filtered.length > 0 ? (
-                    viewMode !== 'list' ? (
+                    <>
+                    {viewMode !== 'list' ? (
                     <div key={`${activeTab}-${viewMode}-${filterStatuses.join()}`} className={gridClass}>
-                        {filtered.map((listing, i) => renderListingCard(listing, viewMode === 'compact', i))}
+                        {paginatedListings.map((listing, i) => renderListingCard(listing, viewMode === 'compact', i))}
                     </div>
                     ) : (
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -660,7 +710,7 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-50">
-                                    {filtered.map((listing, i) => {
+                                    {paginatedListings.map((listing, i) => {
                                         const badge = entityBadgeConfig[listing.entityType];
                                         const BadgeIcon = badge.icon;
                                         const editable = listing.status !== 'published' && listing.status !== 'archived';
@@ -759,7 +809,7 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
 
                         {/* Mobile cards */}
                         <div className="md:hidden divide-y divide-gray-50">
-                            {filtered.map((listing) => {
+                            {paginatedListings.map((listing) => {
                                 const badge = entityBadgeConfig[listing.entityType];
                                 const BadgeIcon = badge.icon;
                                 const editable = listing.status !== 'published' && listing.status !== 'archived';
@@ -827,7 +877,17 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                             })}
                         </div>
                     </div>
-                    )
+                    )}
+
+                    {/* Pagination UI */}
+                    <Pagination 
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        totalItems={filtered.length}
+                        itemsPerPage={ITEMS_PER_PAGE}
+                        onPageChange={setCurrentPage}
+                    />
+                    </>
                 ) : (
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm text-center py-20 px-6">
                         <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-5">

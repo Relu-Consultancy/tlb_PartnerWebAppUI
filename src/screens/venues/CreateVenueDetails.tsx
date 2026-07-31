@@ -61,7 +61,6 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
     const [stateName, setStateName] = useState('');
     const [pincode, setPincode] = useState('');
     const [address, setAddress] = useState('');
-    const [fullAddress, setFullAddress] = useState('');
     const [latitude, setLatitude] = useState('');
     const [longitude, setLongitude] = useState('');
 
@@ -121,7 +120,6 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
                     setStateName(d.state || '');
                     setPincode(d.pincode || '');
                     setAddress(d.address || '');
-                    setFullAddress(d.full_address || '');
                     setLatitude(d.latitude != null ? String(d.latitude) : '');
                     setLongitude(d.longitude != null ? String(d.longitude) : '');
                     setMinAge(d.min_age != null ? String(d.min_age) : '');
@@ -259,7 +257,6 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
             if (stateName.trim()) payload.state = stateName.trim();
             if (pincode.trim()) payload.pincode = pincode.trim();
             if (address.trim()) payload.address = address.trim();
-            if (fullAddress.trim()) payload.full_address = fullAddress.trim();
             if (latitude.trim()) payload.latitude = latitude.trim();
             if (longitude.trim()) payload.longitude = longitude.trim();
             if (minAge !== '') payload.min_age = parseInt(minAge, 10);
@@ -469,12 +466,6 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
                         onChange={e => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                     />
                 </div>
-                <textarea
-                    className="tlb-input w-full min-h-[80px] resize-y"
-                    placeholder="Full address (optional) — write out the complete address as you'd like customers to see it"
-                    value={fullAddress}
-                    onChange={e => setFullAddress(e.target.value)}
-                />
                 <div className="grid grid-cols-2 gap-3">
                     <input
                         className="tlb-input w-full"

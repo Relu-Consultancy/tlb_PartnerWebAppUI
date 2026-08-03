@@ -1,3 +1,1 @@
-export { Enquiries } from './Enquiries';
-export { ProgramEnquiries } from './ProgramEnquiries';
-export { VenueEnquiries } from './VenueEnquiries';
+export { EnquiriesHub, EnquiriesHub as default } from './EnquiriesHub';

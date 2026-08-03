@@ -94,22 +94,28 @@ export const SkeletonPage: React.FC<{ withHeader?: boolean }> = ({ withHeader = 
 
 /** Dashboard-shaped skeleton: hero + profile card, KPI strip, two widgets, quick actions. */
 export const SkeletonDashboard: React.FC = () => (
-  <div className="min-h-screen bg-gray-50">
+  <div className="min-h-screen bg-[#F8FAFC]">
     <SkelHeader />
-    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Skeleton className="lg:col-span-2 h-44 rounded-3xl" />
-        <Skeleton className="h-44 rounded-3xl" />
+    <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-5 space-y-5">
+      {/* Hero */}
+      <Skeleton className="h-40 rounded-2xl bg-slate-800" />
+      {/* KPI grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+        {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-[120px] rounded-2xl" />)}
       </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Revenue + Activity */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <Skeleton className="lg:col-span-2 h-[420px] rounded-2xl" />
+        <Skeleton className="h-[420px] rounded-2xl" />
+      </div>
+      {/* Offering Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-2xl" />)}
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Skeleton className="h-72 rounded-2xl" />
-        <Skeleton className="h-72 rounded-2xl" />
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-        {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-2xl" />)}
+      {/* Bottom widgets */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <Skeleton className="h-96 rounded-2xl" />
+        <Skeleton className="h-96 rounded-2xl" />
       </div>
     </div>
   </div>

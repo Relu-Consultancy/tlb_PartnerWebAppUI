@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-    Menu, Search, Filter, Lock, Phone, MessageCircle, X, StickyNote, Inbox, Loader2,
+    Search, Filter, Lock, Phone, MessageCircle, X, StickyNote, Inbox, Loader2,
     Users, Sparkles, CheckCircle2, CalendarClock, Check, Mail, Clock,
     IndianRupee, ClipboardList, Calendar, MapPin,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Screen } from '../../types';
 import { toast, Select } from '../../components/ui';
+import { Pagination } from '../../components/ui/Pagination';
 import { getVenueEnquiries, getVenueEnquiryDetail, updateVenueEnquiry, unlockVenueEnquiry } from '../../api/listings';
 
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
@@ -119,7 +120,7 @@ const parseLead = (item: any): Lead => ({
     projectDetails: item.project_details || undefined,
 });
 
-export const VenueEnquiries: React.FC<Props> = ({ onOpenSidebar }) => {
+export const VenueEnquiries: React.FC<Props> = () => {
     const [leads, setLeads] = useState<Lead[]>([]);
     const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
     const [detailLoading, setDetailLoading] = useState(false);
@@ -205,6 +206,13 @@ export const VenueEnquiries: React.FC<Props> = ({ onOpenSidebar }) => {
          l.venueTitle.toLowerCase().includes(search.toLowerCase()))
     );
 
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 10;
+    useEffect(() => { setCurrentPage(1); }, [search, statusFilter]);
+
+    const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+    const paginatedLeads = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
     const kpiCards: { key: VenueEnquiryStatus | ''; label: string; icon: React.ElementType; fg: string; bg: string }[] = [
         { key: '',                     label: 'Total Leads',  icon: Users,         fg: '#B45309', bg: '#FFFBEB' },
         { key: 'new',                  label: 'New',          icon: Sparkles,      fg: STATUS_META.new.fg,                  bg: STATUS_META.new.bg },
@@ -217,15 +225,7 @@ export const VenueEnquiries: React.FC<Props> = ({ onOpenSidebar }) => {
     const hasBrief = pd && (pd.occasion || pd.guest_count || pd.event_date || pd.budget || pd.duration_hours || pd.requirements);
 
     return (
-    <div className="min-h-screen bg-gray-50 pb-24">
-        <header className="bg-white/90 backdrop-blur-sm px-5 md:px-8 py-5 flex items-center gap-4 sticky top-0 z-30 border-b border-gray-100">
-            <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors"><Menu size={24} /></button>
-            <div className="flex-1">
-                <h1 className="tlb-page-title">Venue Enquiries</h1>
-                <p className="tlb-page-sub">Manage venue booking leads</p>
-            </div>
-        </header>
-
+        <>
         <main className="p-5 md:p-6">
             <div className="max-w-6xl mx-auto space-y-6">
                 {/* KPI / quick-filter cards */}
@@ -318,7 +318,7 @@ export const VenueEnquiries: React.FC<Props> = ({ onOpenSidebar }) => {
                                             </div>
                                         </td>
                                     </tr>
-                                ) : filtered.length === 0 ? (
+                                ) : paginatedLeads.length === 0 ? (
                                     <tr>
                                         <td colSpan={6} className="px-6 py-16 text-center">
                                             <div className="flex flex-col items-center gap-3 text-gray-300">
@@ -330,7 +330,7 @@ export const VenueEnquiries: React.FC<Props> = ({ onOpenSidebar }) => {
                                             </div>
                                         </td>
                                     </tr>
-                                ) : filtered.map((lead, i) => (
+                                ) : paginatedLeads.map((lead, i) => (
                                     <motion.tr
                                         key={lead.id}
                                         initial={{ opacity: 0, y: 6 }}
@@ -401,6 +401,14 @@ export const VenueEnquiries: React.FC<Props> = ({ onOpenSidebar }) => {
                             </tbody>
                         </table>
                     </div>
+
+                    <Pagination 
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        totalItems={filtered.length}
+                        itemsPerPage={ITEMS_PER_PAGE}
+                        onPageChange={setCurrentPage}
+                    />
                 </div>
             </div>
         </main>
@@ -617,6 +625,6 @@ export const VenueEnquiries: React.FC<Props> = ({ onOpenSidebar }) => {
             </>
         )}
         </AnimatePresence>
-    </div>
+        </>
     );
 };

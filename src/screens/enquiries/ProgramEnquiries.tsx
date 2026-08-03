@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-    Menu, Search, Phone, MessageCircle, X, StickyNote, Inbox, Loader2,
+    Search, Phone, MessageCircle, X, StickyNote, Inbox, Loader2,
     Users, Sparkles, CheckCircle2, GraduationCap, Mail, Check,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Screen, EnquiryStatus } from '../../types';
+import { Pagination } from '../../components/ui/Pagination';
 import { getProgramListings, getProgramEnquiries, updateProgramEnquiry } from '../../api/listings';
 import { Select } from '../../components/ui';
 
@@ -64,7 +65,7 @@ const avatarTint = (name: string) => {
     return palette[h % palette.length];
 };
 
-export const ProgramEnquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
+export const ProgramEnquiries: React.FC<Props> = () => {
     const [programs, setPrograms] = useState<ProgramOption[]>([]);
     const [selectedProgramId, setSelectedProgramId] = useState<string | null>(null);
     const [leads, setLeads] = useState<ProgramLead[]>([]);
@@ -168,6 +169,13 @@ export const ProgramEnquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar })
         .sort((a, b) => (a.status === 'new' ? -1 : 1) - (b.status === 'new' ? -1 : 1)),
         [leads, statusFilter, search]);
 
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 10;
+    useEffect(() => { setCurrentPage(1); }, [search, statusFilter]);
+
+    const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+    const paginatedLeads = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
     const isLoading = loadingPrograms || loadingEnquiries;
 
     const kpiCards: { key: EnquiryStatus | ''; label: string; icon: React.ElementType; fg: string; bg: string }[] = [
@@ -179,15 +187,7 @@ export const ProgramEnquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar })
     ];
 
     return (
-    <div className="min-h-screen bg-gray-50 pb-24">
-        <header className="bg-white/90 backdrop-blur-sm px-5 md:px-8 py-5 flex items-center gap-4 sticky top-0 z-30 border-b border-gray-100">
-            <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors"><Menu size={24} /></button>
-            <div className="flex-1">
-                <h1 className="tlb-page-title">Program Enquiries</h1>
-                <p className="tlb-page-sub">Manage leads &amp; enrol students</p>
-            </div>
-        </header>
-
+        <>
         <main className="p-5 md:p-6">
             <div className="max-w-6xl mx-auto space-y-6">
                 {/* Program selector */}
@@ -271,7 +271,7 @@ export const ProgramEnquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar })
                                             </div>
                                         </td>
                                     </tr>
-                                ) : filtered.length === 0 ? (
+                                ) : paginatedLeads.length === 0 ? (
                                     <tr>
                                         <td colSpan={6} className="px-6 py-16 text-center">
                                             <div className="flex flex-col items-center gap-3 text-gray-300">
@@ -283,7 +283,7 @@ export const ProgramEnquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar })
                                             </div>
                                         </td>
                                     </tr>
-                                ) : filtered.map((lead, i) => (
+                                ) : paginatedLeads.map((lead, i) => (
                                     <motion.tr
                                         key={lead.id}
                                         initial={{ opacity: 0, y: 6 }}
@@ -351,6 +351,14 @@ export const ProgramEnquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar })
                             </tbody>
                         </table>
                     </div>
+
+                    <Pagination 
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        totalItems={filtered.length}
+                        itemsPerPage={ITEMS_PER_PAGE}
+                        onPageChange={setCurrentPage}
+                    />
                 </div>
             </div>
         </main>
@@ -479,6 +487,6 @@ export const ProgramEnquiries: React.FC<Props> = ({ onNavigate, onOpenSidebar })
             </>
         )}
         </AnimatePresence>
-    </div>
+        </>
     );
 };

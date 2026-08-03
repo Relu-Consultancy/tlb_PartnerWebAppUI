@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import {
-    Menu, ShieldCheck, Clock, AlertCircle, Loader2, CheckCircle2, RefreshCw,
+    ShieldCheck, Clock, AlertCircle, Loader2, CheckCircle2, RefreshCw,
     Image as ImageIcon, UploadCloud, Trash2, FileText, Landmark, BadgeCheck,
 } from 'lucide-react';
 import { Screen } from '../../types';
 import { toast } from '../../components/ui';
 import {
-    getCurrentPartner, getExtendedProfile, updateExtendedProfile,
+    getCurrentPartner,
     getPartnerMedia, uploadPartnerMedia, deletePartnerMedia, submitVerification,
 } from '../../api/onboarding';
 
@@ -26,7 +26,6 @@ const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 const Documents: React.FC<Props> = ({ onOpenSidebar }) => {
     const [loading, setLoading] = useState(true);
     const [partner, setPartner] = useState<any>(null);
-    const [extended, setExtended] = useState<any>(null);
     const [media, setMedia] = useState<any[]>([]);
 
     // KYC form
@@ -38,24 +37,18 @@ const Documents: React.FC<Props> = ({ onOpenSidebar }) => {
     const [savingKyc, setSavingKyc] = useState(false);
 
     // Uploads
-    const [uploadingLogo, setUploadingLogo] = useState(false);
-    const [uploadingCover, setUploadingCover] = useState(false);
     const [uploadingDoc, setUploadingDoc] = useState(false);
-    const logoRef = useRef<HTMLInputElement>(null);
-    const coverRef = useRef<HTMLInputElement>(null);
     const docRef = useRef<HTMLInputElement>(null);
 
     const loadAll = async () => {
         setLoading(true);
         try {
-            const [pRes, eRes, mRes] = await Promise.allSettled([
-                getCurrentPartner(), getExtendedProfile(), getPartnerMedia(),
+            const [pRes, mRes] = await Promise.allSettled([
+                getCurrentPartner(), getPartnerMedia(),
             ]);
             const p = pRes.status === 'fulfilled' ? (pRes.value?.data || pRes.value) : null;
-            const e = eRes.status === 'fulfilled' ? (eRes.value?.data || eRes.value) : null;
             const m = mRes.status === 'fulfilled' ? (mRes.value?.data || mRes.value) : [];
             setPartner(p);
-            setExtended(e);
             setMedia(Array.isArray(m) ? m : []);
 
             const v = (p?.verification || p || {}) as any;
@@ -103,21 +96,6 @@ const Documents: React.FC<Props> = ({ onOpenSidebar }) => {
         }
     };
 
-    const replaceImage = async (file: File, field: 'logo' | 'cover_image', setBusy: (b: boolean) => void) => {
-        setBusy(true);
-        try {
-            const fd = new FormData();
-            fd.append(field, file);
-            await updateExtendedProfile(fd);
-            toast.success(`${field === 'logo' ? 'Logo' : 'Cover'} updated.`);
-            loadAll();
-        } catch (e: any) {
-            toast.error(e?.message || 'Upload failed.');
-        } finally {
-            setBusy(false);
-        }
-    };
-
     const addDocument = async (file: File) => {
         const isVideo = file.type.startsWith('video');
         setUploadingDoc(true);
@@ -142,13 +120,10 @@ const Documents: React.FC<Props> = ({ onOpenSidebar }) => {
         }
     };
 
-    const logoUrl = resolveUrl(extended?.logo || partner?.logo);
-    const coverUrl = resolveUrl(extended?.cover_image || partner?.cover_image);
-
     return (
         <div className="min-h-screen bg-gray-50">
             <header className="bg-white px-6 md:px-10 py-5 flex items-center gap-4 sticky top-0 z-30 border-b border-gray-100">
-                <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors"><Menu size={24} /></button>
+                
                 <div>
                     <h1 className="tlb-page-title">Documents</h1>
                     <p className="tlb-page-sub">View &amp; update your verification documents</p>
@@ -240,53 +215,6 @@ const Documents: React.FC<Props> = ({ onOpenSidebar }) => {
                                     {savingKyc ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
                                     Save Documents
                                 </button>
-                            </div>
-                        </section>
-
-                        {/* Brand documents — logo & cover */}
-                        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6 space-y-4">
-                            <div className="flex items-center gap-2.5">
-                                <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center"><ImageIcon size={18} /></div>
-                                <div>
-                                    <h2 className="font-black text-sm text-gray-900 leading-none">Brand Documents</h2>
-                                    <p className="text-[11px] text-gray-400 mt-1">Logo &amp; cover image on your public profile</p>
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                {/* Logo */}
-                                <div className="border border-gray-100 rounded-xl p-4 flex items-center gap-4">
-                                    <div className="w-16 h-16 rounded-xl bg-gray-100 overflow-hidden flex items-center justify-center shrink-0">
-                                        {logoUrl ? <img src={logoUrl} alt="logo" className="w-full h-full object-cover" /> : <ImageIcon size={22} className="text-gray-300" />}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-bold text-gray-900">Logo</p>
-                                        <p className="text-[11px] text-gray-400">{logoUrl ? 'Uploaded' : 'Not uploaded'}</p>
-                                        <button onClick={() => logoRef.current?.click()} disabled={uploadingLogo}
-                                            className="mt-2 inline-flex items-center gap-1.5 text-xs font-black text-blue-500 hover:underline disabled:opacity-50">
-                                            {uploadingLogo ? <Loader2 size={12} className="animate-spin" /> : <UploadCloud size={12} />}
-                                            {logoUrl ? 'Replace' : 'Upload'}
-                                        </button>
-                                        <input ref={logoRef} type="file" accept="image/*" hidden
-                                            onChange={e => { const f = e.target.files?.[0]; if (f) replaceImage(f, 'logo', setUploadingLogo); e.target.value = ''; }} />
-                                    </div>
-                                </div>
-                                {/* Cover */}
-                                <div className="border border-gray-100 rounded-xl p-4 flex items-center gap-4">
-                                    <div className="w-16 h-16 rounded-xl bg-gray-100 overflow-hidden flex items-center justify-center shrink-0">
-                                        {coverUrl ? <img src={coverUrl} alt="cover" className="w-full h-full object-cover" /> : <ImageIcon size={22} className="text-gray-300" />}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-bold text-gray-900">Cover Image</p>
-                                        <p className="text-[11px] text-gray-400">{coverUrl ? 'Uploaded' : 'Not uploaded'}</p>
-                                        <button onClick={() => coverRef.current?.click()} disabled={uploadingCover}
-                                            className="mt-2 inline-flex items-center gap-1.5 text-xs font-black text-blue-500 hover:underline disabled:opacity-50">
-                                            {uploadingCover ? <Loader2 size={12} className="animate-spin" /> : <UploadCloud size={12} />}
-                                            {coverUrl ? 'Replace' : 'Upload'}
-                                        </button>
-                                        <input ref={coverRef} type="file" accept="image/*" hidden
-                                            onChange={e => { const f = e.target.files?.[0]; if (f) replaceImage(f, 'cover_image', setUploadingCover); e.target.value = ''; }} />
-                                    </div>
-                                </div>
                             </div>
                         </section>
 

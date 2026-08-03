@@ -902,6 +902,84 @@ export const deleteListingTerms = async (listingId: string) => {
     return {};
 };
 
+// ─── FAQ Document (generic — works for all listing types) ─────────────────────
+export const getListingFaqDoc = async (listingId: string) => {
+    const response = await apiClient(`/api/v1/partner/listings/${listingId}/faq-document/`);
+    if (response.status === 404) return null; // FAQ_DOC_NOT_FOUND
+    if (!response.ok) await handleError(response, 'Failed to load FAQ document');
+    return response.json();
+};
+export const setListingFaqDoc = async (listingId: string, data: { document: File }) => {
+    const fd = new FormData();
+    fd.append('document', data.document);
+    const response = await apiClient(`/api/v1/partner/listings/${listingId}/faq-document/`, { method: 'PUT', body: fd });
+    if (!response.ok) await handleError(response, 'Failed to save FAQ document');
+    return response.json();
+};
+export const deleteListingFaqDoc = async (listingId: string) => {
+    const response = await apiClient(`/api/v1/partner/listings/${listingId}/faq-document/`, { method: 'DELETE' });
+    if (!response.ok) await handleError(response, 'Failed to delete FAQ document');
+    return {};
+};
+
+// ─── Per-FAQ Documents ──────────────────────────────────────────────────────
+// Live for Venues today. The URL shape mirrors the per-entity FAQ CRUD above
+// (`/listings/<entity>/<id>/faqs/<faqId>/`) — if the backend ships the same
+// sub-resource for Events/Programs, passing that entity key here is enough
+// to wire it up. Classes have no per-FAQ id (inline `faqs[]` array on the
+// listing PATCH), so this cannot apply to Classes until that changes.
+export type FaqDocumentEntity = 'venues' | 'events' | 'programs';
+
+export interface FaqDocument {
+    id: number;
+    title: string;
+    file_name: string;
+    url: string | null;
+    size_bytes: number | null;
+    sort_order: number;
+    uploaded_at: string;
+}
+
+export const FAQ_DOCUMENT_ACCEPTED_EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg'];
+export const FAQ_DOCUMENT_MAX_BYTES = 10 * 1024 * 1024;
+export const FAQ_DOCUMENT_MAX_COUNT = 5;
+
+const faqDocumentsUrl = (entity: FaqDocumentEntity, listingId: string, faqId: number) =>
+    `/api/v1/partner/listings/${entity}/${listingId}/faqs/${faqId}/documents/`;
+
+export const getFaqDocuments = async (entity: FaqDocumentEntity, listingId: string, faqId: number): Promise<FaqDocument[]> => {
+    const response = await apiClient(faqDocumentsUrl(entity, listingId, faqId));
+    if (!response.ok) await handleError(response, 'Failed to load FAQ documents');
+    const json = await response.json();
+    return json?.data ?? json ?? [];
+};
+
+export const uploadFaqDocument = async (
+    entity: FaqDocumentEntity,
+    listingId: string,
+    faqId: number,
+    data: { file: File; title?: string; sort_order?: number },
+): Promise<FaqDocument> => {
+    const fd = new FormData();
+    fd.append('file', data.file);
+    if (data.title) fd.append('title', data.title);
+    if (data.sort_order != null) fd.append('sort_order', String(data.sort_order));
+    const response = await apiClient(faqDocumentsUrl(entity, listingId, faqId), { method: 'POST', body: fd });
+    if (!response.ok) await handleError(response, 'Failed to upload FAQ document');
+    const json = await response.json();
+    return json?.data ?? json;
+};
+
+export const deleteFaqDocument = async (
+    entity: FaqDocumentEntity,
+    listingId: string,
+    faqId: number,
+    documentId: number,
+): Promise<void> => {
+    const response = await apiClient(`${faqDocumentsUrl(entity, listingId, faqId)}${documentId}/`, { method: 'DELETE' });
+    if (!response.ok) await handleError(response, 'Failed to delete FAQ document');
+};
+
 // ─── Program Media ─────────────────────────────────────────────────────────
 
 export const getProgramMedia = async (listingId: string) => {

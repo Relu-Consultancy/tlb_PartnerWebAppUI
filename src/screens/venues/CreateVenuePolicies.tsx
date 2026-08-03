@@ -34,7 +34,7 @@ export const CreateVenuePolicies: React.FC<Props> = ({ onNavigate }) => {
             </div>
 
             {draftId ? (
-                <FaqTermsEditor listingId={draftId} faqApi={venueFaqApi} accent="amber" />
+                <FaqTermsEditor listingId={draftId} faqApi={venueFaqApi} accent="amber" faqDocumentsEntity="venues" />
             ) : (
                 <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm font-bold text-amber-700">
                     Please complete the earlier steps first so we can save your FAQs and terms.

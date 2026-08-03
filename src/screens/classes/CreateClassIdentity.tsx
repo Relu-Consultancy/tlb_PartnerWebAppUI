@@ -33,7 +33,6 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
     const [stateName, setStateName] = useState('');
     const [pincode, setPincode] = useState('');
     const [address, setAddress] = useState('');
-    const [fullAddress, setFullAddress] = useState('');
     const [meetingLink, setMeetingLink] = useState('');
     const [tag, setTag] = useState('');
     const [price, setPrice] = useState('');
@@ -92,7 +91,6 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
                 setStateName(srv.state || d.state || '');
                 setPincode(srv.pincode || d.pincode || '');
                 setAddress(srv.address || d.address || '');
-                setFullAddress(srv.full_address || d.full_address || '');
                 setMeetingLink(srv.meeting_link || d.meeting_link || '');
                 const loadedPrice = srv.price ?? d.price;
                 if (loadedPrice != null) setPrice(String(loadedPrice));
@@ -160,7 +158,6 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
                 if (stateName.trim()) payload.state = stateName.trim();
                 if (pincode.trim()) payload.pincode = pincode.trim();
                 if (address.trim()) payload.address = address.trim();
-                if (fullAddress.trim()) payload.full_address = fullAddress.trim();
             }
             if ((mode === 'online' || mode === 'hybrid') && meetingLink.trim()) {
                 payload.meeting_link = meetingLink.trim();
@@ -336,12 +333,6 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
                             onChange={(e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                         />
                     </div>
-                    <textarea
-                        className="tlb-input w-full min-h-[80px] resize-y"
-                        placeholder="Full address (optional) — write out the complete address as you'd like customers to see it"
-                        value={fullAddress}
-                        onChange={(e) => setFullAddress(e.target.value)}
-                    />
                 </div>
             )}
 

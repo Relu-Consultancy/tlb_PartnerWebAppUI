@@ -3,12 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, Suspense, lazy, useCallback, Component } from 'react';
+import React, { useState, useEffect, useRef, Suspense, lazy, useCallback, Component } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import { motion } from 'motion/react';
 import { Screen, EntityType } from './types';
 import { PartnerProvider, usePartner } from './context/PartnerContext';
-import { SkeletonPage, Toaster } from './components/ui';
+import { SkeletonPage, Toaster, NoInternetState } from './components/ui';
 
 // ---------------------------------------------------------------------------
 // Error boundary — stops a single screen crash from blanking the whole app.
@@ -72,6 +72,7 @@ const Documents = lazy(() => import('./screens/documents'));
 const Messages = lazy(() => import('./screens/messages'));
 const Packages = lazy(() => import('./screens/packages'));
 const FinancialHub = lazy(() => import('./screens/financial'));
+const Accounts = lazyImport(() => import('./screens/account'), 'Accounts');
 const BrandProfile = lazyImport(() => import('./screens/profile'), 'BrandProfile');
 const PreviewProfile = lazyImport(() => import('./screens/profile'), 'PreviewProfile');
 
@@ -106,13 +107,10 @@ const CreateVenueAmenities = lazyImport(() => import('./screens/venues'), 'Creat
 const CreateVenuePolicies = lazyImport(() => import('./screens/venues'), 'CreateVenuePolicies');
 const CreateVenuePreview = lazyImport(() => import('./screens/venues'), 'CreateVenuePreview');
 
-// Enquiries & Packages
-const Enquiries = lazyImport(() => import('./screens/enquiries'), 'Enquiries');
-const ProgramEnquiries = lazyImport(() => import('./screens/enquiries'), 'ProgramEnquiries');
-const VenueEnquiries = lazyImport(() => import('./screens/enquiries'), 'VenueEnquiries');
+// Enquiries
+const EnquiriesHub = lazyImport(() => import('./screens/enquiries'), 'EnquiriesHub');
 
 // Statistics
-const StatisticsScreen = lazyImport(() => import('./screens/statistics'), 'Statistics');
 
 // Analytics (audience & growth)
 const Analytics = lazy(() => import('./screens/analytics'));
@@ -133,6 +131,7 @@ const SCREEN_CHUNKS = [
   () => import('./screens/auth'),
   () => import('./screens/onboarding'),
   () => import('./screens/dashboard'),
+  () => import('./screens/account'),
   () => import('./screens/attendees'),
   () => import('./screens/reviews'),
   () => import('./screens/followers'),
@@ -147,7 +146,7 @@ const SCREEN_CHUNKS = [
   () => import('./screens/programs'),
   () => import('./screens/venues'),
   () => import('./screens/enquiries'),
-  () => import('./screens/statistics'),
+
   () => import('./screens/analytics'),
   () => import('./screens/coupons'),
   () => import('./screens/support'),
@@ -159,6 +158,7 @@ const prefetchScreens = () => {
 };
 
 import { Sidebar } from './components/Navigation';
+import { TopHeader } from './components/TopHeader';
 import { getAuthToken, getRefreshToken, setAuthToken, clearTokens } from './api/client';
 import { getCurrentPartner } from './api/onboarding';
 
@@ -191,6 +191,7 @@ const routes: Record<Screen, RouteConfig> = {
   ONBOARDING_COMPLETE: { component: OnboardingComplete, hasSidebar: false },
 
   // Core App — has sidebar
+  ACCOUNTS: { component: Accounts, hasSidebar: true },
   HOME: { component: Dashboard, hasSidebar: true },
   BRAND_PROFILE: { component: BrandProfile, hasSidebar: true },
   PREVIEW_PROFILE: { component: PreviewProfile, hasSidebar: true },
@@ -226,10 +227,8 @@ const routes: Record<Screen, RouteConfig> = {
   CREATE_PROGRAM_POLICIES: { component: CreateProgramPolicies, hasSidebar: true },
   CREATE_PROGRAM_PREVIEW: { component: CreateProgramPreview, hasSidebar: false },
 
-  // Enquiries — restricted to Classes/Programs partners
-  ENQUIRIES: { component: Enquiries, hasSidebar: true, requiresEntities: ['Classes'] },
-  PROGRAM_ENQUIRIES: { component: ProgramEnquiries, hasSidebar: true, requiresEntities: ['Programs'] },
-  VENUE_ENQUIRIES: { component: VenueEnquiries, hasSidebar: true, requiresEntities: ['Venues'] },
+  // Enquiries — accessible if partner has any of Classes/Programs/Venues
+  ENQUIRIES: { component: EnquiriesHub, hasSidebar: true },
 
   // Other
   ATTENDEES: { component: Attendees, hasSidebar: true },
@@ -240,7 +239,7 @@ const routes: Record<Screen, RouteConfig> = {
   MESSAGES: { component: Messages, hasSidebar: true },
   PACKAGES: { component: Packages, hasSidebar: true },
   FINANCIAL_HUB: { component: FinancialHub, hasSidebar: true },
-  STATISTICS: { component: StatisticsScreen, hasSidebar: true },
+
   ANALYTICS: { component: Analytics, hasSidebar: true },
   ALL_COUPONS: { component: AllCoupons, hasSidebar: true },
   CREATE_COUPON: { component: CreateCoupon, hasSidebar: true },
@@ -254,10 +253,27 @@ const routes: Record<Screen, RouteConfig> = {
 function AppInner() {
   const { allowedEntities, setAllowedEntities } = usePartner();
   const [currentScreen, setCurrentScreen] = useState<Screen>('LANDING');
+  // The screen we navigated from — lets a child (e.g. PreviewProfile) return to
+  // its actual entry point (Accounts vs Brand Profile) instead of a hardcoded one.
+  const [previousScreen, setPreviousScreen] = useState<Screen | null>(null);
+  const currentScreenRef = useRef<Screen>('LANDING');
+  useEffect(() => { currentScreenRef.current = currentScreen; }, [currentScreen]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
   const [authData, setAuthData] = useState<{ value: string; type: 'email' | 'phone' } | null>(null);
   const [initializing, setInitializing] = useState(true);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // ── Prefetch all screen chunks once the browser is idle after first paint ──
   // so reopening / switching slides loads instantly instead of flashing a blank
@@ -367,6 +383,8 @@ function AppInner() {
 
   // Route guard: redirect restricted screens to HOME
   const guardedNavigate = useCallback((screen: Screen) => {
+    // Remember where we came from so children can offer an accurate "back".
+    if (screen !== currentScreenRef.current) setPreviousScreen(currentScreenRef.current);
     const targetRoute = routes[screen];
     if (targetRoute?.requiresEntities) {
       const hasAccess = targetRoute.requiresEntities.some(e => allowedEntities.includes(e));
@@ -393,6 +411,7 @@ function AppInner() {
 
   return (
     <div className="font-sans text-tlb-dark">
+      {isOffline && <NoInternetState />}
       {route.hasSidebar && (
         <Sidebar
           isOpen={isSidebarOpen}
@@ -403,7 +422,13 @@ function AppInner() {
           onToggleDesktop={() => setDesktopSidebarOpen(prev => !prev)}
         />
       )}
-      <div className={route.hasSidebar && desktopSidebarOpen ? 'lg:ml-60' : ''}>
+      <div className={`flex flex-col min-h-screen ${route.hasSidebar && desktopSidebarOpen ? 'lg:ml-60' : ''}`}>
+        {route.hasSidebar && (
+          <TopHeader 
+            onOpenSidebar={() => { setDesktopSidebarOpen(true); setIsSidebarOpen(true); }}
+            onNavigate={guardedNavigate}
+          />
+        )}
         <Suspense fallback={<SkeletonPage />}>
           {/* Enter-only fade — no `mode="wait"` exit gap, so the new screen mounts
               immediately instead of leaving a blank window while the old one exits. */}
@@ -416,6 +441,7 @@ function AppInner() {
             <ScreenErrorBoundary>
               <Component
                 onNavigate={guardedNavigate}
+                previousScreen={previousScreen}
                 authData={authData}
                 setAuthData={setAuthData}
                 {...(route.hasSidebar ? { onOpenSidebar: () => { setDesktopSidebarOpen(true); setIsSidebarOpen(true); } } : {})}

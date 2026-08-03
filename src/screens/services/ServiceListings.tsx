@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Menu, Plus, Search, Filter, Users, Edit3, CalendarDays, BarChart3, MapPin, Layers, Clock, X, Check, SlidersHorizontal, Play, Pause, Archive, ArchiveRestore, Ticket, Tag, LayoutGrid, Grid3X3, List, LayoutList, Sparkles, CircleDot, FileEdit } from 'lucide-react';
+import { Plus, Search, Filter, Users, Edit3, CalendarDays, BarChart3, MapPin, Layers, Clock, X, Check, SlidersHorizontal, Play, Pause, Archive, ArchiveRestore, Ticket, Tag, LayoutGrid, Grid3X3, List, LayoutList, Sparkles, CircleDot, FileEdit, MessageSquare, ArrowRight, ChevronRight, XCircle } from 'lucide-react';
 import { SkeletonListings, toast, Select, SelectOption } from '../../components/ui';
 import { Screen, EntityType } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
 import { EntityPickerSheet } from '../../components/EntityPickerSheet';
+import { Pagination } from '../../components/ui';
 import { getEventListings, getVenueListings, getClassListings, getProgramListings, setCurrentDraftId, clearCurrentDraftId, setCurrentVenueDraftId, clearCurrentVenueDraftId, setCurrentClassDraftId, clearCurrentClassDraftId, setCurrentProgramDraftId, clearCurrentProgramDraftId, pauseListing, resumeListing, archiveListing, unarchiveListing, updateListing, updateVenueListing, updateClassListing, updateProgramListing } from '../../api/listings';
 import { getCoupons, CouponListItem } from '../../api/coupons';
 
@@ -32,9 +33,27 @@ interface Listing {
     status: ListingStatus;
     coverUrl?: string;
     startDateTime?: string;
+    createdAt?: string;
     isLive?: boolean;
     coupon?: ListingCoupon | null;
 }
+
+// A listing's display date — its scheduled/happening date, else when it was created.
+const listingDate = (l: { startDateTime?: string; createdAt?: string }) => l.startDateTime || l.createdAt;
+
+// Normalize a timestamp to a YYYY-MM-DD key for date-range comparisons.
+const dateKey = (iso?: string): string => {
+    if (!iso) return '';
+    if (/^\d{4}-\d{2}-\d{2}/.test(iso)) return iso.slice(0, 10);
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+};
+
+const fmtDate = (iso?: string): string => {
+    if (!iso) return '—';
+    try { return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }); }
+    catch { return '—'; }
+};
 
 const couponDiscountLabel = (c: { discount_type: string; discount_value: number }) =>
     c.discount_type === 'percent' ? `${c.discount_value}% off` : `₹${c.discount_value} off`;
@@ -61,12 +80,27 @@ const statusBadge: Record<ListingStatus, { label: string; bg: string; color: str
 };
 
 
-const fmtStart = (iso?: string) => {
-    if (!iso) return '';
-    try {
-        return new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-    } catch { return ''; }
-};
+// Navigation card surfacing a related management screen (Bookings / Enquiries)
+// from within the Listings hub.
+const QuickAccessCard: React.FC<{
+    title: string; subtitle: string; icon: React.ElementType; hex: string; onClick: () => void;
+}> = ({ title, subtitle, icon: Icon, hex, onClick }) => (
+    <motion.button
+        whileHover={{ y: -3 }}
+        whileTap={{ scale: 0.98 }}
+        onClick={onClick}
+        className="group flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-4 text-left hover:shadow-md transition-shadow"
+    >
+        <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105" style={{ backgroundColor: `${hex}14`, color: hex }}>
+            <Icon size={20} />
+        </div>
+        <div className="min-w-0 flex-1">
+            <p className="text-sm font-black text-gray-900">{title}</p>
+            <p className="text-[11px] text-gray-400 font-medium truncate">{subtitle}</p>
+        </div>
+        <ArrowRight size={16} className="text-gray-300 group-hover:text-gray-700 group-hover:translate-x-0.5 transition-all shrink-0" />
+    </motion.button>
+);
 
 type SortOption = 'newest' | 'oldest' | 'a-z' | 'z-a';
 type ViewMode = 'comfortable' | 'compact' | 'list';
@@ -92,11 +126,25 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
     const [filterStatuses, setFilterStatuses] = useState<ListingStatus[]>([]);
     const [filterTypes, setFilterTypes] = useState<EntityType[]>([]);
     const [sortBy, setSortBy] = useState<SortOption>('newest');
+    const [filterDateFrom, setFilterDateFrom] = useState('');
+    const [filterDateTo, setFilterDateTo] = useState('');
 
     // Temp state (inside dialog before Apply)
     const [tmpStatuses, setTmpStatuses] = useState<ListingStatus[]>([]);
     const [tmpTypes, setTmpTypes] = useState<EntityType[]>([]);
     const [tmpSort, setTmpSort] = useState<SortOption>('newest');
+    const [tmpDateFrom, setTmpDateFrom] = useState('');
+    const [tmpDateTo, setTmpDateTo] = useState('');
+
+    // Pagination
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 5;
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, activeTab, filterStatuses, filterTypes, filterDateFrom, filterDateTo, sortBy]);
+
+    const [showHistoryModal, setShowHistoryModal] = useState(false);
 
     // Coupon attach/remove
     const [couponList, setCouponList] = useState<CouponListItem[]>([]);
@@ -142,6 +190,8 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
         setTmpStatuses([...filterStatuses]);
         setTmpTypes([...filterTypes]);
         setTmpSort(sortBy);
+        setTmpDateFrom(filterDateFrom);
+        setTmpDateTo(filterDateTo);
         setShowFilter(true);
     };
 
@@ -149,6 +199,8 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
         setFilterStatuses(tmpStatuses);
         setFilterTypes(tmpTypes);
         setSortBy(tmpSort);
+        setFilterDateFrom(tmpDateFrom);
+        setFilterDateTo(tmpDateTo);
         setShowFilter(false);
     };
 
@@ -156,6 +208,8 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
         setTmpStatuses([]);
         setTmpTypes([]);
         setTmpSort('newest');
+        setTmpDateFrom('');
+        setTmpDateTo('');
     };
 
     const toggleTmpStatus = (s: ListingStatus) =>
@@ -164,7 +218,7 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
     const toggleTmpType = (t: EntityType) =>
         setTmpTypes(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
 
-    const activeFilterCount = filterStatuses.length + filterTypes.length + (sortBy !== 'newest' ? 1 : 0);
+    const activeFilterCount = filterStatuses.length + filterTypes.length + (sortBy !== 'newest' ? 1 : 0) + (filterDateFrom || filterDateTo ? 1 : 0);
 
     useEffect(() => {
         const fetchListings = async () => {
@@ -217,7 +271,9 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                         listingType: item.listing_type || '',
                         status: (item.status as ListingStatus) || 'draft',
                         coverUrl: item.cover_url || item.cover,
-                        startDateTime: item.start_datetime,
+                        startDateTime: item.start_datetime || item.start_date || item.next_session_at
+                            || item.next_batch_start || item.next_occurrence || item.starts_at || item.event_date || undefined,
+                        createdAt: item.created_at || item.created || undefined,
                         // Pause/Live state comes from `is_paused` (the flag the
                         // pause/resume endpoints actually toggle). `is_live` is a
                         // separate, unmaintained field and must NOT be used here —
@@ -308,15 +364,30 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
 
     const filtered = listings
         .filter(s => activeTab === 'All' || s.entityType === activeTab)
-        .filter(s => s.title.toLowerCase().includes(searchQuery.toLowerCase()))
+        .filter(s => {
+            const q = searchQuery.trim().toLowerCase();
+            if (!q) return true;
+            return s.title.toLowerCase().includes(q) || s.id.toLowerCase().includes(q);
+        })
         .filter(s => filterStatuses.length === 0 || filterStatuses.includes(s.status))
         .filter(s => filterTypes.length === 0 || filterTypes.includes(s.entityType))
+        .filter(s => {
+            if (!filterDateFrom && !filterDateTo) return true;
+            const k = dateKey(listingDate(s));
+            if (!k) return false;
+            if (filterDateFrom && k < filterDateFrom) return false;
+            if (filterDateTo && k > filterDateTo) return false;
+            return true;
+        })
         .sort((a, b) => {
             if (sortBy === 'a-z') return a.title.localeCompare(b.title);
             if (sortBy === 'z-a') return b.title.localeCompare(a.title);
             if (sortBy === 'oldest') return (a.startDateTime || a.id) < (b.startDateTime || b.id) ? -1 : 1;
             return (a.startDateTime || a.id) > (b.startDateTime || b.id) ? -1 : 1; // newest
         });
+
+    const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+    const paginatedListings = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
     const tabCounts = {
         All: listings.length,
@@ -327,20 +398,42 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
 
     const tabs: (EntityType | 'All')[] = ['All', ...allowedEntities];
 
+    // Single hub for post-listing operations. Inside, each listing opens its
+    // bookings + attendee check-in (booking listings) or enquiries + attendees
+    // (enquiry listings) — see the Bookings & Enquiries screen.
+    const quickAccess: { title: string; subtitle: string; icon: React.ElementType; hex: string; nav: Screen }[] = [
+        { title: 'Bookings & Enquiries', subtitle: 'Track bookings, leads & attendance per listing', icon: MessageSquare, hex: '#3B82F6', nav: 'BOOKINGS' },
+        { title: 'Coupons', subtitle: 'Create & manage discount coupons', icon: Tag, hex: '#8B5CF6', nav: 'ALL_COUPONS' },
+    ];
+
     // Interactive status quick-filters (drive filterStatuses)
     const statusCounts = {
         published: listings.filter(l => l.status === 'published').length,
         pending: listings.filter(l => l.status === 'pending').length,
         draft: listings.filter(l => l.status === 'draft').length,
         archived: listings.filter(l => l.status === 'archived').length,
+        rejected: listings.filter(l => l.status === 'rejected').length,
     };
     const STAT_CHIPS: { key: ListingStatus | 'all'; label: string; count: number; icon: any; fg: string; bg: string }[] = [
         { key: 'all', label: 'All Listings', count: listings.length, icon: LayoutList, fg: '#CA8A04', bg: '#FEFCE8' },
         { key: 'published', label: 'Live', count: statusCounts.published, icon: Sparkles, fg: '#059669', bg: '#ECFDF5' },
         { key: 'pending', label: 'In Review', count: statusCounts.pending, icon: CircleDot, fg: '#D97706', bg: '#FFFBEB' },
+        { key: 'rejected', label: 'Rejected', count: statusCounts.rejected, icon: XCircle, fg: '#DC2626', bg: '#FEF2F2' },
         { key: 'draft', label: 'Drafts', count: statusCounts.draft, icon: FileEdit, fg: '#4B5563', bg: '#F3F4F6' },
         { key: 'archived', label: 'Archived', count: statusCounts.archived, icon: Archive, fg: '#6B7280', bg: '#F3F4F6' },
     ];
+    // Most recently created listing that's live and open for bookings (published, not paused).
+    const latestActiveListing: Listing | null = listings
+        .filter((l: Listing) => l.status === 'published' && l.isLive !== false)
+        .sort((a: Listing, b: Listing) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())[0] || null;
+
+    const HISTORY_LIMIT = 2;
+    // Everything else, newest first — the "history" trailing behind the single highlighted listing above.
+    const olderListings: Listing[] = listings
+        .filter((l: Listing) => !latestActiveListing || l.id !== latestActiveListing.id)
+        .sort((a: Listing, b: Listing) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    const olderListingsShown = olderListings.slice(0, HISTORY_LIMIT);
+
     const toggleStatusFilter = (s: ListingStatus | 'all') => {
         if (s === 'all') { setFilterStatuses([]); return; }
         setFilterStatuses(prev => prev.length === 1 && prev[0] === s ? [] : [s]);
@@ -402,8 +495,16 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                 {/* Body */}
                 <div className={`flex-1 flex flex-col ${compact ? 'p-3' : 'p-4'}`}>
                     <p className="font-bold text-sm text-gray-900 truncate">{listing.title}</p>
+                    {!compact && (
+                        <p className="font-mono text-[10px] text-gray-400 truncate mt-0.5" title={listing.id}>ID: {listing.id}</p>
+                    )}
                     {!compact && listing.category && (
                         <p className="text-[11px] text-gray-400 font-medium mt-0.5 truncate">{listing.category}</p>
+                    )}
+                    {listingDate(listing) && (
+                        <p className="text-[11px] text-gray-400 font-medium mt-1 flex items-center gap-1">
+                            <Clock size={10} className="text-gray-300" /> {fmtDate(listingDate(listing))}
+                        </p>
                     )}
                     {listing.coupon && (
                         <span className="inline-flex w-max items-center gap-1 mt-2 px-2 py-0.5 rounded-md bg-tlb-yellow/15 text-tlb-dark text-[10px] font-black">
@@ -446,7 +547,7 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
             {/* Header */}
             <header className="bg-white px-6 md:px-8 py-5 flex items-center justify-between sticky top-0 z-30 border-b border-gray-100">
                 <div className="flex items-center gap-4">
-                    <button onClick={onOpenSidebar} className="p-2 -ml-2 hover:bg-gray-50 rounded-xl transition-colors"><Menu size={22} /></button>
+                    
                     <div>
                         <h1 className="text-xl font-black text-gray-900 tracking-tight">Listings</h1>
                         <p className="text-xs font-medium text-gray-400 mt-0.5 hidden sm:block">Manage all your services</p>
@@ -489,6 +590,165 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                     })}
                 </div>
 
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+                {/* Latest Active Listing — the most recently created listing that's live and taking bookings */}
+                <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                    <div className="flex items-center gap-2 mb-4">
+                        <Sparkles size={16} className="text-emerald-500" />
+                        <h2 className="text-sm font-black text-gray-900">Latest Active Listing</h2>
+                    </div>
+                    {latestActiveListing ? (() => {
+                        const badge = entityBadgeConfig[latestActiveListing.entityType];
+                        const BadgeIcon = badge.icon;
+                        return (
+                            <button
+                                onClick={() => setSearchQuery(latestActiveListing.title)}
+                                className="group w-full flex items-center gap-4 text-left"
+                            >
+                                <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 relative">
+                                    {latestActiveListing.coverUrl ? (
+                                        <img src={latestActiveListing.coverUrl} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                                    ) : (
+                                        <div className={`w-full h-full flex items-center justify-center ${badge.bg}`}>
+                                            <BadgeIcon size={22} className={`${badge.color} opacity-70`} />
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className={`inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-md ${badge.bg} ${badge.color}`}>
+                                            {latestActiveListing.entityType}
+                                        </span>
+                                        <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live · Accepting bookings
+                                        </span>
+                                    </div>
+                                    <p className="font-bold text-sm text-gray-900 truncate">{latestActiveListing.title}</p>
+                                    {listingDate(latestActiveListing) && (
+                                        <p className="text-[11px] text-gray-400 font-medium mt-0.5 flex items-center gap-1">
+                                            <Clock size={10} className="text-gray-300" /> {fmtDate(listingDate(latestActiveListing))}
+                                        </p>
+                                    )}
+                                </div>
+                                <ArrowRight size={16} className="text-gray-300 group-hover:text-gray-700 group-hover:translate-x-0.5 transition-all shrink-0" />
+                            </button>
+                        );
+                    })() : (
+                        <div className="flex items-center gap-3 text-gray-400">
+                            <div className="w-11 h-11 rounded-xl bg-gray-50 flex items-center justify-center shrink-0">
+                                <Sparkles size={18} className="text-gray-300" />
+                            </div>
+                            <p className="text-sm font-bold">No active listing</p>
+                        </div>
+                    )}
+                </div>
+
+                {/* History — everything older than the highlighted listing above */}
+                <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                    <div className="flex items-center gap-2 mb-4">
+                        <Clock size={16} className="text-gray-400" />
+                        <h2 className="text-sm font-black text-gray-900">History</h2>
+                    </div>
+                    {olderListingsShown.length > 0 ? (
+                        <div className="space-y-2">
+                            {olderListingsShown.map(listing => {
+                                const badge = entityBadgeConfig[listing.entityType];
+                                const BadgeIcon = badge.icon;
+                                return (
+                                    <button
+                                        key={listing.id}
+                                        onClick={() => setSearchQuery(listing.title)}
+                                        className="group w-full flex items-center gap-3 text-left p-1.5 -m-1.5 rounded-xl hover:bg-gray-50 transition-colors"
+                                    >
+                                        <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0">
+                                            {listing.coverUrl ? (
+                                                <img src={listing.coverUrl} alt="" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <div className={`w-full h-full flex items-center justify-center ${badge.bg}`}>
+                                                    <BadgeIcon size={15} className={`${badge.color} opacity-70`} />
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-bold text-gray-900 truncate">{listing.title}</p>
+                                            <p className="text-[11px] text-gray-400 truncate flex items-center gap-1">
+                                                {listing.entityType} · {statusBadge[listing.status].label}
+                                                {listingDate(listing) && <> · {fmtDate(listingDate(listing))}</>}
+                                            </p>
+                                        </div>
+                                        <ChevronRight size={15} className="text-gray-300 group-hover:text-gray-600 transition-colors shrink-0" />
+                                    </button>
+                                );
+                            })}
+                            {olderListings.length > HISTORY_LIMIT && (
+                                <button
+                                    onClick={() => setShowHistoryModal(true)}
+                                    className="w-full text-xs font-bold text-blue-500 hover:text-blue-600 text-center pt-2"
+                                >
+                                    +{olderListings.length - HISTORY_LIMIT} more
+                                </button>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-3 text-gray-400">
+                            <div className="w-11 h-11 rounded-xl bg-gray-50 flex items-center justify-center shrink-0">
+                                <Clock size={18} className="text-gray-300" />
+                            </div>
+                            <p className="text-sm font-bold">No older listings yet</p>
+                        </div>
+                    )}
+                </div>
+                </div>
+
+                {/* Action Required: Review & Rejected Listings */}
+                {(statusCounts.pending > 0 || statusCounts.rejected > 0) && (
+                    <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm space-y-4">
+                        <div className="flex items-center gap-2">
+                            <CircleDot size={18} className="text-amber-500" />
+                            <h2 className="text-sm font-black text-gray-900">Attention Required</h2>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                            {listings.filter(l => l.status === 'pending' || l.status === 'rejected').map(listing => (
+                                <div key={`attention-${listing.id}`} className={`flex items-start gap-3 p-4 rounded-xl border ${listing.status === 'rejected' ? 'bg-red-50 border-red-100' : 'bg-amber-50 border-amber-100'}`}>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center justify-between gap-2 mb-1">
+                                            <span className={`inline-flex items-center text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-widest ${listing.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                                                {listing.status === 'rejected' ? 'Rejected' : 'In Review'}
+                                            </span>
+                                            <span className="text-[10px] font-bold text-gray-400 truncate">{listing.entityType}</span>
+                                        </div>
+                                        <p className="text-sm font-bold text-gray-900 truncate" title={listing.title}>{listing.title}</p>
+                                        <p className="text-[11px] text-gray-500 mt-1 line-clamp-2">
+                                            {listing.status === 'rejected'
+                                                ? 'This listing was rejected by the admin team. Please review and edit the details before re-submitting.'
+                                                : 'This listing is currently under review by our team. You will be notified once it is approved and goes live.'}
+                                        </p>
+                                        <div className="mt-3 flex justify-end">
+                                            <button onClick={() => handleEdit(listing)} className={`text-xs font-bold transition-colors ${listing.status === 'rejected' ? 'text-red-600 hover:text-red-700' : 'text-amber-600 hover:text-amber-700'}`}>
+                                                View / Edit Details <ArrowRight size={12} className="inline ml-1 -mt-0.5" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Quick access — related management surfaces (Bookings / Enquiries) */}
+                <div className={`grid gap-3 ${quickAccess.length > 1 ? 'sm:grid-cols-2' : 'grid-cols-1'}`}>
+                    {quickAccess.map(q => (
+                        <QuickAccessCard
+                            key={q.title}
+                            title={q.title}
+                            subtitle={q.subtitle}
+                            icon={q.icon}
+                            hex={q.hex}
+                            onClick={() => onNavigate(q.nav)}
+                        />
+                    ))}
+                </div>
+
                 {/* Search + Filter + Tabs row */}
                 <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                     <div className="flex-1 flex gap-3">
@@ -496,7 +756,7 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                             <Search size={16} className="text-gray-400" />
                             <input
                                 className="bg-transparent flex-1 text-sm outline-none placeholder:text-gray-400"
-                                placeholder="Search listings..."
+                                placeholder="Search listings by name or ID…"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                             />
@@ -554,9 +814,10 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
 
                 {/* Table / Cards */}
                 {filtered.length > 0 ? (
-                    viewMode !== 'list' ? (
+                    <>
+                    {viewMode !== 'list' ? (
                     <div key={`${activeTab}-${viewMode}-${filterStatuses.join()}`} className={gridClass}>
-                        {filtered.map((listing, i) => renderListingCard(listing, viewMode === 'compact', i))}
+                        {paginatedListings.map((listing, i) => renderListingCard(listing, viewMode === 'compact', i))}
                     </div>
                     ) : (
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -565,7 +826,7 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                             <table className="w-full text-left">
                                 <thead>
                                     <tr className="bg-gray-50/80 border-b border-gray-100">
-                                        {['Listing', 'Type', 'Category', 'Status', 'Actions'].map(h => (
+                                        {['Listing', 'Type', 'Category', 'Date', 'Status', 'Actions'].map(h => (
                                             <th key={h} className={`px-5 py-3.5 text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap ${h === 'Actions' ? 'text-right' : ''}`}>
                                                 {h}
                                             </th>
@@ -573,7 +834,7 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-50">
-                                    {filtered.map((listing, i) => {
+                                    {paginatedListings.map((listing, i) => {
                                         const badge = entityBadgeConfig[listing.entityType];
                                         const BadgeIcon = badge.icon;
                                         const editable = listing.status !== 'published' && listing.status !== 'archived';
@@ -598,11 +859,7 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                                                         )}
                                                         <div className="min-w-0">
                                                             <p className="font-bold text-sm text-gray-900 truncate max-w-[260px]">{listing.title}</p>
-                                                            {listing.startDateTime && (
-                                                                <p className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-1">
-                                                                    <Clock size={10} /> {fmtStart(listing.startDateTime)}
-                                                                </p>
-                                                            )}
+                                                            <p className="font-mono text-[10px] text-gray-400 truncate max-w-[260px]" title={listing.id}>ID: {listing.id}</p>
                                                             {listing.coupon && (
                                                                 <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-md bg-tlb-yellow/15 text-tlb-dark text-[10px] font-black">
                                                                     <Tag size={9} /> {listing.coupon.code} · {couponDiscountLabel(listing.coupon)}
@@ -618,6 +875,11 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                                                 </td>
                                                 <td className="px-5 py-4">
                                                     <span className="text-xs font-medium text-gray-500">{listing.category || '-'}</span>
+                                                </td>
+                                                <td className="px-5 py-4">
+                                                    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 whitespace-nowrap">
+                                                        <Clock size={11} className="text-gray-300" /> {fmtDate(listingDate(listing))}
+                                                    </span>
                                                 </td>
                                                 <td className="px-5 py-4">
                                                     <span className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-700">
@@ -671,7 +933,7 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
 
                         {/* Mobile cards */}
                         <div className="md:hidden divide-y divide-gray-50">
-                            {filtered.map((listing) => {
+                            {paginatedListings.map((listing) => {
                                 const badge = entityBadgeConfig[listing.entityType];
                                 const BadgeIcon = badge.icon;
                                 const editable = listing.status !== 'published' && listing.status !== 'archived';
@@ -696,8 +958,14 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                                                     </span>
                                                 </div>
                                                 <p className="font-bold text-sm text-gray-900 truncate">{listing.title}</p>
+                                                <p className="font-mono text-[10px] text-gray-400 truncate mt-0.5" title={listing.id}>ID: {listing.id}</p>
                                                 {listing.category && (
                                                     <p className="text-[10px] text-gray-400 font-medium mt-0.5">{listing.category}</p>
+                                                )}
+                                                {listingDate(listing) && (
+                                                    <p className="text-[10px] text-gray-400 font-medium mt-0.5 flex items-center gap-1">
+                                                        <Clock size={9} className="text-gray-300" /> {fmtDate(listingDate(listing))}
+                                                    </p>
                                                 )}
                                                 {listing.coupon && (
                                                     <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-md bg-tlb-yellow/15 text-tlb-dark text-[10px] font-black">
@@ -733,7 +1001,17 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                             })}
                         </div>
                     </div>
-                    )
+                    )}
+
+                    {/* Pagination UI */}
+                    <Pagination 
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        totalItems={filtered.length}
+                        itemsPerPage={ITEMS_PER_PAGE}
+                        onPageChange={setCurrentPage}
+                    />
+                    </>
                 ) : (
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm text-center py-20 px-6">
                         <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-5">
@@ -758,6 +1036,60 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                 allowedEntities={allowedEntities}
                 onNavigate={onNavigate}
             />
+
+            {/* History — full list popup */}
+            {showHistoryModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backdropFilter: 'blur(4px)', backgroundColor: 'rgba(0,0,0,0.4)' }} onClick={() => setShowHistoryModal(false)}>
+                    <div className="bg-white w-full max-w-lg rounded-3xl p-6 flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-start justify-between gap-3 mb-4">
+                            <div className="flex items-center gap-2">
+                                <div className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center shrink-0">
+                                    <Clock size={18} className="text-gray-500" />
+                                </div>
+                                <div className="min-w-0">
+                                    <h2 className="font-black text-lg leading-tight">History</h2>
+                                    <p className="text-xs text-gray-400 font-medium">{olderListings.length} older listing{olderListings.length === 1 ? '' : 's'}</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowHistoryModal(false)} className="p-1.5 rounded-xl hover:bg-gray-100 text-gray-400 transition-colors">
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className="space-y-1.5 overflow-y-auto -mx-2 px-2">
+                            {olderListings.map(listing => {
+                                const badge = entityBadgeConfig[listing.entityType];
+                                const BadgeIcon = badge.icon;
+                                return (
+                                    <button
+                                        key={listing.id}
+                                        onClick={() => { setSearchQuery(listing.title); setShowHistoryModal(false); }}
+                                        className="group w-full flex items-center gap-3 text-left p-2 rounded-xl hover:bg-gray-50 transition-colors"
+                                    >
+                                        <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0">
+                                            {listing.coverUrl ? (
+                                                <img src={listing.coverUrl} alt="" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <div className={`w-full h-full flex items-center justify-center ${badge.bg}`}>
+                                                    <BadgeIcon size={15} className={`${badge.color} opacity-70`} />
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-bold text-gray-900 truncate">{listing.title}</p>
+                                            <p className="text-[11px] text-gray-400 truncate flex items-center gap-1">
+                                                {listing.entityType} · {statusBadge[listing.status].label}
+                                                {listingDate(listing) && <> · {fmtDate(listingDate(listing))}</>}
+                                            </p>
+                                        </div>
+                                        <ChevronRight size={15} className="text-gray-300 group-hover:text-gray-600 transition-colors shrink-0" />
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Coupon attach/remove modal */}
             {couponModalListing && (
@@ -883,6 +1215,38 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                                             </button>
                                         );
                                     })}
+                            </div>
+                        </div>
+
+                        {/* Date range */}
+                        <div>
+                            <div className="flex items-center justify-between mb-3">
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Date Range</p>
+                                {(tmpDateFrom || tmpDateTo) && (
+                                    <button onClick={() => { setTmpDateFrom(''); setTmpDateTo(''); }} className="text-[10px] font-black text-gray-400 hover:text-red-500 transition-colors">Clear</button>
+                                )}
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">From</label>
+                                    <input
+                                        type="date"
+                                        value={tmpDateFrom}
+                                        max={tmpDateTo || undefined}
+                                        onChange={e => setTmpDateFrom(e.target.value)}
+                                        className="w-full bg-white border-2 border-gray-100 rounded-xl px-3 py-2.5 text-sm font-bold text-gray-700 focus:border-tlb-yellow outline-none transition-colors"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 mb-1 block">To</label>
+                                    <input
+                                        type="date"
+                                        value={tmpDateTo}
+                                        min={tmpDateFrom || undefined}
+                                        onChange={e => setTmpDateTo(e.target.value)}
+                                        className="w-full bg-white border-2 border-gray-100 rounded-xl px-3 py-2.5 text-sm font-bold text-gray-700 focus:border-tlb-yellow outline-none transition-colors"
+                                    />
+                                </div>
                             </div>
                         </div>
 

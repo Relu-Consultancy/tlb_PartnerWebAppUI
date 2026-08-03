@@ -57,7 +57,6 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
     const [stateName, setStateName] = useState('');
     const [pincode, setPincode] = useState('');
     const [address, setAddress] = useState('');
-    const [fullAddress, setFullAddress] = useState('');
     const [meetingLink, setMeetingLink] = useState('');
 
     const [saving, setSaving] = useState(false);
@@ -111,7 +110,6 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
                     setStateName(d.state || '');
                     setPincode(d.pincode || '');
                     setAddress(d.address || '');
-                    setFullAddress(d.full_address || '');
                     setMeetingLink(d.meeting_link || '');
                 } catch (err) {
                     console.warn('Could not load existing draft', err);
@@ -176,7 +174,6 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
                 if (stateName) payload.state = stateName;
                 if (pincode) payload.pincode = pincode;
                 if (address) payload.address = address;
-                if (fullAddress) payload.full_address = fullAddress;
             }
             if (mode === 'online' || mode === 'hybrid') {
                 if (meetingLink) payload.meeting_link = meetingLink;
@@ -451,12 +448,6 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
                             onChange={(e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                         />
                     </div>
-                    <textarea
-                        className="tlb-input w-full min-h-[80px] resize-y"
-                        placeholder="Full address (optional) — write out the complete address as you'd like customers to see it"
-                        value={fullAddress}
-                        onChange={(e) => setFullAddress(e.target.value)}
-                    />
                 </div>
             )}
 

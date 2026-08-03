@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Plus, Search, Filter, Users, Edit3, CalendarDays, BarChart3, MapPin, Layers, Clock, X, Check, SlidersHorizontal, Play, Pause, Archive, ArchiveRestore, Ticket, Tag, LayoutGrid, Grid3X3, List, LayoutList, Sparkles, CircleDot, FileEdit, MessageSquare, ArrowRight, XCircle } from 'lucide-react';
+import { Plus, Search, Filter, Users, Edit3, CalendarDays, BarChart3, MapPin, Layers, Clock, X, Check, SlidersHorizontal, Play, Pause, Archive, ArchiveRestore, Ticket, Tag, LayoutGrid, Grid3X3, List, LayoutList, Sparkles, CircleDot, FileEdit, MessageSquare, ArrowRight, ChevronRight, XCircle } from 'lucide-react';
 import { SkeletonListings, toast, Select, SelectOption } from '../../components/ui';
 import { Screen, EntityType } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
@@ -143,6 +143,8 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
     useEffect(() => {
         setCurrentPage(1);
     }, [searchQuery, activeTab, filterStatuses, filterTypes, filterDateFrom, filterDateTo, sortBy]);
+
+    const [showHistoryModal, setShowHistoryModal] = useState(false);
 
     // Coupon attach/remove
     const [couponList, setCouponList] = useState<CouponListItem[]>([]);
@@ -420,6 +422,18 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
         { key: 'draft', label: 'Drafts', count: statusCounts.draft, icon: FileEdit, fg: '#4B5563', bg: '#F3F4F6' },
         { key: 'archived', label: 'Archived', count: statusCounts.archived, icon: Archive, fg: '#6B7280', bg: '#F3F4F6' },
     ];
+    // Most recently created listing that's live and open for bookings (published, not paused).
+    const latestActiveListing: Listing | null = listings
+        .filter((l: Listing) => l.status === 'published' && l.isLive !== false)
+        .sort((a: Listing, b: Listing) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())[0] || null;
+
+    const HISTORY_LIMIT = 2;
+    // Everything else, newest first — the "history" trailing behind the single highlighted listing above.
+    const olderListings: Listing[] = listings
+        .filter((l: Listing) => !latestActiveListing || l.id !== latestActiveListing.id)
+        .sort((a: Listing, b: Listing) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    const olderListingsShown = olderListings.slice(0, HISTORY_LIMIT);
+
     const toggleStatusFilter = (s: ListingStatus | 'all') => {
         if (s === 'all') { setFilterStatuses([]); return; }
         setFilterStatuses(prev => prev.length === 1 && prev[0] === s ? [] : [s]);
@@ -574,6 +588,116 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                             </motion.button>
                         );
                     })}
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+                {/* Latest Active Listing — the most recently created listing that's live and taking bookings */}
+                <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                    <div className="flex items-center gap-2 mb-4">
+                        <Sparkles size={16} className="text-emerald-500" />
+                        <h2 className="text-sm font-black text-gray-900">Latest Active Listing</h2>
+                    </div>
+                    {latestActiveListing ? (() => {
+                        const badge = entityBadgeConfig[latestActiveListing.entityType];
+                        const BadgeIcon = badge.icon;
+                        return (
+                            <button
+                                onClick={() => setSearchQuery(latestActiveListing.title)}
+                                className="group w-full flex items-center gap-4 text-left"
+                            >
+                                <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 relative">
+                                    {latestActiveListing.coverUrl ? (
+                                        <img src={latestActiveListing.coverUrl} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                                    ) : (
+                                        <div className={`w-full h-full flex items-center justify-center ${badge.bg}`}>
+                                            <BadgeIcon size={22} className={`${badge.color} opacity-70`} />
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className={`inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-md ${badge.bg} ${badge.color}`}>
+                                            {latestActiveListing.entityType}
+                                        </span>
+                                        <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live · Accepting bookings
+                                        </span>
+                                    </div>
+                                    <p className="font-bold text-sm text-gray-900 truncate">{latestActiveListing.title}</p>
+                                    {listingDate(latestActiveListing) && (
+                                        <p className="text-[11px] text-gray-400 font-medium mt-0.5 flex items-center gap-1">
+                                            <Clock size={10} className="text-gray-300" /> {fmtDate(listingDate(latestActiveListing))}
+                                        </p>
+                                    )}
+                                </div>
+                                <ArrowRight size={16} className="text-gray-300 group-hover:text-gray-700 group-hover:translate-x-0.5 transition-all shrink-0" />
+                            </button>
+                        );
+                    })() : (
+                        <div className="flex items-center gap-3 text-gray-400">
+                            <div className="w-11 h-11 rounded-xl bg-gray-50 flex items-center justify-center shrink-0">
+                                <Sparkles size={18} className="text-gray-300" />
+                            </div>
+                            <p className="text-sm font-bold">No active listing</p>
+                        </div>
+                    )}
+                </div>
+
+                {/* History — everything older than the highlighted listing above */}
+                <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                    <div className="flex items-center gap-2 mb-4">
+                        <Clock size={16} className="text-gray-400" />
+                        <h2 className="text-sm font-black text-gray-900">History</h2>
+                    </div>
+                    {olderListingsShown.length > 0 ? (
+                        <div className="space-y-2">
+                            {olderListingsShown.map(listing => {
+                                const badge = entityBadgeConfig[listing.entityType];
+                                const BadgeIcon = badge.icon;
+                                return (
+                                    <button
+                                        key={listing.id}
+                                        onClick={() => setSearchQuery(listing.title)}
+                                        className="group w-full flex items-center gap-3 text-left p-1.5 -m-1.5 rounded-xl hover:bg-gray-50 transition-colors"
+                                    >
+                                        <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0">
+                                            {listing.coverUrl ? (
+                                                <img src={listing.coverUrl} alt="" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <div className={`w-full h-full flex items-center justify-center ${badge.bg}`}>
+                                                    <BadgeIcon size={15} className={`${badge.color} opacity-70`} />
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-bold text-gray-900 truncate">{listing.title}</p>
+                                            <p className="text-[11px] text-gray-400 truncate flex items-center gap-1">
+                                                {listing.entityType} · {statusBadge[listing.status].label}
+                                                {listingDate(listing) && <> · {fmtDate(listingDate(listing))}</>}
+                                            </p>
+                                        </div>
+                                        <ChevronRight size={15} className="text-gray-300 group-hover:text-gray-600 transition-colors shrink-0" />
+                                    </button>
+                                );
+                            })}
+                            {olderListings.length > HISTORY_LIMIT && (
+                                <button
+                                    onClick={() => setShowHistoryModal(true)}
+                                    className="w-full text-xs font-bold text-blue-500 hover:text-blue-600 text-center pt-2"
+                                >
+                                    +{olderListings.length - HISTORY_LIMIT} more
+                                </button>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-3 text-gray-400">
+                            <div className="w-11 h-11 rounded-xl bg-gray-50 flex items-center justify-center shrink-0">
+                                <Clock size={18} className="text-gray-300" />
+                            </div>
+                            <p className="text-sm font-bold">No older listings yet</p>
+                        </div>
+                    )}
+                </div>
                 </div>
 
                 {/* Action Required: Review & Rejected Listings */}
@@ -912,6 +1036,60 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                 allowedEntities={allowedEntities}
                 onNavigate={onNavigate}
             />
+
+            {/* History — full list popup */}
+            {showHistoryModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backdropFilter: 'blur(4px)', backgroundColor: 'rgba(0,0,0,0.4)' }} onClick={() => setShowHistoryModal(false)}>
+                    <div className="bg-white w-full max-w-lg rounded-3xl p-6 flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-start justify-between gap-3 mb-4">
+                            <div className="flex items-center gap-2">
+                                <div className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center shrink-0">
+                                    <Clock size={18} className="text-gray-500" />
+                                </div>
+                                <div className="min-w-0">
+                                    <h2 className="font-black text-lg leading-tight">History</h2>
+                                    <p className="text-xs text-gray-400 font-medium">{olderListings.length} older listing{olderListings.length === 1 ? '' : 's'}</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowHistoryModal(false)} className="p-1.5 rounded-xl hover:bg-gray-100 text-gray-400 transition-colors">
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className="space-y-1.5 overflow-y-auto -mx-2 px-2">
+                            {olderListings.map(listing => {
+                                const badge = entityBadgeConfig[listing.entityType];
+                                const BadgeIcon = badge.icon;
+                                return (
+                                    <button
+                                        key={listing.id}
+                                        onClick={() => { setSearchQuery(listing.title); setShowHistoryModal(false); }}
+                                        className="group w-full flex items-center gap-3 text-left p-2 rounded-xl hover:bg-gray-50 transition-colors"
+                                    >
+                                        <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0">
+                                            {listing.coverUrl ? (
+                                                <img src={listing.coverUrl} alt="" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <div className={`w-full h-full flex items-center justify-center ${badge.bg}`}>
+                                                    <BadgeIcon size={15} className={`${badge.color} opacity-70`} />
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-bold text-gray-900 truncate">{listing.title}</p>
+                                            <p className="text-[11px] text-gray-400 truncate flex items-center gap-1">
+                                                {listing.entityType} · {statusBadge[listing.status].label}
+                                                {listingDate(listing) && <> · {fmtDate(listingDate(listing))}</>}
+                                            </p>
+                                        </div>
+                                        <ChevronRight size={15} className="text-gray-300 group-hover:text-gray-600 transition-colors shrink-0" />
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Coupon attach/remove modal */}
             {couponModalListing && (

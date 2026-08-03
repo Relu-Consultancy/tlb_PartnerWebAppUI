@@ -13,7 +13,7 @@ import { toast, Pagination } from '../../components/ui';
 import {
     getBookings, getBookingDetail, markBookingAttended, getBookingPaymentDetail,
     getEventListings, getClassListings, getProgramListings, getVenueListings,
-    getClassEnquiries, getVenueEnquiries, getProgramEnquiries, getPartnerListings,
+    getClassEnquiries, getVenueEnquiries, getProgramEnquiries,
 } from '../../api/listings';
 
 type ScreenVariant = 'attendees' | 'bookings';

@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Trash2, Loader2, HelpCircle, FileText, Save, Check, X, Upload } from 'lucide-react';
-import { getListingTerms, setListingTerms, deleteListingTerms, getListingFaqDoc, setListingFaqDoc, deleteListingFaqDoc } from '../../api/listings';
+import { Plus, Trash2, Loader2, HelpCircle, FileText, Save, Check, X, Upload, Paperclip } from 'lucide-react';
+import {
+    getListingTerms, setListingTerms, deleteListingTerms, getListingFaqDoc, setListingFaqDoc, deleteListingFaqDoc,
+    uploadFaqDocument, deleteFaqDocument,
+    FaqDocument, FaqDocumentEntity, FAQ_DOCUMENT_ACCEPTED_EXTENSIONS, FAQ_DOCUMENT_MAX_BYTES, FAQ_DOCUMENT_MAX_COUNT,
+} from '../../api/listings';
 import { toast } from './Toast';
 
 export interface FaqApi {
@@ -10,14 +14,40 @@ export interface FaqApi {
     remove: (listingId: string, faqId: number) => Promise<any>;
 }
 
-interface FaqRow { id?: number; question: string; answer: string; saving?: boolean; }
+interface FaqRow { id?: number; question: string; answer: string; saving?: boolean; documents?: FaqDocument[]; uploadingDoc?: boolean; }
 
 interface Props {
     listingId: string;
     faqApi: FaqApi;
     /** Accent colour matching the wizard theme. */
     accent?: 'blue' | 'amber' | 'emerald' | 'purple';
+    /**
+     * Enables per-FAQ document attachments (price list, floor plan, etc.) — up to
+     * FAQ_DOCUMENT_MAX_COUNT files per FAQ. Only pass this for entities whose backend
+     * actually exposes `/listings/<entity>/<id>/faqs/<faqId>/documents/`; live for
+     * Venues today. Omit to leave a listing type unaffected.
+     */
+    faqDocumentsEntity?: FaqDocumentEntity;
 }
+
+const fmtBytes = (n: number | null): string => {
+    if (n == null) return 'size unknown';
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+    return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const fileExtension = (name: string): string => (name.split('.').pop() || '').toLowerCase();
+
+const validateFaqDocument = (file: File): string | null => {
+    if (!FAQ_DOCUMENT_ACCEPTED_EXTENSIONS.includes(fileExtension(file.name))) {
+        return 'Upload a PDF, Word, Excel or image file.';
+    }
+    if (file.size > FAQ_DOCUMENT_MAX_BYTES) {
+        return 'File must be under 10 MB.';
+    }
+    return null;
+};
 
 const ACCENT: Record<NonNullable<Props['accent']>, { btn: string; soft: string; text: string; ring: string }> = {
     blue:    { btn: 'bg-blue-500 hover:bg-blue-600',       soft: 'bg-blue-50 text-blue-600',       text: 'text-blue-600',    ring: 'focus:border-blue-300' },
@@ -28,7 +58,7 @@ const ACCENT: Record<NonNullable<Props['accent']>, { btn: string; soft: string; 
 
 const MAX_DOC = 10 * 1024 * 1024;
 
-export const FaqTermsEditor: React.FC<Props> = ({ listingId, faqApi, accent = 'blue' }) => {
+export const FaqTermsEditor: React.FC<Props> = ({ listingId, faqApi, accent = 'blue', faqDocumentsEntity }) => {
     const a = ACCENT[accent];
 
     const [faqs, setFaqs] = useState<FaqRow[]>([]);
@@ -55,7 +85,7 @@ export const FaqTermsEditor: React.FC<Props> = ({ listingId, faqApi, accent = 'b
                 const res = await faqApi.list(listingId);
                 const data = res?.data ?? res;
                 const arr = Array.isArray(data) ? data : (data?.results ?? []);
-                if (alive) setFaqs(arr.map((f: any) => ({ id: f.id, question: f.question || '', answer: f.answer || '' })));
+                if (alive) setFaqs(arr.map((f: any) => ({ id: f.id, question: f.question || '', answer: f.answer || '', documents: Array.isArray(f.documents) ? f.documents : [] })));
             } catch { /* ignore */ } finally { if (alive) setLoadingFaqs(false); }
         })();
         (async () => {
@@ -95,11 +125,13 @@ export const FaqTermsEditor: React.FC<Props> = ({ listingId, faqApi, accent = 'b
         try {
             const payload = { question: f.question.trim(), answer: f.answer.trim(), sort_order: idx };
             if (f.id) {
-                await faqApi.update(listingId, f.id, payload);
+                const res = await faqApi.update(listingId, f.id, payload);
+                const updated = res?.data ?? res;
+                if (Array.isArray(updated?.documents)) setRow(idx, { documents: updated.documents });
             } else {
                 const res = await faqApi.create(listingId, payload);
                 const created = res?.data ?? res;
-                if (created?.id) setRow(idx, { id: created.id });
+                if (created?.id) setRow(idx, { id: created.id, documents: Array.isArray(created.documents) ? created.documents : [] });
             }
             toast.success('FAQ saved.');
         } catch (e: any) {
@@ -116,6 +148,42 @@ export const FaqTermsEditor: React.FC<Props> = ({ listingId, faqApi, accent = 'b
             catch (e: any) { toast.error(e?.message || 'Failed to delete FAQ.'); return; }
         }
         setFaqs(prev => prev.filter((_, i) => i !== idx));
+    };
+
+    // ── Per-FAQ document handlers (only active when `faqDocumentsEntity` is passed) ──
+    const pickFaqRowDoc = async (idx: number, e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        e.target.value = '';
+        if (!file || !faqDocumentsEntity) return;
+        const f = faqs[idx];
+        if (!f.id) return;
+        const err = validateFaqDocument(file);
+        if (err) { toast.warning(err); return; }
+        if ((f.documents?.length || 0) >= FAQ_DOCUMENT_MAX_COUNT) {
+            toast.warning(`Maximum ${FAQ_DOCUMENT_MAX_COUNT} documents per FAQ.`);
+            return;
+        }
+        setRow(idx, { uploadingDoc: true });
+        try {
+            const doc = await uploadFaqDocument(faqDocumentsEntity, listingId, f.id, { file });
+            setRow(idx, { documents: [...(f.documents || []), doc] });
+            toast.success('Document uploaded.');
+        } catch (e: any) {
+            toast.error(e?.message || 'Failed to upload document.');
+        } finally {
+            setRow(idx, { uploadingDoc: false });
+        }
+    };
+
+    const removeFaqRowDoc = async (idx: number, docId: number) => {
+        const f = faqs[idx];
+        if (!f.id || !faqDocumentsEntity) return;
+        try {
+            await deleteFaqDocument(faqDocumentsEntity, listingId, f.id, docId);
+            setRow(idx, { documents: (f.documents || []).filter((d: FaqDocument) => d.id !== docId) });
+        } catch (e: any) {
+            toast.error(e?.message || 'Failed to delete document.');
+        }
     };
 
     const pickFaqDoc = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -251,6 +319,58 @@ export const FaqTermsEditor: React.FC<Props> = ({ listingId, faqApi, accent = 'b
                                         {f.id ? 'Update' : 'Save'}
                                     </button>
                                 </div>
+
+                                {faqDocumentsEntity && (
+                                    <div className="pt-2.5 border-t border-gray-200/70">
+                                        {!f.id ? (
+                                            <p className="text-[11px] text-gray-400">Save this FAQ to attach documents.</p>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {(f.documents || []).length > 0 && (
+                                                    <div className="space-y-1.5">
+                                                        {(f.documents || []).map(doc => (
+                                                            <div key={doc.id} className="flex items-center gap-2 bg-white rounded-lg px-2.5 py-1.5 border border-gray-100">
+                                                                <FileText size={13} className={`shrink-0 ${a.text}`} />
+                                                                <div className="min-w-0 flex-1">
+                                                                    {doc.url ? (
+                                                                        <a href={doc.url} target="_blank" rel="noreferrer" className="text-xs font-bold text-gray-700 hover:underline truncate block">
+                                                                            {doc.title || doc.file_name}
+                                                                        </a>
+                                                                    ) : (
+                                                                        <span className="text-xs font-bold text-gray-400 truncate block">{doc.title || doc.file_name} (file unavailable)</span>
+                                                                    )}
+                                                                    <span className="text-[10px] text-gray-400">{fmtBytes(doc.size_bytes)}</span>
+                                                                </div>
+                                                                <button
+                                                                    onClick={() => removeFaqRowDoc(idx, doc.id)}
+                                                                    className="text-gray-300 hover:text-red-500 p-0.5 shrink-0"
+                                                                    aria-label={`Remove ${doc.title || doc.file_name}`}
+                                                                >
+                                                                    <X size={13} />
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                {(f.documents?.length || 0) < FAQ_DOCUMENT_MAX_COUNT ? (
+                                                    <label className="inline-flex items-center gap-1.5 text-[11px] font-bold text-gray-500 hover:text-gray-700 cursor-pointer">
+                                                        {f.uploadingDoc ? <Loader2 size={12} className="animate-spin" /> : <Paperclip size={12} />}
+                                                        {f.uploadingDoc ? 'Uploading…' : 'Attach document'}
+                                                        <input
+                                                            type="file"
+                                                            accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                                                            className="hidden"
+                                                            disabled={f.uploadingDoc}
+                                                            onChange={e => pickFaqRowDoc(idx, e)}
+                                                        />
+                                                    </label>
+                                                ) : (
+                                                    <p className="text-[10px] text-gray-400">Maximum {FAQ_DOCUMENT_MAX_COUNT} documents reached.</p>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         ))}
                         <button

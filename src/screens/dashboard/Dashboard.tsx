@@ -14,7 +14,6 @@ import { usePartner } from '../../context/PartnerContext';
 import { EntityPickerSheet } from '../../components/EntityPickerSheet';
 import {
   SkeletonDashboard, fmtCurrency,
-  BookingsCalendar, LatestListings,
   AreaSparkline, TrendAreaChart, DonutChart,
 } from '../../components/ui';
 import {
@@ -864,16 +863,6 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
             </div>
           </section>
         )}
-
-        {/* ─── Latest Listings + Bookings Calendar ─── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          <motion.div {...fadeUp} transition={{ duration: 0.3 }}>
-            <LatestListings onViewAll={() => onNavigate('SERVICE_LISTINGS')} />
-          </motion.div>
-          <motion.div {...fadeUp} transition={{ duration: 0.3, delay: 0.05 }}>
-            <BookingsCalendar onViewAll={() => onNavigate('BOOKINGS')} />
-          </motion.div>
-        </div>
 
       </main>
 

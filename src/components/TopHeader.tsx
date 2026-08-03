@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Menu, Bell, LineChart, UserCircle, LogOut, Edit3, Eye } from 'lucide-react';
+import { Menu, Sparkles, CalendarDays, UserCircle, LogOut, Edit3, Eye } from 'lucide-react';
 import { Screen } from '../types';
 import { NotificationCenter } from './NotificationCenter';
+import { LatestListings, BookingsCalendar } from './ui';
 import { getCurrentPartner, getBusinessProfile, getExtendedProfile, getPartnerFollowerCount } from '../api/onboarding';
 import { usePartner } from '../context/PartnerContext';
 
@@ -13,6 +14,7 @@ interface TopHeaderProps {
 export const TopHeader: React.FC<TopHeaderProps> = ({ onOpenSidebar, onNavigate }) => {
     const [menuOpen, setMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
+    const [activePopup, setActivePopup] = useState<'latest' | 'calendar' | null>(null);
 
     const { allowedEntities } = usePartner();
     const [partnerData, setPartnerData] = useState<any>(null);
@@ -84,13 +86,21 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ onOpenSidebar, onNavigate 
                 </button>
             </div>
             
-            <div className="flex items-center gap-3 sm:gap-4">
-                <button 
-                    onClick={() => onNavigate('ANALYTICS')} 
-                    className="flex items-center gap-2 px-3 sm:px-4 py-2 border border-gray-200 hover:bg-gray-50 rounded-[14px] transition-colors text-gray-400 hover:text-gray-700 font-bold text-sm shadow-sm"
+            <div className="flex items-center gap-2 sm:gap-3">
+                <button
+                    onClick={() => setActivePopup('latest')}
+                    title="Latest Listings"
+                    className="p-2.5 border border-gray-200 hover:bg-gray-50 rounded-[14px] transition-colors text-gray-400 hover:text-gray-700 shadow-sm"
                 >
-                    <LineChart size={18} strokeWidth={2.5} />
-                    <span className="hidden sm:inline">Analytics</span>
+                    <Sparkles size={18} strokeWidth={2.5} />
+                </button>
+
+                <button
+                    onClick={() => setActivePopup('calendar')}
+                    title="Bookings Calendar"
+                    className="p-2.5 border border-gray-200 hover:bg-gray-50 rounded-[14px] transition-colors text-gray-400 hover:text-gray-700 shadow-sm"
+                >
+                    <CalendarDays size={18} strokeWidth={2.5} />
                 </button>
 
                 <NotificationCenter variant="light" onNavigate={onNavigate} />
@@ -180,6 +190,27 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ onOpenSidebar, onNavigate 
                     )}
                 </div>
             </div>
+
+            {activePopup && (
+                <div
+                    className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-20 bg-black/40 backdrop-blur-sm"
+                    onClick={() => setActivePopup(null)}
+                >
+                    <div className="w-full max-w-md" onClick={e => e.stopPropagation()}>
+                        {activePopup === 'latest' ? (
+                            <LatestListings
+                                onClose={() => setActivePopup(null)}
+                                onViewAll={() => { setActivePopup(null); onNavigate('SERVICE_LISTINGS'); }}
+                            />
+                        ) : (
+                            <BookingsCalendar
+                                onClose={() => setActivePopup(null)}
+                                onViewAll={() => { setActivePopup(null); onNavigate('BOOKINGS'); }}
+                            />
+                        )}
+                    </div>
+                </div>
+            )}
         </header>
     );
 };

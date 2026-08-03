@@ -1,5 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ArrowRight, Loader2, Plus, X, Check, Wifi, Car, Utensils, Monitor, TreePine, ShieldCheck, Accessibility, Sofa } from 'lucide-react';
+import {
+    ArrowRight, Loader2, Plus, X, Check,
+    Wifi, Car, Utensils, Monitor, TreePine, ShieldCheck, Accessibility, Sofa,
+    Gamepad2, Baby, Briefcase, LayoutGrid,
+    Lock, ParkingMeter, ParkingSquare, Bike, Coffee, Music, PenTool, Video,
+    Cigarette, HandHeart, Armchair, Flame, DoorOpen, AlarmSmoke, MoveVertical,
+    Volleyball, Dumbbell, Waves, Blocks, Printer, Presentation, Laptop,
+    Toilet, FireExtinguisher, Camera, Cross, Snowflake, Zap, Volume2, Projector, Mic,
+    UtensilsCrossed,
+} from 'lucide-react';
 import { motion } from 'motion/react';
 import { Screen } from '../../types';
 import { WizardLayout, WizardNavigation, toast } from '../../components/ui';
@@ -9,12 +18,18 @@ import {
     getVenueAmenities,
     updateVenueAmenities,
     AmenityGroup,
+    AmenityItem,
 } from '../../api/listings';
 
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar?: () => void; }
 
 const CUSTOM_MAX = 15;
 const CUSTOM_CHAR_MAX = 100;
+
+// Generic fallback used whenever the API returns a group/icon key we don't recognize yet —
+// the catalog is server-driven and can grow without a frontend release.
+const GENERIC_GROUP_ICON = LayoutGrid;
+const GENERIC_AMENITY_ICON = Check;
 
 const GROUP_ICONS: Record<string, React.ElementType> = {
     basics: Wifi,
@@ -25,7 +40,59 @@ const GROUP_ICONS: Record<string, React.ElementType> = {
     comfort: Sofa,
     outdoor: TreePine,
     safety: ShieldCheck,
+    recreation: Gamepad2,
+    childcare: Baby,
+    business: Briefcase,
 };
+
+// Keyed by the amenity's `icon` slug (see GET /listings/venues/metadata/amenities/).
+// Never match on `name`/`id` — only `slug`/`icon` are stable across catalog edits.
+const AMENITY_ICONS: Record<string, React.ElementType> = {
+    wifi: Wifi,
+    parking: Car,
+    'paid-parking': ParkingMeter,
+    'street-parking': ParkingSquare,
+    'two-wheeler-parking': Bike,
+    'accessible-parking': Accessibility,
+    locker: Lock,
+    cafe: Coffee,
+    dj: Music,
+    whiteboard: PenTool,
+    'video-conferencing': Video,
+    'smoking-zone': Cigarette,
+    'prayer-room': HandHeart,
+    'outdoor-seating': Armchair,
+    bbq: Flame,
+    'emergency-exit': DoorOpen,
+    'smoke-detector': AlarmSmoke,
+    'fire-extinguisher': FireExtinguisher,
+    'accessible-restroom': Toilet,
+    restrooms: Toilet,
+    'braille-elevator': MoveVertical,
+    elevator: MoveVertical,
+    'indoor-games': Blocks,
+    'sports-court': Volleyball,
+    gym: Dumbbell,
+    spa: Waves,
+    'kids-play-area': Blocks,
+    creche: Baby,
+    'baby-changing': Baby,
+    printing: Printer,
+    'meeting-room': Presentation,
+    'coworking-desk': Laptop,
+    cctv: Camera,
+    'first-aid': Cross,
+    ac: Snowflake,
+    'power-backup': Zap,
+    'sound-system': Volume2,
+    projector: Projector,
+    mic: Mic,
+    catering: UtensilsCrossed,
+    seating: Armchair,
+};
+
+const groupIcon = (key: string): React.ElementType => GROUP_ICONS[key] || GENERIC_GROUP_ICON;
+const amenityIcon = (key?: string): React.ElementType => (key && AMENITY_ICONS[key]) || GENERIC_AMENITY_ICON;
 
 export const CreateVenueAmenities: React.FC<Props> = ({ onNavigate }) => {
     const [draftId, setDraftId] = useState<string | null>(null);
@@ -35,6 +102,10 @@ export const CreateVenueAmenities: React.FC<Props> = ({ onNavigate }) => {
 
     const [catalog, setCatalog] = useState<AmenityGroup[]>([]);
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+    // Amenities the venue already has that no longer exist in the current catalog
+    // (retired/renamed server-side — see `getAmenityCatalog` docs). Kept so the
+    // partner can still see + remove them even though they can't be re-picked.
+    const [retiredAmenities, setRetiredAmenities] = useState<AmenityItem[]>([]);
     const [customAmenities, setCustomAmenities] = useState<string[]>([]);
     const [customInput, setCustomInput] = useState('');
 
@@ -52,8 +123,12 @@ export const CreateVenueAmenities: React.FC<Props> = ({ onNavigate }) => {
                     getAmenityCatalog(),
                     getVenueAmenities(id).catch(() => ({ amenities: [], custom_amenities: [] })),
                 ]);
-                setCatalog(Array.isArray(catalogData) ? catalogData : []);
-                setSelectedIds(new Set((venueData.amenities || []).map(a => a.id)));
+                const safeCatalog = Array.isArray(catalogData) ? catalogData : [];
+                setCatalog(safeCatalog);
+                const catalogIds = new Set(safeCatalog.flatMap(g => g.amenities.map(a => a.id)));
+                const venueAmenities = venueData.amenities || [];
+                setSelectedIds(new Set(venueAmenities.map(a => a.id)));
+                setRetiredAmenities(venueAmenities.filter(a => !catalogIds.has(a.id)));
                 setCustomAmenities(venueData.custom_amenities || []);
             } catch (err: any) {
                 setLoadError(err?.message || 'Failed to load amenities.');
@@ -152,9 +227,10 @@ export const CreateVenueAmenities: React.FC<Props> = ({ onNavigate }) => {
                 </div>
             )}
 
-            {/* Catalog groups */}
+            {/* Catalog groups — only groups with ≥1 active amenity are returned by the API,
+                so this renders whatever comes back rather than assuming a fixed set. */}
             {catalog.map((group, gi) => {
-                const GroupIcon = GROUP_ICONS[group.group] || Wifi;
+                const GroupIcon = groupIcon(group.group);
                 return (
                     <motion.div
                         key={group.group}
@@ -171,6 +247,7 @@ export const CreateVenueAmenities: React.FC<Props> = ({ onNavigate }) => {
                         <div className="flex flex-wrap gap-2">
                             {group.amenities.map(amenity => {
                                 const active = selectedIds.has(amenity.id);
+                                const AmenityIcon = amenityIcon(amenity.icon);
                                 return (
                                     <button
                                         key={amenity.id}
@@ -181,7 +258,7 @@ export const CreateVenueAmenities: React.FC<Props> = ({ onNavigate }) => {
                                                 : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
                                         }`}
                                     >
-                                        {active && <Check size={14} className="text-amber-600" />}
+                                        {active ? <Check size={14} className="text-amber-600" /> : <AmenityIcon size={14} className="text-gray-400" />}
                                         {amenity.name}
                                     </button>
                                 );
@@ -190,6 +267,39 @@ export const CreateVenueAmenities: React.FC<Props> = ({ onNavigate }) => {
                     </motion.div>
                 );
             })}
+
+            {/* Retired amenities — this venue already had them before they were superseded in
+                the catalog. They won't appear above, but stay applied until removed here. */}
+            {retiredAmenities.filter(a => selectedIds.has(a.id)).length > 0 && (
+                <div>
+                    <div className="flex items-center gap-2.5 mb-3">
+                        <div className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center text-gray-500">
+                            <GENERIC_GROUP_ICON size={15} />
+                        </div>
+                        <div>
+                            <h3 className="text-sm font-black text-gray-900">Previously Added</h3>
+                            <p className="text-[11px] text-gray-400">No longer offered in the picker, but still applied to your venue</p>
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {retiredAmenities.filter(a => selectedIds.has(a.id)).map(amenity => (
+                            <span
+                                key={amenity.id}
+                                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-bold bg-gray-50 border-2 border-gray-200 text-gray-600"
+                            >
+                                {amenity.name}
+                                <button
+                                    onClick={() => toggleAmenity(amenity.id)}
+                                    className="p-0.5 rounded-full hover:bg-gray-200 transition-colors"
+                                    aria-label={`Remove ${amenity.name}`}
+                                >
+                                    <X size={12} />
+                                </button>
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* Custom amenities */}
             <div className="pt-2">

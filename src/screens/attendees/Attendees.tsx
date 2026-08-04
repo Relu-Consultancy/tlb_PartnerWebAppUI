@@ -29,6 +29,8 @@ type BookingStatus = 'confirmed' | 'awaiting_payment' | 'attended' | 'cancelled'
 type PaymentStatus = 'paid' | 'pending' | 'refunded';
 type BookingType = 'event' | 'class' | 'program' | 'venue';
 type TabFilter = 'all' | BookingStatus;
+// Bookings screen landing tabs. 'grid' = the existing groupMode-driven By Listing / By Date cards.
+type LandingTab = 'overview' | 'grid' | 'listings' | 'bookings' | 'enquiries';
 
 interface BookingSummary {
     id: string;
@@ -456,6 +458,34 @@ const GroupRow: React.FC<GroupItemProps> = ({ title, subtitle, counts: c, grad, 
     );
 };
 
+// ── Section card wrapper — used by the Bookings screen's Overview tab ──
+const Panel: React.FC<{ title: string; subtitle?: string; children: React.ReactNode }> = ({ title, subtitle, children }) => (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <h3 className="font-black text-gray-900 text-sm">{title}</h3>
+        {subtitle && <p className="text-[11px] text-gray-400 mt-0.5 mb-4">{subtitle}</p>}
+        <div className={subtitle ? '' : 'mt-4'}>{children}</div>
+    </div>
+);
+
+// ── Label→value breakdown row with a proportion bar (Overview tab panels) ──
+const BreakdownRow: React.FC<{ label: string; value: number; total: number; color: string }> = ({ label, value, total, color }) => {
+    const pct = total > 0 ? Math.round((value / total) * 100) : 0;
+    return (
+        <div>
+            <div className="flex items-center justify-between text-xs font-bold mb-1.5">
+                <span className="flex items-center gap-2 text-gray-600">
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+                    {label}
+                </span>
+                <span className="text-gray-900">{value}</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: color }} />
+            </div>
+        </div>
+    );
+};
+
 const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'attendees' }) => {
     const { allowedEntities } = usePartner();
     const isAttendees = variant === 'attendees';
@@ -470,8 +500,19 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
 
     // ── Navigation between the two levels ──
     const [groupMode, setGroupMode] = useState<'listing' | 'date'>('listing');
+    // Bookings screen only: which top-level landing tab is active. Attendees screen
+    // doesn't use this — it keeps its original groupMode-driven toggle.
+    const [landingTab, setLandingTab] = useState<LandingTab>('overview');
     const [selected, setSelected] = useState<{ mode: 'listing' | 'date'; key: string } | null>(null);
     const [listingSearch, setListingSearch] = useState('');
+    // Flat "Bookings" landing tab (all bookings across all listings) — separate from the
+    // per-listing drill-down's searchQuery/activeTab/bookingPage below.
+    const [allBookingsSearch, setAllBookingsSearch] = useState('');
+    const [allBookingsStatus, setAllBookingsStatus] = useState<TabFilter>('all');
+    const [allBookingsPage, setAllBookingsPage] = useState(1);
+    // Flat "Enquiries" landing tab (all enquiries across all listings).
+    const [allEnquiriesSearch, setAllEnquiriesSearch] = useState('');
+    const [allEnquiriesPage, setAllEnquiriesPage] = useState(1);
     const [density, setDensityState] = useState<Density>(() => {
         try { return (localStorage.getItem('attendees_density') as Density) || 'comfortable'; } catch { return 'comfortable'; }
     });
@@ -768,6 +809,8 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
     const [bookingPage, setBookingPage] = useState(1);
     const ITEMS_PER_PAGE = 10;
     useEffect(() => { setBookingPage(1); }, [searchQuery, activeTab]);
+    useEffect(() => { setAllBookingsPage(1); }, [allBookingsSearch, allBookingsStatus]);
+    useEffect(() => { setAllEnquiriesPage(1); }, [allEnquiriesSearch]);
     const totalBookingPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
     const paginatedBookings = filtered.slice((bookingPage - 1) * ITEMS_PER_PAGE, bookingPage * ITEMS_PER_PAGE);
 
@@ -839,6 +882,67 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
             { label: 'Awaiting Payment', value: globalCounts.awaiting_payment, icon: CreditCard, color: 'text-amber-600', bg: 'bg-amber-50' },
         ];
 
+    // Overview tab breakdown panels (Bookings screen only) — derived from data already loaded above.
+    const statusBreakdownRows = [
+        { label: 'Confirmed', value: globalCounts.confirmed, color: '#38BDF8' },
+        { label: 'Attended', value: globalCounts.attended, color: '#34D399' },
+        { label: 'Awaiting Payment', value: globalCounts.awaiting_payment, color: '#FBBF24' },
+        { label: 'Cancelled', value: globalCounts.cancelled, color: '#F87171' },
+    ];
+    const TYPE_COLOR: Record<BookingType, string> = { event: '#3B82F6', class: '#8B5CF6', program: '#10B981', venue: '#F59E0B' };
+    const bookingsByType: Record<BookingType, number> = { event: 0, class: 0, program: 0, venue: 0 };
+    allBookings.forEach(b => { bookingsByType[b.booking_type] = (bookingsByType[b.booking_type] || 0) + 1; });
+    const typeBreakdownRows = allowedEntities
+        .map((e: EntityType) => ENTITY_TO_TYPE[e])
+        .map((t: BookingType) => ({ label: TYPE_META[t].label, value: bookingsByType[t] || 0, color: TYPE_COLOR[t] }));
+
+    // ── "Listings" table tab (Bookings screen only) ──
+    const listingsTableRows = listings
+        .filter(l => l.title.toLowerCase().includes(listingSearch.toLowerCase()))
+        .sort(byHappenDate(nowMs));
+
+    // ── "Bookings" flat table tab (Bookings screen only) ──
+    const allBookingsMatches = (b: BookingSummary) => {
+        const q = allBookingsSearch.toLowerCase();
+        return !q
+            || b.customer_name.toLowerCase().includes(q)
+            || b.customer_email.toLowerCase().includes(q)
+            || b.booking_reference.toLowerCase().includes(q)
+            || (b.listing_title || '').toLowerCase().includes(q);
+    };
+    const allBookingsByStatus = allBookingsStatus === 'all' ? allBookings : allBookings.filter(b => b.status === allBookingsStatus);
+    const allBookingsFiltered = allBookingsByStatus.filter(allBookingsMatches);
+    const ALL_BOOKINGS_PER_PAGE = 10;
+    const allBookingsTotalPages = Math.ceil(allBookingsFiltered.length / ALL_BOOKINGS_PER_PAGE);
+    const allBookingsPaginated = allBookingsFiltered.slice((allBookingsPage - 1) * ALL_BOOKINGS_PER_PAGE, allBookingsPage * ALL_BOOKINGS_PER_PAGE);
+    const ALL_BOOKINGS_TABS: { key: TabFilter; label: string; count: number }[] = [
+        { key: 'all', label: 'All', count: globalCounts.total },
+        { key: 'awaiting_payment', label: 'Awaiting Payment', count: globalCounts.awaiting_payment },
+        { key: 'confirmed', label: 'Confirmed', count: globalCounts.confirmed },
+        { key: 'attended', label: 'Attended', count: globalCounts.attended },
+        { key: 'cancelled', label: 'Cancelled', count: globalCounts.cancelled },
+    ];
+
+    // ── "Enquiries" flat table tab (Bookings screen only) ──
+    const listingById = new Map<string, ListingCard>(listings.map((l: ListingCard): [string, ListingCard] => [l.id, l]));
+    const allEnquiriesFlat: (EnquiryRow & { listingTitle: string })[] = [];
+    Object.keys(enquiriesByListing).forEach((listingId: string) => {
+        (enquiriesByListing[listingId] || []).forEach((e: EnquiryRow) => {
+            allEnquiriesFlat.push({ ...e, listingTitle: listingById.get(e.listingId)?.title || 'Unknown listing' });
+        });
+    });
+    const allEnquiriesFiltered = allEnquiriesFlat.filter(e => {
+        const q = allEnquiriesSearch.toLowerCase();
+        return !q
+            || e.name.toLowerCase().includes(q)
+            || e.contact.toLowerCase().includes(q)
+            || e.detail.toLowerCase().includes(q)
+            || e.listingTitle.toLowerCase().includes(q);
+    });
+    const ALL_ENQUIRIES_PER_PAGE = 10;
+    const allEnquiriesTotalPages = Math.ceil(allEnquiriesFiltered.length / ALL_ENQUIRIES_PER_PAGE);
+    const allEnquiriesPaginated = allEnquiriesFiltered.slice((allEnquiriesPage - 1) * ALL_ENQUIRIES_PER_PAGE, allEnquiriesPage * ALL_ENQUIRIES_PER_PAGE);
+
     const ItemComp = density === 'list' ? GroupRow : GroupCard;
     const gridClass = density === 'list'
         ? 'grid grid-cols-1 gap-2.5'
@@ -909,23 +1013,92 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
                             </div>
                         ) : (
                             <>
-                                {/* Summary KPI strip */}
-                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-                                    {globalKpis.map(({ label, value, icon: Icon, color, bg }) => (
-                                        <div key={label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
-                                            <div className={`w-11 h-11 rounded-xl ${bg} flex items-center justify-center shrink-0`}>
-                                                <Icon size={20} className={color} />
-                                            </div>
-                                            <div className="min-w-0">
-                                                <p className={`text-2xl font-black leading-none ${color}`}>{value}</p>
-                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1 truncate">{label}</p>
-                                            </div>
+                                {/* Section tabs (Bookings screen only) */}
+                                {!isAttendees && (
+                                    <div className="border-b border-gray-200/80">
+                                        <div className="flex gap-6 overflow-x-auto no-scrollbar px-1">
+                                            {([
+                                                { key: 'overview' as const, label: 'Overview', icon: LayoutGrid },
+                                                { key: 'listing' as const, label: 'By Listing', icon: Layers },
+                                                { key: 'date' as const, label: 'By Date', icon: CalendarDays },
+                                                { key: 'listings' as const, label: 'Directory', icon: List },
+                                                { key: 'bookings' as const, label: 'Bookings', icon: CreditCard },
+                                                { key: 'enquiries' as const, label: 'Enquiries', icon: MessageCircle },
+                                            ]).map(t => {
+                                                const active = t.key === 'listing' || t.key === 'date'
+                                                    ? landingTab === 'grid' && groupMode === t.key
+                                                    : landingTab === t.key;
+                                                return (
+                                                    <button
+                                                        key={t.key}
+                                                        onClick={() => {
+                                                            if (t.key === 'listing' || t.key === 'date') { setLandingTab('grid'); setGroupMode(t.key); }
+                                                            else setLandingTab(t.key);
+                                                        }}
+                                                        className={`relative flex items-center gap-2 py-4 text-sm font-bold whitespace-nowrap transition-colors ${active ? 'text-gray-900' : 'text-gray-400 hover:text-gray-600'}`}
+                                                    >
+                                                        <t.icon size={16} />
+                                                        <span>{t.label}</span>
+                                                        {active && (
+                                                            <motion.div
+                                                                layoutId="bookings-tab-line"
+                                                                className="absolute bottom-[-1px] left-0 right-0 h-0.5 bg-gray-900 rounded-t-full"
+                                                                transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+                                                            />
+                                                        )}
+                                                    </button>
+                                                );
+                                            })}
                                         </div>
-                                    ))}
-                                </div>
+                                    </div>
+                                )}
+
+                                {/* Summary KPI strip */}
+                                {(isAttendees || landingTab === 'overview') && (
+                                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+                                        {globalKpis.map(({ label, value, icon: Icon, color, bg }) => (
+                                            <div key={label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
+                                                <div className={`w-11 h-11 rounded-xl ${bg} flex items-center justify-center shrink-0`}>
+                                                    <Icon size={20} className={color} />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className={`text-2xl font-black leading-none ${color}`}>{value}</p>
+                                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1 truncate">{label}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Overview breakdown panels (Bookings screen only) */}
+                                {!isAttendees && landingTab === 'overview' && (
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                                        <Panel title="Bookings by Status" subtitle="Breakdown across all your bookings">
+                                            <div className="space-y-3.5">
+                                                {statusBreakdownRows.map(r => (
+                                                    <BreakdownRow key={r.label} label={r.label} value={r.value} total={globalCounts.total} color={r.color} />
+                                                ))}
+                                            </div>
+                                        </Panel>
+                                        <Panel title="Bookings by Listing Type" subtitle="Where your bookings are coming from">
+                                            {typeBreakdownRows.length > 0 ? (
+                                                <div className="space-y-3.5">
+                                                    {typeBreakdownRows.map(r => (
+                                                        <BreakdownRow key={r.label} label={r.label} value={r.value} total={globalCounts.total} color={r.color} />
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p className="text-xs text-gray-400 py-6 text-center">No offerings yet</p>
+                                            )}
+                                        </Panel>
+                                    </div>
+                                )}
 
                                 {/* Toggle + search */}
+                                {(isAttendees || landingTab === 'grid') && (
+                                <>
                                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                                    {isAttendees ? (
                                     <div className="inline-flex bg-white border border-gray-100 rounded-2xl p-1 shadow-sm w-fit">
                                         {([
                                             { mode: 'listing' as const, label: 'By Listing Type', icon: Layers },
@@ -942,6 +1115,7 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
                                             </button>
                                         ))}
                                     </div>
+                                    ) : <div />}
                                     <div className="flex items-center gap-3">
                                         {/* Density / view control */}
                                         <div className="inline-flex bg-white border border-gray-100 rounded-xl p-1 shadow-sm shrink-0">
@@ -1086,6 +1260,253 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
                                         </motion.div>
                                     )}
                                 </AnimatePresence>
+                                </>
+                                )}
+
+                                {/* Listings — table view (Bookings screen only) */}
+                                {!isAttendees && landingTab === 'listings' && (
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-3 bg-white rounded-2xl px-4 py-3 border border-gray-100 shadow-sm md:w-80">
+                                            <Search size={16} className="text-gray-400 shrink-0" />
+                                            <input
+                                                className="flex-1 bg-transparent border-none focus:outline-none text-sm font-bold placeholder:text-gray-300"
+                                                placeholder="Search listings…"
+                                                value={listingSearch}
+                                                onChange={e => setListingSearch(e.target.value)}
+                                            />
+                                            {listingSearch && (
+                                                <button onClick={() => setListingSearch('')} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
+                                            )}
+                                        </div>
+                                        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                                            <div className="overflow-x-auto">
+                                                {listingsTableRows.length === 0 ? (
+                                                    <div className="flex flex-col items-center gap-2 py-20 text-center">
+                                                        <Inbox size={32} className="text-gray-200" />
+                                                        <p className="text-sm font-bold text-gray-400">{listingSearch ? `No listings match “${listingSearch}”` : 'No listings yet'}</p>
+                                                    </div>
+                                                ) : (
+                                                    <table className="w-full text-left">
+                                                        <thead>
+                                                            <tr className="bg-gray-50/50 border-b border-gray-100">
+                                                                {['Listing', 'Type', 'Status', 'Bookings', ''].map(h => (
+                                                                    <th key={h || 'actions'} className="px-5 py-3.5 text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
+                                                                ))}
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-gray-50">
+                                                            {listingsTableRows.map(l => {
+                                                                const meta = TYPE_META[l.type];
+                                                                const c = computeCounts(bookingsByListing[l.id] || []);
+                                                                const highlight = upcomingStateOf(l, nowMs);
+                                                                return (
+                                                                    <tr key={l.id} className="hover:bg-gray-50/40 transition-colors cursor-pointer" onClick={() => openGroup('listing', l.id)}>
+                                                                        <td className="px-5 py-4">
+                                                                            <div className="flex items-center gap-2.5">
+                                                                                <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${meta.grad} flex items-center justify-center shrink-0`}>
+                                                                                    <meta.icon size={14} className="text-white" />
+                                                                                </div>
+                                                                                <p className="font-bold text-sm text-gray-900 whitespace-nowrap">{l.title}</p>
+                                                                            </div>
+                                                                        </td>
+                                                                        <td className="px-5 py-4">
+                                                                            <span className={`text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${meta.badge}`}>{meta.label}</span>
+                                                                        </td>
+                                                                        <td className="px-5 py-4">
+                                                                            {highlight
+                                                                                ? <LivePill state={highlight} className="text-[9px] px-2 py-0.5" />
+                                                                                : <span className="text-xs font-bold text-gray-400">{l.status ? l.status.replace(/_/g, ' ') : '—'}</span>}
+                                                                        </td>
+                                                                        <td className="px-5 py-4 text-sm font-black text-gray-900">{c.total}</td>
+                                                                        <td className="px-5 py-4 text-right">
+                                                                            <span className="text-xs font-black text-blue-600 whitespace-nowrap">View <ChevronRight size={13} className="inline -mt-0.5" /></span>
+                                                                        </td>
+                                                                    </tr>
+                                                                );
+                                                            })}
+                                                        </tbody>
+                                                    </table>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Bookings — flat table across every listing (Bookings screen only) */}
+                                {!isAttendees && landingTab === 'bookings' && (
+                                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                                        <div className="flex gap-1 border-b border-gray-100 px-4 pt-4 overflow-x-auto">
+                                            {ALL_BOOKINGS_TABS.map(tab => (
+                                                <button
+                                                    key={tab.key}
+                                                    onClick={() => setAllBookingsStatus(tab.key)}
+                                                    className={`pb-3 px-4 text-sm font-bold transition-colors border-b-2 whitespace-nowrap flex items-center gap-2 ${
+                                                        allBookingsStatus === tab.key ? 'border-tlb-yellow text-gray-900' : 'border-transparent text-gray-400 hover:text-gray-600'
+                                                    }`}
+                                                >
+                                                    {tab.label}
+                                                    {tab.count > 0 && (
+                                                        <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${allBookingsStatus === tab.key ? 'bg-tlb-yellow text-gray-900' : 'bg-gray-100 text-gray-500'}`}>
+                                                            {tab.count}
+                                                        </span>
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <div className="p-4 border-b border-gray-50">
+                                            <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-2.5">
+                                                <Search size={16} className="text-gray-400 shrink-0" />
+                                                <input
+                                                    className="flex-1 bg-transparent border-none focus:outline-none text-sm font-bold placeholder:text-gray-300"
+                                                    placeholder="Search by name, email, booking ref, or listing…"
+                                                    value={allBookingsSearch}
+                                                    onChange={e => setAllBookingsSearch(e.target.value)}
+                                                />
+                                                {allBookingsSearch && (
+                                                    <button onClick={() => setAllBookingsSearch('')} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="overflow-x-auto">
+                                            {allBookingsPaginated.length === 0 ? (
+                                                <div className="flex flex-col items-center gap-2 py-20 text-center">
+                                                    <Inbox size={32} className="text-gray-200" />
+                                                    <p className="text-sm font-bold text-gray-400">{allBookingsSearch ? 'No bookings match your search' : 'No bookings in this view'}</p>
+                                                </div>
+                                            ) : (
+                                                <table className="w-full text-left">
+                                                    <thead>
+                                                        <tr className="bg-gray-50/50 border-b border-gray-100">
+                                                            {['Booking Ref', 'Customer', 'Listing', 'Status', 'Payment', 'Amount', 'Date', ''].map(h => (
+                                                                <th key={h || 'actions'} className="px-5 py-3.5 text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
+                                                            ))}
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-gray-50">
+                                                        {allBookingsPaginated.map(b => (
+                                                            <tr key={b.id} className="hover:bg-gray-50/40 transition-colors cursor-pointer" onClick={() => handleViewDetail(b.id)}>
+                                                                <td className="px-5 py-4">
+                                                                    <span className="font-mono text-xs font-bold text-gray-700 bg-gray-100 px-2 py-1 rounded-lg whitespace-nowrap">{b.booking_reference}</span>
+                                                                </td>
+                                                                <td className="px-5 py-4">
+                                                                    <p className="font-bold text-sm text-gray-900 whitespace-nowrap">{b.customer_name}</p>
+                                                                    <p className="text-xs text-gray-400 font-medium mt-0.5">{b.customer_email}</p>
+                                                                </td>
+                                                                <td className="px-5 py-4">
+                                                                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-700">
+                                                                        {React.createElement(TYPE_META[b.booking_type]?.icon || Layers, { size: 13, className: 'text-gray-400 shrink-0' })}
+                                                                        <span className="truncate max-w-[180px]">{b.listing_title || '—'}</span>
+                                                                    </span>
+                                                                </td>
+                                                                <td className="px-5 py-4">
+                                                                    <span className={`text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${STATUS_COLORS[b.status] || FALLBACK_BADGE}`}>{b.status.replace(/_/g, ' ')}</span>
+                                                                </td>
+                                                                <td className="px-5 py-4">
+                                                                    <span className={`text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${PAYMENT_COLORS[b.payment_status] || FALLBACK_BADGE}`}>{b.payment_status}</span>
+                                                                </td>
+                                                                <td className="px-5 py-4">
+                                                                    <span className="text-sm font-black text-gray-900 whitespace-nowrap">{b.total_amount === 0 ? 'Free' : formatAmount(b.total_amount, b.currency)}</span>
+                                                                </td>
+                                                                <td className="px-5 py-4 text-sm text-gray-500 font-medium whitespace-nowrap">{formatDate(b.created_at)}</td>
+                                                                <td className="px-5 py-4">
+                                                                    <span className="text-xs font-black text-blue-600 px-3 py-1.5 rounded-xl whitespace-nowrap">View</span>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            )}
+                                            <Pagination
+                                                currentPage={allBookingsPage}
+                                                totalPages={allBookingsTotalPages}
+                                                totalItems={allBookingsFiltered.length}
+                                                itemsPerPage={ALL_BOOKINGS_PER_PAGE}
+                                                onPageChange={setAllBookingsPage}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Enquiries — flat table across every lead-based listing (Bookings screen only) */}
+                                {!isAttendees && landingTab === 'enquiries' && (
+                                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                                        <div className="p-4 border-b border-gray-50">
+                                            <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-2.5">
+                                                <Search size={16} className="text-gray-400 shrink-0" />
+                                                <input
+                                                    className="flex-1 bg-transparent border-none focus:outline-none text-sm font-bold placeholder:text-gray-300"
+                                                    placeholder="Search by name, contact, or listing…"
+                                                    value={allEnquiriesSearch}
+                                                    onChange={e => setAllEnquiriesSearch(e.target.value)}
+                                                />
+                                                {allEnquiriesSearch && (
+                                                    <button onClick={() => setAllEnquiriesSearch('')} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="overflow-x-auto">
+                                            {allEnquiriesPaginated.length === 0 ? (
+                                                <div className="flex flex-col items-center gap-2 py-20 text-center">
+                                                    <MessageCircle size={32} className="text-gray-200" />
+                                                    <p className="text-sm font-bold text-gray-400">{allEnquiriesSearch ? 'No enquiries match your search' : 'No enquiries yet'}</p>
+                                                    <p className="text-xs text-gray-400">Leads across all your listings will appear here.</p>
+                                                </div>
+                                            ) : (
+                                                <table className="w-full text-left">
+                                                    <thead>
+                                                        <tr className="bg-gray-50/50 border-b border-gray-100">
+                                                            {['Enquirer', 'Listing', 'Details', 'Received', 'Contact', 'Status'].map(h => (
+                                                                <th key={h} className={`px-5 py-3.5 text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap ${h === 'Status' ? 'text-right' : ''}`}>{h}</th>
+                                                            ))}
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-gray-50">
+                                                        {allEnquiriesPaginated.map(e => {
+                                                            const hidden = !e.contact || e.contact === 'Hidden';
+                                                            const wa = e.contact.replace(/[^\d]/g, '');
+                                                            return (
+                                                                <tr key={`${e.listingId}-${e.id}`} className="hover:bg-gray-50/40 transition-colors">
+                                                                    <td className="px-5 py-4">
+                                                                        <div className="flex items-center gap-3">
+                                                                            <div className="w-9 h-9 rounded-full bg-violet-100 text-violet-700 flex items-center justify-center text-xs font-black shrink-0">
+                                                                                {(e.name.trim()[0] || '?').toUpperCase()}
+                                                                            </div>
+                                                                            <p className="font-bold text-sm text-gray-900 whitespace-nowrap">{e.name}</p>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="px-5 py-4 text-sm text-gray-600 font-medium truncate max-w-[160px]">{e.listingTitle}</td>
+                                                                    <td className="px-5 py-4 text-sm text-gray-500 font-medium">{e.detail || '—'}</td>
+                                                                    <td className="px-5 py-4 text-sm text-gray-500 font-medium whitespace-nowrap">{e.createdAt ? formatDate(e.createdAt) : '—'}</td>
+                                                                    <td className="px-5 py-4">
+                                                                        {hidden ? (
+                                                                            <span className="text-xs font-bold text-gray-300">Hidden</span>
+                                                                        ) : (
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className="font-mono text-xs font-bold text-gray-700 whitespace-nowrap">{e.contact}</span>
+                                                                                <a href={`tel:${e.contact}`} className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 transition-colors"><Phone size={13} /></a>
+                                                                                {wa && <a href={`https://wa.me/${wa}`} target="_blank" rel="noopener noreferrer" className="w-7 h-7 rounded-lg bg-green-50 text-green-600 flex items-center justify-center hover:bg-green-100 transition-colors"><MessageCircle size={13} /></a>}
+                                                                            </div>
+                                                                        )}
+                                                                    </td>
+                                                                    <td className="px-5 py-4 text-right">
+                                                                        <span className={`text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${ENQUIRY_STATUS_COLORS[e.status] || FALLBACK_BADGE}`}>{e.status.replace(/_/g, ' ')}</span>
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            )}
+                                            <Pagination
+                                                currentPage={allEnquiriesPage}
+                                                totalPages={allEnquiriesTotalPages}
+                                                totalItems={allEnquiriesFiltered.length}
+                                                itemsPerPage={ALL_ENQUIRIES_PER_PAGE}
+                                                onPageChange={setAllEnquiriesPage}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
                             </>
                         )}
                     </div>

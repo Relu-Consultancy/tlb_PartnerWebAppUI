@@ -43,7 +43,9 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ onOpenSidebar, onNavigate 
                     setExtendedData(extRes.value.data || extRes.value);
                 }
                 if (pId) {
-                    getPartnerFollowerCount(pId).then(count => setFollowerCount(count)).catch(() => {});
+                    getPartnerFollowerCount(pId)
+                        .then(res => setFollowerCount((res?.data ?? res)?.follower_count ?? 0))
+                        .catch(() => {});
                 }
             } catch (err) {}
         };

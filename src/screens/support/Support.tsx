@@ -790,31 +790,34 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                             {/* Support hero */}
                             <motion.section
                                 initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}
-                                className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-tlb-dark via-gray-900 to-black text-white p-6 sm:p-8"
+                                className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 sm:p-8"
                             >
-                                <div className="absolute -right-12 -top-16 w-60 h-60 bg-tlb-yellow/10 rounded-full blur-3xl" />
-                                <LifeBuoy size={150} className="absolute -right-8 -bottom-14 text-white/5" />
-                                <div className="relative">
-                                    <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white/60">We're here to help</p>
-                                    <h2 className="text-2xl font-black mt-1.5">How can we help you today?</h2>
-                                    <p className="text-sm text-gray-400 mt-1.5 max-w-md">Raise a ticket and the TLB team will get back to you — usually within a few hours.</p>
-                                    <div className="mt-5 flex flex-col sm:flex-row gap-3 max-w-2xl">
-                                        <div className="flex-1 flex items-center gap-3 bg-white rounded-xl px-4 py-3">
-                                            <Search size={18} className="text-gray-400 shrink-0" />
-                                            <input
-                                                type="text" value={query} onChange={e => setQuery(e.target.value)}
-                                                placeholder="Search your tickets…"
-                                                className="flex-1 bg-transparent text-sm font-bold text-gray-800 placeholder:text-gray-300 outline-none"
-                                            />
-                                        </div>
-                                        <button onClick={openNew} className="bg-tlb-yellow text-tlb-dark rounded-xl px-5 py-3 text-sm font-black flex items-center justify-center gap-1.5 hover:brightness-105 active:scale-95 transition-all shrink-0">
-                                            <Plus size={18} /> New Ticket
-                                        </button>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-11 h-11 rounded-2xl bg-tlb-yellow/15 flex items-center justify-center text-tlb-dark shrink-0">
+                                        <LifeBuoy size={20} />
                                     </div>
-                                    <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-[11px] text-white/60 font-medium">
-                                        <span className="inline-flex items-center gap-1.5"><Clock size={12} /> Avg response in a few hours</span>
-                                        <span className="inline-flex items-center gap-1.5"><MessageSquare size={12} /> Chat-based support</span>
+                                    <div>
+                                        <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400">We're here to help</p>
+                                        <h2 className="text-xl font-black text-gray-900 mt-0.5">How can we help you today?</h2>
                                     </div>
+                                </div>
+                                <p className="text-sm text-gray-500 mt-3 max-w-md">Raise a ticket and the TLB team will get back to you — usually within a few hours.</p>
+                                <div className="mt-5 flex flex-col sm:flex-row gap-3 max-w-2xl">
+                                    <div className="flex-1 flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-xl px-4 py-3">
+                                        <Search size={18} className="text-gray-400 shrink-0" />
+                                        <input
+                                            type="text" value={query} onChange={e => setQuery(e.target.value)}
+                                            placeholder="Search your tickets…"
+                                            className="flex-1 bg-transparent text-sm font-bold text-gray-800 placeholder:text-gray-300 outline-none"
+                                        />
+                                    </div>
+                                    <button onClick={openNew} className="tlb-button shrink-0">
+                                        <Plus size={18} /> New Ticket
+                                    </button>
+                                </div>
+                                <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-[11px] text-gray-400 font-medium">
+                                    <span className="inline-flex items-center gap-1.5"><Clock size={12} /> Avg response in a few hours</span>
+                                    <span className="inline-flex items-center gap-1.5"><MessageSquare size={12} /> Chat-based support</span>
                                 </div>
                             </motion.section>
 

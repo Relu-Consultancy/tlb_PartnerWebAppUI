@@ -510,9 +510,14 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
     const [allBookingsSearch, setAllBookingsSearch] = useState('');
     const [allBookingsStatus, setAllBookingsStatus] = useState<TabFilter>('all');
     const [allBookingsPage, setAllBookingsPage] = useState(1);
+    const [allBookingsPageSize, setAllBookingsPageSize] = useState(10);
     // Flat "Enquiries" landing tab (all enquiries across all listings).
     const [allEnquiriesSearch, setAllEnquiriesSearch] = useState('');
     const [allEnquiriesPage, setAllEnquiriesPage] = useState(1);
+    const [allEnquiriesPageSize, setAllEnquiriesPageSize] = useState(10);
+    // "Directory" landing tab (flat listings table).
+    const [listingsTablePage, setListingsTablePage] = useState(1);
+    const [listingsTablePageSize, setListingsTablePageSize] = useState(10);
     const [density, setDensityState] = useState<Density>(() => {
         try { return (localStorage.getItem('attendees_density') as Density) || 'comfortable'; } catch { return 'comfortable'; }
     });
@@ -809,8 +814,9 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
     const [bookingPage, setBookingPage] = useState(1);
     const ITEMS_PER_PAGE = 10;
     useEffect(() => { setBookingPage(1); }, [searchQuery, activeTab]);
-    useEffect(() => { setAllBookingsPage(1); }, [allBookingsSearch, allBookingsStatus]);
-    useEffect(() => { setAllEnquiriesPage(1); }, [allEnquiriesSearch]);
+    useEffect(() => { setAllBookingsPage(1); }, [allBookingsSearch, allBookingsStatus, allBookingsPageSize]);
+    useEffect(() => { setAllEnquiriesPage(1); }, [allEnquiriesSearch, allEnquiriesPageSize]);
+    useEffect(() => { setListingsTablePage(1); }, [listingSearch, listingsTablePageSize]);
     const totalBookingPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
     const paginatedBookings = filtered.slice((bookingPage - 1) * ITEMS_PER_PAGE, bookingPage * ITEMS_PER_PAGE);
 
@@ -900,6 +906,8 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
     const listingsTableRows = listings
         .filter(l => l.title.toLowerCase().includes(listingSearch.toLowerCase()))
         .sort(byHappenDate(nowMs));
+    const listingsTableTotalPages = Math.ceil(listingsTableRows.length / listingsTablePageSize);
+    const listingsTablePaginated = listingsTableRows.slice((listingsTablePage - 1) * listingsTablePageSize, listingsTablePage * listingsTablePageSize);
 
     // ── "Bookings" flat table tab (Bookings screen only) ──
     const allBookingsMatches = (b: BookingSummary) => {
@@ -912,9 +920,8 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
     };
     const allBookingsByStatus = allBookingsStatus === 'all' ? allBookings : allBookings.filter(b => b.status === allBookingsStatus);
     const allBookingsFiltered = allBookingsByStatus.filter(allBookingsMatches);
-    const ALL_BOOKINGS_PER_PAGE = 10;
-    const allBookingsTotalPages = Math.ceil(allBookingsFiltered.length / ALL_BOOKINGS_PER_PAGE);
-    const allBookingsPaginated = allBookingsFiltered.slice((allBookingsPage - 1) * ALL_BOOKINGS_PER_PAGE, allBookingsPage * ALL_BOOKINGS_PER_PAGE);
+    const allBookingsTotalPages = Math.ceil(allBookingsFiltered.length / allBookingsPageSize);
+    const allBookingsPaginated = allBookingsFiltered.slice((allBookingsPage - 1) * allBookingsPageSize, allBookingsPage * allBookingsPageSize);
     const ALL_BOOKINGS_TABS: { key: TabFilter; label: string; count: number }[] = [
         { key: 'all', label: 'All', count: globalCounts.total },
         { key: 'awaiting_payment', label: 'Awaiting Payment', count: globalCounts.awaiting_payment },
@@ -939,9 +946,8 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
             || e.detail.toLowerCase().includes(q)
             || e.listingTitle.toLowerCase().includes(q);
     });
-    const ALL_ENQUIRIES_PER_PAGE = 10;
-    const allEnquiriesTotalPages = Math.ceil(allEnquiriesFiltered.length / ALL_ENQUIRIES_PER_PAGE);
-    const allEnquiriesPaginated = allEnquiriesFiltered.slice((allEnquiriesPage - 1) * ALL_ENQUIRIES_PER_PAGE, allEnquiriesPage * ALL_ENQUIRIES_PER_PAGE);
+    const allEnquiriesTotalPages = Math.ceil(allEnquiriesFiltered.length / allEnquiriesPageSize);
+    const allEnquiriesPaginated = allEnquiriesFiltered.slice((allEnquiriesPage - 1) * allEnquiriesPageSize, allEnquiriesPage * allEnquiriesPageSize);
 
     const ItemComp = density === 'list' ? GroupRow : GroupCard;
     const gridClass = density === 'list'
@@ -1295,7 +1301,7 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
                                                             </tr>
                                                         </thead>
                                                         <tbody className="divide-y divide-gray-50">
-                                                            {listingsTableRows.map(l => {
+                                                            {listingsTablePaginated.map(l => {
                                                                 const meta = TYPE_META[l.type];
                                                                 const c = computeCounts(bookingsByListing[l.id] || []);
                                                                 const highlight = upcomingStateOf(l, nowMs);
@@ -1325,8 +1331,16 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
                                                                 );
                                                             })}
                                                         </tbody>
-                                                    </table>
+                                    </table>
                                                 )}
+                                                <Pagination
+                                                    currentPage={listingsTablePage}
+                                                    totalPages={listingsTableTotalPages}
+                                                    totalItems={listingsTableRows.length}
+                                                    itemsPerPage={listingsTablePageSize}
+                                                    onPageChange={setListingsTablePage}
+                                                    onItemsPerPageChange={setListingsTablePageSize}
+                                                />
                                             </div>
                                         </div>
                                     </div>
@@ -1399,10 +1413,10 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
                                                                     </span>
                                                                 </td>
                                                                 <td className="px-5 py-4">
-                                                                    <span className={`text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${STATUS_COLORS[b.status] || FALLBACK_BADGE}`}>{b.status.replace(/_/g, ' ')}</span>
+                                                                    <span className={`inline-block whitespace-nowrap text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${STATUS_COLORS[b.status] || FALLBACK_BADGE}`}>{b.status.replace(/_/g, ' ')}</span>
                                                                 </td>
                                                                 <td className="px-5 py-4">
-                                                                    <span className={`text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${PAYMENT_COLORS[b.payment_status] || FALLBACK_BADGE}`}>{b.payment_status}</span>
+                                                                    <span className={`inline-block whitespace-nowrap text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${PAYMENT_COLORS[b.payment_status] || FALLBACK_BADGE}`}>{b.payment_status}</span>
                                                                 </td>
                                                                 <td className="px-5 py-4">
                                                                     <span className="text-sm font-black text-gray-900 whitespace-nowrap">{b.total_amount === 0 ? 'Free' : formatAmount(b.total_amount, b.currency)}</span>
@@ -1420,8 +1434,9 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
                                                 currentPage={allBookingsPage}
                                                 totalPages={allBookingsTotalPages}
                                                 totalItems={allBookingsFiltered.length}
-                                                itemsPerPage={ALL_BOOKINGS_PER_PAGE}
+                                                itemsPerPage={allBookingsPageSize}
                                                 onPageChange={setAllBookingsPage}
+                                                onItemsPerPageChange={setAllBookingsPageSize}
                                             />
                                         </div>
                                     </div>
@@ -1489,7 +1504,7 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
                                                                         )}
                                                                     </td>
                                                                     <td className="px-5 py-4 text-right">
-                                                                        <span className={`text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${ENQUIRY_STATUS_COLORS[e.status] || FALLBACK_BADGE}`}>{e.status.replace(/_/g, ' ')}</span>
+                                                                        <span className={`inline-block whitespace-nowrap text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${ENQUIRY_STATUS_COLORS[e.status] || FALLBACK_BADGE}`}>{e.status.replace(/_/g, ' ')}</span>
                                                                     </td>
                                                                 </tr>
                                                             );
@@ -1501,8 +1516,9 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
                                                 currentPage={allEnquiriesPage}
                                                 totalPages={allEnquiriesTotalPages}
                                                 totalItems={allEnquiriesFiltered.length}
-                                                itemsPerPage={ALL_ENQUIRIES_PER_PAGE}
+                                                itemsPerPage={allEnquiriesPageSize}
                                                 onPageChange={setAllEnquiriesPage}
+                                                onItemsPerPageChange={setAllEnquiriesPageSize}
                                             />
                                         </div>
                                     </div>
@@ -1629,12 +1645,12 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
                                                                 </td>
                                                             )}
                                                             <td className="px-5 py-4">
-                                                                <span className={`text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${STATUS_COLORS[b.status] || FALLBACK_BADGE}`}>
+                                                                <span className={`inline-block whitespace-nowrap text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${STATUS_COLORS[b.status] || FALLBACK_BADGE}`}>
                                                                     {b.status.replace(/_/g, ' ')}
                                                                 </span>
                                                             </td>
                                                             <td className="px-5 py-4">
-                                                                <span className={`text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${PAYMENT_COLORS[b.payment_status] || FALLBACK_BADGE}`}>
+                                                                <span className={`inline-block whitespace-nowrap text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${PAYMENT_COLORS[b.payment_status] || FALLBACK_BADGE}`}>
                                                                     {b.payment_status}
                                                                 </span>
                                                             </td>
@@ -1716,7 +1732,7 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
                                                                     )}
                                                                 </td>
                                                                 <td className="px-5 py-4 text-right">
-                                                                    <span className={`text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${ENQUIRY_STATUS_COLORS[e.status] || FALLBACK_BADGE}`}>
+                                                                    <span className={`inline-block whitespace-nowrap text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${ENQUIRY_STATUS_COLORS[e.status] || FALLBACK_BADGE}`}>
                                                                         {e.status.replace(/_/g, ' ')}
                                                                     </span>
                                                                 </td>
@@ -1769,7 +1785,7 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
                                                                     </span>
                                                                 </td>
                                                                 <td className="px-5 py-4">
-                                                                    <span className={`text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${STATUS_COLORS[b.status] || FALLBACK_BADGE}`}>
+                                                                    <span className={`inline-block whitespace-nowrap text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${STATUS_COLORS[b.status] || FALLBACK_BADGE}`}>
                                                                         {b.status.replace(/_/g, ' ')}
                                                                     </span>
                                                                 </td>

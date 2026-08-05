@@ -159,7 +159,7 @@ const prefetchScreens = () => {
 
 import { Sidebar } from './components/Navigation';
 import { TopHeader } from './components/TopHeader';
-import { getAuthToken, getRefreshToken, setAuthToken, clearTokens } from './api/client';
+import { getAuthToken, getRefreshToken, clearTokens, refreshAccessToken } from './api/client';
 import { getCurrentPartner } from './api/onboarding';
 
 // ---------------------------------------------------------------------------
@@ -198,37 +198,37 @@ const routes: Record<Screen, RouteConfig> = {
 
   // Services / Listings — has sidebar
   SERVICE_LISTINGS: { component: ServiceListings, hasSidebar: true },
-  CREATE_CLASS_IDENTITY: { component: CreateClassIdentity, hasSidebar: true },
-  CREATE_CLASS_BATCH: { component: CreateClassBatch, hasSidebar: true },
-  CREATE_CLASS_MEDIA: { component: CreateClassMedia, hasSidebar: true },
-  CREATE_CLASS_POLICIES: { component: CreateClassPolicies, hasSidebar: true },
-  CREATE_CLASS_PREVIEW: { component: CreateClassPreview, hasSidebar: false },
+  CREATE_CLASS_IDENTITY: { component: CreateClassIdentity, hasSidebar: true, requiresEntities: ['Classes'] },
+  CREATE_CLASS_BATCH: { component: CreateClassBatch, hasSidebar: true, requiresEntities: ['Classes'] },
+  CREATE_CLASS_MEDIA: { component: CreateClassMedia, hasSidebar: true, requiresEntities: ['Classes'] },
+  CREATE_CLASS_POLICIES: { component: CreateClassPolicies, hasSidebar: true, requiresEntities: ['Classes'] },
+  CREATE_CLASS_PREVIEW: { component: CreateClassPreview, hasSidebar: false, requiresEntities: ['Classes'] },
 
   // Event creation — has sidebar
-  CREATE_EVENT_DETAILS: { component: CreateEventDetails, hasSidebar: true },
-  CREATE_EVENT_SCHEDULE: { component: CreateEventSchedule, hasSidebar: true },
-  CREATE_EVENT_MEDIA: { component: CreateEventMedia, hasSidebar: true },
-  CREATE_EVENT_POLICIES: { component: CreateEventPolicies, hasSidebar: true },
-  CREATE_EVENT_PREVIEW: { component: CreateEventPreview, hasSidebar: false },
+  CREATE_EVENT_DETAILS: { component: CreateEventDetails, hasSidebar: true, requiresEntities: ['Events'] },
+  CREATE_EVENT_SCHEDULE: { component: CreateEventSchedule, hasSidebar: true, requiresEntities: ['Events'] },
+  CREATE_EVENT_MEDIA: { component: CreateEventMedia, hasSidebar: true, requiresEntities: ['Events'] },
+  CREATE_EVENT_POLICIES: { component: CreateEventPolicies, hasSidebar: true, requiresEntities: ['Events'] },
+  CREATE_EVENT_PREVIEW: { component: CreateEventPreview, hasSidebar: false, requiresEntities: ['Events'] },
 
   // Venue creation — has sidebar
-  CREATE_VENUE_DETAILS: { component: CreateVenueDetails, hasSidebar: true },
-  CREATE_VENUE_OCCASIONS: { component: CreateVenueOccasions, hasSidebar: true },
-  CREATE_VENUE_AVAILABILITY: { component: CreateVenueAvailability, hasSidebar: true },
-  CREATE_VENUE_PACKAGES: { component: CreateVenuePackages, hasSidebar: true },
-  CREATE_VENUE_AMENITIES: { component: CreateVenueAmenities, hasSidebar: true },
-  CREATE_VENUE_POLICIES: { component: CreateVenuePolicies, hasSidebar: true },
-  CREATE_VENUE_PREVIEW: { component: CreateVenuePreview, hasSidebar: false },
+  CREATE_VENUE_DETAILS: { component: CreateVenueDetails, hasSidebar: true, requiresEntities: ['Venues'] },
+  CREATE_VENUE_OCCASIONS: { component: CreateVenueOccasions, hasSidebar: true, requiresEntities: ['Venues'] },
+  CREATE_VENUE_AVAILABILITY: { component: CreateVenueAvailability, hasSidebar: true, requiresEntities: ['Venues'] },
+  CREATE_VENUE_PACKAGES: { component: CreateVenuePackages, hasSidebar: true, requiresEntities: ['Venues'] },
+  CREATE_VENUE_AMENITIES: { component: CreateVenueAmenities, hasSidebar: true, requiresEntities: ['Venues'] },
+  CREATE_VENUE_POLICIES: { component: CreateVenuePolicies, hasSidebar: true, requiresEntities: ['Venues'] },
+  CREATE_VENUE_PREVIEW: { component: CreateVenuePreview, hasSidebar: false, requiresEntities: ['Venues'] },
 
   // Programs creation — has sidebar
-  CREATE_PROGRAM_IDENTITY: { component: CreateProgramIdentity, hasSidebar: true },
-  CREATE_PROGRAM_BATCH: { component: CreateProgramBatch, hasSidebar: true },
-  CREATE_PROGRAM_MEDIA: { component: CreateProgramMedia, hasSidebar: true },
-  CREATE_PROGRAM_POLICIES: { component: CreateProgramPolicies, hasSidebar: true },
-  CREATE_PROGRAM_PREVIEW: { component: CreateProgramPreview, hasSidebar: false },
+  CREATE_PROGRAM_IDENTITY: { component: CreateProgramIdentity, hasSidebar: true, requiresEntities: ['Programs'] },
+  CREATE_PROGRAM_BATCH: { component: CreateProgramBatch, hasSidebar: true, requiresEntities: ['Programs'] },
+  CREATE_PROGRAM_MEDIA: { component: CreateProgramMedia, hasSidebar: true, requiresEntities: ['Programs'] },
+  CREATE_PROGRAM_POLICIES: { component: CreateProgramPolicies, hasSidebar: true, requiresEntities: ['Programs'] },
+  CREATE_PROGRAM_PREVIEW: { component: CreateProgramPreview, hasSidebar: false, requiresEntities: ['Programs'] },
 
   // Enquiries — accessible if partner has any of Classes/Programs/Venues
-  ENQUIRIES: { component: EnquiriesHub, hasSidebar: true },
+  ENQUIRIES: { component: EnquiriesHub, hasSidebar: true, requiresEntities: ['Classes', 'Programs', 'Venues'] },
 
   // Other
   ATTENDEES: { component: Attendees, hasSidebar: true },
@@ -304,37 +304,14 @@ function AppInner() {
           return;
         }
 
-        try {
-          const BASE_URL = 'https://tlb-api.reluconsultancy.in';
-          const refreshRes = await fetch(`${BASE_URL}/api/v1/auth/refresh-token/`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ refresh_token: refreshToken }),
-          });
-
-          if (refreshRes.ok) {
-            const res = await refreshRes.json();
-            const payload = res.data || res;
-            const newAccess = payload.access_token || payload.access;
-            if (newAccess) {
-              setAuthToken(newAccess);
-              token = newAccess;
-            } else {
-              clearTokens();
-              setInitializing(false);
-              return;
-            }
-          } else {
-            // Refresh token is invalid/expired — full logout
-            clearTokens();
-            setInitializing(false);
-            return;
-          }
-        } catch {
-          clearTokens();
+        // Shared with apiClient's own 401-retry — never re-implement this fetch here.
+        const newAccess = await refreshAccessToken();
+        if (!newAccess) {
+          // Refresh token is invalid/expired, or the request failed — full logout
           setInitializing(false);
           return;
         }
+        token = newAccess;
       }
 
       // We have a (possibly refreshed) access token — fetch partner status

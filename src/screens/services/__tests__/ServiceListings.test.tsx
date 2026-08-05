@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../../test/msw/server';
@@ -115,10 +115,13 @@ describe('ServiceListings — tabs', () => {
         // Click on Events tab (tab label is "Events (1)")
         const eventTabBtns = screen.getAllByRole('button').filter(b => b.textContent?.startsWith('Events'));
         if (eventTabBtns.length > 0) await user.click(eventTabBtns[0]);
+        // Scoped to the filtered directory — "My Class" may still legitimately appear in the
+        // unrelated Latest Active/History overview cards, which aren't affected by this tab filter.
+        const directory = screen.getByTestId('listings-directory');
         await waitFor(() =>
-            expect(screen.queryAllByText('My Class')).toHaveLength(0)
+            expect(within(directory).queryAllByText('My Class')).toHaveLength(0)
         );
-        expect(screen.getAllByText('My Event').length).toBeGreaterThan(0);
+        expect(within(directory).getAllByText('My Event').length).toBeGreaterThan(0);
     });
 });
 
@@ -143,8 +146,11 @@ describe('ServiceListings — search', () => {
         await waitFor(() => screen.getAllByText('Summer Art Festival'));
         const searchInput = screen.getByPlaceholderText(/search listings/i);
         await user.type(searchInput, 'Winter');
-        expect(screen.queryAllByText('Summer Art Festival')).toHaveLength(0);
-        expect(screen.getAllByText('Winter Dance Camp').length).toBeGreaterThan(0);
+        // Scoped to the filtered directory — the unrelated Latest Active/History overview
+        // cards intentionally aren't affected by this search box.
+        const directory = screen.getByTestId('listings-directory');
+        expect(within(directory).queryAllByText('Summer Art Festival')).toHaveLength(0);
+        expect(within(directory).getAllByText('Winter Dance Camp').length).toBeGreaterThan(0);
     });
 });
 

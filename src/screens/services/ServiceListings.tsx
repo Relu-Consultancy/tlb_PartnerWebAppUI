@@ -138,11 +138,11 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
 
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
-    const ITEMS_PER_PAGE = 5;
+    const [itemsPerPage, setItemsPerPage] = useState(5);
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchQuery, activeTab, filterStatuses, filterTypes, filterDateFrom, filterDateTo, sortBy]);
+    }, [searchQuery, activeTab, filterStatuses, filterTypes, filterDateFrom, filterDateTo, sortBy, itemsPerPage]);
 
     const [showHistoryModal, setShowHistoryModal] = useState(false);
 
@@ -386,8 +386,8 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
             return (a.startDateTime || a.id) > (b.startDateTime || b.id) ? -1 : 1; // newest
         });
 
-    const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
-    const paginatedListings = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+    const totalPages = Math.ceil(filtered.length / itemsPerPage);
+    const paginatedListings = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
     const tabCounts = {
         All: listings.length,
@@ -816,11 +816,11 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                 {filtered.length > 0 ? (
                     <>
                     {viewMode !== 'list' ? (
-                    <div key={`${activeTab}-${viewMode}-${filterStatuses.join()}`} className={gridClass}>
+                    <div key={`${activeTab}-${viewMode}-${filterStatuses.join()}`} data-testid="listings-directory" className={gridClass}>
                         {paginatedListings.map((listing, i) => renderListingCard(listing, viewMode === 'compact', i))}
                     </div>
                     ) : (
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div data-testid="listings-directory" className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                         {/* Desktop table */}
                         <div className="hidden md:block overflow-x-auto">
                             <table className="w-full text-left">
@@ -1004,12 +1004,13 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                     )}
 
                     {/* Pagination UI */}
-                    <Pagination 
+                    <Pagination
                         currentPage={currentPage}
                         totalPages={totalPages}
                         totalItems={filtered.length}
-                        itemsPerPage={ITEMS_PER_PAGE}
+                        itemsPerPage={itemsPerPage}
                         onPageChange={setCurrentPage}
+                        onItemsPerPageChange={setItemsPerPage}
                     />
                     </>
                 ) : (

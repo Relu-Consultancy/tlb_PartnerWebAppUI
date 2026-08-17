@@ -5,15 +5,16 @@ import {
     User, CreditCard, Users, CheckCircle,
     Inbox, RefreshCw, Phone, Mail, Wallet, MessageCircle,
     FileText, AlertCircle, CalendarDays, GraduationCap, Layers, MapPin,
-    LayoutGrid, Grid3X3, List, History,
+    LayoutGrid, Grid3X3, List, History, ShoppingBag, XCircle,
 } from 'lucide-react';
-import { Screen, EntityType } from '../../types';
+import { Screen, EntityType, EnquiryStatus } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
-import { toast, Pagination } from '../../components/ui';
+import { toast, Pagination, Select } from '../../components/ui';
 import {
     getBookings, getBookingDetail, markBookingAttended, getBookingPaymentDetail,
     getEventListings, getClassListings, getProgramListings, getVenueListings,
     getClassEnquiries, getVenueEnquiries, getProgramEnquiries,
+    updateClassEnquiry, updateVenueEnquiry, updateProgramEnquiry,
 } from '../../api/listings';
 
 type ScreenVariant = 'attendees' | 'bookings';
@@ -127,6 +128,7 @@ interface ListingCard {
 interface EnquiryRow {
     id: string;
     listingId: string;
+    entityType: 'Classes' | 'Venues' | 'Programs';
     name: string;
     detail: string;   // batch / occasion / parent
     contact: string;  // phone / email, or 'Hidden' until unlocked
@@ -143,6 +145,29 @@ const ENQUIRY_STATUS_COLORS: Record<string, string> = {
     closed: 'bg-gray-100 text-gray-600',
 };
 
+// Status options a partner can move an enquiry through, per entity type — mirrors the
+// dedicated Enquiries / VenueEnquiries / ProgramEnquiries CRM screens' STATUS_OPTIONS.
+const ENQUIRY_STATUS_OPTIONS: Record<EnquiryRow['entityType'], { value: EnquiryStatus; label: string }[]> = {
+    Classes: [
+        { value: 'new', label: 'New' },
+        { value: 'contacted', label: 'Contacted' },
+        { value: 'trial_booked', label: 'Trial Booked' },
+        { value: 'closed', label: 'Closed' },
+    ],
+    Programs: [
+        { value: 'new', label: 'New' },
+        { value: 'contacted', label: 'Contacted' },
+        { value: 'enrolled', label: 'Enrolled' },
+        { value: 'closed', label: 'Closed' },
+    ],
+    Venues: [
+        { value: 'new', label: 'New' },
+        { value: 'contacted', label: 'Contacted' },
+        { value: 'site_visit_scheduled', label: 'Site Visit' },
+        { value: 'closed', label: 'Closed' },
+    ],
+};
+
 const pick = (...vals: unknown[]): string => {
     for (const v of vals) {
         if (v !== undefined && v !== null && String(v).trim() !== '') return String(v);
@@ -152,9 +177,10 @@ const pick = (...vals: unknown[]): string => {
 
 // Map a raw enquiry object (any entity) → EnquiryRow. `listingId` is passed in for
 // per-listing endpoints (programs) or resolved from the payload (classes/venues).
-const normalizeEnquiry = (item: any, listingId?: string): EnquiryRow => ({
+const normalizeEnquiry = (item: any, entityType: EnquiryRow['entityType'], listingId?: string): EnquiryRow => ({
     id: String(item.id ?? ''),
     listingId: listingId ?? pick(item.listing_id, item.class_id, item.venue_id, item.program_id, item.class, item.venue),
+    entityType,
     name: pick(item.student_name, item.contact_name, item.customer_name, item.name) || 'Unknown',
     detail: pick(item.batch_name, item.occasion, item.parent_name && `Parent: ${item.parent_name}`, item.event_type),
     contact: pick(item.mobile, item.contact_number, item.phone, item.email) || 'Hidden',
@@ -486,6 +512,22 @@ const BreakdownRow: React.FC<{ label: string; value: number; total: number; colo
     );
 };
 
+// ── Card wrapper for a labeled section inside the booking detail drawer ──
+const DetailSection: React.FC<{ icon: React.ElementType; label: string; tint?: string; right?: React.ReactNode; children: React.ReactNode }> = ({
+    icon: Icon, label, tint = 'bg-gray-100 text-gray-500', right, children,
+}) => (
+    <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-4">
+        <div className="flex items-center gap-2 mb-3">
+            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${tint}`}>
+                <Icon size={13} />
+            </div>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex-1">{label}</p>
+            {right}
+        </div>
+        {children}
+    </div>
+);
+
 const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'attendees' }) => {
     const { allowedEntities } = usePartner();
     const isAttendees = variant === 'attendees';
@@ -652,14 +694,14 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
                 const unwrapList = (res: any): any[] => Array.isArray(res) ? res : (res?.data || res?.results || res?.data?.results || []);
                 const jobs: Promise<void>[] = [];
                 if (wanted.includes('Classes')) {
-                    jobs.push(getClassEnquiries().then((res: any) => unwrapList(res).forEach(it => push(normalizeEnquiry(it)))).catch(() => { /* ignore */ }));
+                    jobs.push(getClassEnquiries().then((res: any) => unwrapList(res).forEach(it => push(normalizeEnquiry(it, 'Classes')))).catch(() => { /* ignore */ }));
                 }
                 if (wanted.includes('Venues')) {
-                    jobs.push(getVenueEnquiries().then((res: any) => unwrapList(res).forEach(it => push(normalizeEnquiry(it)))).catch(() => { /* ignore */ }));
+                    jobs.push(getVenueEnquiries().then((res: any) => unwrapList(res).forEach(it => push(normalizeEnquiry(it, 'Venues')))).catch(() => { /* ignore */ }));
                 }
                 if (wanted.includes('Programs')) {
                     listingCards.filter(l => l.type === 'program').forEach(l => {
-                        jobs.push(getProgramEnquiries(l.id).then((res: any) => unwrapList(res).forEach(it => push(normalizeEnquiry(it, l.id)))).catch(() => { /* ignore */ }));
+                        jobs.push(getProgramEnquiries(l.id).then((res: any) => unwrapList(res).forEach(it => push(normalizeEnquiry(it, 'Programs', l.id)))).catch(() => { /* ignore */ }));
                     });
                 }
                 await Promise.all(jobs);
@@ -758,6 +800,31 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
             toast.error((e as Error)?.message || 'Failed to mark as attended');
         } finally {
             setMarkingRowId(null);
+        }
+    };
+
+    // Update an enquiry's status inline (flat Enquiries tab + per-listing drill-down),
+    // dispatching to the right entity-specific endpoint. Optimistic with rollback on failure.
+    const handleEnquiryStatusChange = async (row: EnquiryRow, status: EnquiryStatus) => {
+        const prevStatus = row.status;
+        const patchStatus = (s: string) => setEnquiriesByListing((prev: Record<string, EnquiryRow[]>) => {
+            const list = prev[row.listingId];
+            if (!list) return prev;
+            return { ...prev, [row.listingId]: list.map((e: EnquiryRow) => e.id === row.id ? { ...e, status: s } : e) };
+        });
+        patchStatus(status);
+        try {
+            if (row.entityType === 'Classes') {
+                await updateClassEnquiry(row.id, { status });
+            } else if (row.entityType === 'Venues') {
+                await updateVenueEnquiry(row.id, { status });
+            } else {
+                await updateProgramEnquiry(row.listingId, Number(row.id), { status });
+            }
+            toast.success('Enquiry status updated');
+        } catch (e: unknown) {
+            patchStatus(prevStatus);
+            toast.error((e as Error)?.message || 'Failed to update enquiry status');
         }
     };
 
@@ -1504,7 +1571,15 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
                                                                         )}
                                                                     </td>
                                                                     <td className="px-5 py-4 text-right">
-                                                                        <span className={`inline-block whitespace-nowrap text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${ENQUIRY_STATUS_COLORS[e.status] || FALLBACK_BADGE}`}>{e.status.replace(/_/g, ' ')}</span>
+                                                                        <Select
+                                                                            value={e.status}
+                                                                            onChange={(v) => handleEnquiryStatusChange(e, v as EnquiryStatus)}
+                                                                            options={ENQUIRY_STATUS_OPTIONS[e.entityType]}
+                                                                            ariaLabel="Enquiry status"
+                                                                            align="right"
+                                                                            className="inline-block"
+                                                                            buttonClassName={`inline-flex items-center gap-1 whitespace-nowrap text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest outline-none cursor-pointer transition-colors ${ENQUIRY_STATUS_COLORS[e.status] || FALLBACK_BADGE}`}
+                                                                        />
                                                                     </td>
                                                                 </tr>
                                                             );
@@ -1732,9 +1807,15 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
                                                                     )}
                                                                 </td>
                                                                 <td className="px-5 py-4 text-right">
-                                                                    <span className={`inline-block whitespace-nowrap text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${ENQUIRY_STATUS_COLORS[e.status] || FALLBACK_BADGE}`}>
-                                                                        {e.status.replace(/_/g, ' ')}
-                                                                    </span>
+                                                                    <Select
+                                                                        value={e.status}
+                                                                        onChange={(v) => handleEnquiryStatusChange(e, v as EnquiryStatus)}
+                                                                        options={ENQUIRY_STATUS_OPTIONS[e.entityType]}
+                                                                        ariaLabel="Enquiry status"
+                                                                        align="right"
+                                                                        className="inline-block"
+                                                                        buttonClassName={`inline-flex items-center gap-1 whitespace-nowrap text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-widest outline-none cursor-pointer transition-colors ${ENQUIRY_STATUS_COLORS[e.status] || FALLBACK_BADGE}`}
+                                                                    />
                                                                 </td>
                                                             </tr>
                                                         );
@@ -1821,16 +1902,31 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
             {/* Booking Detail Drawer */}
             {selectedId && (
                 <div className="fixed inset-0 z-50 flex">
-                    <div className="flex-1 bg-black/30 backdrop-blur-sm" onClick={handleCloseDetail} />
-                    <div className="w-full max-w-lg bg-white h-full overflow-hidden shadow-2xl flex flex-col">
-                        <div className="shrink-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between">
-                            <div>
+                    <motion.div
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}
+                        className="flex-1 bg-black/40 backdrop-blur-sm" onClick={handleCloseDetail}
+                    />
+                    <motion.div
+                        initial={{ x: '100%' }} animate={{ x: 0 }} transition={{ type: 'spring', stiffness: 320, damping: 34 }}
+                        className="w-full max-w-lg bg-white h-full overflow-hidden shadow-2xl flex flex-col"
+                    >
+                        <div className="shrink-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center gap-3">
+                            {detail && (() => {
+                                const meta = TYPE_META[detail.booking_type];
+                                const Icon = meta?.icon || Layers;
+                                return (
+                                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${meta?.grad || 'from-gray-600 to-gray-800'} flex items-center justify-center shrink-0`}>
+                                        <Icon size={18} className="text-white" />
+                                    </div>
+                                );
+                            })()}
+                            <div className="min-w-0 flex-1">
                                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Booking Details</p>
                                 {detail && (
-                                    <p className="font-mono text-sm font-bold text-gray-900 mt-0.5">{detail.booking_reference}</p>
+                                    <p className="font-mono text-sm font-bold text-gray-900 mt-0.5 truncate">{detail.booking_reference}</p>
                                 )}
                             </div>
-                            <button onClick={handleCloseDetail} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+                            <button onClick={handleCloseDetail} className="p-2 hover:bg-gray-100 rounded-xl transition-colors shrink-0">
                                 <X size={20} />
                             </button>
                         </div>
@@ -1846,29 +1942,43 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
                             </div>
                         ) : detail ? (
                             <>
-                                <div className="flex-1 overflow-y-auto">
-                                    <div className="px-6 pt-5 pb-4 flex items-center gap-2 flex-wrap">
-                                        <span className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest ${STATUS_COLORS[detail.status] || FALLBACK_BADGE}`}>
-                                            {detail.status.replace(/_/g, ' ')}
-                                        </span>
-                                        <span className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest ${TYPE_META[detail.booking_type]?.badge || FALLBACK_BADGE}`}>
-                                            {detail.booking_type}
-                                        </span>
-                                        <span className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest ${PAYMENT_COLORS[detail.payment_status] || FALLBACK_BADGE}`}>
-                                            {detail.payment_status}
-                                        </span>
-                                        <span className="ml-auto text-xl font-black text-gray-900">
+                                <div className="flex-1 overflow-y-auto bg-gray-50/60">
+                                    {/* Hero — status + amount, tinted by entity type */}
+                                    <div className={`px-6 pt-5 pb-5 bg-gradient-to-br ${TYPE_META[detail.booking_type]?.grad || 'from-gray-700 to-gray-900'}`}>
+                                        <div className="flex items-center gap-2 flex-wrap mb-4">
+                                            <span className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest bg-white/15 text-white`}>
+                                                <span className="inline-block w-1.5 h-1.5 rounded-full mr-1.5 bg-white/80" />
+                                                {detail.status.replace(/_/g, ' ')}
+                                            </span>
+                                            <span className="text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest bg-white/15 text-white">
+                                                {detail.booking_type}
+                                            </span>
+                                            <span className="text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest bg-white/15 text-white">
+                                                {detail.payment_status}
+                                            </span>
+                                        </div>
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-white/60">Total Amount</p>
+                                        <p className="text-3xl font-black text-white mt-0.5">
                                             {detail.total_amount === 0 ? 'Free' : formatAmount(detail.total_amount, detail.currency)}
-                                        </span>
+                                        </p>
                                     </div>
 
-                                    <div className="px-6 space-y-5 pb-6">
-                                        {detail.listing_title && (
-                                            <div className="bg-gray-50 rounded-xl px-4 py-3">
-                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{detail.booking_type || 'Listing'}</p>
-                                                <p className="text-sm font-bold text-gray-900 mt-0.5">{detail.listing_title}</p>
-                                            </div>
-                                        )}
+                                    <div className="px-6 space-y-4 py-5">
+                                        {detail.listing_title && (() => {
+                                            const meta = TYPE_META[detail.booking_type];
+                                            const Icon = meta?.icon || Layers;
+                                            return (
+                                                <div className="bg-white border border-gray-100 rounded-2xl shadow-sm px-4 py-3.5 flex items-center gap-3">
+                                                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${meta?.badge || FALLBACK_BADGE}`}>
+                                                        <Icon size={16} />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{detail.booking_type || 'Listing'}</p>
+                                                        <p className="text-sm font-bold text-gray-900 mt-0.5 truncate">{detail.listing_title}</p>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
 
                                         {actionError && (
                                             <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex items-start gap-3">
@@ -1877,18 +1987,17 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
                                             </div>
                                         )}
 
-                                        <div className="bg-gray-50 rounded-2xl p-4 space-y-3">
-                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Customer</p>
+                                        <DetailSection icon={User} label="Customer" tint="bg-violet-100 text-violet-700">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center shrink-0">
-                                                    <User size={16} className="text-gray-500" />
+                                                <div className="w-9 h-9 rounded-full bg-violet-100 text-violet-700 flex items-center justify-center shrink-0 text-sm font-black">
+                                                    {(detail.customer_name?.trim()[0] || '?').toUpperCase()}
                                                 </div>
                                                 <div>
                                                     <p className="font-bold text-sm text-gray-900">{detail.customer_name}</p>
-                                                    <p className="text-xs text-gray-400 font-medium">{formatDate(detail.created_at)}</p>
+                                                    <p className="text-xs text-gray-400 font-medium">Booked {formatDate(detail.created_at)}</p>
                                                 </div>
                                             </div>
-                                            <div className="space-y-2 pt-1">
+                                            <div className="space-y-2 pt-3 mt-3 border-t border-gray-50">
                                                 {detail.customer_email && (
                                                     <div className="flex items-center gap-2.5">
                                                         <Mail size={13} className="text-gray-400 shrink-0" />
@@ -1908,14 +2017,13 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
                                                     </div>
                                                 )}
                                             </div>
-                                        </div>
+                                        </DetailSection>
 
                                         {detail.line_items.length > 0 && (
-                                            <div>
-                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Order Items</p>
+                                            <DetailSection icon={ShoppingBag} label="Order Items" tint="bg-amber-100 text-amber-700">
                                                 <div className="space-y-2">
                                                     {detail.line_items.map(item => (
-                                                        <div key={item.id} className="bg-gray-50 rounded-2xl px-4 py-3 flex items-center justify-between">
+                                                        <div key={item.id} className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
                                                             <p className="text-sm font-bold text-gray-900">
                                                                 {item.ticket_name || item.package_name || item.batch_name || item.item_type}
                                                             </p>
@@ -1923,19 +2031,15 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
                                                         </div>
                                                     ))}
                                                 </div>
-                                            </div>
+                                            </DetailSection>
                                         )}
 
                                         {detail.attendees.length > 0 && (
-                                            <div>
-                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                                    <Users size={11} />
-                                                    Attendees ({detail.attendees.length})
-                                                </p>
+                                            <DetailSection icon={Users} label={`Attendees (${detail.attendees.length})`} tint="bg-blue-100 text-blue-700">
                                                 <div className="space-y-2">
                                                     {detail.attendees.map((att, i) => (
-                                                        <div key={att.id} className="bg-gray-50 rounded-2xl px-4 py-3 flex items-center gap-3">
-                                                            <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center shrink-0 text-xs font-black text-gray-500">
+                                                        <div key={att.id} className="bg-gray-50 rounded-xl px-4 py-3 flex items-center gap-3">
+                                                            <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center shrink-0 text-xs font-black">
                                                                 {i + 1}
                                                             </div>
                                                             <div className="flex-1 min-w-0">
@@ -1953,76 +2057,87 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
                                                         </div>
                                                     ))}
                                                 </div>
-                                            </div>
+                                            </DetailSection>
                                         )}
 
                                         {paymentDetail && (paymentDetail.payment_method || paymentDetail.amount != null || paymentDetail.status) && (
-                                            <div className="bg-gray-50 rounded-2xl p-4 space-y-2.5">
-                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                                                    <Wallet size={11} /> Payment Summary
-                                                </p>
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-xs text-gray-500 font-medium">Method</span>
-                                                    <span className="text-sm font-bold text-gray-900 capitalize">{paymentDetail.payment_method?.replace(/_/g, ' ') || '—'}</span>
-                                                </div>
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-xs text-gray-500 font-medium">Amount</span>
-                                                    <span className="text-sm font-bold text-gray-900">
-                                                        {paymentDetail.amount != null ? formatAmount(paymentDetail.amount, detail.currency) : '—'}
-                                                    </span>
-                                                </div>
-                                                {paymentDetail.status && (
+                                            <DetailSection icon={Wallet} label="Payment Summary" tint="bg-emerald-100 text-emerald-700">
+                                                <div className="space-y-2.5">
                                                     <div className="flex items-center justify-between">
-                                                        <span className="text-xs text-gray-500 font-medium">Status</span>
-                                                        <span className="text-sm font-bold text-gray-900 capitalize">{paymentDetail.status.replace(/_/g, ' ')}</span>
+                                                        <span className="text-xs text-gray-500 font-medium">Method</span>
+                                                        <span className="text-sm font-bold text-gray-900 capitalize">{paymentDetail.payment_method?.replace(/_/g, ' ') || '—'}</span>
                                                     </div>
-                                                )}
-                                            </div>
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-xs text-gray-500 font-medium">Amount</span>
+                                                        <span className="text-sm font-bold text-gray-900">
+                                                            {paymentDetail.amount != null ? formatAmount(paymentDetail.amount, detail.currency) : '—'}
+                                                        </span>
+                                                    </div>
+                                                    {paymentDetail.status && (
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-xs text-gray-500 font-medium">Status</span>
+                                                            <span className="text-sm font-bold text-gray-900 capitalize">{paymentDetail.status.replace(/_/g, ' ')}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </DetailSection>
                                         )}
 
                                         {detail.transactions.length > 0 && (
-                                            <div>
-                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                                    <CreditCard size={11} />
-                                                    Payment Activity
-                                                </p>
-                                                <div className="space-y-1.5">
-                                                    {detail.transactions.map(txn => (
-                                                        <div key={txn.id} className="bg-gray-50 rounded-xl px-4 py-2.5 flex items-center gap-3">
-                                                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest shrink-0 ${
-                                                                txn.status === 'success' && detail.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-700' :
-                                                                txn.status === 'success' ? 'bg-amber-100 text-amber-700' :
-                                                                txn.status === 'failed' ? 'bg-red-100 text-red-700' :
-                                                                'bg-gray-100 text-gray-600'
-                                                            }`}>
-                                                                {txn.status === 'success' && detail.payment_status !== 'paid' ? 'Initiated' : txn.status}
-                                                            </span>
-                                                            <div className="flex-1 min-w-0">
-                                                                <p className="text-xs font-bold text-gray-700 capitalize truncate">
-                                                                    {txn.transaction_type.replace(/_/g, ' ')}
-                                                                </p>
-                                                                <p className="text-[10px] text-gray-400">{formatDate(txn.created_at)}</p>
-                                                            </div>
-                                                            {txn.razorpay_payment_id && (
-                                                                <p className="font-mono text-[10px] text-gray-400 shrink-0">{txn.razorpay_payment_id.slice(-8)}</p>
+                                            <DetailSection icon={CreditCard} label="Payment Activity" tint="bg-gray-200 text-gray-600">
+                                                <div className="space-y-0">
+                                                    {detail.transactions.map((txn, i) => (
+                                                        <div key={txn.id} className="relative flex gap-3 pb-4 last:pb-0">
+                                                            {i < detail.transactions.length - 1 && (
+                                                                <span className="absolute left-[5px] top-3 bottom-0 w-px bg-gray-100" />
                                                             )}
+                                                            <span className={`relative z-10 mt-1 w-[11px] h-[11px] rounded-full shrink-0 ring-4 ring-white ${
+                                                                txn.status === 'success' && detail.payment_status === 'paid' ? 'bg-emerald-500' :
+                                                                txn.status === 'success' ? 'bg-amber-500' :
+                                                                txn.status === 'failed' ? 'bg-red-500' :
+                                                                'bg-gray-400'
+                                                            }`} />
+                                                            <div className="flex-1 min-w-0 flex items-center gap-3 bg-gray-50 rounded-xl px-3.5 py-2.5">
+                                                                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest shrink-0 ${
+                                                                    txn.status === 'success' && detail.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-700' :
+                                                                    txn.status === 'success' ? 'bg-amber-100 text-amber-700' :
+                                                                    txn.status === 'failed' ? 'bg-red-100 text-red-700' :
+                                                                    'bg-gray-100 text-gray-600'
+                                                                }`}>
+                                                                    {txn.status === 'success' && detail.payment_status !== 'paid' ? 'Initiated' : txn.status}
+                                                                </span>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-xs font-bold text-gray-700 capitalize truncate">
+                                                                        {txn.transaction_type.replace(/_/g, ' ')}
+                                                                    </p>
+                                                                    <p className="text-[10px] text-gray-400">{formatDate(txn.created_at)}</p>
+                                                                </div>
+                                                                {txn.razorpay_payment_id && (
+                                                                    <p className="font-mono text-[10px] text-gray-400 shrink-0">{txn.razorpay_payment_id.slice(-8)}</p>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     ))}
                                                 </div>
-                                            </div>
+                                            </DetailSection>
                                         )}
 
                                         {(detail.status === 'cancelled' || detail.cancelled_at) && (
-                                            <div className="bg-red-50 rounded-2xl px-4 py-3 border border-red-100 space-y-1">
-                                                <p className="text-[10px] font-black text-red-400 uppercase tracking-widest">Cancellation</p>
+                                            <div className="bg-red-50 rounded-2xl px-4 py-3.5 border border-red-100">
+                                                <div className="flex items-center gap-2 mb-1.5">
+                                                    <div className="w-6 h-6 rounded-lg bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                                                        <XCircle size={12} />
+                                                    </div>
+                                                    <p className="text-[10px] font-black text-red-500 uppercase tracking-widest">Cancellation</p>
+                                                </div>
                                                 <p className="text-sm font-bold text-red-700">
                                                     {detail.cancellation_reason || 'No reason provided'}
                                                 </p>
                                                 {detail.cancelled_at && (
-                                                    <p className="text-xs text-red-400 font-medium">{formatDate(detail.cancelled_at)}</p>
+                                                    <p className="text-xs text-red-400 font-medium mt-1">{formatDate(detail.cancelled_at)}</p>
                                                 )}
                                                 {detail.refund_amount != null && (
-                                                    <p className="text-sm font-black text-red-500 pt-0.5">
+                                                    <p className="text-sm font-black text-red-500 pt-1.5">
                                                         Refund: {formatAmount(detail.refund_amount, detail.currency)}
                                                     </p>
                                                 )}
@@ -2047,7 +2162,7 @@ const BookingsBase: React.FC<Props> = ({ onNavigate, onOpenSidebar, variant = 'a
                                 )}
                             </>
                         ) : null}
-                    </div>
+                    </motion.div>
                 </div>
             )}
         </div>

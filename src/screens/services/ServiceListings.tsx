@@ -382,8 +382,13 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
         .sort((a, b) => {
             if (sortBy === 'a-z') return a.title.localeCompare(b.title);
             if (sortBy === 'z-a') return b.title.localeCompare(a.title);
-            if (sortBy === 'oldest') return (a.startDateTime || a.id) < (b.startDateTime || b.id) ? -1 : 1;
-            return (a.startDateTime || a.id) > (b.startDateTime || b.id) ? -1 : 1; // newest
+            // Compare as real timestamps, not raw strings — falling back to a
+            // listing's UUID `id` when it has no date (e.g. an unscheduled
+            // Draft) mixed UUID and ISO-date string comparisons together and
+            // produced an essentially random order.
+            const aTime = new Date(listingDate(a) || 0).getTime();
+            const bTime = new Date(listingDate(b) || 0).getTime();
+            return sortBy === 'oldest' ? aTime - bTime : bTime - aTime; // newest
         });
 
     const totalPages = Math.ceil(filtered.length / itemsPerPage);

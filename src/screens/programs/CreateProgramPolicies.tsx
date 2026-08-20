@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Eye, Plus, Trash2, HelpCircle, FileText, Loader2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Eye, FileText, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation } from '../../components/ui';
+import { WizardLayout, WizardNavigation, FaqTermsEditor, FaqApi, RefundPolicyToggle } from '../../components/ui';
 import {
     getCurrentProgramDraftId,
     getProgramListingDetail,
@@ -14,74 +14,44 @@ import {
 
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
 
-interface LocalFaq {
-    apiId?: number;
-    key: number;
-    question: string;
-    answer: string;
-    isDirty: boolean;
-}
-
-let nextKey = 1;
-const blankFaq = (): LocalFaq => ({ key: nextKey++, question: '', answer: '', isDirty: true });
+const programFaqApi: FaqApi = {
+    list: getProgramFaqs,
+    create: createProgramFaq,
+    update: updateProgramFaq,
+    remove: deleteProgramFaq,
+};
 
 export const CreateProgramPolicies: React.FC<Props> = ({ onNavigate }) => {
+    const draftId = getCurrentProgramDraftId();
     const [cancelPolicy, setCancelPolicy] = useState('');
     const [refundPolicy, setRefundPolicy] = useState('');
-    const [faqs, setFaqs] = useState<LocalFaq[]>([blankFaq()]);
+    // Backend treats an unset value as refundable.
+    const [isRefundable, setIsRefundable] = useState(true);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
-    const deletedFaqIds = useRef<number[]>([]);
 
     useEffect(() => {
-        const id = getCurrentProgramDraftId();
-        if (!id) { setLoading(false); return; }
+        if (!draftId) { setLoading(false); return; }
         (async () => {
             try {
-                const [detailRes, faqsRes] = await Promise.allSettled([
-                    getProgramListingDetail(id),
-                    getProgramFaqs(id),
-                ]);
-                if (detailRes.status === 'fulfilled') {
-                    const d = detailRes.value.data || detailRes.value;
-                    // Per API 11.3, these may or may not exist at top level
-                    setCancelPolicy(d.cancellation_policy || '');
-                    setRefundPolicy(d.refund_policy || '');
-                }
-                if (faqsRes.status === 'fulfilled') {
-                    const raw = faqsRes.value.data || faqsRes.value;
-                    const list: any[] = Array.isArray(raw) ? raw : [];
-                    if (list.length > 0) {
-                        setFaqs(list.map((f: any) => ({
-                            apiId: f.id,
-                            key: nextKey++,
-                            question: f.question || '',
-                            answer: f.answer || '',
-                            isDirty: false,
-                        })));
-                    }
-                }
+                const res = await getProgramListingDetail(draftId);
+                const d = res.data || res;
+                // Per API 11.3, these may or may not exist at top level
+                setCancelPolicy(d.cancellation_policy || '');
+                setRefundPolicy(d.refund_policy || '');
+                setIsRefundable(d.is_refundable !== false);
             } catch (e) {
                 console.error('Failed to load program policies', e);
             } finally {
                 setLoading(false);
             }
         })();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-
-    const updateFaq = (key: number, patch: Partial<LocalFaq>) =>
-        setFaqs(prev => prev.map(f => f.key === key ? { ...f, ...patch, isDirty: true } : f));
-
-    const removeFaq = (key: number) => {
-        const faq = faqs.find(f => f.key === key);
-        if (faq?.apiId) deletedFaqIds.current.push(faq.apiId);
-        setFaqs(prev => prev.filter(f => f.key !== key));
-    };
 
     const handleNext = async () => {
         if (saving) return;
-        const draftId = getCurrentProgramDraftId();
         if (!draftId) { onNavigate('CREATE_PROGRAM_PREVIEW'); return; }
         setSaving(true);
         setError('');
@@ -89,25 +59,8 @@ export const CreateProgramPolicies: React.FC<Props> = ({ onNavigate }) => {
             await updateProgramListing(draftId, {
                 ...(cancelPolicy.trim() ? { cancellation_policy: cancelPolicy.trim() } : {}),
                 ...(refundPolicy.trim() ? { refund_policy: refundPolicy.trim() } : {}),
+                is_refundable: isRefundable,
             });
-            for (const id of deletedFaqIds.current) {
-                await deleteProgramFaq(draftId, id);
-            }
-            deletedFaqIds.current = [];
-            for (const faq of faqs) {
-                if (!faq.isDirty || !faq.question.trim()) continue;
-                if (faq.apiId) {
-                    await updateProgramFaq(draftId, faq.apiId, {
-                        question: faq.question.trim(),
-                        answer: faq.answer.trim(),
-                    });
-                } else {
-                    await createProgramFaq(draftId, {
-                        question: faq.question.trim(),
-                        answer: faq.answer.trim(),
-                    });
-                }
-            }
             onNavigate('CREATE_PROGRAM_PREVIEW');
         } catch (e: any) {
             setError(e?.message || 'Failed to save. Please try again.');
@@ -153,6 +106,8 @@ export const CreateProgramPolicies: React.FC<Props> = ({ onNavigate }) => {
                 </div>
             )}
 
+            <RefundPolicyToggle value={isRefundable} onChange={setIsRefundable} accent="emerald" />
+
             <div className="space-y-4">
                 <div>
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
@@ -178,43 +133,13 @@ export const CreateProgramPolicies: React.FC<Props> = ({ onNavigate }) => {
                 </div>
             </div>
 
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                    <HelpCircle size={12} /> Frequently Asked Questions
-                </label>
-                <div className="space-y-3">
-                    {faqs.map((faq, idx) => (
-                        <div key={faq.key} className="bg-white rounded-2xl border border-gray-100 p-4 space-y-3">
-                            <div className="flex items-center justify-between">
-                                <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">FAQ {idx + 1}</p>
-                                {faqs.length > 1 && (
-                                    <button onClick={() => removeFaq(faq.key)} className="text-red-400 hover:text-red-600 p-1">
-                                        <Trash2 size={14} />
-                                    </button>
-                                )}
-                            </div>
-                            <input
-                                className="tlb-input w-full"
-                                placeholder="Question"
-                                value={faq.question}
-                                onChange={(e) => updateFaq(faq.key, { question: e.target.value })}
-                            />
-                            <textarea
-                                className="tlb-input w-full min-h-[60px] resize-y"
-                                placeholder="Answer"
-                                value={faq.answer}
-                                onChange={(e) => updateFaq(faq.key, { answer: e.target.value })}
-                            />
-                        </div>
-                    ))}
+            {draftId ? (
+                <FaqTermsEditor listingId={draftId} faqApi={programFaqApi} accent="emerald" faqDocumentsEntity="programs" />
+            ) : (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm font-bold text-amber-700">
+                    Please complete the earlier steps first so we can save your FAQs and terms.
                 </div>
-                <button
-                    onClick={() => setFaqs(prev => [...prev, blankFaq()])}
-                    className="w-full mt-3 py-2.5 border-2 border-dashed border-gray-200 rounded-2xl text-xs font-bold text-gray-400 flex items-center justify-center gap-2 hover:border-emerald-300 hover:text-emerald-500 transition-colors"
-                >
-                    <Plus size={16} /> Add Question
-                </button>
-            </div>
+            )}
 
             <WizardNavigation
                 onBack={() => onNavigate('CREATE_PROGRAM_MEDIA')}

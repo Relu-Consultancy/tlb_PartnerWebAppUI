@@ -1,73 +1,66 @@
 import React, { useState, useEffect } from 'react';
-import { Eye, Plus, Trash2, HelpCircle, FileText, Loader2 } from 'lucide-react';
+import { Eye, FileText, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation, SkeletonList } from '../../components/ui';
+import { WizardLayout, WizardNavigation, SkeletonList, FaqTermsEditor, FaqApi, RefundPolicyToggle } from '../../components/ui';
 import {
     getCurrentClassDraftId,
     getClassListingDetail,
     updateClassListing,
+    getClassFaqs,
+    createClassFaq,
+    updateClassFaq,
+    deleteClassFaq,
 } from '../../api/listings';
 
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
 
-interface LocalFaq { key: number; question: string; answer: string; }
-
-let nextKey = 1;
-const blankFaq = (): LocalFaq => ({ key: nextKey++, question: '', answer: '' });
+const classFaqApi: FaqApi = {
+    list: getClassFaqs,
+    create: createClassFaq,
+    update: updateClassFaq,
+    remove: deleteClassFaq,
+};
 
 export const CreateClassPolicies: React.FC<Props> = ({ onNavigate }) => {
+    const draftId = getCurrentClassDraftId();
     const [cancelPolicy, setCancelPolicy] = useState('');
     const [refundPolicy, setRefundPolicy] = useState('');
-    const [faqs, setFaqs] = useState<LocalFaq[]>([blankFaq()]);
+    // Backend treats an unset value as refundable.
+    const [isRefundable, setIsRefundable] = useState(true);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
 
     useEffect(() => {
-        const id = getCurrentClassDraftId();
-        if (!id) { setLoading(false); return; }
+        if (!draftId) { setLoading(false); return; }
         (async () => {
             try {
-                const res = await getClassListingDetail(id);
+                const res = await getClassListingDetail(draftId);
                 const d = res.data || res;
                 const srv = d.service || {};
                 // service-specific fields live under .service per API 10.3
                 setCancelPolicy(srv.cancellation_policy || d.cancellation_policy || '');
                 setRefundPolicy(srv.refund_policy || d.refund_policy || '');
-                const existing: { question: string; answer: string }[] = srv.faqs || d.faqs || [];
-                if (existing.length > 0) {
-                    setFaqs(existing.map(f => ({ key: nextKey++, question: f.question, answer: f.answer })));
-                }
+                setIsRefundable((srv.is_refundable ?? d.is_refundable) !== false);
             } catch (e) {
                 console.error('Failed to load class policies', e);
             } finally {
                 setLoading(false);
             }
         })();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-
-    const updateFaq = (key: number, field: 'question' | 'answer', value: string) =>
-        setFaqs(prev => prev.map(f => f.key === key ? { ...f, [field]: value } : f));
-
-    const removeFaq = (key: number) => {
-        if (faqs.length > 1) setFaqs(prev => prev.filter(f => f.key !== key));
-    };
 
     const handleNext = async () => {
         if (saving) return;
-        const draftId = getCurrentClassDraftId();
         if (!draftId) { onNavigate('CREATE_CLASS_PREVIEW'); return; }
         setSaving(true);
         setError('');
         try {
-            const validFaqs = faqs
-                .filter(f => f.question.trim())
-                .map(f => ({ question: f.question.trim(), answer: f.answer.trim() }));
-
             await updateClassListing(draftId, {
                 ...(cancelPolicy.trim() ? { cancellation_policy: cancelPolicy.trim() } : {}),
                 ...(refundPolicy.trim() ? { refund_policy: refundPolicy.trim() } : {}),
-                faqs: validFaqs,
+                is_refundable: isRefundable,
             });
             onNavigate('CREATE_CLASS_PREVIEW');
         } catch (e: any) {
@@ -112,6 +105,8 @@ export const CreateClassPolicies: React.FC<Props> = ({ onNavigate }) => {
                 </div>
             )}
 
+            <RefundPolicyToggle value={isRefundable} onChange={setIsRefundable} accent="yellow" />
+
             <div className="space-y-4">
                 <div>
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
@@ -137,43 +132,13 @@ export const CreateClassPolicies: React.FC<Props> = ({ onNavigate }) => {
                 </div>
             </div>
 
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                    <HelpCircle size={12} /> Frequently Asked Questions
-                </label>
-                <div className="space-y-3">
-                    {faqs.map((faq, idx) => (
-                        <div key={faq.key} className="bg-white rounded-2xl border border-gray-100 p-4 space-y-3">
-                            <div className="flex items-center justify-between">
-                                <p className="text-[10px] font-black text-tlb-yellow uppercase tracking-widest">FAQ {idx + 1}</p>
-                                {faqs.length > 1 && (
-                                    <button onClick={() => removeFaq(faq.key)} className="text-red-400 hover:text-red-600 p-1">
-                                        <Trash2 size={14} />
-                                    </button>
-                                )}
-                            </div>
-                            <input
-                                className="tlb-input w-full"
-                                placeholder="Question"
-                                value={faq.question}
-                                onChange={(e) => updateFaq(faq.key, 'question', e.target.value)}
-                            />
-                            <textarea
-                                className="tlb-input w-full min-h-[60px] resize-y"
-                                placeholder="Answer"
-                                value={faq.answer}
-                                onChange={(e) => updateFaq(faq.key, 'answer', e.target.value)}
-                            />
-                        </div>
-                    ))}
+            {draftId ? (
+                <FaqTermsEditor listingId={draftId} faqApi={classFaqApi} accent="amber" faqDocumentsEntity="classes" />
+            ) : (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm font-bold text-amber-700">
+                    Please complete the earlier steps first so we can save your FAQs and terms.
                 </div>
-                <button
-                    onClick={() => setFaqs(prev => [...prev, blankFaq()])}
-                    className="w-full mt-3 py-2.5 border-2 border-dashed border-gray-200 rounded-2xl text-xs font-bold text-gray-400 flex items-center justify-center gap-2 hover:border-tlb-yellow/30 hover:text-tlb-yellow transition-colors"
-                >
-                    <Plus size={16} /> Add Question
-                </button>
-            </div>
+            )}
 
             <WizardNavigation
                 onBack={() => onNavigate('CREATE_CLASS_MEDIA')}

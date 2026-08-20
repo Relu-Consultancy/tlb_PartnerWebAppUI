@@ -40,7 +40,11 @@ interface MenuCoords {
     left?: number;
     right?: number;
     minWidth: number;
+    maxHeight: number;
 }
+
+const MENU_MARGIN = 12; // gap kept from the viewport edge / the trigger
+const MENU_CAP = 320; // never grow past this even when there's room to spare
 
 /**
  * Accessible, animated single-select dropdown — a drop-in replacement for native
@@ -78,14 +82,19 @@ export const Select: React.FC<SelectProps> = ({
         const btn = buttonRef.current;
         if (!btn) return;
         const r = btn.getBoundingClientRect();
+        // Always open downward — flipping upward when the trigger sits low on
+        // a long page (e.g. below a map) reliably ended up overlapping content
+        // further up instead. Cap the height to whatever's actually left below
+        // the trigger so the menu scrolls within itself rather than overshoot.
         const spaceBelow = window.innerHeight - r.bottom;
-        const dropUp = spaceBelow < 260 && r.top > spaceBelow;
+        const maxHeight = Math.max(160, Math.min(MENU_CAP, spaceBelow - MENU_MARGIN));
         setCoords({
-            top: dropUp ? undefined : r.bottom + 6,
-            bottom: dropUp ? window.innerHeight - r.top + 6 : undefined,
+            top: r.bottom + 6,
+            bottom: undefined,
             left: align === 'left' ? r.left : undefined,
             right: align === 'right' ? window.innerWidth - r.right : undefined,
             minWidth: r.width,
+            maxHeight,
         });
     };
 
@@ -192,8 +201,9 @@ export const Select: React.FC<SelectProps> = ({
                     left: coords.left,
                     right: coords.right,
                     minWidth: coords.minWidth,
+                    maxHeight: coords.maxHeight,
                 }}
-                className="z-[200] max-h-64 overflow-auto rounded-xl border border-gray-100 bg-white p-1.5 shadow-2xl ring-1 ring-black/5"
+                className="z-[200] overflow-auto rounded-xl border border-gray-100 bg-white p-1.5 shadow-2xl ring-1 ring-black/5"
             >
                 {options.map((opt, i) => {
                     const isSelected = opt.value === value;

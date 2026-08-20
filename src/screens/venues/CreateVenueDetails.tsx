@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowRight, MapPin, Check, Camera, Play, Image as ImageIcon, Trash2, Loader2, MessageCircle, CalendarCheck } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation, toast, Select } from '../../components/ui';
-import { INDIAN_STATES, getCitiesForState } from '../../data/indianStatesAndCities';
+import { WizardLayout, WizardNavigation, toast, Select, LocationPicker } from '../../components/ui';
+import { PickedLocation } from '../../components/ui/LocationPicker';
 import {
     getVenueMetaCategories,
     getVenueListingDetail,
@@ -57,12 +57,20 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
     // Location
     const [locationType, setLocationType] = useState('');
     const [city, setCity] = useState('');
-    const [district, setDistrict] = useState('');
-    const [stateName, setStateName] = useState('');
-    const [pincode, setPincode] = useState('');
     const [address, setAddress] = useState('');
     const [latitude, setLatitude] = useState('');
     const [longitude, setLongitude] = useState('');
+
+    // Google Maps location picker — venues save plain city/address/lat/lng
+    // (already-working fields above); no place_id shortcut for this entity yet.
+    const handleLocationPicked = (loc: PickedLocation) => {
+        setAddress(loc.address);
+        setCity(loc.city);
+        // Backend rejects more than 6 decimal places; Google's resolved
+        // coordinates can come back with more than that.
+        setLatitude(loc.latitude.toFixed(6));
+        setLongitude(loc.longitude.toFixed(6));
+    };
 
     // Age & capacity
     const [minAge, setMinAge] = useState('');
@@ -116,9 +124,6 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
                     if (d.booking_type === 'enquiry' || d.booking_type === 'direct_booking') setBookingType(d.booking_type);
                     setLocationType(d.location_type || '');
                     setCity(d.city || '');
-                    setDistrict(d.district || '');
-                    setStateName(d.state || '');
-                    setPincode(d.pincode || '');
                     setAddress(d.address || '');
                     setLatitude(d.latitude != null ? String(d.latitude) : '');
                     setLongitude(d.longitude != null ? String(d.longitude) : '');
@@ -253,12 +258,17 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
             if (selectedSubcategoryId != null) payload.subcategory_id = selectedSubcategoryId;
             if (locationType) payload.location_type = locationType;
             if (city.trim()) payload.city = city.trim();
-            if (district.trim()) payload.district = district.trim();
-            if (stateName.trim()) payload.state = stateName.trim();
-            if (pincode.trim()) payload.pincode = pincode.trim();
             if (address.trim()) payload.address = address.trim();
-            if (latitude.trim()) payload.latitude = latitude.trim();
-            if (longitude.trim()) payload.longitude = longitude.trim();
+            // Clamp to 6 decimal places — the backend rejects anything more
+            // precise, which a hand-typed or pasted coordinate can exceed.
+            if (latitude.trim()) {
+                const n = Number(latitude.trim());
+                payload.latitude = Number.isFinite(n) ? n.toFixed(6) : latitude.trim();
+            }
+            if (longitude.trim()) {
+                const n = Number(longitude.trim());
+                payload.longitude = Number.isFinite(n) ? n.toFixed(6) : longitude.trim();
+            }
             if (minAge !== '') payload.min_age = parseInt(minAge, 10);
             if (maxAge !== '') payload.max_age = parseInt(maxAge, 10);
             if (minCapacity !== '') payload.min_capacity = parseInt(minCapacity, 10);
@@ -430,57 +440,20 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
                     <MapPin size={12} /> Location
                 </label>
+
+                <LocationPicker
+                    initialLatitude={latitude ? Number(latitude) : null}
+                    initialLongitude={longitude ? Number(longitude) : null}
+                    initialAddress={address}
+                    onSelect={handleLocationPicked}
+                />
+
                 <textarea
                     className="tlb-input w-full min-h-[70px] resize-y"
                     placeholder="Street, building, landmark *"
                     value={address}
                     onChange={e => setAddress(e.target.value)}
                 />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <Select
-                        value={stateName}
-                        onChange={v => { setStateName(v); setCity(''); }}
-                        options={INDIAN_STATES.map(s => ({ value: s, label: s }))}
-                        placeholder="State"
-                    />
-                    <Select
-                        value={city}
-                        onChange={setCity}
-                        options={getCitiesForState(stateName).map(c => ({ value: c, label: c }))}
-                        placeholder="City *"
-                        disabled={!stateName}
-                    />
-                    <input
-                        className="tlb-input w-full"
-                        placeholder="District"
-                        maxLength={100}
-                        value={district}
-                        onChange={e => setDistrict(e.target.value)}
-                    />
-                    <input
-                        className="tlb-input w-full"
-                        placeholder="Pincode"
-                        inputMode="numeric"
-                        maxLength={6}
-                        value={pincode}
-                        onChange={e => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                    <input
-                        className="tlb-input w-full"
-                        placeholder="Latitude (optional)"
-                        value={latitude}
-                        onChange={e => setLatitude(e.target.value)}
-                    />
-                    <input
-                        className="tlb-input w-full"
-                        placeholder="Longitude (optional)"
-                        value={longitude}
-                        onChange={e => setLongitude(e.target.value)}
-                    />
-                </div>
-                <p className="text-[10px] text-gray-400">Coordinates enable geo-distance search for customers.</p>
             </div>
 
             {/* Age Range */}

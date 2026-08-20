@@ -66,10 +66,10 @@ describe('CreateProgramIdentity — metadata loading', () => {
 });
 
 describe('CreateProgramIdentity — delivery mode', () => {
-    it('shows address fields for offline mode (default)', async () => {
+    it('shows the location picker for offline mode (default)', async () => {
         renderComponent();
         await waitFor(() => screen.queryByText('Dance'));
-        expect(screen.queryByPlaceholderText(/city/i)).toBeInTheDocument();
+        expect(screen.queryByPlaceholderText(/search for the venue's address/i)).toBeInTheDocument();
     });
 
     it('shows meeting link for online mode', async () => {

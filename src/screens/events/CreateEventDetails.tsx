@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, MapPin, Check, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation, toast, Select } from '../../components/ui';
-import { INDIAN_STATES, getCitiesForState } from '../../data/indianStatesAndCities';
+import { WizardLayout, WizardNavigation, toast, LocationPicker } from '../../components/ui';
+import { PickedLocation } from '../../components/ui/LocationPicker';
 import {
     getEventMetaCategories,
     getEventMetaFormats,
@@ -53,11 +53,28 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
     const [customMax, setCustomMax] = useState<string>('');
     const [mode, setMode] = useState<Mode>('offline');
     const [city, setCity] = useState('');
-    const [district, setDistrict] = useState('');
-    const [stateName, setStateName] = useState('');
-    const [pincode, setPincode] = useState('');
     const [address, setAddress] = useState('');
     const [meetingLink, setMeetingLink] = useState('');
+
+    // Google Maps location picker — area/coordinates/place_id aren't shown as
+    // separate inputs; they ride along with the address/city fields above.
+    const [area, setArea] = useState('');
+    const [latitude, setLatitude] = useState<number | null>(null);
+    const [longitude, setLongitude] = useState<number | null>(null);
+    const [placeId, setPlaceId] = useState<string | undefined>(undefined);
+
+    const handleLocationPicked = (loc: PickedLocation) => {
+        setAddress(loc.address);
+        setCity(loc.city);
+        setArea(loc.area);
+        setLatitude(loc.latitude);
+        setLongitude(loc.longitude);
+        setPlaceId(loc.place_id);
+    };
+
+    // A manual edit after a pick invalidates the place_id (and the map's
+    // resolved area) — fall back to sending the raw lat/lng + address instead.
+    const editAddressManually = (v: string) => { setAddress(v); setPlaceId(undefined); setArea(''); };
 
     const [saving, setSaving] = useState(false);
     const [draftLoading, setDraftLoading] = useState(false);
@@ -106,10 +123,10 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
                     }
                     if (d.mode) setMode(d.mode);
                     setCity(d.city || '');
-                    setDistrict(d.district || '');
-                    setStateName(d.state || '');
-                    setPincode(d.pincode || '');
                     setAddress(d.address || '');
+                    setArea(d.area || '');
+                    setLatitude(d.latitude != null ? Number(d.latitude) : null);
+                    setLongitude(d.longitude != null ? Number(d.longitude) : null);
                     setMeetingLink(d.meeting_link || '');
                 } catch (err) {
                     console.warn('Could not load existing draft', err);
@@ -169,11 +186,22 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
             const ageGroup = buildAgeGroup();
             if (ageGroup) payload.age_group = ageGroup;
             if (mode === 'offline' || mode === 'hybrid') {
-                if (city) payload.city = city;
-                if (district) payload.district = district;
-                if (stateName) payload.state = stateName;
-                if (pincode) payload.pincode = pincode;
-                if (address) payload.address = address;
+                // Google Maps location — prefer the place_id (server re-resolves
+                // it); otherwise fall back to the raw picked/typed coordinates.
+                // latitude/longitude must always be sent together.
+                if (placeId) {
+                    payload.place_id = placeId;
+                } else {
+                    if (city) payload.city = city;
+                    if (address) payload.address = address;
+                    if (area) payload.area = area;
+                    if (latitude != null && longitude != null) {
+                        // Backend rejects more than 6 decimal places; Google's
+                        // resolved coordinates can come back with more than that.
+                        payload.latitude = latitude.toFixed(6);
+                        payload.longitude = longitude.toFixed(6);
+                    }
+                }
             }
             if (mode === 'online' || mode === 'hybrid') {
                 if (meetingLink) payload.meeting_link = meetingLink;
@@ -412,42 +440,20 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block">
                         <MapPin size={12} className="inline mr-1" /> Venue Location
                     </label>
+
+                    <LocationPicker
+                        initialLatitude={latitude}
+                        initialLongitude={longitude}
+                        initialAddress={address}
+                        onSelect={handleLocationPicked}
+                    />
+
                     <textarea
                         className="tlb-input w-full min-h-[70px] resize-y"
                         placeholder="Street, building, landmark"
                         value={address}
-                        onChange={(e) => setAddress(e.target.value)}
+                        onChange={(e) => editAddressManually(e.target.value)}
                     />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <Select
-                            value={stateName}
-                            onChange={(v: string) => { setStateName(v); setCity(''); }}
-                            options={INDIAN_STATES.map(s => ({ value: s, label: s }))}
-                            placeholder="State"
-                        />
-                        <Select
-                            value={city}
-                            onChange={setCity}
-                            options={getCitiesForState(stateName).map(c => ({ value: c, label: c }))}
-                            placeholder="City"
-                            disabled={!stateName}
-                        />
-                        <input
-                            className="tlb-input w-full"
-                            placeholder="District"
-                            maxLength={100}
-                            value={district}
-                            onChange={(e) => setDistrict(e.target.value)}
-                        />
-                        <input
-                            className="tlb-input w-full"
-                            placeholder="Pincode"
-                            inputMode="numeric"
-                            maxLength={6}
-                            value={pincode}
-                            onChange={(e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                        />
-                    </div>
                 </div>
             )}
 

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, MapPin, Tag, Check, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation, Select } from '../../components/ui';
-import { INDIAN_STATES, getCitiesForState } from '../../data/indianStatesAndCities';
+import { WizardLayout, WizardNavigation, Select, LocationPicker } from '../../components/ui';
+import { PickedLocation } from '../../components/ui/LocationPicker';
 import {
     getCurrentProgramDraftId,
     setCurrentProgramDraftId,
@@ -33,11 +33,20 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
     const [programFormat, setProgramFormat] = useState('');
     const [deliveryMode, setDeliveryMode] = useState('offline');
     const [city, setCity] = useState('');
-    const [district, setDistrict] = useState('');
-    const [stateName, setStateName] = useState('');
-    const [pincode, setPincode] = useState('');
     const [address, setAddress] = useState('');
     const [meetingLink, setMeetingLink] = useState('');
+
+    // Google Maps location picker — Programs' PATCH endpoint isn't confirmed to
+    // accept latitude/longitude yet, so these ride along best-effort; city and
+    // address (already-supported fields) always update regardless.
+    const [latitude, setLatitude] = useState<number | null>(null);
+    const [longitude, setLongitude] = useState<number | null>(null);
+    const handleLocationPicked = (loc: PickedLocation) => {
+        setAddress(loc.address);
+        setCity(loc.city);
+        setLatitude(loc.latitude);
+        setLongitude(loc.longitude);
+    };
 
     // API-driven metadata
     const [categories, setCategories] = useState<ApiCategory[]>([]);
@@ -101,10 +110,9 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                 const loadedBookingType = d.booking_type;
                 if (loadedBookingType === 'enquiry' || loadedBookingType === 'direct_booking') setBookingType(loadedBookingType);
                 setCity(d.city || '');
-                setDistrict(d.district || '');
-                setStateName(d.state || '');
-                setPincode(d.pincode || '');
                 setAddress(d.address || '');
+                if (d.latitude != null) setLatitude(Number(d.latitude));
+                if (d.longitude != null) setLongitude(Number(d.longitude));
                 setMeetingLink(d.meeting_link || '');
                 // Category & subcategory come as objects { id, name }
                 const catId = d.category?.id;
@@ -171,10 +179,13 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
             if (moduleCount) payload.module_count = Number(moduleCount);
             if (needsAddress) {
                 if (city.trim()) payload.city = city.trim();
-                if (district.trim()) payload.district = district.trim();
-                if (stateName.trim()) payload.state = stateName.trim();
-                if (pincode.trim()) payload.pincode = pincode.trim();
                 if (address.trim()) payload.address = address.trim();
+                // Best-effort — not yet confirmed on the Programs endpoint, but
+                // harmless to send (unrecognized fields are dropped, not rejected).
+                if (latitude != null && longitude != null) {
+                    payload.latitude = latitude.toFixed(6);
+                    payload.longitude = longitude.toFixed(6);
+                }
             }
             if ((deliveryMode === 'online' || deliveryMode === 'hybrid') && meetingLink.trim()) {
                 payload.meeting_link = meetingLink.trim();
@@ -345,13 +356,15 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block">
                         <MapPin size={12} className="inline mr-1" /> Program Location
                     </label>
+
+                    <LocationPicker
+                        initialLatitude={latitude}
+                        initialLongitude={longitude}
+                        initialAddress={address}
+                        onSelect={handleLocationPicked}
+                    />
+
                     <textarea className="tlb-input w-full min-h-[70px] resize-y" placeholder="Street, building, landmark" value={address} onChange={(e) => setAddress(e.target.value)} />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <Select value={stateName} onChange={(v: string) => { setStateName(v); setCity(''); }} options={INDIAN_STATES.map(s => ({ value: s, label: s }))} placeholder="State" />
-                        <Select value={city} onChange={setCity} options={getCitiesForState(stateName).map(c => ({ value: c, label: c }))} placeholder="City" disabled={!stateName} />
-                        <input className="tlb-input w-full" placeholder="District" maxLength={100} value={district} onChange={(e) => setDistrict(e.target.value)} />
-                        <input className="tlb-input w-full" placeholder="Pincode" inputMode="numeric" maxLength={6} value={pincode} onChange={(e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))} />
-                    </div>
                 </div>
             )}
 

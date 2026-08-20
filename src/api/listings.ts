@@ -881,6 +881,28 @@ export const deleteVenueFaq = async (listingId: string, faqId: number) => {
     return response.status === 204 ? {} : response.json().catch(() => ({}));
 };
 
+// ─── Class FAQs ─────────────────────────────────────────────────────────────
+export const getClassFaqs = async (listingId: string) => {
+    const response = await apiClient(`/api/v1/partner/listings/classes/${listingId}/faqs/`);
+    if (!response.ok) await handleError(response, 'Failed to load class FAQs');
+    return response.json();
+};
+export const createClassFaq = async (listingId: string, data: { question: string; answer: string; sort_order?: number }) => {
+    const response = await apiClient(`/api/v1/partner/listings/classes/${listingId}/faqs/`, { method: 'POST', body: JSON.stringify(data) });
+    if (!response.ok) await handleError(response, 'Failed to create class FAQ');
+    return response.json();
+};
+export const updateClassFaq = async (listingId: string, faqId: number, data: { question: string; answer: string; sort_order?: number }) => {
+    const response = await apiClient(`/api/v1/partner/listings/classes/${listingId}/faqs/${faqId}/`, { method: 'PUT', body: JSON.stringify(data) });
+    if (!response.ok) await handleError(response, 'Failed to update class FAQ');
+    return response.json();
+};
+export const deleteClassFaq = async (listingId: string, faqId: number) => {
+    const response = await apiClient(`/api/v1/partner/listings/classes/${listingId}/faqs/${faqId}/`, { method: 'DELETE' });
+    if (!response.ok) await handleError(response, 'Failed to delete class FAQ');
+    return response.status === 204 ? {} : response.json().catch(() => ({}));
+};
+
 // ─── Terms & Conditions (generic — works for all listing types) ─────────────
 export const getListingTerms = async (listingId: string) => {
     const response = await apiClient(`/api/v1/partner/listings/${listingId}/terms/`);
@@ -923,12 +945,9 @@ export const deleteListingFaqDoc = async (listingId: string) => {
 };
 
 // ─── Per-FAQ Documents ──────────────────────────────────────────────────────
-// Live for Venues today. The URL shape mirrors the per-entity FAQ CRUD above
-// (`/listings/<entity>/<id>/faqs/<faqId>/`) — if the backend ships the same
-// sub-resource for Events/Programs, passing that entity key here is enough
-// to wire it up. Classes have no per-FAQ id (inline `faqs[]` array on the
-// listing PATCH), so this cannot apply to Classes until that changes.
-export type FaqDocumentEntity = 'venues' | 'events' | 'programs';
+// Live for Venues, Events, Programs, and Classes. The URL shape mirrors the
+// per-entity FAQ CRUD above (`/listings/<entity>/<id>/faqs/<faqId>/`).
+export type FaqDocumentEntity = 'venues' | 'events' | 'programs' | 'classes';
 
 export interface FaqDocument {
     id: number;

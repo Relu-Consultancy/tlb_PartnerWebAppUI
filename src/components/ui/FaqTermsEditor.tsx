@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Trash2, Loader2, HelpCircle, FileText, Save, Check, X, Upload, Paperclip } from 'lucide-react';
+import { Plus, Trash2, Loader2, HelpCircle, FileText, Save, X, Upload, Paperclip } from 'lucide-react';
 import {
     getListingTerms, setListingTerms, deleteListingTerms, getListingFaqDoc, setListingFaqDoc, deleteListingFaqDoc,
-    uploadFaqDocument, deleteFaqDocument,
+    uploadFaqDocument, deleteFaqDocument, bulkSaveFaqs,
     FaqDocument, FaqDocumentEntity, FAQ_DOCUMENT_ACCEPTED_EXTENSIONS, FAQ_DOCUMENT_MAX_BYTES, FAQ_DOCUMENT_MAX_COUNT,
 } from '../../api/listings';
 import { toast } from './Toast';
@@ -14,7 +14,7 @@ export interface FaqApi {
     remove: (listingId: string, faqId: number) => Promise<any>;
 }
 
-interface FaqRow { id?: number; question: string; answer: string; saving?: boolean; documents?: FaqDocument[]; uploadingDoc?: boolean; }
+interface FaqRow { id?: number; question: string; answer: string; documents?: FaqDocument[]; uploadingDoc?: boolean; }
 
 interface Props {
     listingId: string;
@@ -22,10 +22,11 @@ interface Props {
     /** Accent colour matching the wizard theme. */
     accent?: 'blue' | 'amber' | 'emerald' | 'purple';
     /**
-     * Enables per-FAQ document attachments (price list, floor plan, etc.) — up to
-     * FAQ_DOCUMENT_MAX_COUNT files per FAQ. Only pass this for entities whose backend
-     * actually exposes `/listings/<entity>/<id>/faqs/<faqId>/documents/`; live for
-     * Venues today. Omit to leave a listing type unaffected.
+     * The listing type this FAQ list belongs to. Drives two things: the bulk
+     * PUT .../faqs/bulk/ call the single "Save FAQs" button uses (without this,
+     * saving is disabled), and per-FAQ document attachments (up to
+     * FAQ_DOCUMENT_MAX_COUNT files per FAQ). Live for all four listing types —
+     * every current caller passes this; treat it as required in practice.
      */
     faqDocumentsEntity?: FaqDocumentEntity;
 }
@@ -63,6 +64,8 @@ export const FaqTermsEditor: React.FC<Props> = ({ listingId, faqApi, accent = 'b
 
     const [faqs, setFaqs] = useState<FaqRow[]>([]);
     const [loadingFaqs, setLoadingFaqs] = useState(true);
+    const [savingFaqs, setSavingFaqs] = useState(false);
+    const [confirmBulkSave, setConfirmBulkSave] = useState(false);
 
     const [termsContent, setTermsContent] = useState('');
     const [termsDocUrl, setTermsDocUrl] = useState<string | null>(null);
@@ -118,36 +121,39 @@ export const FaqTermsEditor: React.FC<Props> = ({ listingId, faqApi, accent = 'b
 
     const addFaq = () => setFaqs(prev => [...prev, { question: '', answer: '' }]);
 
-    const saveFaq = async (idx: number) => {
-        const f = faqs[idx];
-        if (!f.question.trim() || !f.answer.trim()) { toast.warning('Both question and answer are required.'); return; }
-        setRow(idx, { saving: true });
-        try {
-            const payload = { question: f.question.trim(), answer: f.answer.trim(), sort_order: idx };
-            if (f.id) {
-                const res = await faqApi.update(listingId, f.id, payload);
-                const updated = res?.data ?? res;
-                if (Array.isArray(updated?.documents)) setRow(idx, { documents: updated.documents });
-            } else {
-                const res = await faqApi.create(listingId, payload);
-                const created = res?.data ?? res;
-                if (created?.id) setRow(idx, { id: created.id, documents: Array.isArray(created.documents) ? created.documents : [] });
-            }
-            toast.success('FAQ saved.');
-        } catch (e: any) {
-            toast.error(e?.message || 'Failed to save FAQ.');
-        } finally {
-            setRow(idx, { saving: false });
-        }
+    // Any FAQ carrying documents today means saving again will wipe them —
+    // the bulk endpoint drops and recreates every row (even unchanged ones),
+    // which deletes their attached documents along with them.
+    const anyDocsAttached = faqs.some(f => (f.documents?.length || 0) > 0);
+
+    const removeFaq = (idx: number) => {
+        // Deletion is deferred to the next Save — the bulk endpoint is
+        // replace-all, so a row simply missing from the array is removed.
+        setFaqs(prev => prev.filter((_, i) => i !== idx));
     };
 
-    const removeFaq = async (idx: number) => {
-        const f = faqs[idx];
-        if (f.id) {
-            try { await faqApi.remove(listingId, f.id); }
-            catch (e: any) { toast.error(e?.message || 'Failed to delete FAQ.'); return; }
+    const saveAllFaqs = async (skipConfirm = false) => {
+        if (!faqDocumentsEntity) return; // bulk save requires a known entity
+        const incomplete = faqs.some(f => (f.question.trim() && !f.answer.trim()) || (!f.question.trim() && f.answer.trim()));
+        if (incomplete) { toast.warning('Complete or remove any FAQ that only has a question or only an answer.'); return; }
+        const rows = faqs.filter(f => f.question.trim() && f.answer.trim());
+
+        if (!skipConfirm && anyDocsAttached) { setConfirmBulkSave(true); return; }
+        setConfirmBulkSave(false);
+
+        setSavingFaqs(true);
+        try {
+            const payload = rows.map((f, i) => ({ question: f.question.trim(), answer: f.answer.trim(), sort_order: i }));
+            const res = await bulkSaveFaqs(faqDocumentsEntity, listingId, payload);
+            const data = res?.data ?? res;
+            const arr = Array.isArray(data) ? data : (data?.results ?? []);
+            setFaqs(arr.map((f: any) => ({ id: f.id, question: f.question || '', answer: f.answer || '', documents: Array.isArray(f.documents) ? f.documents : [] })));
+            toast.success('FAQs saved.');
+        } catch (e: any) {
+            toast.error(e?.message || 'Failed to save FAQs.');
+        } finally {
+            setSavingFaqs(false);
         }
-        setFaqs(prev => prev.filter((_, i) => i !== idx));
     };
 
     // ── Per-FAQ document handlers (only active when `faqDocumentsEntity` is passed) ──
@@ -309,21 +315,10 @@ export const FaqTermsEditor: React.FC<Props> = ({ listingId, faqApi, accent = 'b
                                     value={f.answer}
                                     onChange={e => setRow(idx, { answer: e.target.value })}
                                 />
-                                <div className="flex justify-end">
-                                    <button
-                                        onClick={() => saveFaq(idx)}
-                                        disabled={f.saving}
-                                        className={`inline-flex items-center gap-1.5 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition-colors disabled:opacity-50 ${a.btn}`}
-                                    >
-                                        {f.saving ? <Loader2 size={13} className="animate-spin" /> : f.id ? <Check size={13} /> : <Save size={13} />}
-                                        {f.id ? 'Update' : 'Save'}
-                                    </button>
-                                </div>
-
                                 {faqDocumentsEntity && (
                                     <div className="pt-2.5 border-t border-gray-200/70">
                                         {!f.id ? (
-                                            <p className="text-[11px] text-gray-400">Save this FAQ to attach documents.</p>
+                                            <p className="text-[11px] text-gray-400">Save your FAQs below to attach documents to this one.</p>
                                         ) : (
                                             <div className="space-y-2">
                                                 {(f.documents || []).length > 0 && (
@@ -379,6 +374,50 @@ export const FaqTermsEditor: React.FC<Props> = ({ listingId, faqApi, accent = 'b
                         >
                             <Plus size={16} /> Add FAQ
                         </button>
+
+                        {faqs.length > 0 && faqDocumentsEntity && (
+                            <>
+                                {anyDocsAttached && !confirmBulkSave && (
+                                    <p className="text-[11px] text-amber-600 bg-amber-50 border border-amber-100 rounded-xl px-3.5 py-2.5">
+                                        Saving replaces every FAQ, which removes the documents currently attached to
+                                        them — even ones you didn't change. Re-attach after saving if needed.
+                                    </p>
+                                )}
+                                {confirmBulkSave && (
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-red-50 border border-red-100 rounded-xl px-3.5 py-3">
+                                        <p className="text-xs font-bold text-red-700 flex-1">
+                                            This will remove the documents attached to your FAQs. Continue?
+                                        </p>
+                                        <div className="flex gap-2 shrink-0">
+                                            <button
+                                                onClick={() => setConfirmBulkSave(false)}
+                                                className="text-xs font-bold text-gray-500 hover:text-gray-700 px-3 py-2"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={() => saveAllFaqs(true)}
+                                                disabled={savingFaqs}
+                                                className="inline-flex items-center gap-1.5 text-white text-xs font-bold px-3.5 py-2 rounded-xl bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-50"
+                                            >
+                                                {savingFaqs ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                                                Save anyway
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                                <div className="flex justify-end">
+                                    <button
+                                        onClick={() => saveAllFaqs()}
+                                        disabled={savingFaqs}
+                                        className={`inline-flex items-center gap-1.5 text-white text-sm font-bold px-4 py-2.5 rounded-xl transition-colors disabled:opacity-50 ${a.btn}`}
+                                    >
+                                        {savingFaqs ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+                                        Save FAQs
+                                    </button>
+                                </div>
+                            </>
+                        )}
                         
                         {/* FAQ Document Upload */}
                         <div className="pt-4 border-t border-gray-100 mt-6">

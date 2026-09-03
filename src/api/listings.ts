@@ -999,6 +999,26 @@ export const deleteFaqDocument = async (
     if (!response.ok) await handleError(response, 'Failed to delete FAQ document');
 };
 
+// ─── Bulk FAQ save (replace-all) ──────────────────────────────────────────
+// One PUT for a "build the list, then Save" form. The array sent becomes the
+// complete FAQ list — anything not included is deleted, and every FAQ (even
+// ones whose text is unchanged) is dropped and recreated with a new id, which
+// also deletes any documents attached to it. Prefer this for the main FAQ
+// editor's single Save action; use the per-FAQ CRUD above only for inline
+// edit/delete of one row without touching the others.
+export const bulkSaveFaqs = async (
+    entity: FaqDocumentEntity,
+    listingId: string,
+    faqs: { question: string; answer: string; sort_order?: number }[],
+): Promise<any> => {
+    const response = await apiClient(`/api/v1/partner/listings/${entity}/${listingId}/faqs/bulk/`, {
+        method: 'PUT',
+        body: JSON.stringify({ faqs }),
+    });
+    if (!response.ok) await handleError(response, 'Failed to save FAQs');
+    return response.json();
+};
+
 // ─── Program Media ─────────────────────────────────────────────────────────
 
 export const getProgramMedia = async (listingId: string) => {

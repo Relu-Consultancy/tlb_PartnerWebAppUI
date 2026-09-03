@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, MapPin, Check, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation, toast, LocationPicker } from '../../components/ui';
+import { WizardLayout, WizardNavigation, toast, LocationPicker, LanguagePicker, validateLanguages } from '../../components/ui';
 import { PickedLocation } from '../../components/ui/LocationPicker';
 import {
     getEventMetaCategories,
@@ -55,6 +55,11 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
     const [city, setCity] = useState('');
     const [address, setAddress] = useState('');
     const [meetingLink, setMeetingLink] = useState('');
+
+    // Languages this listing is conducted in — [] means "not specified yet".
+    const [languages, setLanguages] = useState<string[]>([]);
+    const [otherLanguage, setOtherLanguage] = useState('');
+    const [langError, setLangError] = useState('');
 
     // Google Maps location picker — area/coordinates/place_id aren't shown as
     // separate inputs; they ride along with the address/city fields above.
@@ -128,6 +133,8 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
                     setLatitude(d.latitude != null ? Number(d.latitude) : null);
                     setLongitude(d.longitude != null ? Number(d.longitude) : null);
                     setMeetingLink(d.meeting_link || '');
+                    setLanguages(Array.isArray(d.languages) ? d.languages : []);
+                    setOtherLanguage(d.other_language || '');
                 } catch (err) {
                     console.warn('Could not load existing draft', err);
                 } finally {
@@ -159,6 +166,9 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
             toast.warning('Please enter an event title.');
             return;
         }
+        const langErr = validateLanguages(languages, otherLanguage);
+        if (langErr) { setLangError(langErr); toast.warning(langErr); return; }
+        setLangError('');
         setSaving(true);
         try {
             // 1. Create draft if none exists yet
@@ -205,6 +215,11 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
             }
             if (mode === 'online' || mode === 'hybrid') {
                 if (meetingLink) payload.meeting_link = meetingLink;
+            }
+
+            if (languages.length) {
+                payload.languages = languages;
+                if (languages.includes('other')) payload.other_language = otherLanguage.trim();
             }
 
             await updateListing(draftId, payload);
@@ -456,6 +471,14 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
                     />
                 </div>
             )}
+
+            <LanguagePicker
+                languages={languages}
+                otherLanguage={otherLanguage}
+                onChange={(l, o) => { setLanguages(l); setOtherLanguage(o); setLangError(''); }}
+                accent="blue"
+                error={langError}
+            />
 
             {/* Meeting link (online / hybrid) */}
             {(mode === 'online' || mode === 'hybrid') && (

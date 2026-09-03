@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, MapPin, Tag, Check, Loader2 } from 'lucide-react';
+import { ArrowRight, MapPin, Tag, Check, Loader2, MessageCircle, CalendarCheck } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation, Select, LocationPicker } from '../../components/ui';
+import { WizardLayout, WizardNavigation, Select, LocationPicker, LanguagePicker, validateLanguages } from '../../components/ui';
 import { PickedLocation } from '../../components/ui/LocationPicker';
 import {
     getCurrentProgramDraftId,
@@ -35,6 +35,11 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
     const [city, setCity] = useState('');
     const [address, setAddress] = useState('');
     const [meetingLink, setMeetingLink] = useState('');
+
+    // Languages this listing is conducted in — [] means "not specified yet".
+    const [languages, setLanguages] = useState<string[]>([]);
+    const [otherLanguage, setOtherLanguage] = useState('');
+    const [langError, setLangError] = useState('');
 
     // Google Maps location picker — Programs' PATCH endpoint isn't confirmed to
     // accept latitude/longitude yet, so these ride along best-effort; city and
@@ -114,6 +119,8 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                 if (d.latitude != null) setLatitude(Number(d.latitude));
                 if (d.longitude != null) setLongitude(Number(d.longitude));
                 setMeetingLink(d.meeting_link || '');
+                setLanguages(Array.isArray(d.languages) ? d.languages : []);
+                setOtherLanguage(d.other_language || '');
                 // Category & subcategory come as objects { id, name }
                 const catId = d.category?.id;
                 const subId = d.subcategory?.id;
@@ -146,6 +153,9 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
             setError('Please select a subcategory for the chosen category.');
             return;
         }
+        const langErr = validateLanguages(languages, otherLanguage);
+        if (langErr) { setLangError(langErr); setError(langErr); return; }
+        setLangError('');
         if (saving) return;
         setError('');
         setSaving(true);
@@ -198,6 +208,11 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                 payload.subcategory_id = selectedSubcategoryId;
             }
             if (selectedTagId != null) payload.tag_ids = [selectedTagId];
+
+            if (languages.length) {
+                payload.languages = languages;
+                if (languages.includes('other')) payload.other_language = otherLanguage.trim();
+            }
 
             await updateProgramListing(draftId!, payload);
             onNavigate('CREATE_PROGRAM_BATCH');
@@ -334,6 +349,52 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                 </div>
             </div>
 
+            {/* Booking Type */}
+            <div>
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">
+                    Booking Type <span className="text-red-400">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                    {([
+                        {
+                            value: 'enquiry',
+                            label: 'Enquiry',
+                            icon: <MessageCircle size={22} />,
+                            desc: 'Customers send an enquiry and you follow up to confirm.',
+                        },
+                        {
+                            value: 'direct_booking',
+                            label: 'Direct Booking',
+                            icon: <CalendarCheck size={22} />,
+                            desc: 'Customers book and pay online.',
+                        },
+                    ] as const).map((opt) => (
+                        <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setBookingType(opt.value)}
+                            className={`relative flex flex-col items-start gap-2 p-4 rounded-2xl border-2 text-left transition-all ${
+                                bookingType === opt.value
+                                    ? 'border-emerald-400 bg-emerald-50'
+                                    : 'border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm'
+                            }`}
+                        >
+                            {bookingType === opt.value && (
+                                <div className="absolute top-2.5 right-2.5 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center">
+                                    <Check size={11} className="text-white" />
+                                </div>
+                            )}
+                            <span className={bookingType === opt.value ? 'text-emerald-600' : 'text-gray-400'}>
+                                {opt.icon}
+                            </span>
+                            <span className="text-sm font-black text-gray-800 pr-6">{opt.label}</span>
+                            <span className="text-[11px] text-gray-400 leading-snug">{opt.desc}</span>
+                        </button>
+                    ))}
+                </div>
+                <p className="text-[11px] text-gray-400 mt-2">Enquiry programs collect leads you follow up on. Direct booking lets customers pay for a batch online.</p>
+            </div>
+
             {/* Capacity, Hours, Modules */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
@@ -367,6 +428,14 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                     <textarea className="tlb-input w-full min-h-[70px] resize-y" placeholder="Street, building, landmark" value={address} onChange={(e) => setAddress(e.target.value)} />
                 </div>
             )}
+
+            <LanguagePicker
+                languages={languages}
+                otherLanguage={otherLanguage}
+                onChange={(l, o) => { setLanguages(l); setOtherLanguage(o); setLangError(''); }}
+                accent="emerald"
+                error={langError}
+            />
 
             {/* Meeting Link (online / hybrid only) */}
             {(deliveryMode === 'online' || deliveryMode === 'hybrid') && (

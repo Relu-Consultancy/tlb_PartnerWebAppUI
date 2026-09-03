@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Rocket, Clock, Loader2, AlertCircle, CheckCircle2, ShieldCheck, GraduationCap } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation, AppListingPreview } from '../../components/ui';
+import { WizardLayout, WizardNavigation, AppListingPreview, formatLanguages } from '../../components/ui';
 import type { AppListingPreviewModel, PreviewFact } from '../../components/ui';
 import {
     getClassListingDetail,
@@ -195,6 +195,7 @@ export const CreateClassPreview: React.FC<Props> = ({ onNavigate }) => {
     const clsLoc = srv.location || listing?.location;
     const firstBatch = batches[0];
     const clsPrice = listing?.price ?? srv.price ?? listing?.fee ?? srv.fee;
+    const langLine = listing ? formatLanguages((listing.languages ? listing : srv).languages, (listing.languages ? listing : srv).other_language) : '';
     const previewModel: AppListingPreviewModel | null = listing ? {
         typeLabel: 'Class',
         title: listing.title || '',
@@ -207,6 +208,7 @@ export const CreateClassPreview: React.FC<Props> = ({ onNavigate }) => {
         description: listing.description || listing.short_description || '',
         aboutTitle: 'About Class',
         facts: [
+            langLine ? { icon: 'language', label: 'Language', value: langLine } : null,
             (minAge != null || maxAge != null) ? { icon: 'age', label: 'Age Group', value: `${minAge ?? '?'}–${maxAge ?? '?'} yrs` } : null,
             mode ? { icon: 'mode', label: 'Mode', value: titleCase(mode) } : null,
             batches.length ? { icon: 'schedule', label: 'Batches', value: `${batches.length} batch${batches.length > 1 ? 'es' : ''}` } : null,

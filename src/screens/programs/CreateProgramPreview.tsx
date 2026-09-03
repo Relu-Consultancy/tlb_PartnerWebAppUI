@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Rocket, Clock, Loader2, AlertCircle, CheckCircle2, ShieldCheck, BookOpen } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation, AppListingPreview } from '../../components/ui';
+import { WizardLayout, WizardNavigation, AppListingPreview, formatLanguages } from '../../components/ui';
 import type { AppListingPreviewModel, PreviewFact } from '../../components/ui';
 import {
     getProgramListingDetail,
@@ -195,6 +195,7 @@ export const CreateProgramPreview: React.FC<Props> = ({ onNavigate }) => {
     const pgLoc = program?.location;
     const firstPgBatch = batches[0];
     const pgPrice = program?.price ?? program?.fee;
+    const langLine = program ? formatLanguages(program.languages, program.other_language) : '';
     const previewModel: AppListingPreviewModel | null = program ? {
         typeLabel: 'Program',
         title: program.title || '',
@@ -207,6 +208,7 @@ export const CreateProgramPreview: React.FC<Props> = ({ onNavigate }) => {
         description: program.description || program.short_description || '',
         aboutTitle: 'About Program',
         facts: [
+            langLine ? { icon: 'language', label: 'Language', value: langLine } : null,
             (minAge != null || maxAge != null) ? { icon: 'age', label: 'Age Group', value: `${minAge ?? '?'}–${maxAge ?? '?'} yrs` } : null,
             programFormat ? { icon: 'format', label: 'Format', value: titleCase(programFormat) } : null,
             deliveryMode ? { icon: 'mode', label: 'Mode', value: titleCase(deliveryMode) } : null,

@@ -135,11 +135,11 @@ describe('CreateProgramIdentity — pre-fill from existing draft', () => {
 });
 
 describe('CreateProgramIdentity — booking type', () => {
-    it('does not expose a Direct Booking / Enquiry option in the UI', async () => {
+    it('exposes Enquiry / Direct Booking options in the UI', async () => {
         renderComponent();
         await waitFor(() => expect(screen.queryByText('Dance')).toBeInTheDocument(), { timeout: 3000 });
-        expect(screen.queryByText('Direct Booking')).not.toBeInTheDocument();
-        expect(screen.queryByText('Enquiry')).not.toBeInTheDocument();
+        expect(screen.getByText('Enquiry')).toBeInTheDocument();
+        expect(screen.getByText('Direct Booking')).toBeInTheDocument();
     });
 
     it('defaults booking_type to "enquiry" in the PATCH payload', async () => {

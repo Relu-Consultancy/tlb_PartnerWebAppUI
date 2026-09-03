@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowRight, MapPin, Check, Camera, Play, Image as ImageIcon, Trash2, Loader2, MessageCircle, CalendarCheck } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation, toast, Select, LocationPicker } from '../../components/ui';
+import { WizardLayout, WizardNavigation, toast, Select, LocationPicker, LanguagePicker, validateLanguages } from '../../components/ui';
 import { PickedLocation } from '../../components/ui/LocationPicker';
 import {
     getVenueMetaCategories,
@@ -60,6 +60,11 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
     const [address, setAddress] = useState('');
     const [latitude, setLatitude] = useState('');
     const [longitude, setLongitude] = useState('');
+
+    // Languages this listing is conducted in — [] means "not specified yet".
+    const [languages, setLanguages] = useState<string[]>([]);
+    const [otherLanguage, setOtherLanguage] = useState('');
+    const [langError, setLangError] = useState('');
 
     // Google Maps location picker — venues save plain city/address/lat/lng
     // (already-working fields above); no place_id shortcut for this entity yet.
@@ -125,6 +130,8 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
                     setLocationType(d.location_type || '');
                     setCity(d.city || '');
                     setAddress(d.address || '');
+                    setLanguages(Array.isArray(d.languages) ? d.languages : []);
+                    setOtherLanguage(d.other_language || '');
                     setLatitude(d.latitude != null ? String(d.latitude) : '');
                     setLongitude(d.longitude != null ? String(d.longitude) : '');
                     setMinAge(d.min_age != null ? String(d.min_age) : '');
@@ -239,6 +246,9 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
 
     const handleNext = async () => {
         if (!title.trim()) { toast.warning('Please enter a venue name.'); return; }
+        const langErr = validateLanguages(languages, otherLanguage);
+        if (langErr) { setLangError(langErr); toast.warning(langErr); return; }
+        setLangError('');
         setSaving(true);
         try {
             let id = draftId;
@@ -273,6 +283,11 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
             if (maxAge !== '') payload.max_age = parseInt(maxAge, 10);
             if (minCapacity !== '') payload.min_capacity = parseInt(minCapacity, 10);
             if (maxCapacity !== '') payload.max_capacity = parseInt(maxCapacity, 10);
+
+            if (languages.length) {
+                payload.languages = languages;
+                if (languages.includes('other')) payload.other_language = otherLanguage.trim();
+            }
 
             await updateVenueListing(id!, payload);
             onNavigate('CREATE_VENUE_OCCASIONS');
@@ -415,6 +430,14 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
                     />
                 </div>
             )}
+
+            <LanguagePicker
+                languages={languages}
+                otherLanguage={otherLanguage}
+                onChange={(l, o) => { setLanguages(l); setOtherLanguage(o); setLangError(''); }}
+                accent="amber"
+                error={langError}
+            />
 
             {/* Location Type */}
             <div>

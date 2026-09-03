@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Rocket, Clock, Loader2, AlertCircle, CheckCircle2, ShieldCheck, LockKeyhole } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation, AppListingPreview } from '../../components/ui';
+import { WizardLayout, WizardNavigation, AppListingPreview, formatLanguages } from '../../components/ui';
 import type { AppListingPreviewModel, PreviewFact } from '../../components/ui';
 import {
     getListingDetail,
@@ -274,6 +274,7 @@ export const CreateEventPreview: React.FC<Props> = ({ onNavigate }) => {
     const isOnline = event?.mode === 'online';
     const minTicket = event?.tickets && event.tickets.length
         ? Math.min(...event.tickets.map(t => Number(t.price) || 0)) : undefined;
+    const langLine = event ? formatLanguages(event.languages, event.other_language) : '';
     const previewModel: AppListingPreviewModel | null = event ? {
         typeLabel: 'Event',
         title: event.title || '',
@@ -286,6 +287,7 @@ export const CreateEventPreview: React.FC<Props> = ({ onNavigate }) => {
         description: event.description || '',
         aboutTitle: 'About Event',
         facts: [
+            langLine ? { icon: 'language', label: 'Language', value: langLine } : null,
             event.age_group ? { icon: 'age', label: 'Age Group', value: `${event.age_group.min_age}–${event.age_group.max_age} yrs` } : null,
             event.format ? { icon: 'format', label: 'Format', value: titleCase(event.format) } : null,
             event.mode ? { icon: 'mode', label: 'Mode', value: titleCase(event.mode) } : null,

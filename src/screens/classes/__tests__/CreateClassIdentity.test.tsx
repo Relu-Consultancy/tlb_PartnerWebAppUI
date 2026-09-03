@@ -132,11 +132,27 @@ describe('CreateClassIdentity — pre-fill from existing draft', () => {
 });
 
 describe('CreateClassIdentity — booking type', () => {
-    it('does not expose a Direct Booking / Enquiry option in the UI', async () => {
+    it('exposes Enquiry / Direct Booking options in the UI', async () => {
         renderComponent();
         await waitFor(() => screen.getByText(/identity & story/i));
-        expect(screen.queryByText('Direct Booking')).not.toBeInTheDocument();
-        expect(screen.queryByText('Enquiry')).not.toBeInTheDocument();
+        expect(screen.getByText('Enquiry')).toBeInTheDocument();
+        expect(screen.getByText('Direct Booking')).toBeInTheDocument();
+    });
+
+    it('sends booking_type "direct_booking" when that option is chosen', async () => {
+        let patchBody: any = null;
+        server.use(http.patch(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/`, async ({ request }) => {
+            patchBody = await request.json();
+            return HttpResponse.json({ success: true, data: mockClassDraft });
+        }));
+        sessionStorage.setItem('current_class_draft_id', CLASS_DRAFT_ID);
+        renderComponent();
+        const user = userEvent.setup();
+        await waitFor(() => screen.getByPlaceholderText(/advanced robotics workshop/i));
+        await user.type(screen.getByPlaceholderText(/advanced robotics workshop/i), 'My Class');
+        await user.click(screen.getByText('Direct Booking'));
+        await user.click(screen.getByRole('button', { name: /next|continue/i }));
+        await waitFor(() => expect(patchBody?.booking_type).toBe('direct_booking'));
     });
 
     it('defaults booking_type to "enquiry" in the PATCH payload', async () => {

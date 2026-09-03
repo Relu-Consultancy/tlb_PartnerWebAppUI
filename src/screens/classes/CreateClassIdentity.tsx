@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, MapPin, Tag, Check, Loader2 } from 'lucide-react';
+import { ArrowRight, MapPin, Tag, Check, Loader2, MessageCircle, CalendarCheck } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation, LocationPicker } from '../../components/ui';
+import { WizardLayout, WizardNavigation, LocationPicker, LanguagePicker, validateLanguages } from '../../components/ui';
 import { PickedLocation } from '../../components/ui/LocationPicker';
 import {
     getCurrentClassDraftId,
@@ -31,6 +31,11 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
     const [city, setCity] = useState('');
     const [address, setAddress] = useState('');
     const [meetingLink, setMeetingLink] = useState('');
+
+    // Languages this listing is conducted in — [] means "not specified yet".
+    const [languages, setLanguages] = useState<string[]>([]);
+    const [otherLanguage, setOtherLanguage] = useState('');
+    const [langError, setLangError] = useState('');
 
     // Google Maps location picker — Classes' PATCH endpoint isn't confirmed to
     // accept latitude/longitude yet, so these ride along best-effort; city and
@@ -102,11 +107,13 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
                 if (rawLat != null) setLatitude(Number(rawLat));
                 if (rawLng != null) setLongitude(Number(rawLng));
                 setMeetingLink(srv.meeting_link || d.meeting_link || '');
+                setLanguages(Array.isArray(d.languages) ? d.languages : []);
+                setOtherLanguage(d.other_language || '');
                 const loadedPrice = srv.price ?? d.price;
                 if (loadedPrice != null) setPrice(String(loadedPrice));
                 const loadedMode = srv.mode || d.mode;
                 if (loadedMode) setMode(loadedMode);
-                const loadedBookingType = d.booking_type;
+                const loadedBookingType = srv.booking_type || d.booking_type;
                 if (loadedBookingType === 'enquiry' || loadedBookingType === 'direct_booking') setBookingType(loadedBookingType);
                 const loadedTag = srv.tags?.[0] || d.tags?.[0];
                 if (loadedTag) setTag(loadedTag);
@@ -136,6 +143,9 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
             setSaveError('Please select a subcategory for the chosen category.');
             return;
         }
+        const langErr = validateLanguages(languages, otherLanguage);
+        if (langErr) { setLangError(langErr); setSaveError(langErr); return; }
+        setLangError('');
         if (saving) return;
         setSaveError('');
         setSaving(true);
@@ -182,6 +192,11 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
                 payload.subcategory_id = selectedSubcategoryId; // always send alongside category to clear any stale subcategory on the backend
             } else if (selectedSubcategoryId != null) {
                 payload.subcategory_id = selectedSubcategoryId;
+            }
+
+            if (languages.length) {
+                payload.languages = languages;
+                if (languages.includes('other')) payload.other_language = otherLanguage.trim();
             }
 
             await updateClassListing(draftId!, payload);
@@ -291,6 +306,52 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
                 )}
             </div>
 
+            {/* Booking Type */}
+            <div>
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">
+                    Booking Type <span className="text-red-400">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                    {([
+                        {
+                            value: 'enquiry',
+                            label: 'Enquiry',
+                            icon: <MessageCircle size={22} />,
+                            desc: 'Customers send an enquiry and you follow up to confirm.',
+                        },
+                        {
+                            value: 'direct_booking',
+                            label: 'Direct Booking',
+                            icon: <CalendarCheck size={22} />,
+                            desc: 'Customers book and pay online.',
+                        },
+                    ] as const).map((opt) => (
+                        <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setBookingType(opt.value)}
+                            className={`relative flex flex-col items-start gap-2 p-4 rounded-2xl border-2 text-left transition-all ${
+                                bookingType === opt.value
+                                    ? 'border-tlb-yellow bg-tlb-yellow/10'
+                                    : 'border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm'
+                            }`}
+                        >
+                            {bookingType === opt.value && (
+                                <div className="absolute top-2.5 right-2.5 w-5 h-5 bg-tlb-yellow rounded-full flex items-center justify-center">
+                                    <Check size={11} className="text-white" />
+                                </div>
+                            )}
+                            <span className={bookingType === opt.value ? 'text-amber-600' : 'text-gray-400'}>
+                                {opt.icon}
+                            </span>
+                            <span className="text-sm font-black text-gray-800 pr-6">{opt.label}</span>
+                            <span className="text-[11px] text-gray-400 leading-snug">{opt.desc}</span>
+                        </button>
+                    ))}
+                </div>
+                <p className="text-[11px] text-gray-400 mt-2">Enquiry classes collect leads you follow up on. Direct booking lets customers pay for a batch online.</p>
+            </div>
+
             {/* Fees */}
             <div>
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Fees (₹)</label>
@@ -326,6 +387,14 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
                     />
                 </div>
             )}
+
+            <LanguagePicker
+                languages={languages}
+                otherLanguage={otherLanguage}
+                onChange={(l, o) => { setLanguages(l); setOtherLanguage(o); setLangError(''); }}
+                accent="yellow"
+                error={langError}
+            />
 
             {/* Meeting Link (online / hybrid only) */}
             {(mode === 'online' || mode === 'hybrid') && (

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Rocket, Clock, Loader2, AlertCircle, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation, AppListingPreview } from '../../components/ui';
+import { WizardLayout, WizardNavigation, AppListingPreview, formatLanguages } from '../../components/ui';
 import type { AppListingPreviewModel, PreviewFact } from '../../components/ui';
 import {
     getVenueListingDetail,
@@ -196,6 +196,7 @@ export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
 
     const minPkg = packages.length ? Math.min(...packages.map(p => Number(p.price) || 0)) : undefined;
     const firstSlot = slots[0];
+    const langLine = venue ? formatLanguages(venue.languages, venue.other_language) : '';
     const previewModel: AppListingPreviewModel | null = venue ? {
         typeLabel: 'Venue',
         title: venue.title || '',
@@ -208,6 +209,7 @@ export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
         description: venue.description || '',
         aboutTitle: 'About Venue',
         facts: [
+            langLine ? { icon: 'language', label: 'Language', value: langLine } : null,
             (venue.min_capacity != null || venue.max_capacity != null) ? {
                 icon: 'capacity', label: 'Capacity',
                 value: venue.min_capacity != null && venue.max_capacity != null

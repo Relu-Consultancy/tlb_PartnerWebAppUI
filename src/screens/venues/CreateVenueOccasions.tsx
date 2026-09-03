@@ -19,8 +19,8 @@ interface OccasionItem { id: number; name: string; slug: string }
 interface DiscoveryOption { value: string; label: string }
 
 const ATTENDEE_FIELD_OPTIONS: { key: string; label: string }[] = [
-    { key: 'child_name',           label: 'Child Name' },
-    { key: 'child_age',            label: 'Child Age' },
+    { key: 'child_name',           label: 'Contact Person Name' },
+    { key: 'child_age',            label: 'Age' },
     { key: 'contact_number',       label: 'Contact Number' },
     { key: 'email',                label: 'Email' },
     { key: 'guest_count',          label: 'Guest Count' },

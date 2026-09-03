@@ -181,9 +181,11 @@ const normalizeEnquiry = (item: any, entityType: EnquiryRow['entityType'], listi
     id: String(item.id ?? ''),
     listingId: listingId ?? pick(item.listing_id, item.class_id, item.venue_id, item.program_id, item.class, item.venue),
     entityType,
-    name: pick(item.student_name, item.contact_name, item.customer_name, item.name) || 'Unknown',
-    detail: pick(item.batch_name, item.occasion, item.parent_name && `Parent: ${item.parent_name}`, item.event_type),
-    contact: pick(item.mobile, item.contact_number, item.phone, item.email) || 'Hidden',
+    name: pick(item.attendee_name, item.student_name, item.contact_name, item.customer_name, item.name) || 'Unknown',
+    // Venue/Program/Class enquiries were trimmed to a single contact number;
+    // occasion/email only survive on pre-trim records the API still echoes.
+    detail: pick(item.batch_name, item.student_age != null ? `Age ${item.student_age}` : '', item.occasion, item.event_type),
+    contact: pick(item.mobile, item.contact_number, item.phone) || 'Hidden',
     status: pick(item.status) || 'new',
     createdAt: pick(item.created_at),
 });

@@ -22,7 +22,6 @@ interface Lead {
     isUnlocked: boolean;
     status: EnquiryStatus;
     message?: string;
-    area?: string;
     notes: string;
 }
 
@@ -88,7 +87,7 @@ export const Enquiries: React.FC<Props> = () => {
             const formattedData: Lead[] = raw.map((item: any) => ({
                 id: String(item.id),
                 classTitle: item.class_title || '',
-                studentName: item.student_name || 'Unknown Student',
+                studentName: item.attendee_name || item.student_name || 'Unknown Student',
                 parentName: item.parent_name || undefined,
                 batch: item.batch_name || `Batch ${item.batch || ''}`.trim() || 'General',
                 age: item.student_age != null ? String(item.student_age) : 'N/A',
@@ -97,7 +96,6 @@ export const Enquiries: React.FC<Props> = () => {
                 isUnlocked: !!item.is_contact_unlocked,
                 status: (item.status || 'new') as EnquiryStatus,
                 message: item.message || undefined,
-                area: item.area || undefined,
                 notes: item.internal_notes || '',
             }));
             setLeads(formattedData);
@@ -440,12 +438,6 @@ export const Enquiries: React.FC<Props> = () => {
                                     <p className="text-sm font-bold mt-0.5">{selectedLead.dateTime}</p>
                                 </div>
                             </div>
-                            {selectedLead.area && (
-                                <div className="bg-gray-50 rounded-xl px-4 py-3">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Area / Locality</p>
-                                    <p className="text-sm font-bold mt-0.5">{selectedLead.area}</p>
-                                </div>
-                            )}
                         </div>
 
                         {selectedLead.message && (

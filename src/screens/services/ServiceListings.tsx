@@ -6,7 +6,7 @@ import { Screen, EntityType } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
 import { EntityPickerSheet } from '../../components/EntityPickerSheet';
 import { Pagination } from '../../components/ui';
-import { getEventListings, getVenueListings, getClassListings, getProgramListings, setCurrentDraftId, clearCurrentDraftId, setCurrentVenueDraftId, clearCurrentVenueDraftId, setCurrentClassDraftId, clearCurrentClassDraftId, setCurrentProgramDraftId, clearCurrentProgramDraftId, pauseListing, resumeListing, archiveListing, unarchiveListing, updateListing, updateVenueListing, updateClassListing, updateProgramListing } from '../../api/listings';
+import { getEventListings, getVenueListings, getClassListings, getProgramListings, setCurrentDraftId, clearCurrentDraftId, setCurrentVenueDraftId, clearCurrentVenueDraftId, setCurrentClassDraftId, clearCurrentClassDraftId, setCurrentProgramDraftId, clearCurrentProgramDraftId, pauseListing, resumeListing, archiveListing, unarchiveListing, updateListing, updateVenueListing, updateClassListing, updateProgramListing, setClassListingLive } from '../../api/listings';
 import { getCoupons, CouponListItem } from '../../api/coupons';
 
 interface Props {
@@ -276,11 +276,16 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
                         createdAt: item.created_at || item.created || undefined,
                         // Pause/Live state comes from `is_paused` (the flag the
                         // pause/resume endpoints actually toggle). `is_live` is a
-                        // separate, unmaintained field and must NOT be used here —
-                        // reading it made resumed listings snap back to "Paused"
-                        // on refetch. Fall back to legacy is_live only if is_paused
-                        // is absent for some entity type.
-                        isLive: item.is_paused != null ? !item.is_paused : (item.is_live !== false),
+                        // separate, unmaintained field for Events/Venues/Programs and
+                        // must NOT be used for them — reading it made resumed listings
+                        // snap back to "Paused" on refetch. Classes are the exception:
+                        // ClassService.is_live is real and admin-editable independently
+                        // of Listing.is_paused (confirmed via Django admin), and the
+                        // portal's own pause/resume writes both together — so a class
+                        // only counts as live when neither flag says otherwise.
+                        isLive: entityType === 'Classes'
+                            ? item.is_live !== false && item.is_paused !== true
+                            : (item.is_paused != null ? !item.is_paused : (item.is_live !== false)),
                         coupon: item.coupon || null,
                     }));
                     setListings(normalized);
@@ -333,16 +338,25 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate, onOpenSidebar }) 
         }
     };
 
-    // The backend exposes only the generic, entity-agnostic action routes
-    // (/api/v1/partner/listings/{id}/pause|resume|archive|unarchive/). The old
-    // entity-specific routes (/classes/.../live/, /programs/.../archive/) 404, so
-    // all entity types use the generic endpoints here.
+    // Pause/resume goes through the generic, entity-agnostic action routes
+    // (/api/v1/partner/listings/{id}/pause|resume/), which toggle Listing.is_paused.
+    //
+    // Classes are the exception: their payload carries no `is_paused`, so the
+    // read mapping above falls back to `is_live` — a field that lives on
+    // ClassService and which the generic route does not touch. Writing only via
+    // the generic route left the toggle flipping optimistically and then
+    // reverting on the next refetch, so classes also post to their own
+    // /classes/{id}/live/ route to move the field actually being read.
     const handleTogglePause = async (listing: Listing) => {
+        const isPaused = listing.isLive === false;
+        const nextLive = isPaused; // resuming makes it live again
         try {
-            const isPaused = listing.isLive === false;
             if (isPaused) await resumeListing(listing.id);
             else await pauseListing(listing.id);
-            setListings(prev => prev.map(l => l.id === listing.id ? { ...l, isLive: isPaused } : l));
+            if (listing.entityType === 'Classes') {
+                await setClassListingLive(listing.id, nextLive);
+            }
+            setListings(prev => prev.map(l => l.id === listing.id ? { ...l, isLive: nextLive } : l));
         } catch (err: any) {
             toast.error(err.message || 'Failed to update listing status');
         }

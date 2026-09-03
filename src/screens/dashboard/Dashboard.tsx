@@ -261,8 +261,12 @@ export const Home: React.FC<HomeProps> = ({ onNavigate, onOpenSidebar }) => {
       const reviewed: ReviewedListing[] = [];
       for (const { it, type } of items) {
         const status = it?.status || 'draft';
-        // Pause/Live state comes from `is_paused` (see My Listings note); `is_live` is a legacy fallback.
-        const isLive = it?.is_paused != null ? !it.is_paused : (it?.is_live !== false);
+        // Pause/Live state — see the My Listings note. Classes are the one
+        // exception where `is_live` is real and admin-editable independently of
+        // `is_paused`, so both must agree for a class to count as live.
+        const isLive = type === 'Classes'
+            ? it?.is_live !== false && it?.is_paused !== true
+            : (it?.is_paused != null ? !it.is_paused : (it?.is_live !== false));
         if (status === 'published') { isLive ? c.live++ : c.paused++; }
         else if (status === 'pending') c.pending++;
         else if (status === 'archived') c.archived++;

@@ -1067,6 +1067,30 @@ export const getBookings = async (params?: { status?: string; listing_id?: strin
     return response.json();
 };
 
+/** Follows `getBookings` pagination for one filter set (bounded to `maxPages`). */
+const fetchAllBookingPages = async (
+    params: { status?: string; listing_id?: string },
+    maxPages: number,
+): Promise<any[]> => {
+    const all: any[] = [];
+    for (let page = 1; page <= maxPages; page++) {
+        const json = await getBookings({ ...params, page });
+        const data = json?.data ?? json;
+        const rows: any[] = Array.isArray(data) ? data : (data?.results ?? []);
+        all.push(...rows);
+        if (!(json?.next ?? data?.next) || rows.length === 0) break;
+    }
+    return all;
+};
+
+/** Every booking for one listing, following pagination (bounded to `maxPages`). */
+export const getAllListingBookings = async (listingId: string, maxPages = 20): Promise<any[]> =>
+    fetchAllBookingPages({ listing_id: listingId }, maxPages);
+
+/** Every booking across the partner's listings, following pagination (bounded to `maxPages`). */
+export const getAllBookings = async (maxPages = 30): Promise<any[]> =>
+    fetchAllBookingPages({}, maxPages);
+
 export const getBookingDetail = async (bookingId: string) => {
     const response = await apiClient(`/api/v1/partner/bookings/${bookingId}/`);
     if (!response.ok) await handleError(response, 'Failed to load booking detail');

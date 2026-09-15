@@ -228,6 +228,21 @@ export const mockVenueDraft = {
     created_at: '2026-05-07T12:00:00Z',
 };
 
+// ─── Bank details fixture (Revenue & payouts screen) ───────────────────────────
+
+export const mockBankDetails = {
+    account_holder_name: 'Aviraj Studio',
+    bank_name: 'HDFC Bank',
+    branch_name: 'Indiranagar',
+    account_number_masked: '••4412',
+    ifsc_code: 'HDFC0000123',
+    cancelled_cheque_url: '',
+    consent_given: true,
+    verification_status: 'verified',
+    verification_note: '',
+    updated_at: '2026-08-01T10:00:00Z',
+};
+
 // ─── Coupon fixtures ──────────────────────────────────────────────────────────
 
 export const mockCoupon = {
@@ -687,6 +702,10 @@ export const handlers = [
         const body = await request.json() as Record<string, unknown>;
         return HttpResponse.json({ success: true, data: { ...mockCoupon, id: params.id, ...body } });
     }),
+
+    // ─── Bank details (Revenue & payouts screen) ───
+    http.get(`${BASE}/api/v1/partner/bank-details/`, () =>
+        HttpResponse.json({ success: true, data: mockBankDetails })),
 
     // ─── Partner verticals (Services & categories self-service) ───
     http.get(`${BASE}/api/v1/partner/verticals/`, () =>

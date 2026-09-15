@@ -183,6 +183,13 @@ export const mockProgramListing = {
     created_at: '2026-05-07T12:00:00Z',
 };
 
+// ─── Partner verticals fixture (Services & categories self-service) ───────────
+
+export const mockVerticals = [
+    { id: 1, name: 'Events' },
+    { id: 2, name: 'Classes' },
+];
+
 // ─── Venue fixtures ───────────────────────────────────────────────────────────
 
 export const mockVenuePackages = [
@@ -605,4 +612,14 @@ export const handlers = [
         HttpResponse.json({ success: true, data: { partner_id: 1, follower_count: 87 } })),
     http.get(`${BASE}/api/v1/partner/:id/followers/`, () =>
         HttpResponse.json({ success: true, data: mockFollowers })),
+
+    // ─── Partner verticals (Services & categories self-service) ───
+    http.get(`${BASE}/api/v1/partner/verticals/`, () =>
+        HttpResponse.json({ success: true, data: mockVerticals })),
+    http.post(`${BASE}/api/v1/partner/verticals/`, async ({ request }) => {
+        const body = await request.json() as { category: string };
+        return HttpResponse.json({ success: true, data: { id: 99, name: body.category } });
+    }),
+    http.delete(`${BASE}/api/v1/partner/verticals/`, () =>
+        HttpResponse.json({ success: true, data: { message: 'removed' } })),
 ];

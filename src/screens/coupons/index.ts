@@ -1,2 +1,2 @@
 export { CreateCoupon } from './CreateCoupon';
-export { AllCoupons } from './AllCoupons';
+export { Coupons } from './Coupons';

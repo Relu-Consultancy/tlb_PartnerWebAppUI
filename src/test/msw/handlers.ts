@@ -228,6 +228,29 @@ export const mockVenueDraft = {
     created_at: '2026-05-07T12:00:00Z',
 };
 
+// ─── Coupon fixtures ──────────────────────────────────────────────────────────
+
+export const mockCoupon = {
+    id: 'coupon-1',
+    code: 'MONSOON20',
+    discount_type: 'percent',
+    discount_value: 20,
+    is_active: true,
+    usage_count: 28,
+    usage_limit: 100,
+    expires_at: '2099-08-31',
+    description: 'Monsoon weekday push',
+    max_discount: 400,
+    min_order_value: null,
+    per_user_limit: 1,
+    starts_at: '2020-08-01',
+    target_listings: [],
+    target_listing_types: [],
+    target_genders: [],
+    target_min_age: null,
+    target_max_age: null,
+};
+
 // ─── Statistics fixtures ──────────────────────────────────────────────────────
 
 export const mockStatsOverview = {
@@ -612,6 +635,22 @@ export const handlers = [
         HttpResponse.json({ success: true, data: { partner_id: 1, follower_count: 87 } })),
     http.get(`${BASE}/api/v1/partner/:id/followers/`, () =>
         HttpResponse.json({ success: true, data: mockFollowers })),
+
+    // ─── Coupons ───
+    http.get(`${BASE}/api/v1/partner/coupons/`, () =>
+        HttpResponse.json({ success: true, data: [] })),
+    http.get(`${BASE}/api/v1/partner/coupons/:id/`, ({ params }) =>
+        HttpResponse.json({ success: true, data: { ...mockCoupon, id: params.id } })),
+    http.get(`${BASE}/api/v1/partner/coupons/:id/usages/`, () =>
+        HttpResponse.json({ success: true, data: [] })),
+    http.post(`${BASE}/api/v1/partner/coupons/`, async ({ request }) => {
+        const body = await request.json() as Record<string, unknown>;
+        return HttpResponse.json({ success: true, data: { ...mockCoupon, id: 'new-coupon-id', ...body } }, { status: 201 });
+    }),
+    http.patch(`${BASE}/api/v1/partner/coupons/:id/`, async ({ request, params }) => {
+        const body = await request.json() as Record<string, unknown>;
+        return HttpResponse.json({ success: true, data: { ...mockCoupon, id: params.id, ...body } });
+    }),
 
     // ─── Partner verticals (Services & categories self-service) ───
     http.get(`${BASE}/api/v1/partner/verticals/`, () =>

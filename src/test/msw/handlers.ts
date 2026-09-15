@@ -378,6 +378,14 @@ export const mockFollowers = [
     { id: 'f2', user: { full_name: 'Diya Kapoor', city: 'Pune' }, followed_at: '2026-06-25T10:00:00Z' },
 ];
 
+// Flat shape the current `getFollowers()` (src/api/followers.ts) actually returns —
+// distinct from the nested `mockFollowers` shape above, which backs the older
+// id-scoped `/partner/:id/followers/` endpoint used elsewhere (e.g. profile previews).
+export const mockFollowersList = [
+    { user_id: 'u1', full_name: 'Aarav Mehta', city: 'Mumbai', gender: 'male', followed_at: '2026-06-20T10:00:00Z' },
+    { user_id: 'u2', full_name: 'Diya Kapoor', city: 'Pune', gender: 'female', followed_at: '2026-06-25T10:00:00Z' },
+];
+
 // ─── Default handlers ─────────────────────────────────────────────────────────
 
 export const handlers = [
@@ -693,6 +701,14 @@ export const handlers = [
         HttpResponse.json({ success: true, data: { partner_id: 1, follower_count: 87 } })),
     http.get(`${BASE}/api/v1/partner/:id/followers/`, () =>
         HttpResponse.json({ success: true, data: mockFollowers })),
+    // Self-scoped list the Followers screen itself calls (src/api/followers.ts).
+    http.get(`${BASE}/api/v1/partner/followers/`, ({ request }) => {
+        const search = new URL(request.url).searchParams.get('search')?.toLowerCase() || '';
+        const results = search
+            ? mockFollowersList.filter(f => f.full_name.toLowerCase().includes(search))
+            : mockFollowersList;
+        return HttpResponse.json({ success: true, data: { count: 87, page: 1, page_size: 20, next: null, previous: null, results } });
+    }),
 
     // ─── Coupons ───
     http.get(`${BASE}/api/v1/partner/coupons/`, () =>

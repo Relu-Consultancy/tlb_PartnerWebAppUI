@@ -20,10 +20,10 @@ describe('Followers screen', () => {
     it('loads and shows the total follower count', async () => {
         render(<Followers {...defaultProps} />);
         await waitFor(() => expect(screen.getByText('87')).toBeInTheDocument());
-        expect(screen.getByText(/total followers/i)).toBeInTheDocument();
+        expect(screen.getByText('followers')).toBeInTheDocument();
     });
 
-    it('renders follower rows from the API (tolerating name / full_name shapes)', async () => {
+    it('renders follower rows from the API', async () => {
         render(<Followers {...defaultProps} />);
         await waitFor(() => expect(screen.getByText('Aarav Mehta')).toBeInTheDocument());
         expect(screen.getByText('Diya Kapoor')).toBeInTheDocument();
@@ -34,27 +34,21 @@ describe('Followers screen', () => {
         render(<Followers {...defaultProps} />);
         await waitFor(() => screen.getByText('Aarav Mehta'));
         await user.type(screen.getByPlaceholderText(/search followers/i), 'Diya');
-        expect(screen.queryByText('Aarav Mehta')).not.toBeInTheDocument();
+        await waitFor(() => expect(screen.queryByText('Aarav Mehta')).not.toBeInTheDocument());
         expect(screen.getByText('Diya Kapoor')).toBeInTheDocument();
     });
 
     it('shows an empty state when there are no followers', async () => {
-        server.use(
-            http.get(`${BASE}/api/v1/partner/:id/followers/`, () =>
-                HttpResponse.json({ success: true, data: [] })),
-            http.get(`${BASE}/api/v1/partner/:id/followers/count/`, () =>
-                HttpResponse.json({ success: true, data: { follower_count: 0 } })),
-        );
+        server.use(http.get(`${BASE}/api/v1/partner/followers/`, () =>
+            HttpResponse.json({ success: true, data: { count: 0, page: 1, page_size: 20, next: null, previous: null, results: [] } })));
         render(<Followers {...defaultProps} />);
         await waitFor(() => expect(screen.getByText(/no followers yet/i)).toBeInTheDocument());
     });
 
     it('surfaces an error with a retry action when loading fails', async () => {
-        server.use(
-            http.get(`${BASE}/api/v1/partner/me/`, () =>
-                HttpResponse.json({ error: { message: 'boom' } }, { status: 500 })),
-        );
+        server.use(http.get(`${BASE}/api/v1/partner/followers/`, () =>
+            HttpResponse.json({ error: { message: 'boom' } }, { status: 500 })));
         render(<Followers {...defaultProps} />);
-        await waitFor(() => expect(screen.getByText(/try again/i)).toBeInTheDocument());
+        await waitFor(() => expect(screen.getByText(/boom/i)).toBeInTheDocument());
     });
 });

@@ -317,6 +317,38 @@ export const mockStatsEnquiries = {
     ],
 };
 
+export const mockStatsRevenue = {
+    period: '30d',
+    gross_revenue: '124600.00',
+    platform_fees: '18690.00',
+    refunds: '2000.00',
+    net_earnings: '105910.00',
+    confirmed_bookings: 57,
+    avg_order_value: '2186.00',
+    this_month: '124600.00',
+    prev_month: '98900.00',
+    revenue_growth_pct: 26,
+    revenue_by_type: [
+        { type: 'event', amount: '47300.00', count: 28 },
+        { type: 'class', amount: '36150.00', count: 14 },
+        { type: 'venue', amount: '26200.00', count: 9 },
+    ],
+    revenue_trend: [
+        { month: 'Jun 2026', year: 2026, count: 40, earnings: '98900.00' },
+        { month: 'Jul 2026', year: 2026, count: 57, earnings: '124600.00' },
+    ],
+};
+
+export const mockStatsReviews = {
+    avg_rating: 4.6,
+    total_reviews: 46,
+    reviews_this_month: 5,
+    reviews_prev_month: 3,
+    rating_distribution: [{ rating: 5, count: 30 }, { rating: 4, count: 10 }],
+    avg_rating_trend: [{ month: 'Jul 2026', avg_rating: 4.6, count: 5 }],
+    recent_reviews: [],
+};
+
 // ─── Followers fixtures ───────────────────────────────────────────────────────
 
 export const mockFollowers = [
@@ -627,6 +659,10 @@ export const handlers = [
         HttpResponse.json({ success: true, data: mockStatsVenues })),
     http.get(`${BASE}/api/v1/partner/stats/enquiries/`, () =>
         HttpResponse.json({ success: true, data: mockStatsEnquiries })),
+    http.get(`${BASE}/api/v1/partner/stats/revenue/`, () =>
+        HttpResponse.json({ success: true, data: mockStatsRevenue })),
+    http.get(`${BASE}/api/v1/partner/stats/reviews/`, () =>
+        HttpResponse.json({ success: true, data: mockStatsReviews })),
     http.post(`${BASE}/api/v1/partner/:id/track-view/`, () =>
         HttpResponse.json({ success: true, data: { message: 'tracked' } })),
 

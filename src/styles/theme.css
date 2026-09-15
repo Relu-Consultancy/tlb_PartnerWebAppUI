@@ -2,4 +2,39 @@
     --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
     --color-tlb-yellow: #FACC15;
     --color-tlb-dark: #141414;
+
+    /* Partner portal palette — from the client mocks (TLB Partner - *.html).
+       Warm neutral chrome, white cards, amber accent. */
+    --color-tlb-canvas: #FBF9F5;       /* page ground */
+    --color-tlb-chrome: #FDFBF7;       /* sidebar + top bar */
+    --color-tlb-line: #EDE9E1;         /* card + chrome borders */
+    --color-tlb-divider: #F2EFE8;      /* rows inside cards */
+    --color-tlb-edge: #E2DED5;         /* form fields, outline buttons */
+    --color-tlb-hover: #F4F1EA;        /* hover wash, neutral chips */
+    --color-tlb-wash: #F7F4ED;         /* notes, locked fields */
+    --color-tlb-highlight: #FFFDF6;    /* hovered action rows */
+    --color-tlb-amber: #F5B301;        /* primary CTA + money figures */
+    --color-tlb-amber-deep: #DFA100;
+    --color-tlb-amber-soft: #FDF0CE;
+    --color-tlb-amber-line: #F0DFA8;
+    --color-tlb-cream: #FDF7E3;
+    --color-tlb-cream-line: #F0E4BF;
+    --color-tlb-gold: #8A6D00;         /* text on amber-soft */
+    --color-tlb-link: #B8860B;
+    --color-tlb-ink: #1A1917;
+    --color-tlb-body: #3B3A36;
+    --color-tlb-sub: #6E6C66;
+    --color-tlb-muted: #8A8880;
+    --color-tlb-faint: #B5B2AA;
+    --color-tlb-red: #E23636;
+    --color-tlb-red-deep: #B22222;
+    --color-tlb-red-soft: #FDECEC;
+    --color-tlb-green: #2E9E5B;
+    --color-tlb-green-soft: #E7F6ED;
+    --color-tlb-blue: #3A63C9;
+    --color-tlb-blue-soft: #E8EEFB;
+    --color-tlb-purple: #7C3AED;
+    --color-tlb-purple-soft: #F3EAFB;
+
+    --shadow-pop: 0 12px 32px rgba(20, 19, 18, 0.13);
 }

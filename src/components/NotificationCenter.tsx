@@ -1,64 +1,48 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-    Bell, Ticket, IndianRupee, MessageSquare, Heart, ClipboardList, Megaphone,
-    CheckCheck, ArrowRight, Loader2,
+    Bell, Check, IndianRupee, MessageCircle, Heart, Layers, Megaphone,
+    Star, AlertCircle, ShieldCheck, Loader2,
 } from 'lucide-react';
 import { Screen } from '../types';
 import {
     getUnreadCount, listNotifications, markNotificationRead,
     markAllNotificationsRead, InAppNotification,
 } from '../api/notifications';
+import { useDismiss } from '../hooks/useDismiss';
+import { timeAgo } from '../utils/format';
+import { IconTile, Tone } from './portal';
 
 const POLL_MS = 60000;
-const PREVIEW_LIMIT = 5;
+const PREVIEW_LIMIT = 7;
 
 interface Props {
-    /** 'dark' for the navy sidebar, 'light' for white headers. */
-    variant?: 'dark' | 'light';
-    /** Navigates to the dedicated Messages screen (View all / individual item). */
+    /** Navigates to the dedicated Messages screen (See all / individual item). */
     onNavigate?: (screen: Screen) => void;
 }
 
-const TINT: Record<string, string> = {
-    emerald: 'bg-emerald-50 text-emerald-600',
-    blue: 'bg-blue-50 text-blue-600',
-    amber: 'bg-amber-50 text-amber-600',
-    rose: 'bg-rose-50 text-rose-600',
-    purple: 'bg-purple-50 text-purple-600',
-    gray: 'bg-gray-100 text-gray-500',
-};
-
-const metaFor = (type: string): { icon: React.ElementType; tint: string } => {
+const metaFor = (type: string): { icon: React.ElementType; tone: Tone } => {
     const t = (type || '').toLowerCase();
-    if (t.includes('booking')) return { icon: Ticket, tint: 'emerald' };
-    if (t.includes('payment') || t.includes('payout') || t.includes('refund')) return { icon: IndianRupee, tint: 'amber' };
-    if (t.includes('enquiry') || t.includes('lead')) return { icon: MessageSquare, tint: 'blue' };
-    if (t.includes('follower')) return { icon: Heart, tint: 'rose' };
-    if (t.includes('listing')) return { icon: ClipboardList, tint: 'purple' };
-    if (t === 'broadcast') return { icon: Megaphone, tint: 'blue' };
-    return { icon: Bell, tint: 'gray' };
+    if (t.includes('refund') || t.includes('cancel') || t.includes('failed')) return { icon: AlertCircle, tone: 'red' };
+    if (t.includes('booking')) return { icon: Check, tone: 'green' };
+    if (t.includes('payout') || t.includes('payment')) return { icon: IndianRupee, tone: 'blue' };
+    if (t.includes('enquiry') || t.includes('lead')) return { icon: MessageCircle, tone: 'red' };
+    if (t.includes('review') || t.includes('rating')) return { icon: Star, tone: 'amber' };
+    if (t.includes('listing')) return { icon: Layers, tone: 'amber' };
+    if (t.includes('follower')) return { icon: Heart, tone: 'purple' };
+    if (t === 'broadcast') return { icon: Megaphone, tone: 'amber' };
+    return { icon: ShieldCheck, tone: 'neutral' };
 };
 
-const timeAgo = (iso: string): string => {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return '';
-    const s = Math.floor((Date.now() - d.getTime()) / 1000);
-    if (s < 60) return 'just now';
-    const m = Math.floor(s / 60); if (m < 60) return `${m}m ago`;
-    const h = Math.floor(m / 60); if (h < 24) return `${h}h ago`;
-    const days = Math.floor(h / 24); if (days < 7) return `${days}d ago`;
-    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-};
-
-// Bell button + unread badge. Clicking opens a lightweight dropdown with the
-// latest notifications; "View all" jumps to the dedicated Messages screen.
-export const NotificationCenter: React.FC<Props> = ({ variant = 'dark', onNavigate }) => {
+// Bell button + unread badge. Opens a dropdown with the latest notifications;
+// "See all" jumps to the dedicated Messages screen.
+export const NotificationCenter: React.FC<Props> = ({ onNavigate }) => {
     const [unread, setUnread] = useState(0);
     const [open, setOpen] = useState(false);
     const [items, setItems] = useState<InAppNotification[] | null>(null);
     const [loading, setLoading] = useState(false);
     const rootRef = useRef<HTMLDivElement>(null);
+    useDismiss(rootRef, open, () => setOpen(false));
 
     const refreshUnread = useCallback(() => {
         getUnreadCount().then(setUnread).catch(() => { /* silent */ });
@@ -80,21 +64,6 @@ export const NotificationCenter: React.FC<Props> = ({ variant = 'dark', onNaviga
             .finally(() => setLoading(false));
     }, [open]);
 
-    // Close on outside click / Escape.
-    useEffect(() => {
-        if (!open) return;
-        const onDown = (e: MouseEvent) => {
-            if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
-        };
-        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
-        document.addEventListener('mousedown', onDown);
-        document.addEventListener('keydown', onKey);
-        return () => {
-            document.removeEventListener('mousedown', onDown);
-            document.removeEventListener('keydown', onKey);
-        };
-    }, [open]);
-
     const badge = unread > 99 ? '99+' : String(unread);
 
     const openItem = (n: InAppNotification) => {
@@ -114,19 +83,18 @@ export const NotificationCenter: React.FC<Props> = ({ variant = 'dark', onNaviga
     };
 
     return (
-        <div ref={rootRef} className="relative">
+        <div ref={rootRef} className="relative flex-none">
             <button
+                type="button"
                 onClick={() => setOpen(o => !o)}
-                className={`relative rounded-xl transition-colors ${
-                    variant === 'light'
-                        ? `p-2.5 text-gray-500 hover:bg-gray-50 ${open ? 'bg-gray-100 text-gray-900' : ''}`
-                        : `p-2 text-gray-300 hover:bg-white/10 hover:text-white ${open ? 'bg-white/10 text-white' : ''}`
-                }`}
+                aria-haspopup="dialog"
+                aria-expanded={open}
                 aria-label={`Notifications${unread ? ` (${unread} unread)` : ''}`}
+                className={`relative w-[38px] h-[38px] rounded-[10px] border border-tlb-line flex items-center justify-center text-tlb-ink transition-colors ${open ? 'bg-tlb-wash' : 'bg-white hover:bg-tlb-wash'}`}
             >
-                <Bell size={variant === 'light' ? 20 : 18} />
+                <Bell size={16} strokeWidth={2.75} />
                 {unread > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 bg-red-500 rounded-full text-[9px] font-black text-white flex items-center justify-center">
+                    <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-tlb-red text-white text-[10px] font-bold flex items-center justify-center">
                         {badge}
                     </span>
                 )}
@@ -135,74 +103,60 @@ export const NotificationCenter: React.FC<Props> = ({ variant = 'dark', onNaviga
             <AnimatePresence>
                 {open && (
                     <motion.div
-                        initial={{ opacity: 0, y: -6, scale: 0.98 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -6, scale: 0.98 }}
-                        transition={{ duration: 0.15 }}
-                        className="absolute right-0 mt-2 w-[360px] max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-2xl shadow-black/20 border border-gray-200 overflow-hidden z-50"
+                        role="dialog"
+                        aria-label="Notifications"
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -4 }}
+                        transition={{ duration: 0.12 }}
+                        className="pt-popover absolute right-0 top-12 z-50 w-[360px] max-w-[calc(100vw-2rem)] overflow-hidden"
                     >
-                        {/* Header */}
-                        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                            <div className="flex items-center gap-2">
-                                <p className="text-sm font-black text-gray-900">Notifications</p>
-                                {unread > 0 && (
-                                    <span className="min-w-[18px] h-[18px] px-1.5 bg-red-500 rounded-full text-[10px] font-black text-white flex items-center justify-center">{badge}</span>
-                                )}
-                            </div>
+                        <div className="flex items-center justify-between px-[17px] py-[13px] border-b border-tlb-divider">
+                            <span className="pt-h-sec">Notifications</span>
                             {unread > 0 && (
-                                <button onClick={markAll} className="flex items-center gap-1 text-[11px] font-bold text-gray-500 hover:text-gray-900 transition-colors">
-                                    <CheckCheck size={13} /> Mark all read
-                                </button>
+                                <button type="button" onClick={markAll} className="pt-link text-xs">Mark all read</button>
                             )}
                         </div>
 
-                        {/* List */}
-                        <div className="max-h-[380px] overflow-y-auto">
+                        <div className="max-h-[400px] overflow-y-auto px-[17px] pt-1 pb-2">
                             {loading && items === null ? (
-                                <div className="flex items-center justify-center py-10 text-gray-400">
+                                <div className="flex items-center justify-center py-10 text-tlb-muted">
                                     <Loader2 size={20} className="animate-spin" />
                                 </div>
                             ) : items && items.length > 0 ? (
                                 items.map(n => {
-                                    const m = metaFor(n.notification_type);
+                                    const meta = metaFor(n.notification_type);
+                                    const sub = [n.body, timeAgo(n.created_at)].filter(Boolean).join(' · ');
                                     return (
                                         <button
                                             key={n.id}
+                                            type="button"
                                             onClick={() => openItem(n)}
-                                            className={`w-full text-left flex gap-3 px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0 ${n.is_read ? '' : 'bg-yellow-50/40'}`}
+                                            className="w-full text-left flex items-center gap-[11px] py-[9px] border-b border-tlb-divider last:border-b-0 hover:bg-tlb-highlight transition-colors"
                                         >
-                                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${TINT[m.tint]}`}>
-                                                <m.icon size={16} />
-                                            </div>
-                                            <div className="min-w-0 flex-1">
-                                                <div className="flex items-start gap-2">
-                                                    <p className={`text-[13px] leading-snug flex-1 ${n.is_read ? 'font-semibold text-gray-800' : 'font-black text-gray-900'}`}>{n.title}</p>
-                                                    {!n.is_read && <span className="w-2 h-2 rounded-full bg-red-500 shrink-0 mt-1.5" />}
-                                                </div>
-                                                {n.body && <p className="text-[12px] text-gray-500 leading-snug mt-0.5 line-clamp-2">{n.body}</p>}
-                                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mt-1">{timeAgo(n.created_at)}</p>
-                                            </div>
+                                            <IconTile tone={meta.tone} icon={meta.icon} />
+                                            <span className="flex-1 min-w-0">
+                                                <span className={`block text-[12.5px] leading-snug text-tlb-ink ${n.is_read ? 'font-semibold' : 'font-bold'}`}>{n.title}</span>
+                                                {sub && <span className="block text-[11px] text-tlb-muted mt-px truncate">{sub}</span>}
+                                            </span>
+                                            {!n.is_read && <span className="w-[7px] h-[7px] rounded-full bg-tlb-amber flex-none" aria-label="Unread" />}
                                         </button>
                                     );
                                 })
                             ) : (
-                                <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
-                                    <div className="w-11 h-11 rounded-2xl bg-gray-100 flex items-center justify-center text-gray-400 mb-3">
-                                        <Bell size={20} />
-                                    </div>
-                                    <p className="text-sm font-black text-gray-900">You're all caught up</p>
-                                    <p className="text-[12px] text-gray-400 mt-0.5">New notifications will show up here.</p>
+                                <div className="flex flex-col items-center justify-center py-10 text-center">
+                                    <IconTile tone="neutral" icon={Bell} size="md" />
+                                    <p className="text-[13px] font-bold text-tlb-ink mt-3">You're all caught up</p>
+                                    <p className="text-[11.5px] text-tlb-muted mt-0.5">New notifications will show up here.</p>
                                 </div>
                             )}
                         </div>
 
-                        {/* Footer */}
-                        <button
-                            onClick={() => { setOpen(false); onNavigate?.('MESSAGES'); }}
-                            className="w-full flex items-center justify-center gap-1.5 px-4 py-3 border-t border-gray-100 text-[13px] font-black text-gray-700 hover:bg-gray-50 transition-colors"
-                        >
-                            View all notifications <ArrowRight size={14} />
-                        </button>
+                        <div className="px-[17px] py-[11px] border-t border-tlb-divider text-center">
+                            <button type="button" onClick={() => { setOpen(false); onNavigate?.('MESSAGES'); }} className="pt-link text-xs">
+                                See all notifications
+                            </button>
+                        </div>
                     </motion.div>
                 )}
             </AnimatePresence>

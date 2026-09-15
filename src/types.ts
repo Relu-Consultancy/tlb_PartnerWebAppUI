@@ -27,6 +27,7 @@ export type Screen =
   | 'BRAND_PROFILE'
   | 'PREVIEW_PROFILE'
   | 'SERVICE_LISTINGS'
+  | 'BOOKINGS_ENQUIRIES'
   // Class creation flow (existing)
   | 'CREATE_CLASS_IDENTITY'
   | 'CREATE_CLASS_BATCH'

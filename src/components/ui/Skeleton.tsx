@@ -9,9 +9,8 @@ import React from 'react';
 // Each exported skeleton mirrors the LAYOUT of the screen it stands in for, so
 // content doesn't jump when the real data arrives:
 //   SkeletonPage      generic (route Suspense fallback / unknown destination)
-//   SkeletonDashboard hero + profile card + KPI strip + widgets + quick actions
-//   SkeletonListings  header + stat-chips + responsive card grid
-//   SkeletonProfile   cover + avatar + bio + detail rows
+//   SkeletonDashboard title + KPI pairs + service table + side cards (inside portal shell)
+//   SkeletonProfile   title row + summary card + tabs + sections (inside portal shell)
 //   SkeletonList      compact stacked rows (inline / wizard sections)
 // ---------------------------------------------------------------------------
 
@@ -53,22 +52,6 @@ export const SkeletonList: React.FC<{ rows?: number; className?: string }> = ({ 
   </div>
 );
 
-/** One listing-card placeholder — mirrors the cover-banner card in ServiceListings. */
-export const SkeletonCard: React.FC = () => (
-  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col overflow-hidden">
-    <Skeleton className="h-28 w-full rounded-none" />
-    <div className="p-4 flex flex-col gap-2">
-      <Skeleton className="h-3.5 w-2/3" />
-      <Skeleton className="h-3 w-1/3" />
-      <div className="flex items-center justify-end gap-1.5 mt-3 pt-3 border-t border-gray-50">
-        <Skeleton className="w-8 h-8 rounded-lg" />
-        <Skeleton className="w-8 h-8 rounded-lg" />
-        <Skeleton className="w-8 h-8 rounded-lg" />
-      </div>
-    </div>
-  </div>
-);
-
 /**
  * Generic full-page skeleton (sticky header + hero + KPI strip + panels).
  * Used for route Suspense fallbacks where the destination screen isn't known yet.
@@ -92,68 +75,47 @@ export const SkeletonPage: React.FC<{ withHeader?: boolean }> = ({ withHeader = 
   </div>
 );
 
-/** Dashboard-shaped skeleton: hero + profile card, KPI strip, two widgets, quick actions. */
+/** Dashboard-shaped skeleton (portal shell supplies the top bar): title, KPI pairs, service table, side cards. */
 export const SkeletonDashboard: React.FC = () => (
-  <div className="min-h-screen bg-[#F8FAFC]">
-    <SkelHeader />
-    <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-5 space-y-5">
-      {/* Hero */}
-      <Skeleton className="h-40 rounded-2xl bg-slate-800" />
-      {/* KPI grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-        {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-[120px] rounded-2xl" />)}
+  <div
+    className="px-4 sm:px-[26px] pt-4 pb-6 grid content-start gap-x-[18px] gap-y-3.5 lg:grid-cols-[minmax(0,1.55fr)_minmax(320px,1fr)]"
+    aria-busy="true"
+    aria-label="Loading dashboard"
+  >
+    <div className="lg:col-span-2 space-y-2">
+      <Skeleton className="h-7 w-40" />
+      <Skeleton className="h-3.5 w-72 max-w-full" />
+    </div>
+    <div className="flex flex-col gap-3.5">
+      <div className="grid grid-cols-2 gap-2.5">
+        {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-[92px] rounded-[14px]" />)}
       </div>
-      {/* Revenue + Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <Skeleton className="lg:col-span-2 h-[420px] rounded-2xl" />
-        <Skeleton className="h-[420px] rounded-2xl" />
-      </div>
-      {/* Offering Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-2xl" />)}
-      </div>
-      {/* Bottom widgets */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <Skeleton className="h-96 rounded-2xl" />
-        <Skeleton className="h-96 rounded-2xl" />
-      </div>
+      <Skeleton className="h-60 rounded-[14px]" />
+      <Skeleton className="h-44 rounded-[14px]" />
+    </div>
+    <div className="flex flex-col gap-3.5">
+      <Skeleton className="h-80 rounded-[14px]" />
+      <Skeleton className="h-52 rounded-[14px]" />
     </div>
   </div>
 );
 
-/** Listings-shaped skeleton: header + stat-chips + responsive card grid. */
-export const SkeletonListings: React.FC<{ cards?: number }> = ({ cards = 6 }) => (
-  <div className="min-h-screen bg-gray-50">
-    <SkelHeader />
-    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
-      {/* stat-chip quick filters */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-2xl" />)}
-      </div>
-      {/* card grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-        {Array.from({ length: cards }).map((_, i) => <SkeletonCard key={i} />)}
-      </div>
-    </div>
-  </div>
-);
-
-/** Profile-shaped skeleton: cover banner + overlapping avatar + bio + detail rows. */
+/** My Profile-shaped skeleton (portal shell supplies the top bar): title row, summary card, tabs + sections. */
 export const SkeletonProfile: React.FC = () => (
-  <div className="min-h-screen bg-gray-50">
-    <SkelHeader />
-    <div className="px-4 sm:px-6 py-6 max-w-3xl mx-auto space-y-6">
-      <div className="bg-white rounded-3xl overflow-hidden border border-gray-100 shadow-sm">
-        <Skeleton className="h-36 w-full rounded-none" />
-        <div className="px-6 pb-6">
-          <Skeleton className="w-16 h-16 rounded-2xl -mt-8 border-4 border-white relative z-10" />
-          <Skeleton className="h-5 w-1/2 mt-3" />
-          <Skeleton className="h-3 w-full mt-3" />
-          <Skeleton className="h-3 w-4/5 mt-2" />
-        </div>
-      </div>
+  <div className="px-4 sm:px-[26px] pt-5 pb-9 flex flex-col gap-[18px]" aria-busy="true" aria-label="Loading profile">
+    <div className="flex items-end justify-between gap-4">
       <div className="space-y-2">
-        {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-12 rounded-2xl" />)}
+        <Skeleton className="h-3 w-32" />
+        <Skeleton className="h-6 w-40" />
+      </div>
+      <Skeleton className="h-9 w-48 rounded-full hidden sm:block" />
+    </div>
+    <Skeleton className="h-[140px] rounded-[14px]" />
+    <div className="grid gap-5 lg:grid-cols-[236px_minmax(0,1fr)]">
+      <Skeleton className="h-72 rounded-[14px] hidden lg:block" />
+      <div className="flex flex-col gap-[18px]">
+        <Skeleton className="h-80 rounded-[14px]" />
+        <Skeleton className="h-64 rounded-[14px]" />
       </div>
     </div>
   </div>

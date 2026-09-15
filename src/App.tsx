@@ -110,6 +110,9 @@ const CreateVenuePreview = lazyImport(() => import('./screens/venues'), 'CreateV
 // Enquiries
 const EnquiriesHub = lazyImport(() => import('./screens/enquiries'), 'EnquiriesHub');
 
+// Bookings/Enquiries — unified inbox (Classes/Programs/Venues enquiries + Events/Venues bookings)
+const BookingsEnquiries = lazyImport(() => import('./screens/bookings-enquiries'), 'BookingsEnquiries');
+
 // Statistics
 
 // Analytics (audience & growth)
@@ -117,7 +120,7 @@ const Analytics = lazy(() => import('./screens/analytics'));
 
 // Coupons
 const CreateCoupon = lazyImport(() => import('./screens/coupons'), 'CreateCoupon');
-const AllCoupons = lazyImport(() => import('./screens/coupons'), 'AllCoupons');
+const Coupons = lazyImport(() => import('./screens/coupons'), 'Coupons');
 
 // Help & Support
 const Support = lazyImport(() => import('./screens/support'), 'Support');
@@ -141,6 +144,7 @@ const SCREEN_CHUNKS = [
   () => import('./screens/financial'),
   () => import('./screens/profile'),
   () => import('./screens/services'),
+  () => import('./screens/bookings-enquiries'),
   () => import('./screens/classes'),
   () => import('./screens/events'),
   () => import('./screens/programs'),
@@ -160,6 +164,7 @@ const prefetchScreens = () => {
 import { Sidebar } from './components/Navigation';
 import { TopHeader } from './components/TopHeader';
 import { getAuthToken, getRefreshToken, clearTokens, refreshAccessToken } from './api/client';
+import { invalidatePortalSummary } from './api/portalSummary';
 import { getCurrentPartner } from './api/onboarding';
 
 // ---------------------------------------------------------------------------
@@ -198,6 +203,7 @@ const routes: Record<Screen, RouteConfig> = {
 
   // Services / Listings — has sidebar
   SERVICE_LISTINGS: { component: ServiceListings, hasSidebar: true },
+  BOOKINGS_ENQUIRIES: { component: BookingsEnquiries, hasSidebar: true },
   CREATE_CLASS_IDENTITY: { component: CreateClassIdentity, hasSidebar: true, requiresEntities: ['Classes'] },
   CREATE_CLASS_BATCH: { component: CreateClassBatch, hasSidebar: true, requiresEntities: ['Classes'] },
   CREATE_CLASS_MEDIA: { component: CreateClassMedia, hasSidebar: true, requiresEntities: ['Classes'] },
@@ -241,7 +247,7 @@ const routes: Record<Screen, RouteConfig> = {
   FINANCIAL_HUB: { component: FinancialHub, hasSidebar: true },
 
   ANALYTICS: { component: Analytics, hasSidebar: true },
-  ALL_COUPONS: { component: AllCoupons, hasSidebar: true },
+  ALL_COUPONS: { component: Coupons, hasSidebar: true },
   CREATE_COUPON: { component: CreateCoupon, hasSidebar: true },
   HELP_SUPPORT: { component: Support, hasSidebar: true },
   PARTNER_NETWORK: { component: PartnerNetwork, hasSidebar: true },
@@ -259,7 +265,6 @@ function AppInner() {
   const currentScreenRef = useRef<Screen>('LANDING');
   useEffect(() => { currentScreenRef.current = currentScreen; }, [currentScreen]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
   const [authData, setAuthData] = useState<{ value: string; type: 'email' | 'phone' } | null>(null);
   const [initializing, setInitializing] = useState(true);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -374,6 +379,8 @@ function AppInner() {
     if (screen === 'LANDING') {
       clearTokens();
       sessionStorage.clear();
+      // Memoised partner data must never leak into the next account's session.
+      invalidatePortalSummary();
     }
     setCurrentScreen(screen);
   }, [allowedEntities]);
@@ -395,14 +402,12 @@ function AppInner() {
           onClose={() => setIsSidebarOpen(false)}
           currentScreen={currentScreen}
           onNavigate={guardedNavigate}
-          desktopOpen={desktopSidebarOpen}
-          onToggleDesktop={() => setDesktopSidebarOpen(prev => !prev)}
         />
       )}
-      <div className={`flex flex-col min-h-screen ${route.hasSidebar && desktopSidebarOpen ? 'lg:ml-60' : ''}`}>
+      <div className={`flex flex-col min-h-screen ${route.hasSidebar ? 'lg:ml-[220px] bg-tlb-canvas' : ''}`}>
         {route.hasSidebar && (
-          <TopHeader 
-            onOpenSidebar={() => { setDesktopSidebarOpen(true); setIsSidebarOpen(true); }}
+          <TopHeader
+            onOpenSidebar={() => setIsSidebarOpen(true)}
             onNavigate={guardedNavigate}
           />
         )}
@@ -421,7 +426,7 @@ function AppInner() {
                 previousScreen={previousScreen}
                 authData={authData}
                 setAuthData={setAuthData}
-                {...(route.hasSidebar ? { onOpenSidebar: () => { setDesktopSidebarOpen(true); setIsSidebarOpen(true); } } : {})}
+                {...(route.hasSidebar ? { onOpenSidebar: () => setIsSidebarOpen(true) } : {})}
               />
             </ScreenErrorBoundary>
           </motion.div>

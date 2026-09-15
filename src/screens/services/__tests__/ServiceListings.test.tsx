@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../../test/msw/server';
@@ -17,7 +17,7 @@ function renderWithPartner(allowedEntities: string[] = ['Events']) {
     sessionStorage.setItem('allowedEntities', JSON.stringify(allowedEntities));
     return render(
         <PartnerProvider>
-            <ServiceListings onNavigate={mockNavigate} onOpenSidebar={vi.fn()} />
+            <ServiceListings onNavigate={mockNavigate} />
         </PartnerProvider>
     );
 }
@@ -30,191 +30,102 @@ beforeEach(() => {
 describe('ServiceListings — loading and error states', () => {
     it('shows a skeleton loader initially', () => {
         renderWithPartner();
-        // Skeleton placeholders use the animate-pulse utility.
         expect(document.querySelector('.animate-pulse')).toBeTruthy();
     });
 
-    it('shows error message on API failure', async () => {
+    it('shows an error message when every service type fails to load', async () => {
         server.use(http.get(`${BASE}/api/v1/partner/listings/events/`, () =>
             HttpResponse.json({ error: { code: 'SERVER_ERROR', message: 'Listings unavailable' } }, { status: 500 })));
         renderWithPartner();
-        await waitFor(() =>
-            expect(screen.getByText(/listings unavailable/i)).toBeInTheDocument()
-        );
+        await waitFor(() => expect(screen.getByText(/listings unavailable/i)).toBeInTheDocument());
     });
 });
 
 describe('ServiceListings — listing display', () => {
-    it('shows listing title after loading', async () => {
+    it('shows the listing title, a synthesized code, and its status', async () => {
         renderWithPartner();
-        // Component renders both a desktop table and mobile cards, so the title
-        // appears more than once in jsdom (no CSS to hide either layout).
-        await waitFor(() =>
-            expect(screen.getAllByText('Test Event').length).toBeGreaterThan(0)
-        );
+        await waitFor(() => expect(screen.getByText('Test Event')).toBeInTheDocument());
+        expect(screen.getByText(/^LST-\d{6}$/)).toBeInTheDocument();
+        // "Draft" also labels a stats tile, so at least one match is the row's own status pill.
+        expect(screen.getAllByText('Draft').length).toBeGreaterThan(0);
     });
 
-    it('shows Draft status badge', async () => {
-        renderWithPartner();
-        await waitFor(() =>
-            expect(screen.getAllByText('Draft').length).toBeGreaterThan(0)
-        );
-    });
-
-    it('shows category name on the listing card', async () => {
-        renderWithPartner();
-        await waitFor(() => screen.getAllByText('Test Event'));
-        // mockListing has category { name: 'Dance' } — rendered in the category column
-        expect(screen.getAllByText('Dance').length).toBeGreaterThan(0);
-    });
-
-    it('shows empty state when no listings returned', async () => {
+    it('shows an empty state when no listings match the filters', async () => {
         server.use(http.get(`${BASE}/api/v1/partner/listings/events/`, () =>
             HttpResponse.json({ success: true, data: [] })));
         renderWithPartner();
-        await waitFor(() =>
-            expect(screen.getByText(/no listings yet/i)).toBeInTheDocument()
-        );
+        await waitFor(() => expect(screen.getByText(/no listings match/i)).toBeInTheDocument());
     });
 
-    it('shows the Listings heading', async () => {
+    it('shows the My listings heading', async () => {
         renderWithPartner();
-        await waitFor(() =>
-            expect(screen.getByRole('heading', { name: 'Listings' })).toBeInTheDocument()
-        );
+        await waitFor(() => expect(screen.getByRole('heading', { name: 'My listings' })).toBeInTheDocument());
     });
 });
 
-describe('ServiceListings — tabs', () => {
-    it('shows All tab', async () => {
-        renderWithPartner();
-        await waitFor(() =>
-            expect(screen.getByText('All')).toBeInTheDocument()
-        );
-    });
-
-    it('shows allowed entity tabs', async () => {
-        renderWithPartner(['Events', 'Classes']);
-        await waitFor(() => screen.getAllByText('Test Event'));
-        // Both entity tabs should be present
-        const tabs = screen.getAllByRole('button', { name: /^(All|Events|Classes)/ });
-        expect(tabs.length).toBeGreaterThanOrEqual(3);
-    });
-
-    it('filters to show only selected entity type', async () => {
+describe('ServiceListings — service scope', () => {
+    it('filters to only the selected service type', async () => {
         server.use(
             http.get(`${BASE}/api/v1/partner/listings/events/`, () =>
-                HttpResponse.json({ success: true, data: [{ id: '1', title: 'My Event', status: 'draft', listing_type: 'event', category: { id: 1, name: 'Dance' } }] })),
+                HttpResponse.json({ success: true, data: [{ id: '1', title: 'My Event', status: 'draft', listing_type: 'event' }] })),
             http.get(`${BASE}/api/v1/partner/listings/classes/`, () =>
-                HttpResponse.json({ success: true, data: [{ id: '2', title: 'My Class', status: 'draft', listing_type: 'class', category: { id: 3, name: 'Sports' } }] }))
+                HttpResponse.json({ success: true, data: [{ id: '2', title: 'My Class', status: 'draft', listing_type: 'class' }] })),
         );
         renderWithPartner(['Events', 'Classes']);
         const user = userEvent.setup();
-        await waitFor(() => screen.getAllByText('My Event'));
-        await waitFor(() => screen.getAllByText('My Class'));
-        // Click on Events tab (tab label is "Events (1)")
-        const eventTabBtns = screen.getAllByRole('button').filter(b => b.textContent?.startsWith('Events'));
-        if (eventTabBtns.length > 0) await user.click(eventTabBtns[0]);
-        // Scoped to the filtered directory — "My Class" may still legitimately appear in the
-        // unrelated Latest Active/History overview cards, which aren't affected by this tab filter.
-        const directory = screen.getByTestId('listings-directory');
-        await waitFor(() =>
-            expect(within(directory).queryAllByText('My Class')).toHaveLength(0)
-        );
-        expect(within(directory).getAllByText('My Event').length).toBeGreaterThan(0);
+        await waitFor(() => screen.getByText('My Event'));
+        await waitFor(() => screen.getByText('My Class'));
+
+        await user.click(screen.getByRole('tab', { name: /^Events/ }));
+        expect(screen.getByText('My Event')).toBeInTheDocument();
+        expect(screen.queryByText('My Class')).not.toBeInTheDocument();
     });
 });
 
 describe('ServiceListings — search', () => {
-    it('has a search input', async () => {
-        renderWithPartner();
-        await waitFor(() => screen.getAllByText('Test Event'));
-        expect(screen.getByPlaceholderText(/search listings/i)).toBeInTheDocument();
-    });
-
-    it('filters listings by search query', async () => {
+    it('filters listings by title', async () => {
         server.use(http.get(`${BASE}/api/v1/partner/listings/events/`, () =>
             HttpResponse.json({
                 success: true,
                 data: [
-                    { id: '1', title: 'Summer Art Festival', status: 'draft', listing_type: 'event', category: { id: 1, name: 'Dance' } },
-                    { id: '2', title: 'Winter Dance Camp', status: 'draft', listing_type: 'event', category: { id: 1, name: 'Dance' } },
+                    { id: '1', title: 'Summer Art Festival', status: 'draft', listing_type: 'event' },
+                    { id: '2', title: 'Winter Dance Camp', status: 'draft', listing_type: 'event' },
                 ],
             })));
         renderWithPartner();
         const user = userEvent.setup();
-        await waitFor(() => screen.getAllByText('Summer Art Festival'));
-        const searchInput = screen.getByPlaceholderText(/search listings/i);
-        await user.type(searchInput, 'Winter');
-        // Scoped to the filtered directory — the unrelated Latest Active/History overview
-        // cards intentionally aren't affected by this search box.
-        const directory = screen.getByTestId('listings-directory');
-        expect(within(directory).queryAllByText('Summer Art Festival')).toHaveLength(0);
-        expect(within(directory).getAllByText('Winter Dance Camp').length).toBeGreaterThan(0);
+        await waitFor(() => screen.getByText('Summer Art Festival'));
+        await user.type(screen.getByPlaceholderText(/search listings/i), 'Winter');
+        expect(screen.queryByText('Summer Art Festival')).not.toBeInTheDocument();
+        expect(screen.getByText('Winter Dance Camp')).toBeInTheDocument();
     });
 });
 
 describe('ServiceListings — edit and create navigation', () => {
-    it('shows an Edit action for draft events', async () => {
-        renderWithPartner();
-        // Edit is an icon button (title="Edit") on desktop + a text button on mobile.
-        await waitFor(() =>
-            expect(screen.getAllByTitle('Edit').length).toBeGreaterThan(0)
-        );
-    });
-
-    it('sets draft id and navigates to CREATE_EVENT_DETAILS on Edit click', async () => {
+    it('sets the draft id and navigates to CREATE_EVENT_DETAILS on Edit', async () => {
         renderWithPartner();
         const user = userEvent.setup();
-        await waitFor(() => screen.getAllByTitle('Edit'));
-        await user.click(screen.getAllByTitle('Edit')[0]);
+        await waitFor(() => screen.getByText('Test Event'));
+        await user.click(screen.getByRole('button', { name: 'Edit' }));
         expect(getCurrentDraftId()).toBe(DRAFT_ID);
         expect(mockNavigate).toHaveBeenCalledWith('CREATE_EVENT_DETAILS');
     });
 
-    it('shows an Edit action for pending listings (still editable)', async () => {
+    it('shows a Locked button instead of Edit for a published (archived) listing', async () => {
         server.use(http.get(`${BASE}/api/v1/partner/listings/events/`, () =>
             HttpResponse.json({
                 success: true,
-                data: [{
-                    id: DRAFT_ID,
-                    title: 'Pending Event',
-                    status: 'pending',
-                    listing_type: 'event',
-                    category: { id: 1, name: 'Dance' },
-                }],
+                data: [{ id: DRAFT_ID, title: 'Archived Event', status: 'archived', listing_type: 'event' }],
             })));
         renderWithPartner();
-        await waitFor(() =>
-            expect(screen.getAllByTitle('Edit').length).toBeGreaterThan(0)
-        );
-        expect(screen.queryAllByTitle('Locked')).toHaveLength(0);
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Locked' })).toBeInTheDocument());
     });
 
-    it('shows Locked button for published listings', async () => {
-        server.use(http.get(`${BASE}/api/v1/partner/listings/events/`, () =>
-            HttpResponse.json({
-                success: true,
-                data: [{
-                    id: DRAFT_ID,
-                    title: 'Published Event',
-                    status: 'published',
-                    listing_type: 'event',
-                    category: { id: 1, name: 'Dance' },
-                }],
-            })));
-        renderWithPartner();
-        await waitFor(() =>
-            expect(screen.getByText('Locked')).toBeInTheDocument()
-        );
-    });
-
-    it('navigates to CREATE_EVENT_DETAILS on Add Listing when only Events allowed', async () => {
+    it('navigates straight to the wizard when only one service type is allowed', async () => {
         renderWithPartner(['Events']);
         const user = userEvent.setup();
-        await waitFor(() => screen.getAllByText('Test Event'));
-        const addBtn = document.querySelector('header button[class*="bg-tlb-yellow"]') as HTMLButtonElement;
-        await user.click(addBtn);
+        await waitFor(() => screen.getByText('Test Event'));
+        await user.click(screen.getByRole('button', { name: '+ New listing' }));
         expect(mockNavigate).toHaveBeenCalledWith('CREATE_EVENT_DETAILS');
     });
 });

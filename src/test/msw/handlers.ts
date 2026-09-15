@@ -228,6 +228,13 @@ export const mockVenueDraft = {
     created_at: '2026-05-07T12:00:00Z',
 };
 
+// ─── Reviews fixtures ─────────────────────────────────────────────────────────
+
+export const mockReviewsList = [
+    { id: 'rev-1', listing_id: 'l1', listing_title: 'Pottery Term — 6 weeks', listing_type: 'class', rating: 5, comment: 'Unhurried and warm.', reviewer_name: 'Meera K.', created_at: '2026-08-01T10:00:00Z' },
+    { id: 'rev-2', listing_id: 'l2', listing_title: 'Daylight Studio — Photoshoot hire', listing_type: 'venue', rating: 3, comment: 'Studio was nice but ran late opening.', reviewer_name: 'Arun V.', created_at: '2026-08-10T10:00:00Z' },
+];
+
 // ─── Bank details fixture (Revenue & payouts screen) ───────────────────────────
 
 export const mockBankDetails = {
@@ -702,6 +709,10 @@ export const handlers = [
         const body = await request.json() as Record<string, unknown>;
         return HttpResponse.json({ success: true, data: { ...mockCoupon, id: params.id, ...body } });
     }),
+
+    // ─── Reviews list (Reviews screen) ───
+    http.get(`${BASE}/api/v1/partner/reviews/`, () =>
+        HttpResponse.json({ success: true, data: { count: mockReviewsList.length, next: null, previous: null, results: mockReviewsList } })),
 
     // ─── Bank details (Revenue & payouts screen) ───
     http.get(`${BASE}/api/v1/partner/bank-details/`, () =>

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Eye, FileText, Loader2 } from 'lucide-react';
+import { Eye, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation, FaqTermsEditor, FaqApi, RefundPolicyToggle } from '../../components/ui';
+import { FaqTermsEditor, FaqApi, RefundPolicyToggle } from '../../components/ui';
+import { WizardShell, WizardNav, WizardField } from '../../components/portal/wizard';
 import {
     getCurrentProgramDraftId,
     getProgramListingDetail,
@@ -71,83 +72,61 @@ export const CreateProgramPolicies: React.FC<Props> = ({ onNavigate }) => {
 
     if (loading) {
         return (
-            <WizardLayout
-                title="New Program"
-                stepText="Stage 4 of 5"
-                subtitle="Policies & FAQs"
-                progressPercentage={80}
-                themeColor="emerald"
-                onBack={() => onNavigate('CREATE_PROGRAM_MEDIA')}
-            >
-                <div className="flex justify-center py-12">
-                    <Loader2 size={24} className="animate-spin text-emerald-500" />
+            <WizardShell title="New program" entityType="Programs" step={4} totalSteps={5} stepLabel="Policies & FAQs" onBack={() => onNavigate('CREATE_PROGRAM_MEDIA')}>
+                <div className="pt-card p-5 sm:p-6 flex items-center justify-center gap-2 text-tlb-muted text-xs font-bold py-12">
+                    <Loader2 size={16} className="animate-spin" /> Loading…
                 </div>
-            </WizardLayout>
+            </WizardShell>
         );
     }
 
     return (
-        <WizardLayout
-            title="New Program"
-            stepText="Stage 4 of 5"
-            subtitle="Policies & FAQs"
-            progressPercentage={80}
-            themeColor="emerald"
-            onBack={() => onNavigate('CREATE_PROGRAM_MEDIA')}
-        >
-            <div className="space-y-1">
-                <h2 className="text-2xl font-black">Policies & FAQs</h2>
-                <p className="text-sm text-gray-400">Set clear expectations and answer common questions.</p>
-            </div>
-
-            {error && (
-                <div className="bg-red-50 border border-red-200 rounded-2xl p-3 text-xs font-bold text-red-600">
-                    {error}
-                </div>
-            )}
-
-            <RefundPolicyToggle value={isRefundable} onChange={setIsRefundable} accent="emerald" />
-
-            <div className="space-y-4">
+        <WizardShell title="New program" entityType="Programs" step={4} totalSteps={5} stepLabel="Policies & FAQs" onBack={() => onNavigate('CREATE_PROGRAM_MEDIA')}>
+            <div className="pt-card p-5 sm:p-6 flex flex-col gap-6">
                 <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                        <FileText size={12} /> Cancellation Policy
-                    </label>
-                    <textarea
-                        className="tlb-input w-full min-h-[100px] resize-y"
-                        placeholder="e.g. Cancellations must be made 24 hours in advance for a full refund..."
-                        value={cancelPolicy}
-                        onChange={(e) => setCancelPolicy(e.target.value)}
-                    />
+                    <h2 className="pt-h-sec">Policies &amp; FAQs</h2>
+                    <p className="text-[13px] text-tlb-sub mt-0.5">Set clear expectations and answer common questions.</p>
                 </div>
-                <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                        <FileText size={12} /> Refund Policy
-                    </label>
-                    <textarea
-                        className="tlb-input w-full min-h-[100px] resize-y"
-                        placeholder="e.g. No refunds after the first session. Prorated refunds available for medical reasons..."
-                        value={refundPolicy}
-                        onChange={(e) => setRefundPolicy(e.target.value)}
-                    />
+
+                {error && <div className="pt-note bg-tlb-red-soft text-tlb-red-deep">{error}</div>}
+
+                <RefundPolicyToggle value={isRefundable} onChange={setIsRefundable} />
+
+                <div className="flex flex-col gap-4">
+                    <WizardField label="Cancellation policy">
+                        <textarea
+                            className="pt-input min-h-[100px]"
+                            placeholder="e.g. Cancellations must be made 24 hours in advance for a full refund..."
+                            value={cancelPolicy}
+                            onChange={(e) => setCancelPolicy(e.target.value)}
+                        />
+                    </WizardField>
+                    <WizardField label="Refund policy">
+                        <textarea
+                            className="pt-input min-h-[100px]"
+                            placeholder="e.g. No refunds after the first session. Prorated refunds available for medical reasons..."
+                            value={refundPolicy}
+                            onChange={(e) => setRefundPolicy(e.target.value)}
+                        />
+                    </WizardField>
                 </div>
+
+                {draftId ? (
+                    <FaqTermsEditor listingId={draftId} faqApi={programFaqApi} faqDocumentsEntity="programs" />
+                ) : (
+                    <div className="pt-note bg-tlb-amber-soft text-tlb-gold">
+                        Please complete the earlier steps first so we can save your FAQs and terms.
+                    </div>
+                )}
+
+                <WizardNav
+                    onNext={handleNext}
+                    nextText={saving ? 'Saving…' : 'Preview & finish'}
+                    nextIcon={saving ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} strokeWidth={2.75} />}
+                />
             </div>
-
-            {draftId ? (
-                <FaqTermsEditor listingId={draftId} faqApi={programFaqApi} accent="emerald" faqDocumentsEntity="programs" />
-            ) : (
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm font-bold text-amber-700">
-                    Please complete the earlier steps first so we can save your FAQs and terms.
-                </div>
-            )}
-
-            <WizardNavigation
-                onBack={() => onNavigate('CREATE_PROGRAM_MEDIA')}
-                onNext={handleNext}
-                nextText={saving ? 'Saving...' : 'Preview & Finish'}
-                nextIcon={saving ? <Loader2 size={18} className="animate-spin" /> : <Eye size={18} />}
-                themeColor="emerald"
-            />
-        </WizardLayout>
+        </WizardShell>
     );
 };
+
+export default CreateProgramPolicies;

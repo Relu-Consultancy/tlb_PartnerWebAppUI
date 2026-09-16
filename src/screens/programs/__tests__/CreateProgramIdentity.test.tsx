@@ -139,7 +139,7 @@ describe('CreateProgramIdentity — booking type', () => {
         renderComponent();
         await waitFor(() => expect(screen.queryByText('Dance')).toBeInTheDocument(), { timeout: 3000 });
         expect(screen.getByText('Enquiry')).toBeInTheDocument();
-        expect(screen.getByText('Direct Booking')).toBeInTheDocument();
+        expect(screen.getByText('Direct booking')).toBeInTheDocument();
     });
 
     it('defaults booking_type to "enquiry" in the PATCH payload', async () => {

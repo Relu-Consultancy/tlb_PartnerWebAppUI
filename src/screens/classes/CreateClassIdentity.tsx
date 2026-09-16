@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, MapPin, Tag, Check, Loader2, MessageCircle, CalendarCheck } from 'lucide-react';
+import { ArrowRight, MapPin, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation, LocationPicker, LanguagePicker, validateLanguages } from '../../components/ui';
+import { LocationPicker, LanguagePicker, validateLanguages } from '../../components/ui';
 import { PickedLocation } from '../../components/ui/LocationPicker';
+import { WizardShell, WizardNav, WizardField, OptionTileGrid, BookingTypeCards } from '../../components/portal/wizard';
 import {
     getCurrentClassDraftId,
     setCurrentClassDraftId,
@@ -209,288 +210,189 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
     };
 
     return (
-        <WizardLayout
-            title="New Listing"
-            stepText="Stage 1 of 5"
-            subtitle="Identity"
-            progressPercentage={20}
-            themeColor="yellow"
-            onBack={() => onNavigate('SERVICE_LISTINGS')}
-        >
-            <div className="space-y-1">
-                <h2 className="text-2xl font-black">Identity & Story</h2>
-                <p className="text-sm text-gray-400">Capture the "What" and "Why" of your class.</p>
-            </div>
-
-            {saveError && (
-                <div className="bg-red-50 border border-red-200 rounded-2xl p-3 text-xs font-bold text-red-600">
-                    {saveError}
-                </div>
-            )}
-            {metaError && (
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-xs font-bold text-amber-700">
-                    {metaError}
-                </div>
-            )}
-
-            {/* Service Title */}
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Service Title <span className="text-red-400">*</span></label>
-                <input
-                    className="tlb-input w-full"
-                    placeholder="e.g. Advanced Robotics Workshop"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                />
-            </div>
-
-            {/* Short Description */}
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Short Summary</label>
-                <input
-                    className="tlb-input w-full"
-                    placeholder="One-line description shown in search results"
-                    value={shortDesc}
-                    onChange={(e) => setShortDesc(e.target.value)}
-                />
-            </div>
-
-            {/* Master Description */}
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Description</label>
-                <textarea
-                    className="tlb-input w-full min-h-[160px] resize-y"
-                    placeholder="Describe your class — curriculum, what to bring, certifications..."
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                />
-            </div>
-
-            {/* Target Age Group */}
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Target Age Group</label>
-                <div className="flex gap-3">
-                    <div className="flex-1">
-                        <input className="tlb-input w-full" type="number" placeholder="Min (e.g. 8)" min={0} value={minAge} onChange={(e) => setMinAge(e.target.value)} />
-                    </div>
-                    <span className="self-center text-gray-300 font-bold">to</span>
-                    <div className="flex-1">
-                        <input className="tlb-input w-full" type="number" placeholder="Max (e.g. 14)" min={0} value={maxAge} onChange={(e) => setMaxAge(e.target.value)} />
-                    </div>
-                    <span className="self-center text-sm text-gray-400 font-bold">Years</span>
-                </div>
-            </div>
-
-            {/* Mode (from API /metadata/formats/) */}
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">Mode</label>
-                {metaLoading ? (
-                    <div className="flex items-center gap-2 text-gray-400 text-xs font-bold">
-                        <Loader2 size={14} className="animate-spin" /> Loading modes…
-                    </div>
-                ) : (
-                    <div className="flex gap-2">
-                        {modes.map((m) => (
-                            <button
-                                key={m.value}
-                                onClick={() => setMode(m.value)}
-                                className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${mode === m.value
-                                    ? 'bg-tlb-yellow text-tlb-dark shadow-sm'
-                                    : 'bg-white border border-gray-200 text-gray-500 hover:border-tlb-yellow/50'
-                                }`}
-                            >
-                                {m.label}
-                            </button>
-                        ))}
-                    </div>
-                )}
-            </div>
-
-            {/* Booking Type */}
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">
-                    Booking Type <span className="text-red-400">*</span>
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                    {([
-                        {
-                            value: 'enquiry',
-                            label: 'Enquiry',
-                            icon: <MessageCircle size={22} />,
-                            desc: 'Customers send an enquiry and you follow up to confirm.',
-                        },
-                        {
-                            value: 'direct_booking',
-                            label: 'Direct Booking',
-                            icon: <CalendarCheck size={22} />,
-                            desc: 'Customers book and pay online.',
-                        },
-                    ] as const).map((opt) => (
-                        <button
-                            key={opt.value}
-                            type="button"
-                            onClick={() => setBookingType(opt.value)}
-                            className={`relative flex flex-col items-start gap-2 p-4 rounded-2xl border-2 text-left transition-all ${
-                                bookingType === opt.value
-                                    ? 'border-tlb-yellow bg-tlb-yellow/10'
-                                    : 'border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm'
-                            }`}
-                        >
-                            {bookingType === opt.value && (
-                                <div className="absolute top-2.5 right-2.5 w-5 h-5 bg-tlb-yellow rounded-full flex items-center justify-center">
-                                    <Check size={11} className="text-white" />
-                                </div>
-                            )}
-                            <span className={bookingType === opt.value ? 'text-amber-600' : 'text-gray-400'}>
-                                {opt.icon}
-                            </span>
-                            <span className="text-sm font-black text-gray-800 pr-6">{opt.label}</span>
-                            <span className="text-[11px] text-gray-400 leading-snug">{opt.desc}</span>
-                        </button>
-                    ))}
-                </div>
-                <p className="text-[11px] text-gray-400 mt-2">Enquiry classes collect leads you follow up on. Direct booking lets customers pay for a batch online.</p>
-            </div>
-
-            {/* Fees */}
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Fees (₹)</label>
-                <input
-                    type="number"
-                    className="tlb-input w-full"
-                    placeholder="e.g. 1500"
-                    min={0}
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                />
-            </div>
-
-            {/* Location (offline / hybrid only) */}
-            {needsAddress && (
-                <div className="space-y-3">
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block">
-                        <MapPin size={12} className="inline mr-1" /> Location
-                    </label>
-
-                    <LocationPicker
-                        initialLatitude={latitude}
-                        initialLongitude={longitude}
-                        initialAddress={address}
-                        onSelect={handleLocationPicked}
-                    />
-
-                    <textarea
-                        className="tlb-input w-full min-h-[70px] resize-y"
-                        placeholder="Street, building, landmark"
-                        value={address}
-                        onChange={(e) => setAddress(e.target.value)}
-                    />
-                </div>
-            )}
-
-            <LanguagePicker
-                languages={languages}
-                otherLanguage={otherLanguage}
-                onChange={(l, o) => { setLanguages(l); setOtherLanguage(o); setLangError(''); }}
-                accent="yellow"
-                error={langError}
-            />
-
-            {/* Meeting Link (online / hybrid only) */}
-            {(mode === 'online' || mode === 'hybrid') && (
+        <WizardShell title="New class" entityType="Classes" step={1} totalSteps={5} stepLabel="Identity" onBack={() => onNavigate('SERVICE_LISTINGS')}>
+            <div className="pt-card p-5 sm:p-6 flex flex-col gap-5">
                 <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Meeting Link</label>
-                    <input
-                        className="tlb-input w-full"
-                        placeholder="https://meet.google.com/..."
-                        value={meetingLink}
-                        onChange={(e) => setMeetingLink(e.target.value)}
-                    />
+                    <h2 className="pt-h-sec">Identity &amp; story</h2>
+                    <p className="text-[13px] text-tlb-sub mt-0.5">Capture the "what" and "why" of your class.</p>
                 </div>
-            )}
 
-            {/* Category */}
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">Category</label>
-                {metaLoading ? (
-                    <div className="flex items-center gap-2 text-gray-400 text-xs font-bold">
-                        <Loader2 size={14} className="animate-spin" /> Loading categories…
+                {saveError && <div className="pt-note bg-tlb-red-soft text-tlb-red-deep">{saveError}</div>}
+                {metaError && <div className="pt-note bg-tlb-amber-soft text-tlb-gold">{metaError}</div>}
+
+                <WizardField label="Service title" required>
+                    <input
+                        className="pt-input"
+                        placeholder="e.g. Advanced Robotics Workshop"
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                    />
+                </WizardField>
+
+                <WizardField label="Short summary">
+                    <input
+                        className="pt-input"
+                        placeholder="One-line description shown in search results"
+                        value={shortDesc}
+                        onChange={(e) => setShortDesc(e.target.value)}
+                    />
+                </WizardField>
+
+                <WizardField label="Description">
+                    <textarea
+                        className="pt-input min-h-[160px]"
+                        placeholder="Describe your class — curriculum, what to bring, certifications..."
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                    />
+                </WizardField>
+
+                <WizardField label="Target age group">
+                    <div className="flex items-center gap-3">
+                        <input className="pt-input w-24 text-center" type="number" placeholder="Min" min={0} value={minAge} onChange={(e) => setMinAge(e.target.value)} />
+                        <span className="text-tlb-muted font-bold text-sm">to</span>
+                        <input className="pt-input w-24 text-center" type="number" placeholder="Max" min={0} value={maxAge} onChange={(e) => setMaxAge(e.target.value)} />
+                        <span className="text-tlb-muted font-bold text-sm">yrs</span>
                     </div>
-                ) : categories.length === 0 ? (
-                    <p className="text-xs text-gray-400">No categories available.</p>
-                ) : (
-                    <div className="max-h-[280px] overflow-y-auto rounded-2xl">
-                        <div className="grid grid-cols-2 gap-2 pr-1">
-                            {categories.map((c) => (
+                </WizardField>
+
+                <WizardField label="Mode">
+                    {metaLoading ? (
+                        <div className="flex items-center gap-2 text-tlb-muted text-xs font-bold">
+                            <Loader2 size={14} className="animate-spin" /> Loading modes…
+                        </div>
+                    ) : (
+                        <div className="flex flex-wrap gap-2">
+                            {modes.map((m) => (
                                 <button
-                                    key={c.id}
-                                    onClick={() => { setSelectedCategoryId(c.id); setSelectedSubcategoryId(null); }}
-                                    className={`relative p-3.5 rounded-2xl border-2 text-left transition-all ${selectedCategoryId === c.id
-                                        ? 'border-tlb-yellow bg-tlb-yellow/10'
-                                        : 'border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm'
-                                    }`}
+                                    key={m.value}
+                                    type="button"
+                                    onClick={() => setMode(m.value)}
+                                    className={`pt-scope ${mode === m.value ? 'is-active' : ''}`}
                                 >
-                                    {selectedCategoryId === c.id && (
-                                        <div className="absolute top-2 right-2 w-5 h-5 bg-tlb-yellow rounded-full flex items-center justify-center">
-                                            <Check size={12} className="text-tlb-dark" />
-                                        </div>
-                                    )}
-                                    <span className="text-xs font-bold text-gray-700 leading-tight pr-6">{c.name}</span>
+                                    {m.label}
                                 </button>
                             ))}
                         </div>
-                    </div>
-                )}
-            </div>
+                    )}
+                </WizardField>
 
-            {/* Sub-Category */}
-            {selectedCategory && selectedCategory.subcategories.length > 0 && (
-                <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Sub-Category</label>
+                <WizardField
+                    label="Booking type"
+                    required
+                    hint="Enquiry classes collect leads you follow up on. Direct booking lets customers pay for a batch online."
+                >
+                    <BookingTypeCards
+                        value={bookingType}
+                        onChange={setBookingType}
+                        enquiryDescription="Customers send an enquiry and you follow up to confirm."
+                        directBookingDescription="Customers book and pay online."
+                    />
+                </WizardField>
+
+                <WizardField label="Fees (₹)">
+                    <input
+                        type="number"
+                        className="pt-input"
+                        placeholder="e.g. 1500"
+                        min={0}
+                        value={price}
+                        onChange={(e) => setPrice(e.target.value)}
+                    />
+                </WizardField>
+
+                {needsAddress && (
+                    <WizardField label="Location" className="gap-3">
+                        <span className="sr-only"><MapPin size={12} /></span>
+                        <LocationPicker
+                            initialLatitude={latitude}
+                            initialLongitude={longitude}
+                            initialAddress={address}
+                            onSelect={handleLocationPicked}
+                        />
+                        <textarea
+                            className="pt-input min-h-[70px]"
+                            placeholder="Street, building, landmark"
+                            value={address}
+                            onChange={(e) => setAddress(e.target.value)}
+                        />
+                    </WizardField>
+                )}
+
+                <LanguagePicker
+                    languages={languages}
+                    otherLanguage={otherLanguage}
+                    onChange={(l, o) => { setLanguages(l); setOtherLanguage(o); setLangError(''); }}
+                    error={langError}
+                />
+
+                {(mode === 'online' || mode === 'hybrid') && (
+                    <WizardField label="Meeting link">
+                        <input
+                            className="pt-input"
+                            placeholder="https://meet.google.com/..."
+                            value={meetingLink}
+                            onChange={(e) => setMeetingLink(e.target.value)}
+                        />
+                    </WizardField>
+                )}
+
+                <WizardField label="Category">
+                    {metaLoading ? (
+                        <div className="flex items-center gap-2 text-tlb-muted text-xs font-bold">
+                            <Loader2 size={14} className="animate-spin" /> Loading categories…
+                        </div>
+                    ) : categories.length === 0 ? (
+                        <p className="text-xs text-tlb-muted">No categories available.</p>
+                    ) : (
+                        <div className="max-h-[280px] overflow-y-auto">
+                            <OptionTileGrid
+                                options={categories.map(c => ({ id: String(c.id), label: c.name }))}
+                                isSelected={(id) => selectedCategoryId === Number(id)}
+                                onToggle={(id) => { setSelectedCategoryId(Number(id)); setSelectedSubcategoryId(null); }}
+                            />
+                        </div>
+                    )}
+                </WizardField>
+
+                {selectedCategory && selectedCategory.subcategories.length > 0 && (
+                    <WizardField label="Sub-category">
+                        <div className="flex flex-wrap gap-2">
+                            {selectedCategory.subcategories.map((s) => (
+                                <button
+                                    key={s.id}
+                                    type="button"
+                                    onClick={() => setSelectedSubcategoryId(selectedSubcategoryId === s.id ? null : s.id)}
+                                    className={`pt-scope ${selectedSubcategoryId === s.id ? 'is-active' : ''}`}
+                                >
+                                    {s.name}
+                                </button>
+                            ))}
+                        </div>
+                    </WizardField>
+                )}
+
+                <WizardField label="Tag">
                     <div className="flex flex-wrap gap-2">
-                        {selectedCategory.subcategories.map((s) => (
+                        {tagOptions.map((t) => (
                             <button
-                                key={s.id}
-                                onClick={() => setSelectedSubcategoryId(selectedSubcategoryId === s.id ? null : s.id)}
-                                className={`px-3.5 py-2 rounded-full text-xs font-bold transition-all ${selectedSubcategoryId === s.id
-                                    ? 'bg-tlb-yellow text-tlb-dark shadow-sm'
-                                    : 'bg-white border border-gray-200 text-gray-500 hover:border-tlb-yellow/50'
-                                }`}
+                                key={t}
+                                type="button"
+                                onClick={() => setTag(prev => prev === t ? '' : t)}
+                                className={`pt-scope ${tag === t ? 'is-active' : ''}`}
                             >
-                                {s.name}
+                                {t}
                             </button>
                         ))}
                     </div>
-                </div>
-            )}
+                </WizardField>
 
-            {/* Tags */}
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">
-                    <Tag size={12} className="inline mr-1" /> Tag
-                </label>
-                <div className="flex flex-wrap gap-2">
-                    {tagOptions.map((t) => (
-                        <button
-                            key={t}
-                            onClick={() => setTag(prev => prev === t ? '' : t)}
-                            className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${tag === t
-                                ? 'bg-tlb-yellow text-tlb-dark'
-                                : 'bg-white border border-gray-200 text-gray-500 hover:border-tlb-yellow/30'
-                            }`}
-                        >
-                            {t}
-                        </button>
-                    ))}
-                </div>
+                <WizardNav
+                    onNext={saving ? () => {} : handleNext}
+                    nextText={saving ? 'Saving…' : 'Next: Batch & schedule'}
+                    nextIcon={saving ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} strokeWidth={2.75} />}
+                />
             </div>
-
-            <WizardNavigation
-                onNext={handleNext}
-                nextText={saving ? 'Saving...' : 'Next: Batch & Schedule'}
-                nextIcon={saving ? <Loader2 size={20} className="animate-spin" /> : <ArrowRight size={20} />}
-                themeColor="yellow"
-            />
-        </WizardLayout>
+        </WizardShell>
     );
 };

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowRight, Plus, Trash2, Clock, Users, Loader2 } from 'lucide-react';
+import { ArrowRight, Plus, Trash2, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation, SkeletonList } from '../../components/ui';
+import { SkeletonList } from '../../components/ui';
+import { WizardShell, WizardNav, WizardField } from '../../components/portal/wizard';
 import {
     getCurrentClassDraftId,
     getClassBatches,
@@ -131,124 +132,105 @@ export const CreateClassBatch: React.FC<Props> = ({ onNavigate }) => {
     };
 
     return (
-        <WizardLayout
-            title="New Listing"
-            stepText="Stage 2 of 5"
-            subtitle="Batch & Schedule"
-            progressPercentage={40}
-            themeColor="yellow"
-            onBack={() => onNavigate('CREATE_CLASS_IDENTITY')}
-        >
-            <div className="space-y-1">
-                <h2 className="text-2xl font-black">Batch & Schedule</h2>
-                <p className="text-sm text-gray-400">Set up timings for your classes.</p>
+        <WizardShell title="New class" entityType="Classes" step={2} totalSteps={5} stepLabel="Batches" onBack={() => onNavigate('CREATE_CLASS_IDENTITY')}>
+            <div className="pt-card p-5 sm:p-6 flex flex-col gap-5">
+                <div>
+                    <h2 className="pt-h-sec">Batch &amp; schedule</h2>
+                    <p className="text-[13px] text-tlb-sub mt-0.5">Set up timings for your classes.</p>
+                </div>
+
+                <WizardField label="Batches">
+                    <div className="flex flex-col gap-3">
+                        {loading ? (
+                            <SkeletonList rows={3} className="py-2" />
+                        ) : (
+                            <>
+                                {batches.map((batch, idx) => (
+                                    <div key={batch.key} className="pt-card p-4 flex flex-col gap-3">
+                                        <div className="flex items-center justify-between">
+                                            <p className="pt-eyebrow">Batch {idx + 1}</p>
+                                            {batches.length > 1 && (
+                                                <button type="button" onClick={() => removeBatch(batch.key)} className="text-tlb-red hover:text-tlb-red-deep p-1" aria-label="Remove batch">
+                                                    <Trash2 size={15} />
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        <WizardField label="Batch name">
+                                            <input
+                                                className="pt-input"
+                                                placeholder="e.g. Morning Batch"
+                                                value={batch.name}
+                                                onChange={(e) => update(batch.key, { name: e.target.value })}
+                                            />
+                                        </WizardField>
+
+                                        <WizardField label="Days">
+                                            <div className="flex gap-2">
+                                                {DAY_LABELS.map((day) => (
+                                                    <button
+                                                        key={day}
+                                                        type="button"
+                                                        onClick={() => toggleDay(batch.key, day)}
+                                                        className={`pt-tile !p-0 w-10 h-10 ${batch.days.includes(day) ? 'is-on' : ''}`}
+                                                    >
+                                                        {day}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </WizardField>
+
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <WizardField label="Start time">
+                                                <input
+                                                    type="time"
+                                                    className="pt-input"
+                                                    value={batch.startTime}
+                                                    onChange={(e) => update(batch.key, { startTime: e.target.value })}
+                                                />
+                                            </WizardField>
+                                            <WizardField label="End time">
+                                                <input
+                                                    type="time"
+                                                    className="pt-input"
+                                                    value={batch.endTime}
+                                                    onChange={(e) => update(batch.key, { endTime: e.target.value })}
+                                                />
+                                            </WizardField>
+                                        </div>
+
+                                        <WizardField label="Max students">
+                                            <input
+                                                type="number"
+                                                className="pt-input"
+                                                placeholder="e.g. 20"
+                                                min={1}
+                                                value={batch.capacity}
+                                                onChange={(e) => update(batch.key, { capacity: e.target.value })}
+                                            />
+                                        </WizardField>
+                                    </div>
+                                ))}
+
+                                <button
+                                    type="button"
+                                    onClick={() => setBatches(prev => [...prev, blankBatch()])}
+                                    className="pt-btn pt-btn-o w-full justify-center border-dashed"
+                                >
+                                    <Plus size={14} strokeWidth={2.75} /> Add batch
+                                </button>
+                            </>
+                        )}
+                    </div>
+                </WizardField>
+
+                <WizardNav
+                    onBack={() => onNavigate('CREATE_CLASS_IDENTITY')}
+                    onNext={handleNext}
+                    nextText={saving ? 'Saving…' : 'Next: Media'}
+                    nextIcon={saving ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} strokeWidth={2.75} />}
+                />
             </div>
-
-            {loading ? (
-                <SkeletonList rows={3} className="py-2" />
-            ) : (
-                <>
-                    {batches.map((batch, idx) => (
-                        <div key={batch.key} className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
-                            <div className="flex items-center justify-between">
-                                <p className="text-[10px] font-black text-tlb-yellow uppercase tracking-widest">Batch {idx + 1}</p>
-                                {batches.length > 1 && (
-                                    <button onClick={() => removeBatch(batch.key)} className="text-red-400 hover:text-red-600 p-1">
-                                        <Trash2 size={16} />
-                                    </button>
-                                )}
-                            </div>
-
-                            {/* Batch Name */}
-                            <div>
-                                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">Batch Name</label>
-                                <input
-                                    className="tlb-input w-full"
-                                    placeholder="e.g. Morning Batch"
-                                    value={batch.name}
-                                    onChange={(e) => update(batch.key, { name: e.target.value })}
-                                />
-                            </div>
-
-                            {/* Days */}
-                            <div>
-                                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">Days</label>
-                                <div className="flex gap-2">
-                                    {DAY_LABELS.map((day) => (
-                                        <button
-                                            key={day}
-                                            onClick={() => toggleDay(batch.key, day)}
-                                            className={`w-10 h-10 rounded-xl text-xs font-bold transition-all ${
-                                                batch.days.includes(day)
-                                                    ? 'bg-tlb-yellow text-tlb-dark shadow-sm'
-                                                    : 'bg-gray-50 border border-gray-200 text-gray-400 hover:border-tlb-yellow/30'
-                                            }`}
-                                        >
-                                            {day}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Time Pickers */}
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">
-                                        <Clock size={10} className="inline mr-1" /> Start Time
-                                    </label>
-                                    <input
-                                        type="time"
-                                        className="tlb-input w-full"
-                                        value={batch.startTime}
-                                        onChange={(e) => update(batch.key, { startTime: e.target.value })}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">
-                                        <Clock size={10} className="inline mr-1" /> End Time
-                                    </label>
-                                    <input
-                                        type="time"
-                                        className="tlb-input w-full"
-                                        value={batch.endTime}
-                                        onChange={(e) => update(batch.key, { endTime: e.target.value })}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Capacity */}
-                            <div>
-                                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">
-                                    <Users size={10} className="inline mr-1" /> Max Students
-                                </label>
-                                <input
-                                    type="number"
-                                    className="tlb-input w-full"
-                                    placeholder="e.g. 20"
-                                    min={1}
-                                    value={batch.capacity}
-                                    onChange={(e) => update(batch.key, { capacity: e.target.value })}
-                                />
-                            </div>
-                        </div>
-                    ))}
-
-                    <button
-                        onClick={() => setBatches(prev => [...prev, blankBatch()])}
-                        className="w-full py-3 border-2 border-dashed border-tlb-yellow/30 rounded-2xl text-sm font-bold text-tlb-yellow flex items-center justify-center gap-2 hover:bg-tlb-yellow/5 transition-colors"
-                    >
-                        <Plus size={18} /> Add New Batch
-                    </button>
-                </>
-            )}
-
-            <WizardNavigation
-                onBack={() => onNavigate('CREATE_CLASS_IDENTITY')}
-                onNext={handleNext}
-                nextText={saving ? 'Saving...' : 'Next: Media'}
-                nextIcon={saving ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={18} />}
-                themeColor="yellow"
-            />
-        </WizardLayout>
+        </WizardShell>
     );
 };

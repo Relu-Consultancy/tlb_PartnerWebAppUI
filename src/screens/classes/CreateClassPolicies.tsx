@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Eye, FileText, Loader2 } from 'lucide-react';
+import { Eye, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation, SkeletonList, FaqTermsEditor, FaqApi, RefundPolicyToggle } from '../../components/ui';
+import { SkeletonList, FaqTermsEditor, FaqApi, RefundPolicyToggle } from '../../components/ui';
+import { WizardShell, WizardNav, WizardField } from '../../components/portal/wizard';
 import {
     getCurrentClassDraftId,
     getClassListingDetail,
@@ -72,81 +73,59 @@ export const CreateClassPolicies: React.FC<Props> = ({ onNavigate }) => {
 
     if (loading) {
         return (
-            <WizardLayout
-                title="New Listing"
-                stepText="Stage 4 of 5"
-                subtitle="Entry Path & Policies"
-                progressPercentage={80}
-                themeColor="yellow"
-                onBack={() => onNavigate('CREATE_CLASS_MEDIA')}
-            >
-                <SkeletonList rows={3} className="py-2" />
-            </WizardLayout>
+            <WizardShell title="New class" entityType="Classes" step={4} totalSteps={5} stepLabel="FAQs & terms" onBack={() => onNavigate('CREATE_CLASS_MEDIA')}>
+                <div className="pt-card p-5 sm:p-6 flex flex-col gap-5">
+                    <SkeletonList rows={3} className="py-2" />
+                </div>
+            </WizardShell>
         );
     }
 
     return (
-        <WizardLayout
-            title="New Listing"
-            stepText="Stage 4 of 5"
-            subtitle="Entry Path & Policies"
-            progressPercentage={80}
-            themeColor="yellow"
-            onBack={() => onNavigate('CREATE_CLASS_MEDIA')}
-        >
-            <div className="space-y-1">
-                <h2 className="text-2xl font-black">Entry Path & Policies</h2>
-                <p className="text-sm text-gray-400">Lower the barrier to entry and set clear rules for parents.</p>
-            </div>
-
-            {error && (
-                <div className="bg-red-50 border border-red-200 rounded-2xl p-3 text-xs font-bold text-red-600">
-                    {error}
-                </div>
-            )}
-
-            <RefundPolicyToggle value={isRefundable} onChange={setIsRefundable} accent="yellow" />
-
-            <div className="space-y-4">
+        <WizardShell title="New class" entityType="Classes" step={4} totalSteps={5} stepLabel="FAQs & terms" onBack={() => onNavigate('CREATE_CLASS_MEDIA')}>
+            <div className="pt-card p-5 sm:p-6 flex flex-col gap-6">
                 <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                        <FileText size={12} /> Cancellation Policy
-                    </label>
+                    <h2 className="pt-h-sec">Entry path &amp; policies</h2>
+                    <p className="text-[13px] text-tlb-sub mt-0.5">Lower the barrier to entry and set clear rules for parents.</p>
+                </div>
+
+                {error && <div className="pt-note bg-tlb-red-soft text-tlb-red-deep">{error}</div>}
+
+                <RefundPolicyToggle value={isRefundable} onChange={setIsRefundable} />
+
+                <WizardField label="Cancellation policy">
                     <textarea
-                        className="tlb-input w-full min-h-[100px] resize-y"
+                        className="pt-input min-h-[100px]"
                         placeholder="e.g. Cancellations must be made 24 hours in advance for a full refund..."
                         value={cancelPolicy}
                         onChange={(e) => setCancelPolicy(e.target.value)}
                     />
-                </div>
-                <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                        <FileText size={12} /> Refund Policy
-                    </label>
+                </WizardField>
+
+                <WizardField label="Refund policy">
                     <textarea
-                        className="tlb-input w-full min-h-[100px] resize-y"
+                        className="pt-input min-h-[100px]"
                         placeholder="e.g. No refunds after the first class. Prorated refunds available for medical reasons..."
                         value={refundPolicy}
                         onChange={(e) => setRefundPolicy(e.target.value)}
                     />
-                </div>
+                </WizardField>
+
+                {draftId ? (
+                    <FaqTermsEditor listingId={draftId} faqApi={classFaqApi} faqDocumentsEntity="classes" />
+                ) : (
+                    <div className="pt-note bg-tlb-amber-soft text-tlb-gold">
+                        Please complete the earlier steps first so we can save your FAQs and terms.
+                    </div>
+                )}
+
+                <WizardNav
+                    onBack={() => onNavigate('CREATE_CLASS_MEDIA')}
+                    onNext={handleNext}
+                    nextText={saving ? 'Saving…' : 'Preview & finish'}
+                    nextIcon={saving ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} strokeWidth={2.75} />}
+                />
             </div>
-
-            {draftId ? (
-                <FaqTermsEditor listingId={draftId} faqApi={classFaqApi} accent="amber" faqDocumentsEntity="classes" />
-            ) : (
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm font-bold text-amber-700">
-                    Please complete the earlier steps first so we can save your FAQs and terms.
-                </div>
-            )}
-
-            <WizardNavigation
-                onBack={() => onNavigate('CREATE_CLASS_MEDIA')}
-                onNext={handleNext}
-                nextText={saving ? 'Saving...' : 'Preview & Finish'}
-                nextIcon={saving ? <Loader2 size={18} className="animate-spin" /> : <Eye size={18} />}
-                themeColor="yellow"
-            />
-        </WizardLayout>
+        </WizardShell>
     );
 };

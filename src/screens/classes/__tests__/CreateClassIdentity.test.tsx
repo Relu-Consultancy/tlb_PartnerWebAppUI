@@ -136,7 +136,7 @@ describe('CreateClassIdentity — booking type', () => {
         renderComponent();
         await waitFor(() => screen.getByText(/identity & story/i));
         expect(screen.getByText('Enquiry')).toBeInTheDocument();
-        expect(screen.getByText('Direct Booking')).toBeInTheDocument();
+        expect(screen.getByText('Direct booking')).toBeInTheDocument();
     });
 
     it('sends booking_type "direct_booking" when that option is chosen', async () => {
@@ -150,7 +150,7 @@ describe('CreateClassIdentity — booking type', () => {
         const user = userEvent.setup();
         await waitFor(() => screen.getByPlaceholderText(/advanced robotics workshop/i));
         await user.type(screen.getByPlaceholderText(/advanced robotics workshop/i), 'My Class');
-        await user.click(screen.getByText('Direct Booking'));
+        await user.click(screen.getByText('Direct booking'));
         await user.click(screen.getByRole('button', { name: /next|continue/i }));
         await waitFor(() => expect(patchBody?.booking_type).toBe('direct_booking'));
     });

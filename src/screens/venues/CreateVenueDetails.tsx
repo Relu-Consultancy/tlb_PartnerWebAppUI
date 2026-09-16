@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowRight, MapPin, Check, Camera, Play, Image as ImageIcon, Trash2, Loader2, MessageCircle, CalendarCheck } from 'lucide-react';
+import { ArrowRight, MapPin, Camera, Play, Image as ImageIcon, Trash2, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation, toast, Select, LocationPicker, LanguagePicker, validateLanguages } from '../../components/ui';
+import { toast, Select, LocationPicker, LanguagePicker, validateLanguages } from '../../components/ui';
 import { PickedLocation } from '../../components/ui/LocationPicker';
+import { WizardShell, WizardNav, WizardField, OptionTileGrid, BookingTypeCards } from '../../components/portal/wizard';
 import {
     getVenueMetaCategories,
     getVenueListingDetail,
@@ -300,322 +301,246 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
 
     if (metaLoading) {
         return (
-            <WizardLayout title="New Venue Listing" stepText="Step 1 of 7" subtitle="Details" progressPercentage={14} themeColor="amber" onBack={() => onNavigate('SERVICE_LISTINGS')}>
-                <div className="flex items-center justify-center gap-2 text-gray-400 text-xs font-bold py-12">
+            <WizardShell title="New venue" entityType="Venues" step={1} totalSteps={7} stepLabel="Details" onBack={() => onNavigate('SERVICE_LISTINGS')}>
+                <div className="pt-card p-5 sm:p-6 flex items-center justify-center gap-2 text-tlb-muted text-xs font-bold py-12">
                     <Loader2 size={16} className="animate-spin" /> Loading…
                 </div>
-            </WizardLayout>
+            </WizardShell>
         );
     }
 
     if (metaError) {
         return (
-            <WizardLayout title="New Venue Listing" stepText="Step 1 of 7" subtitle="Details" progressPercentage={14} themeColor="amber" onBack={() => onNavigate('SERVICE_LISTINGS')}>
-                <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-xs font-bold text-red-600">{metaError}</div>
-            </WizardLayout>
+            <WizardShell title="New venue" entityType="Venues" step={1} totalSteps={7} stepLabel="Details" onBack={() => onNavigate('SERVICE_LISTINGS')}>
+                <div className="pt-note bg-tlb-red-soft text-tlb-red-deep">{metaError}</div>
+            </WizardShell>
         );
     }
 
     return (
-        <WizardLayout title="New Venue Listing" stepText="Step 1 of 7" subtitle="Details" progressPercentage={14} themeColor="amber" onBack={() => onNavigate('SERVICE_LISTINGS')}>
-            <div className="space-y-1">
-                <h2 className="text-2xl font-black">Venue Details</h2>
-                <p className="text-sm text-gray-400">Tell us about your space.</p>
-            </div>
-
-            {/* Title */}
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Venue Name</label>
-                <input className="tlb-input w-full" placeholder="e.g. The Wonder Zone" maxLength={200} value={title} onChange={e => setTitle(e.target.value)} />
-            </div>
-
-            {/* Description */}
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Description</label>
-                <textarea
-                    className="tlb-input w-full min-h-[120px] resize-y"
-                    placeholder="Describe the ambiance, facilities, and what makes it special..."
-                    value={description}
-                    onChange={e => setDescription(e.target.value)}
-                />
-            </div>
-
-            {/* Booking Type */}
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">
-                    Booking Type <span className="text-red-400">*</span>
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                    {([
-                        {
-                            value: 'enquiry',
-                            label: 'Enquiry',
-                            icon: <MessageCircle size={22} />,
-                            desc: 'Customers send an enquiry and you follow up to confirm.',
-                        },
-                        {
-                            value: 'direct_booking',
-                            label: 'Direct Booking',
-                            icon: <CalendarCheck size={22} />,
-                            desc: 'Customers book and pay for a package online.',
-                        },
-                    ] as const).map((opt) => (
-                        <button
-                            key={opt.value}
-                            type="button"
-                            onClick={() => setBookingType(opt.value)}
-                            className={`relative flex flex-col items-start gap-2 p-4 rounded-2xl border-2 text-left transition-all ${
-                                bookingType === opt.value
-                                    ? 'border-amber-400 bg-amber-50'
-                                    : 'border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm'
-                            }`}
-                        >
-                            {bookingType === opt.value && (
-                                <div className="absolute top-2.5 right-2.5 w-5 h-5 bg-amber-500 rounded-full flex items-center justify-center">
-                                    <Check size={11} className="text-white" />
-                                </div>
-                            )}
-                            <span className={bookingType === opt.value ? 'text-amber-600' : 'text-gray-400'}>
-                                {opt.icon}
-                            </span>
-                            <span className="text-sm font-black text-gray-800 pr-6">{opt.label}</span>
-                            <span className="text-[11px] text-gray-400 leading-snug">{opt.desc}</span>
-                        </button>
-                    ))}
-                </div>
-                <p className="text-[11px] text-gray-400 mt-2">
-                    Direct-booking venues require at least one package before submission.
-                </p>
-            </div>
-
-            {/* Category */}
-            {categories.length > 0 && (
+        <WizardShell title="New venue" entityType="Venues" step={1} totalSteps={7} stepLabel="Details" onBack={() => onNavigate('SERVICE_LISTINGS')}>
+            <div className="pt-card p-5 sm:p-6 flex flex-col gap-5">
                 <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">Category</label>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        {visibleCategories.map(cat => (
-                            <button key={cat.id} onClick={() => { setSelectedCategoryId(cat.id); setSelectedSubcategoryId(null); }}
-                                className={`relative p-4 rounded-2xl border-2 flex flex-col items-center text-center gap-2 transition-all ${
-                                    selectedCategoryId === cat.id
-                                        ? 'border-amber-400 bg-amber-50'
-                                        : 'border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm'
-                                }`}>
-                                {selectedCategoryId === cat.id && (
-                                    <div className="absolute top-2 right-2 w-5 h-5 bg-amber-500 rounded-full flex items-center justify-center">
-                                        <Check size={12} className="text-white" />
-                                    </div>
-                                )}
-                                <span className="text-xs font-bold text-gray-700 leading-tight">{cat.name}</span>
+                    <h2 className="pt-h-sec">Venue details</h2>
+                    <p className="text-[13px] text-tlb-sub mt-0.5">Tell us about your space.</p>
+                </div>
+
+                <WizardField label="Venue name">
+                    <input className="pt-input" placeholder="e.g. The Wonder Zone" maxLength={200} value={title} onChange={e => setTitle(e.target.value)} />
+                </WizardField>
+
+                <WizardField label="Description">
+                    <textarea
+                        className="pt-input min-h-[120px]"
+                        placeholder="Describe the ambiance, facilities, and what makes it special..."
+                        value={description}
+                        onChange={e => setDescription(e.target.value)}
+                    />
+                </WizardField>
+
+                <WizardField label="Booking type" required hint="Direct-booking venues require at least one package before submission.">
+                    <BookingTypeCards
+                        value={bookingType}
+                        onChange={setBookingType}
+                        enquiryDescription="Customers send an enquiry and you follow up to confirm."
+                        directBookingDescription="Customers book and pay for a package online."
+                    />
+                </WizardField>
+
+                {categories.length > 0 && (
+                    <WizardField label="Category">
+                        <OptionTileGrid
+                            options={visibleCategories.map(c => ({ id: String(c.id), label: c.name }))}
+                            isSelected={(id) => selectedCategoryId === Number(id)}
+                            onToggle={(id) => { setSelectedCategoryId(Number(id)); setSelectedSubcategoryId(null); }}
+                        />
+                        {!showAllCategories && categories.length > 6 && (
+                            <button type="button" onClick={() => setShowAllCategories(true)} className="pt-link mt-1">
+                                Show all {categories.length} categories ↓
+                            </button>
+                        )}
+                    </WizardField>
+                )}
+
+                {selectedCategory && selectedCategory.subcategories.length > 0 && (
+                    <WizardField label="Sub-category">
+                        <Select
+                            value={selectedSubcategoryId != null ? String(selectedSubcategoryId) : ''}
+                            onChange={(v) => setSelectedSubcategoryId(v ? Number(v) : null)}
+                            options={selectedCategory.subcategories.map(s => ({ value: String(s.id), label: s.name }))}
+                            placeholder="Select sub-category..."
+                            ariaLabel="Sub-category"
+                            buttonClassName="pt-input w-full flex items-center justify-between gap-2 text-left cursor-pointer"
+                        />
+                    </WizardField>
+                )}
+
+                <LanguagePicker
+                    languages={languages}
+                    otherLanguage={otherLanguage}
+                    onChange={(l, o) => { setLanguages(l); setOtherLanguage(o); setLangError(''); }}
+                    error={langError}
+                />
+
+                <WizardField label="Location type">
+                    <div className="flex flex-wrap gap-2">
+                        {LOCATION_TYPES.map(lt => (
+                            <button
+                                key={lt.value}
+                                type="button"
+                                onClick={() => setLocationType(locationType === lt.value ? '' : lt.value)}
+                                className={`pt-scope ${locationType === lt.value ? 'is-active' : ''}`}
+                            >
+                                {lt.label}
                             </button>
                         ))}
                     </div>
-                    {!showAllCategories && categories.length > 6 && (
-                        <button onClick={() => setShowAllCategories(true)} className="w-full mt-3 text-xs font-bold text-amber-500 hover:text-amber-700">
-                            Show all {categories.length} categories ↓
-                        </button>
-                    )}
-                </div>
-            )}
+                </WizardField>
 
-            {/* Subcategory */}
-            {selectedCategory && selectedCategory.subcategories.length > 0 && (
-                <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Sub-Category</label>
-                    <Select
-                        value={selectedSubcategoryId != null ? String(selectedSubcategoryId) : ''}
-                        onChange={(v) => setSelectedSubcategoryId(v ? Number(v) : null)}
-                        options={selectedCategory.subcategories.map(s => ({ value: String(s.id), label: s.name }))}
-                        placeholder="Select sub-category..."
-                        ariaLabel="Sub-category"
+                <WizardField label="Venue location" className="gap-3">
+                    <span className="sr-only"><MapPin size={12} /></span>
+                    <LocationPicker
+                        initialLatitude={latitude ? Number(latitude) : null}
+                        initialLongitude={longitude ? Number(longitude) : null}
+                        initialAddress={address}
+                        onSelect={handleLocationPicked}
                     />
-                </div>
-            )}
-
-            <LanguagePicker
-                languages={languages}
-                otherLanguage={otherLanguage}
-                onChange={(l, o) => { setLanguages(l); setOtherLanguage(o); setLangError(''); }}
-                accent="amber"
-                error={langError}
-            />
-
-            {/* Location Type */}
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Location Type <span className="text-gray-300 font-normal normal-case">(optional)</span></label>
-                <div className="flex flex-wrap gap-2">
-                    {LOCATION_TYPES.map(lt => (
-                        <button
-                            key={lt.value}
-                            onClick={() => setLocationType(locationType === lt.value ? '' : lt.value)}
-                            className={`px-3.5 py-2 rounded-full text-xs font-bold transition-all ${locationType === lt.value
-                                ? 'bg-amber-500 text-white shadow-sm'
-                                : 'bg-white border border-gray-200 text-gray-500 hover:border-amber-300'
-                            }`}
-                        >
-                            {lt.label}
-                        </button>
-                    ))}
-                </div>
-            </div>
-
-            {/* Location Fields */}
-            <div className="space-y-3">
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
-                    <MapPin size={12} /> Location
-                </label>
-
-                <LocationPicker
-                    initialLatitude={latitude ? Number(latitude) : null}
-                    initialLongitude={longitude ? Number(longitude) : null}
-                    initialAddress={address}
-                    onSelect={handleLocationPicked}
-                />
-
-                <textarea
-                    className="tlb-input w-full min-h-[70px] resize-y"
-                    placeholder="Street, building, landmark *"
-                    value={address}
-                    onChange={e => setAddress(e.target.value)}
-                />
-            </div>
-
-            {/* Age Range */}
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">Age Range <span className="text-gray-300 font-normal normal-case">(optional)</span></label>
-                <div className="flex items-center gap-3">
-                    <input
-                        type="number"
-                        min={0}
-                        placeholder="Min age"
-                        className="tlb-input w-full"
-                        value={minAge}
-                        onChange={e => setMinAge(e.target.value)}
+                    <textarea
+                        className="pt-input min-h-[70px]"
+                        placeholder="Street, building, landmark *"
+                        value={address}
+                        onChange={e => setAddress(e.target.value)}
                     />
-                    <span className="text-gray-400 font-bold text-sm shrink-0">to</span>
-                    <input
-                        type="number"
-                        min={0}
-                        placeholder="Max age"
-                        className="tlb-input w-full"
-                        value={maxAge}
-                        onChange={e => setMaxAge(e.target.value)}
-                    />
-                    <span className="text-gray-400 font-bold text-sm shrink-0">yrs</span>
-                </div>
-            </div>
+                </WizardField>
 
-            {/* Capacity */}
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">Guest Capacity <span className="text-gray-300 font-normal normal-case">(optional)</span></label>
-                <div className="flex items-center gap-3">
-                    <input
-                        type="number"
-                        min={1}
-                        placeholder="Min guests"
-                        className="tlb-input w-full"
-                        value={minCapacity}
-                        onChange={e => setMinCapacity(e.target.value)}
-                    />
-                    <span className="text-gray-400 font-bold text-sm shrink-0">–</span>
-                    <input
-                        type="number"
-                        min={1}
-                        placeholder="Max guests"
-                        className="tlb-input w-full"
-                        value={maxCapacity}
-                        onChange={e => setMaxCapacity(e.target.value)}
-                    />
-                </div>
-            </div>
-
-            {/* Cover Image */}
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">
-                    Cover Banner <span className="text-red-400">*</span>
-                </label>
-                <input ref={coverInputRef} type="file" accept="image/jpeg,image/png,video/mp4,video/quicktime" className="hidden" onChange={handleCoverPick} />
-                {cover ? (
-                    <div className="relative w-full sm:w-80 aspect-[16/9] rounded-2xl overflow-hidden border border-gray-200">
-                        {isVideoUrl(getUrl(cover)) ? (
-                            <video src={getUrl(cover)} autoPlay muted loop playsInline className="w-full h-full object-cover" />
-                        ) : (
-                            <img src={getUrl(cover)} alt="Cover" className="w-full h-full object-cover" />
-                        )}
-                        <button onClick={handleDeleteCover} className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-lg shadow text-red-500 hover:bg-white" aria-label="Remove cover">
-                            <Trash2 size={14} />
-                        </button>
-                        <button onClick={() => coverInputRef.current?.click()} disabled={busyKind === 'cover'} className="absolute bottom-2 right-2 bg-white/90 px-3 py-1.5 rounded-lg shadow text-xs font-bold text-amber-600 hover:bg-white disabled:opacity-50">
-                            {busyKind === 'cover' ? 'Uploading…' : 'Change'}
-                        </button>
+                <WizardField label="Age range">
+                    <div className="flex items-center gap-3">
+                        <input
+                            type="number"
+                            min={0}
+                            placeholder="Min age"
+                            className="pt-input w-full"
+                            value={minAge}
+                            onChange={e => setMinAge(e.target.value)}
+                        />
+                        <span className="text-tlb-muted font-bold text-sm shrink-0">to</span>
+                        <input
+                            type="number"
+                            min={0}
+                            placeholder="Max age"
+                            className="pt-input w-full"
+                            value={maxAge}
+                            onChange={e => setMaxAge(e.target.value)}
+                        />
+                        <span className="text-tlb-muted font-bold text-sm shrink-0">yrs</span>
                     </div>
-                ) : (
-                    <button onClick={() => coverInputRef.current?.click()} disabled={busyKind === 'cover'} className="w-full sm:w-80 aspect-[16/9] bg-amber-50 rounded-2xl border-2 border-dashed border-amber-200 flex flex-col items-center justify-center text-amber-500 hover:bg-amber-100 transition-colors disabled:opacity-60">
-                        {busyKind === 'cover' ? <Loader2 size={28} className="animate-spin" /> : <Camera size={28} />}
-                        <span className="text-xs font-bold mt-2">{busyKind === 'cover' ? 'Uploading…' : 'Upload Cover'}</span>
-                        <span className="text-[10px] text-amber-400 mt-1">JPG/PNG or MP4/MOV · Image 5MB / Video 15MB</span>
-                    </button>
-                )}
-            </div>
+                </WizardField>
 
-            {/* Gallery */}
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">
-                    Gallery Photos <span className="text-gray-300 font-normal normal-case ml-1">({gallery.length}/{GALLERY_LIMIT})</span>
-                </label>
-                <input ref={galleryInputRef} type="file" accept="image/jpeg,image/png" multiple className="hidden" onChange={handleGalleryPick} />
-                <div className="flex flex-wrap gap-3">
-                    {gallery.map(g => (
-                        <div key={g.id} className="relative w-24 h-24 rounded-2xl overflow-hidden border border-gray-200 group">
-                            <img src={getUrl(g)} alt="Gallery" className="w-full h-full object-cover" />
-                            <button onClick={() => handleDeleteGallery(g.id)} className="absolute top-1 right-1 bg-white/90 p-1 rounded-md text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Remove image">
-                                <Trash2 size={12} />
+                <WizardField label="Guest capacity">
+                    <div className="flex items-center gap-3">
+                        <input
+                            type="number"
+                            min={1}
+                            placeholder="Min guests"
+                            className="pt-input w-full"
+                            value={minCapacity}
+                            onChange={e => setMinCapacity(e.target.value)}
+                        />
+                        <span className="text-tlb-muted font-bold text-sm shrink-0">–</span>
+                        <input
+                            type="number"
+                            min={1}
+                            placeholder="Max guests"
+                            className="pt-input w-full"
+                            value={maxCapacity}
+                            onChange={e => setMaxCapacity(e.target.value)}
+                        />
+                    </div>
+                </WizardField>
+
+                <WizardField label="Cover banner" required>
+                    <input ref={coverInputRef} type="file" accept="image/jpeg,image/png,video/mp4,video/quicktime" className="hidden" onChange={handleCoverPick} />
+                    {cover ? (
+                        <div className="relative w-full sm:w-80 aspect-[16/9] rounded-2xl overflow-hidden border border-tlb-line">
+                            {isVideoUrl(getUrl(cover)) ? (
+                                <video src={getUrl(cover)} autoPlay muted loop playsInline className="w-full h-full object-cover" />
+                            ) : (
+                                <img src={getUrl(cover)} alt="Cover" className="w-full h-full object-cover" />
+                            )}
+                            <button onClick={handleDeleteCover} className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-lg shadow text-tlb-red hover:bg-white" aria-label="Remove cover">
+                                <Trash2 size={14} />
+                            </button>
+                            <button
+                                onClick={() => coverInputRef.current?.click()}
+                                disabled={busyKind === 'cover'}
+                                className="absolute bottom-2 right-2 bg-white/90 px-3 py-1.5 rounded-lg shadow text-xs font-bold text-tlb-link hover:bg-white disabled:opacity-50"
+                            >
+                                {busyKind === 'cover' ? 'Uploading…' : 'Change'}
                             </button>
                         </div>
-                    ))}
-                    {gallery.length < GALLERY_LIMIT && (
-                        <button onClick={() => galleryInputRef.current?.click()} disabled={busyKind === 'gallery'} className="w-24 h-24 bg-amber-50 rounded-2xl border-2 border-dashed border-amber-200 flex flex-col items-center justify-center text-amber-500 hover:bg-amber-100 disabled:opacity-60">
-                            {busyKind === 'gallery' ? <Loader2 size={20} className="animate-spin" /> : <ImageIcon size={20} />}
-                            <span className="text-[10px] font-bold mt-1">{busyKind === 'gallery' ? 'Uploading…' : 'Add'}</span>
+                    ) : (
+                        <button
+                            onClick={() => coverInputRef.current?.click()}
+                            disabled={busyKind === 'cover'}
+                            className="w-full sm:w-80 aspect-[16/9] bg-tlb-amber-soft rounded-2xl border-2 border-dashed border-tlb-amber-line flex flex-col items-center justify-center text-tlb-gold hover:bg-tlb-cream transition-colors disabled:opacity-60"
+                        >
+                            {busyKind === 'cover' ? <Loader2 size={28} className="animate-spin" /> : <Camera size={28} />}
+                            <span className="text-xs font-bold mt-2">{busyKind === 'cover' ? 'Uploading…' : 'Upload cover'}</span>
+                            <span className="text-[10px] mt-1 opacity-80">JPG/PNG or MP4/MOV · Image 5MB / Video 15MB</span>
                         </button>
                     )}
-                </div>
-                <p className="text-[10px] text-gray-400 mt-2">JPG/PNG · Max 5MB each · Up to {GALLERY_LIMIT}</p>
-            </div>
+                </WizardField>
 
-            {/* Video */}
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">
-                    Promo Video <span className="text-gray-300 font-normal normal-case ml-1">(optional)</span>
-                </label>
-                <input ref={videoInputRef} type="file" accept="video/mp4,video/quicktime" className="hidden" onChange={handleVideoPick} />
-                {video ? (
-                    <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 flex items-center gap-3">
-                        <div className="bg-amber-100 p-3 rounded-xl text-amber-500"><Play size={20} /></div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-bold truncate">Video uploaded</p>
-                            <a href={getUrl(video)} target="_blank" rel="noreferrer" className="text-[10px] text-amber-500 truncate block hover:underline">{video.url || video.file_url}</a>
-                        </div>
-                        <button onClick={handleDeleteVideo} className="text-red-500 p-2"><Trash2 size={16} /></button>
+                <WizardField label={`Gallery photos (${gallery.length}/${GALLERY_LIMIT})`} hint={`JPG/PNG · Max 5MB each · Up to ${GALLERY_LIMIT}`}>
+                    <input ref={galleryInputRef} type="file" accept="image/jpeg,image/png" multiple className="hidden" onChange={handleGalleryPick} />
+                    <div className="flex flex-wrap gap-3">
+                        {gallery.map(g => (
+                            <div key={g.id} className="relative w-24 h-24 rounded-2xl overflow-hidden border border-tlb-line group">
+                                <img src={getUrl(g)} alt="Gallery" className="w-full h-full object-cover" />
+                                <button onClick={() => handleDeleteGallery(g.id)} className="absolute top-1 right-1 bg-white/90 p-1 rounded-md text-tlb-red opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Remove image">
+                                    <Trash2 size={12} />
+                                </button>
+                            </div>
+                        ))}
+                        {gallery.length < GALLERY_LIMIT && (
+                            <button onClick={() => galleryInputRef.current?.click()} disabled={busyKind === 'gallery'} className="w-24 h-24 bg-tlb-amber-soft rounded-2xl border-2 border-dashed border-tlb-amber-line flex flex-col items-center justify-center text-tlb-gold hover:bg-tlb-cream disabled:opacity-60">
+                                {busyKind === 'gallery' ? <Loader2 size={20} className="animate-spin" /> : <ImageIcon size={20} />}
+                                <span className="text-[10px] font-bold mt-1">{busyKind === 'gallery' ? 'Uploading…' : 'Add'}</span>
+                            </button>
+                        )}
                     </div>
-                ) : (
-                    <button onClick={() => videoInputRef.current?.click()} disabled={busyKind === 'video'} className="w-full bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200 p-4 flex items-center gap-4 hover:bg-gray-100 disabled:opacity-60">
-                        <div className="bg-gray-200 p-3 rounded-xl text-gray-500">
-                            {busyKind === 'video' ? <Loader2 size={20} className="animate-spin" /> : <Play size={20} />}
-                        </div>
-                        <div className="flex-1 text-left">
-                            <p className="text-sm font-bold">{busyKind === 'video' ? 'Uploading…' : 'Upload Video'}</p>
-                            <p className="text-[10px] text-gray-400">MP4 / MOV · Max 100MB</p>
-                        </div>
-                    </button>
-                )}
-            </div>
+                </WizardField>
 
-            <WizardNavigation
-                onNext={handleNext}
-                nextText={saving ? 'Saving…' : 'Next: Occasions & Discovery'}
-                nextIcon={saving ? <Loader2 size={20} className="animate-spin" /> : <ArrowRight size={20} />}
-                themeColor="amber"
-            />
-        </WizardLayout>
+                <WizardField label="Promo video (optional)">
+                    <input ref={videoInputRef} type="file" accept="video/mp4,video/quicktime" className="hidden" onChange={handleVideoPick} />
+                    {video ? (
+                        <div className="pt-card p-4 flex items-center gap-3">
+                            <div className="pt-tile-md bg-tlb-amber-soft text-tlb-gold"><Play size={18} /></div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-bold truncate">Video uploaded</p>
+                                <a href={getUrl(video)} target="_blank" rel="noreferrer" className="pt-link truncate block">{video.url || video.file_url}</a>
+                            </div>
+                            <button onClick={handleDeleteVideo} className="text-tlb-red p-2"><Trash2 size={16} /></button>
+                        </div>
+                    ) : (
+                        <button onClick={() => videoInputRef.current?.click()} disabled={busyKind === 'video'} className="w-full bg-tlb-wash rounded-2xl border-2 border-dashed border-tlb-edge p-4 flex items-center gap-4 hover:bg-tlb-hover disabled:opacity-60">
+                            <div className="pt-tile-md bg-white text-tlb-muted">
+                                {busyKind === 'video' ? <Loader2 size={20} className="animate-spin" /> : <Play size={20} />}
+                            </div>
+                            <div className="flex-1 text-left">
+                                <p className="text-sm font-bold text-tlb-ink">{busyKind === 'video' ? 'Uploading…' : 'Upload video'}</p>
+                                <p className="text-[10px] text-tlb-muted">MP4 / MOV · Max 100MB</p>
+                            </div>
+                        </button>
+                    )}
+                </WizardField>
+
+                <WizardNav
+                    onNext={saving ? () => {} : handleNext}
+                    nextText={saving ? 'Saving…' : 'Next: Occasions & discovery'}
+                    nextIcon={saving ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} strokeWidth={2.75} />}
+                />
+            </div>
+        </WizardShell>
     );
 };

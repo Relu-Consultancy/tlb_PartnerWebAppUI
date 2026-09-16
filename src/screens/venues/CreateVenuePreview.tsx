@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Rocket, Clock, Loader2, AlertCircle, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation, AppListingPreview, formatLanguages } from '../../components/ui';
+import { AppListingPreview, formatLanguages } from '../../components/ui';
 import type { AppListingPreviewModel, PreviewFact } from '../../components/ui';
+import { WizardShell, WizardNav } from '../../components/portal/wizard';
 import {
     getVenueListingDetail,
     submitVenueListing,
@@ -40,6 +41,11 @@ interface VenueDetail {
     discovery?: { outing_types: string[]; activity_types: string[]; format_types: string[] };
     required_attendee_fields?: string[];
 }
+
+// ─── Result Modal ─────────────────────────────────────────────────────────────
+// Left as-is by design — a deliberate exception to the pt-* redesign, matching
+// the Events reference's ResultModal treatment. Only the surrounding wizard
+// chrome (WizardShell/WizardNav/pt-card) was converted.
 
 type ModalVariant = 'success' | 'under_review' | 'error';
 
@@ -254,67 +260,66 @@ export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
 
     if (loading) {
         return (
-            <WizardLayout title="Review Listing" stepText="Step 7 of 7" subtitle="Preview & Publish" progressPercentage={100} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_POLICIES')}>
-                <div className="flex items-center justify-center gap-2 text-gray-400 text-xs font-bold py-12">
+            <WizardShell title="New venue" entityType="Venues" step={7} totalSteps={7} stepLabel="Preview & publish" onBack={() => onNavigate('CREATE_VENUE_POLICIES')}>
+                <div className="pt-card p-5 sm:p-6 flex items-center justify-center gap-2 text-tlb-muted text-xs font-bold py-12">
                     <Loader2 size={16} className="animate-spin" /> Loading preview…
                 </div>
-            </WizardLayout>
+            </WizardShell>
         );
     }
 
     if (loadError || !venue) {
         return (
-            <WizardLayout title="Review Listing" stepText="Step 7 of 7" subtitle="Preview & Publish" progressPercentage={100} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_POLICIES')}>
-                <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-xs font-bold text-red-600">
-                    {loadError || 'Could not load venue.'}
-                </div>
-            </WizardLayout>
+            <WizardShell title="New venue" entityType="Venues" step={7} totalSteps={7} stepLabel="Preview & publish" onBack={() => onNavigate('CREATE_VENUE_POLICIES')}>
+                <div className="pt-note bg-tlb-red-soft text-tlb-red-deep">{loadError || 'Could not load venue.'}</div>
+            </WizardShell>
         );
     }
 
     return (
-        <WizardLayout title="Review Listing" stepText="Step 7 of 7" subtitle="Preview & Publish" progressPercentage={100} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_POLICIES')}>
-            <div className="text-center space-y-1">
-                <h2 className="text-2xl font-black">Preview Your Venue</h2>
-                <p className="text-sm text-gray-400">Review everything before submitting.</p>
-            </div>
+        <WizardShell title="New venue" entityType="Venues" step={7} totalSteps={7} stepLabel="Preview & publish" onBack={() => onNavigate('CREATE_VENUE_POLICIES')}>
+            <div className="pt-card p-5 sm:p-6 flex flex-col gap-5">
+                <div className="text-center">
+                    <h2 className="pt-h-sec">Preview your venue</h2>
+                    <p className="text-[13px] text-tlb-sub mt-0.5">Review everything before submitting.</p>
+                </div>
 
-            {previewModel && <AppListingPreview model={previewModel} listingId={draftId || undefined} />}
+                {previewModel && <AppListingPreview model={previewModel} listingId={draftId || undefined} />}
 
-            {/* Submission readiness */}
-            {missing.length > 0 ? (
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-2">
-                    <div className="flex items-center gap-2 text-amber-700">
-                        <AlertCircle size={16} />
-                        <p className="text-xs font-black uppercase tracking-widest">Missing for submission</p>
+                {/* Submission readiness */}
+                {missing.length > 0 ? (
+                    <div className="pt-note bg-tlb-amber-soft text-tlb-gold flex-col items-start gap-2">
+                        <div className="flex items-center gap-2">
+                            <AlertCircle size={15} strokeWidth={2.75} />
+                            <p className="pt-eyebrow !text-tlb-gold">Missing for submission</p>
+                        </div>
+                        <ul className="text-xs list-disc pl-5 space-y-0.5">
+                            {missing.map(m => <li key={m}>{m}</li>)}
+                        </ul>
                     </div>
-                    <ul className="text-xs text-amber-700 list-disc pl-5 space-y-0.5">
-                        {missing.map(m => <li key={m}>{m}</li>)}
-                    </ul>
-                </div>
-            ) : venue.status === 'draft' ? (
-                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-2 text-emerald-700">
-                    <CheckCircle2 size={16} />
-                    <p className="text-xs font-black uppercase tracking-widest">Ready to submit for review</p>
-                </div>
-            ) : (
-                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-center gap-2 text-blue-700">
-                    <CheckCircle2 size={16} />
-                    <p className="text-xs font-black uppercase tracking-widest">Venue is {venue.status} — already submitted.</p>
-                </div>
-            )}
+                ) : venue.status === 'draft' ? (
+                    <div className="pt-note bg-tlb-green-soft text-tlb-green">
+                        <CheckCircle2 size={15} strokeWidth={2.75} />
+                        <p className="pt-eyebrow !text-tlb-green">Ready to submit for review</p>
+                    </div>
+                ) : (
+                    <div className="pt-note bg-tlb-blue-soft text-tlb-blue">
+                        <CheckCircle2 size={15} strokeWidth={2.75} />
+                        <p className="pt-eyebrow !text-tlb-blue">Venue is {venue.status} — already submitted.</p>
+                    </div>
+                )}
 
-            <WizardNavigation
-                onBack={() => onNavigate('CREATE_VENUE_POLICIES')}
-                onNext={canSubmit && !submitting ? handleSubmit : () => {}}
-                nextText={submitting ? 'Submitting…' : venue.status === 'draft' ? 'Submit for Review' : 'Done'}
-                nextIcon={submitting ? <Loader2 size={20} className="animate-spin" /> : <Rocket size={20} />}
-                themeColor="amber"
-            />
+                <WizardNav
+                    onBack={() => onNavigate('CREATE_VENUE_POLICIES')}
+                    onNext={canSubmit && !submitting ? handleSubmit : () => {}}
+                    nextText={submitting ? 'Submitting…' : venue.status === 'draft' ? 'Submit for review' : 'Done'}
+                    nextIcon={submitting ? <Loader2 size={14} className="animate-spin" /> : <Rocket size={14} strokeWidth={2.75} />}
+                />
+            </div>
 
             {modal && (
                 <ResultModal variant={modal.variant} message={modal.message} onClose={handleModalClose} />
             )}
-        </WizardLayout>
+        </WizardShell>
     );
 };

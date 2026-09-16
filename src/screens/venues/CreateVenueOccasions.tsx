@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation, toast } from '../../components/ui';
+import { toast } from '../../components/ui';
+import { WizardShell, WizardNav, WizardField, OptionTileGrid } from '../../components/portal/wizard';
 import {
     getVenueMetaOccasions,
     getVenueMetaDiscoveryEnums,
@@ -19,12 +20,12 @@ interface OccasionItem { id: number; name: string; slug: string }
 interface DiscoveryOption { value: string; label: string }
 
 const ATTENDEE_FIELD_OPTIONS: { key: string; label: string }[] = [
-    { key: 'child_name',           label: 'Contact Person Name' },
+    { key: 'child_name',           label: 'Contact person name' },
     { key: 'child_age',            label: 'Age' },
-    { key: 'contact_number',       label: 'Contact Number' },
+    { key: 'contact_number',       label: 'Contact number' },
     { key: 'email',                label: 'Email' },
-    { key: 'guest_count',          label: 'Guest Count' },
-    { key: 'special_requirements', label: 'Special Requirements' },
+    { key: 'guest_count',          label: 'Guest count' },
+    { key: 'special_requirements', label: 'Special requirements' },
 ];
 
 export const CreateVenueOccasions: React.FC<Props> = ({ onNavigate }) => {
@@ -144,19 +145,19 @@ export const CreateVenueOccasions: React.FC<Props> = ({ onNavigate }) => {
 
     if (loading) {
         return (
-            <WizardLayout title="Occasions & Discovery" stepText="Step 2 of 7" subtitle="Configuration" progressPercentage={29} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_DETAILS')}>
-                <div className="flex items-center justify-center gap-2 text-gray-400 text-xs font-bold py-12">
+            <WizardShell title="New venue" entityType="Venues" step={2} totalSteps={7} stepLabel="Occasions" onBack={() => onNavigate('CREATE_VENUE_DETAILS')}>
+                <div className="pt-card p-5 sm:p-6 flex items-center justify-center gap-2 text-tlb-muted text-xs font-bold py-12">
                     <Loader2 size={16} className="animate-spin" /> Loading…
                 </div>
-            </WizardLayout>
+            </WizardShell>
         );
     }
 
     if (loadError) {
         return (
-            <WizardLayout title="Occasions & Discovery" stepText="Step 2 of 7" subtitle="Configuration" progressPercentage={29} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_DETAILS')}>
-                <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-xs font-bold text-red-600">{loadError}</div>
-            </WizardLayout>
+            <WizardShell title="New venue" entityType="Venues" step={2} totalSteps={7} stepLabel="Occasions" onBack={() => onNavigate('CREATE_VENUE_DETAILS')}>
+                <div className="pt-note bg-tlb-red-soft text-tlb-red-deep">{loadError}</div>
+            </WizardShell>
         );
     }
 
@@ -173,11 +174,9 @@ export const CreateVenueOccasions: React.FC<Props> = ({ onNavigate }) => {
             {options.map(o => (
                 <button
                     key={o.value}
+                    type="button"
                     onClick={() => toggle(o.value)}
-                    className={`px-3.5 py-2 rounded-full text-xs font-bold transition-all ${selected.includes(o.value)
-                        ? 'bg-amber-500 text-white shadow-sm'
-                        : 'bg-white border border-gray-200 text-gray-500 hover:border-amber-300'
-                    }`}
+                    className={`pt-scope ${selected.includes(o.value) ? 'is-active' : ''}`}
                 >
                     {o.label}
                 </button>
@@ -186,91 +185,70 @@ export const CreateVenueOccasions: React.FC<Props> = ({ onNavigate }) => {
     );
 
     return (
-        <WizardLayout title="Occasions & Discovery" stepText="Step 2 of 7" subtitle="Configuration" progressPercentage={29} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_DETAILS')}>
-            <div className="space-y-1">
-                <h2 className="text-2xl font-black">Occasions & Discovery</h2>
-                <p className="text-sm text-gray-400">Help customers find the right fit.</p>
-            </div>
+        <WizardShell title="New venue" entityType="Venues" step={2} totalSteps={7} stepLabel="Occasions" onBack={() => onNavigate('CREATE_VENUE_DETAILS')}>
+            <div className="pt-card p-5 sm:p-6 flex flex-col gap-5">
+                <div>
+                    <h2 className="pt-h-sec">Occasions &amp; discovery</h2>
+                    <p className="text-[13px] text-tlb-sub mt-0.5">Help customers find the right fit.</p>
+                </div>
 
-            {/* Occasions */}
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">Supported Occasions <span className="text-gray-300 font-normal normal-case">(optional)</span></label>
-                {occasions.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-3">
-                        {occasions.map(occ => (
-                            <button key={occ.id} onClick={() => toggleOccasion(occ.id)}
-                                className={`p-4 rounded-2xl border-2 flex items-center gap-3 transition-all ${
-                                    selectedOccasionIds.includes(occ.id)
-                                        ? 'border-amber-400 bg-amber-50'
-                                        : 'border-gray-100 bg-white hover:border-amber-200'
-                                }`}>
-                                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
-                                    selectedOccasionIds.includes(occ.id)
-                                        ? 'bg-amber-500 border-amber-500'
-                                        : 'border-gray-300'
-                                }`}>
-                                    {selectedOccasionIds.includes(occ.id) && (
-                                        <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                                            <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                        </svg>
-                                    )}
-                                </div>
-                                <span className={`text-sm font-bold ${selectedOccasionIds.includes(occ.id) ? 'text-amber-900' : 'text-gray-600'}`}>{occ.name}</span>
+                <WizardField label="Supported occasions">
+                    {occasions.length > 0 ? (
+                        <OptionTileGrid
+                            options={occasions.map(occ => ({ id: String(occ.id), label: occ.name }))}
+                            isSelected={(id) => selectedOccasionIds.includes(Number(id))}
+                            onToggle={(id) => toggleOccasion(Number(id))}
+                        />
+                    ) : (
+                        <p className="text-xs text-tlb-muted italic">No occasions available.</p>
+                    )}
+                </WizardField>
+
+                {outingTypeOptions.length > 0 && (
+                    <WizardField label="Outing type">
+                        <ChipGroup options={outingTypeOptions} selected={selectedOutingTypes} toggle={toggleOutingType} />
+                    </WizardField>
+                )}
+
+                {activityTypeOptions.length > 0 && (
+                    <WizardField label="Activity type">
+                        <ChipGroup options={activityTypeOptions} selected={selectedActivityTypes} toggle={toggleActivityType} />
+                    </WizardField>
+                )}
+
+                {formatTypeOptions.length > 0 && (
+                    <WizardField label="Format">
+                        <ChipGroup options={formatTypeOptions} selected={selectedFormatTypes} toggle={toggleFormatType} />
+                    </WizardField>
+                )}
+
+                <WizardField label="Require at checkout">
+                    <div className="pt-card overflow-hidden">
+                        {ATTENDEE_FIELD_OPTIONS.map((field, idx) => (
+                            <button
+                                key={field.key}
+                                type="button"
+                                onClick={() => toggleField(field.key)}
+                                className={`w-full flex items-center justify-between p-4 transition-colors hover:bg-tlb-wash ${idx !== ATTENDEE_FIELD_OPTIONS.length - 1 ? 'border-b border-tlb-divider' : ''}`}
+                            >
+                                <span className="text-sm font-semibold text-tlb-body">{field.label}</span>
+                                <span
+                                    role="switch"
+                                    aria-checked={requiredFields.includes(field.key)}
+                                    className="pt-switch"
+                                />
                             </button>
                         ))}
                     </div>
-                ) : (
-                    <p className="text-xs text-gray-400 italic">No occasions available.</p>
-                )}
+                </WizardField>
+
+                <WizardNav
+                    onBack={() => onNavigate('CREATE_VENUE_DETAILS')}
+                    onNext={saving ? () => {} : handleNext}
+                    nextText={saving ? 'Saving…' : 'Next: Availability'}
+                    nextIcon={saving ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} strokeWidth={2.75} />}
+                />
             </div>
-
-            {/* Discovery — Outing Types */}
-            {outingTypeOptions.length > 0 && (
-                <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">Outing Type <span className="text-gray-300 font-normal normal-case">(optional)</span></label>
-                    <ChipGroup options={outingTypeOptions} selected={selectedOutingTypes} toggle={toggleOutingType} />
-                </div>
-            )}
-
-            {/* Discovery — Activity Types */}
-            {activityTypeOptions.length > 0 && (
-                <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">Activity Type <span className="text-gray-300 font-normal normal-case">(optional)</span></label>
-                    <ChipGroup options={activityTypeOptions} selected={selectedActivityTypes} toggle={toggleActivityType} />
-                </div>
-            )}
-
-            {/* Discovery — Format Types */}
-            {formatTypeOptions.length > 0 && (
-                <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">Format <span className="text-gray-300 font-normal normal-case">(optional)</span></label>
-                    <ChipGroup options={formatTypeOptions} selected={selectedFormatTypes} toggle={toggleFormatType} />
-                </div>
-            )}
-
-            {/* Required Attendee Info */}
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">Require at Checkout <span className="text-gray-300 font-normal normal-case">(optional)</span></label>
-                <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
-                    {ATTENDEE_FIELD_OPTIONS.map((field, idx) => (
-                        <button key={field.key} onClick={() => toggleField(field.key)}
-                            className={`w-full flex items-center justify-between p-4 transition-colors ${idx !== ATTENDEE_FIELD_OPTIONS.length - 1 ? 'border-b border-gray-50' : ''} hover:bg-gray-50`}>
-                            <span className="text-sm font-semibold text-gray-700">{field.label}</span>
-                            <div className={`w-12 h-6 rounded-full p-1 transition-colors ${requiredFields.includes(field.key) ? 'bg-amber-400' : 'bg-gray-200'}`}>
-                                <div className={`w-4 h-4 bg-white rounded-full transition-transform ${requiredFields.includes(field.key) ? 'translate-x-6' : 'translate-x-0'}`} />
-                            </div>
-                        </button>
-                    ))}
-                </div>
-            </div>
-
-            <WizardNavigation
-                onBack={() => onNavigate('CREATE_VENUE_DETAILS')}
-                onNext={saving ? () => {} : handleNext}
-                nextText={saving ? 'Saving…' : 'Next: Availability'}
-                nextIcon={saving ? <Loader2 size={20} className="animate-spin" /> : <ArrowRight size={20} />}
-                themeColor="amber"
-            />
-        </WizardLayout>
+        </WizardShell>
     );
 };

@@ -111,6 +111,18 @@ describe('OTPVerify — verify OTP API', () => {
         await waitFor(() => expect(screen.getByText('Invalid OTP. Please try again.')).toBeInTheDocument());
     });
 
+    it('shows a "too many attempts" toast on a 429, not the generic invalid-OTP message', async () => {
+        server.use(http.post(`${BASE}/api/v1/auth/verify-otp/`, () =>
+            HttpResponse.json({ error: 'Too many requests' }, { status: 429 })));
+        renderOTPVerify();
+        const user = userEvent.setup();
+        const inputs = screen.getAllByRole('textbox');
+        for (let i = 0; i < 6; i++) await user.type(inputs[i], '0');
+        await user.click(screen.getByRole('button', { name: /verify identity/i }));
+        await waitFor(() => expect(screen.getByText(/too many attempts/i)).toBeInTheDocument());
+        expect(screen.queryByText('Invalid OTP. Please try again.')).not.toBeInTheDocument();
+    });
+
     it('rejects login when partner status indicates onboarding is incomplete', async () => {
         // Partner exists but only at otp_verified — login should refuse the session.
         server.use(http.get(`${BASE}/api/v1/partner/me/`, () =>
@@ -149,6 +161,21 @@ describe('OTPVerify — resend OTP', () => {
         await waitFor(() => expect(captured).not.toBeNull(), { timeout: 5000 });
         expect(captured.identifier).toBe('test@example.com');
     }, 30000);
+
+    it('shows a "too many attempts" toast when resend hits the new rate limit', async () => {
+        vi.useFakeTimers();
+        server.use(http.post(`${BASE}/api/v1/auth/request-otp/`, () =>
+            HttpResponse.json({ error: 'Too many requests' }, { status: 429 })));
+        renderOTPVerify();
+        for (let i = 0; i < 31; i++) {
+            act(() => { vi.advanceTimersByTime(1000); });
+        }
+        const resendBtn = screen.getByRole('button', { name: /resend otp/i });
+        vi.useRealTimers();
+        const user = userEvent.setup({ delay: null });
+        await user.click(resendBtn);
+        await waitFor(() => expect(screen.getByText(/too many attempts/i)).toBeInTheDocument());
+    });
 
     it('shows "Change Number/Email?" link', () => {
         renderOTPVerify();

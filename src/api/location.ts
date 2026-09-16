@@ -13,10 +13,27 @@ export interface ResolvedLocation {
     longitude: number;
 }
 
+// All three endpoints proxy billed Google Maps calls and are now capped at
+// 30 requests/minute per partner account — comfortably above normal
+// debounced typing/dragging, so a 429 here should read as "slow down", not
+// as a broken search or an unresolvable address.
+export class LocationApiError extends Error {
+    status: number;
+    code?: string;
+    constructor(message: string, status: number, code?: string) {
+        super(message);
+        this.status = status;
+        this.code = code;
+    }
+}
+
+const RATE_LIMIT_MESSAGE = "You're searching a bit fast — please slow down a moment.";
+
 const handleError = async (response: Response, fallback: string): Promise<never> => {
+    if (response.status === 429) throw new LocationApiError(RATE_LIMIT_MESSAGE, 429, 'RATE_LIMIT_EXCEEDED');
     const err = await response.json().catch(() => null);
     const msg: string = err?.error?.message || err?.message || fallback;
-    throw new Error(msg);
+    throw new LocationApiError(msg, response.status, err?.error?.code);
 };
 
 /** GET /partner/location/autocomplete/ — search-as-you-type address suggestions. */

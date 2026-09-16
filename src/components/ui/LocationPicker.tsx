@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Search, MapPin, Loader2, X, Navigation, CheckCircle2 } from 'lucide-react';
-import { autocompleteLocation, getPlaceDetails, reverseGeocodeLocation, LocationSuggestion, ResolvedLocation } from '../../api/location';
+import { autocompleteLocation, getPlaceDetails, reverseGeocodeLocation, LocationApiError, LocationSuggestion, ResolvedLocation } from '../../api/location';
 
 export interface PickedLocation extends ResolvedLocation {
     place_id?: string;
@@ -72,6 +72,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
     const [query, setQuery] = useState('');
     const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
     const [searching, setSearching] = useState(false);
+    const [searchNotice, setSearchNotice] = useState<string | null>(null);
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [resolving, setResolving] = useState(false);
     const [locating, setLocating] = useState(false);
@@ -162,8 +163,12 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
             const token = sessionTokenRef.current || newSessionToken();
             const results = await autocompleteLocation(q, token);
             setSuggestions(results);
-        } catch {
+        } catch (err) {
             setSuggestions([]);
+            // A 429 here means requests are going out faster than normal debounced
+            // typing should produce — surface it as "slow down", not a silent
+            // empty-results state (which would look like a genuine no-match).
+            setSearchNotice(err instanceof LocationApiError && err.status === 429 ? err.message : null);
         } finally {
             setSearching(false);
         }
@@ -172,6 +177,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
     const handleQueryChange = (v: string) => {
         setQuery(v);
         setDropdownOpen(true);
+        setSearchNotice(null);
         if (v.trim().length < 3) { setSuggestions([]); return; }
         setSearching(true);
         runSearch(v);
@@ -254,7 +260,13 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
                         )}
                     </div>
 
-                    {dropdownOpen && suggestions.length > 0 && (
+                    {dropdownOpen && searchNotice && (
+                        <div className="mt-2 bg-white rounded-2xl border border-gray-100 shadow-xl px-4 py-3">
+                            <p className="text-xs font-semibold text-amber-600">{searchNotice}</p>
+                        </div>
+                    )}
+
+                    {dropdownOpen && !searchNotice && suggestions.length > 0 && (
                         <div className="mt-2 bg-white rounded-2xl border border-gray-100 shadow-xl overflow-hidden max-h-64 overflow-y-auto">
                             {suggestions.map((s) => (
                                 <button

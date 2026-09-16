@@ -313,9 +313,16 @@ function AppInner() {
         }
 
         // Shared with apiClient's own 401-retry — never re-implement this fetch here.
-        const newAccess = await refreshAccessToken();
+        let newAccess = await refreshAccessToken();
+        if (!newAccess && getRefreshToken()) {
+          // Tokens survived the failed call — refresh-token 429'd (a transient
+          // rate limit, not an invalid/expired token). Back off briefly and
+          // retry once before giving up, rather than logging the user out.
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          newAccess = await refreshAccessToken();
+        }
         if (!newAccess) {
-          // Refresh token is invalid/expired, or the request failed — full logout
+          // Refresh token is invalid/expired, or the retry also failed — full logout
           setInitializing(false);
           return;
         }

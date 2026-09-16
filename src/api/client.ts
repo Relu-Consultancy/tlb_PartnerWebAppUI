@@ -25,7 +25,10 @@ export const refreshAccessToken = async (): Promise<string | null> => {
             body: JSON.stringify({ refresh_token }),
         });
         if (!refreshResponse.ok) {
-            clearTokens();
+            // A 429 here is a transient rate limit, not an invalid/expired refresh
+            // token — keep the session tokens intact so the caller can retry shortly
+            // instead of the user being logged out mid-burst.
+            if (refreshResponse.status !== 429) clearTokens();
             return null;
         }
         const res = await refreshResponse.json();

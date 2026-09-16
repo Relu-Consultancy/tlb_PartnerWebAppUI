@@ -1,8 +1,8 @@
 import React from 'react';
 import { LISTING_STATUS_META, Pill } from '../../../components/portal';
-import { slotLabelOf } from '../../../utils/format';
 import { ListingDemand, ListingRow } from '../types';
 import { SERVICE_LABEL, SERVICE_TONE, MODEL_LABEL } from '../presentation';
+import { nextSlotLabel } from '../model';
 import { RowActions } from './RowActions';
 
 const GRID_COLS = 'grid-cols-[minmax(0,1.7fr)_92px_92px_84px_92px_112px_92px_160px]';
@@ -16,12 +16,6 @@ interface ListingsTableProps {
     onTogglePause: (row: ListingRow) => void;
     onToggleArchive: (row: ListingRow) => void;
 }
-
-const nextSlotLabel = (row: ListingRow, now: Date): string => {
-    if (!row.enriched) return '…';
-    if (row.state !== 'live' && row.state !== 'pending') return '—';
-    return slotLabelOf(row.startsAt, now);
-};
 
 export const ListingsTable: React.FC<ListingsTableProps> = ({ rows, demandOf, now, onOpen, onEdit, onTogglePause, onToggleArchive }) => (
     <div className="pt-card overflow-x-auto">

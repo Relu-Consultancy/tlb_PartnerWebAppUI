@@ -121,7 +121,7 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate }) => {
                 <button type="button" onClick={handleAddListing} className="pt-btn pt-btn-d">+ New listing</button>
             </div>
 
-            <PendingBanner rows={listings.rows} onViewPending={() => setStatus('pending')} />
+            <PendingBanner rows={listings.rows} onViewStatus={setStatus} />
 
             <StatsStrip counts={counts} settled={settled} settledLabel={`earned ${getDateRangeOption(dateRange).phrase}`} />
 
@@ -162,6 +162,7 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate }) => {
                 enquiries={enquiries.entries}
                 bookings={bookings.entries}
                 demand={selectedRow ? computeDemand(selectedRow) : null}
+                now={now}
                 onClose={() => setSelectedRow(null)}
                 onNavigate={onNavigate}
                 onEdit={handleEdit}

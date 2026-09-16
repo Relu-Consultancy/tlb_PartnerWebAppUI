@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AlertCircle, ArrowRight, Loader2, Star } from 'lucide-react';
+import { AlertCircle, ArrowRight, Star } from 'lucide-react';
 import { Screen } from '../../../types';
 import { getListingReviews, PartnerReview } from '../../../api/reviews';
 import { LISTING_STATUS_META, Pill, PortalModal } from '../../../components/portal';
@@ -8,12 +8,14 @@ import { BookingEntry, EnquiryEntry } from '../../bookings-enquiries/types';
 import { ENQUIRY_STATUS_META } from '../../bookings-enquiries/presentation';
 import { ListingDemand, ListingRow } from '../types';
 import { SERVICE_LABEL, SERVICE_TONE, MODEL_LABEL } from '../presentation';
+import { nextSlotLabel } from '../model';
 
 interface ListingDetailModalProps {
     row: ListingRow | null;
     enquiries: EnquiryEntry[];
     bookings: BookingEntry[];
     demand: ListingDemand | null;
+    now: Date;
     onClose: () => void;
     onNavigate: (screen: Screen) => void;
     onEdit: (row: ListingRow) => void;
@@ -28,7 +30,7 @@ const fmtDate = (iso: string | null): string => {
 };
 
 export const ListingDetailModal: React.FC<ListingDetailModalProps> = ({
-    row, enquiries, bookings, demand, onClose, onNavigate, onEdit, onTogglePause, onToggleArchive,
+    row, enquiries, bookings, demand, now, onClose, onNavigate, onEdit, onTogglePause, onToggleArchive,
 }) => {
     const [reviews, setReviews] = useState<PartnerReview[] | null>(null);
 
@@ -55,7 +57,6 @@ export const ListingDetailModal: React.FC<ListingDetailModalProps> = ({
             </div>
             <div className="flex flex-wrap items-center gap-2 mb-4 text-[12.5px] text-tlb-sub">
                 <span className="pt-code">{row.code}</span>
-                <span>{row.location}</span>
             </div>
 
             {row.state === 'rejected' && row.reviewMessage && (
@@ -73,10 +74,13 @@ export const ListingDetailModal: React.FC<ListingDetailModalProps> = ({
                 </div>
             )}
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 pb-4 border-b border-tlb-divider">
-                <div><p className="pt-eyebrow mb-1">Model</p><p className="text-[13px] font-semibold text-tlb-ink">{MODEL_LABEL[row.model]}</p></div>
+            <div className="grid grid-cols-2 gap-x-5 gap-y-3.5 pb-4 border-b border-tlb-divider">
+                <div><p className="pt-eyebrow mb-1">Service</p><p className="text-[13px] font-semibold text-tlb-ink">{SERVICE_LABEL[row.entityType]}</p></div>
+                <div><p className="pt-eyebrow mb-1">Revenue model</p><p className="text-[13px] font-semibold text-tlb-ink">{MODEL_LABEL[row.model]}</p></div>
                 <div><p className="pt-eyebrow mb-1">Price</p><p className="text-[13px] font-semibold text-tlb-ink">{row.priceLabel}</p></div>
                 <div><p className="pt-eyebrow mb-1">Capacity</p><p className="text-[13px] font-semibold text-tlb-ink">{row.capacityLabel}</p></div>
+                <div><p className="pt-eyebrow mb-1">Location</p><p className="text-[13px] font-semibold text-tlb-ink">{row.location}</p></div>
+                <div><p className="pt-eyebrow mb-1">Next slot</p><p className="text-[13px] font-semibold text-tlb-ink">{nextSlotLabel(row, now)}</p></div>
                 <div><p className="pt-eyebrow mb-1">This period</p><p className="text-[13px] font-semibold text-tlb-ink">{demand ? demand.label : '—'}</p></div>
                 <div><p className="pt-eyebrow mb-1">Listed on</p><p className="text-[13px] font-semibold text-tlb-ink">{fmtDate(row.createdAt)}</p></div>
             </div>
@@ -88,40 +92,57 @@ export const ListingDetailModal: React.FC<ListingDetailModalProps> = ({
                 </div>
             )}
 
-            {row.model === 'ticketed' && buyers.length > 0 && (
+            {row.model === 'ticketed' && (
                 <div className="mt-5">
                     <p className="pt-eyebrow mb-2">Recent bookings</p>
-                    <div className="rounded-xl border border-tlb-divider overflow-hidden">
-                        {buyers.map(b => (
-                            <div key={b.id} className="flex items-center justify-between gap-3 px-3.5 py-2.5 border-b border-tlb-divider last:border-b-0 text-[12.5px]">
+                    <div className="rounded-xl border border-tlb-divider overflow-hidden overflow-x-auto">
+                        <div className="min-w-[480px] grid grid-cols-[minmax(0,1.4fr)_100px_72px_100px_112px] gap-3 px-3.5 py-2 bg-tlb-chrome border-b border-tlb-divider">
+                            {['Customer', 'Booking', 'Seats', 'Amount', 'Purchased'].map(h => (
+                                <span key={h} className="pt-eyebrow">{h}</span>
+                            ))}
+                        </div>
+                        {buyers.length > 0 ? buyers.map(b => (
+                            <div key={b.id} className="min-w-[480px] grid grid-cols-[minmax(0,1.4fr)_100px_72px_100px_112px] gap-3 items-center px-3.5 py-2.5 border-b border-tlb-divider last:border-b-0 text-[12.5px]">
                                 <span className="font-medium text-tlb-ink truncate">{b.customerName}</span>
-                                <span className="pt-code flex-none">{b.bookingReference || `BKG-${b.id}`}</span>
-                                <span className="font-bold text-tlb-ink flex-none">{formatRupees(b.amount)}</span>
+                                <span className="pt-code">{b.bookingReference || `BKG-${b.id}`}</span>
+                                <span className="text-tlb-muted">—</span>
+                                <span className="font-bold text-tlb-ink">{formatRupees(b.amount)}</span>
+                                <span className="text-tlb-sub">{fmtDate(b.createdAt)}</span>
                             </div>
-                        ))}
+                        )) : (
+                            <div className="min-w-[480px] px-3.5 py-3 text-[12.5px] text-tlb-muted">No bookings yet.</div>
+                        )}
                     </div>
                 </div>
             )}
 
-            {row.model === 'enquiry' && leads.length > 0 && (
+            {row.model === 'enquiry' && (
                 <div className="mt-5">
                     <p className="pt-eyebrow mb-2">Recent enquiries</p>
-                    <div className="rounded-xl border border-tlb-divider overflow-hidden">
-                        {leads.map(e => (
-                            <div key={e.id} className="flex items-center justify-between gap-3 px-3.5 py-2.5 border-b border-tlb-divider last:border-b-0 text-[12.5px]">
+                    <div className="rounded-xl border border-tlb-divider overflow-hidden overflow-x-auto">
+                        <div className="min-w-[520px] grid grid-cols-[minmax(0,1.3fr)_92px_112px_100px_120px] gap-3 px-3.5 py-2 bg-tlb-chrome border-b border-tlb-divider">
+                            {['Customer', 'Enquiry', 'Date wanted', 'Value', 'Stage'].map(h => (
+                                <span key={h} className="pt-eyebrow">{h}</span>
+                            ))}
+                        </div>
+                        {leads.length > 0 ? leads.map(e => (
+                            <div key={e.id} className="min-w-[520px] grid grid-cols-[minmax(0,1.3fr)_92px_112px_100px_120px] gap-3 items-center px-3.5 py-2.5 border-b border-tlb-divider last:border-b-0 text-[12.5px]">
                                 <span className="font-medium text-tlb-ink truncate">{e.name}</span>
-                                <Pill tone={ENQUIRY_STATUS_META[e.status].tone}>{ENQUIRY_STATUS_META[e.status].label}</Pill>
+                                <span className="pt-code">ENQ-{e.id}</span>
+                                <span className="text-tlb-muted">—</span>
+                                <span className="text-tlb-muted">—</span>
+                                <div><Pill tone={ENQUIRY_STATUS_META[e.status].tone}>{ENQUIRY_STATUS_META[e.status].label}</Pill></div>
                             </div>
-                        ))}
+                        )) : (
+                            <div className="min-w-[520px] px-3.5 py-3 text-[12.5px] text-tlb-muted">No enquiries yet.</div>
+                        )}
                     </div>
                 </div>
             )}
 
-            {reviews === null ? (
-                <div className="flex items-center justify-center py-4 text-tlb-muted"><Loader2 size={16} className="animate-spin" /></div>
-            ) : reviews.length > 0 && (
-                <div className="mt-5">
-                    <p className="pt-eyebrow mb-2">Customer reviews</p>
+            <div className="mt-5">
+                <p className="pt-eyebrow mb-2">Customer reviews</p>
+                {reviews && reviews.length > 0 && (
                     <div className="rounded-xl border border-tlb-divider overflow-hidden">
                         {reviews.slice(0, 3).map(r => (
                             <div key={r.id} className="px-3.5 py-2.5 border-b border-tlb-divider last:border-b-0">
@@ -135,8 +156,8 @@ export const ListingDetailModal: React.FC<ListingDetailModalProps> = ({
                             </div>
                         ))}
                     </div>
-                </div>
-            )}
+                )}
+            </div>
 
             <div className="flex flex-wrap items-center gap-2.5 mt-5 pt-4 border-t border-tlb-divider">
                 <button type="button" onClick={() => onEdit(row)} disabled={!editable} className="pt-btn pt-btn-y">

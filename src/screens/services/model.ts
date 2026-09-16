@@ -1,6 +1,6 @@
 import { EntityType } from '../../types';
 import { ListingState } from '../../api/portalSummary';
-import { formatRupees, parseDate, toNumber } from '../../utils/format';
+import { formatRupees, parseDate, slotLabelOf, toNumber } from '../../utils/format';
 import { BookingEntry, EnquiryEntry } from '../bookings-enquiries/types';
 import { BookingModel, ListingDemand, ListingRow } from './types';
 import { DateRangeKey, isWithinRange } from '../../constants/dateRange';
@@ -135,6 +135,14 @@ export const filterListings = (rows: ListingRow[], filters: ListingFilters): Lis
             if (!q) return true;
             return r.title.toLowerCase().includes(q) || r.code.toLowerCase().includes(q);
         });
+
+// ── Next slot — shared by the table row and the detail modal ───────────────
+
+export const nextSlotLabel = (row: Pick<ListingRow, 'enriched' | 'state' | 'startsAt'>, now: Date): string => {
+    if (!row.enriched) return '…';
+    if (row.state !== 'live' && row.state !== 'pending') return '—';
+    return slotLabelOf(row.startsAt, now);
+};
 
 // ── Demand — bookings/enquiries for a listing within the reporting window ──
 

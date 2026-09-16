@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation, FaqTermsEditor, FaqApi, RefundPolicyToggle } from '../../components/ui';
+import { FaqTermsEditor, FaqApi, RefundPolicyToggle } from '../../components/ui';
+import { WizardShell, WizardNav } from '../../components/portal/wizard';
 import {
     getCurrentDraftId, getListingDetail, updateListing,
     getEventFaqs, createEventFaq, updateEventFaq, deleteEventFaq,
@@ -53,44 +54,32 @@ export const CreateEventPolicies: React.FC<Props> = ({ onNavigate }) => {
     };
 
     return (
-        <WizardLayout
-            title="New Event Listing"
-            stepText="Step 4 of 5"
-            subtitle="FAQs & Terms"
-            progressPercentage={80}
-            themeColor="blue"
-            onBack={() => onNavigate('CREATE_EVENT_MEDIA')}
-        >
-            <div className="space-y-1 mb-6">
-                <h2 className="text-2xl font-black">FAQs &amp; Terms</h2>
-                <p className="text-sm text-gray-400">Help customers with answers and your policies. Both are optional.</p>
-            </div>
-
-            {error && (
-                <div className="bg-red-50 border border-red-200 rounded-2xl p-3 text-xs font-bold text-red-600 mb-4">
-                    {error}
+        <WizardShell title="New event" entityType="Events" step={4} totalSteps={5} stepLabel="FAQs & terms" onBack={() => onNavigate('CREATE_EVENT_MEDIA')}>
+            <div className="pt-card p-5 sm:p-6 flex flex-col gap-6">
+                <div>
+                    <h2 className="pt-h-sec">FAQs &amp; terms</h2>
+                    <p className="text-[13px] text-tlb-sub mt-0.5">Help customers with answers and your policies. Both are optional.</p>
                 </div>
-            )}
 
-            <div className="mb-8">
-                <RefundPolicyToggle value={isRefundable} onChange={setIsRefundable} accent="blue" />
+                {error && <div className="pt-note bg-tlb-red-soft text-tlb-red-deep">{error}</div>}
+
+                <RefundPolicyToggle value={isRefundable} onChange={setIsRefundable} />
+
+                {draftId ? (
+                    <FaqTermsEditor listingId={draftId} faqApi={eventFaqApi} faqDocumentsEntity="events" />
+                ) : (
+                    <div className="pt-note bg-tlb-amber-soft text-tlb-gold">
+                        Please complete the earlier steps first so we can save your FAQs and terms.
+                    </div>
+                )}
+
+                <WizardNav
+                    onNext={handleNext}
+                    nextText={saving ? 'Saving…' : 'Next: Review'}
+                    nextIcon={saving ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} strokeWidth={2.75} />}
+                />
             </div>
-
-            {draftId ? (
-                <FaqTermsEditor listingId={draftId} faqApi={eventFaqApi} accent="blue" faqDocumentsEntity="events" />
-            ) : (
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm font-bold text-amber-700">
-                    Please complete the earlier steps first so we can save your FAQs and terms.
-                </div>
-            )}
-
-            <WizardNavigation
-                onNext={handleNext}
-                nextText={saving ? 'Saving…' : 'Next: Review'}
-                nextIcon={saving ? <Loader2 size={20} className="animate-spin" /> : <ArrowRight size={20} />}
-                themeColor="blue"
-            />
-        </WizardLayout>
+        </WizardShell>
     );
 };
 

@@ -53,12 +53,12 @@ describe('CreateEventSchedule — pre-fill from draft', () => {
         });
     });
 
-    it('shows Free Event selected when draft has price_type free', async () => {
+    it('shows Free event selected when draft has price_type free', async () => {
         setCurrentDraftId(DRAFT_ID);
         render(<CreateEventSchedule {...props} />);
         await waitFor(() => {
-            const freeBtn = screen.getByText('Free Event').closest('button');
-            expect(freeBtn?.className).toContain('border-emerald-400');
+            const freeBtn = screen.getByText('Free event').closest('button');
+            expect(freeBtn?.className).toContain('is-on');
         });
     });
 
@@ -73,12 +73,12 @@ describe('CreateEventSchedule — pre-fill from draft', () => {
 });
 
 describe('CreateEventSchedule — pricing toggle', () => {
-    it('shows ticket tiers section when Paid Event is selected', async () => {
+    it('shows ticket tiers section when Paid event is selected', async () => {
         setCurrentDraftId(DRAFT_ID);
         const user = userEvent.setup();
         render(<CreateEventSchedule {...props} />);
-        await waitFor(() => screen.getByText('Free Event'));
-        await user.click(screen.getByText('Paid Event'));
+        await waitFor(() => screen.getByText('Free event'));
+        await user.click(screen.getByText('Paid event'));
         expect(screen.getByText(/ticket tiers/i)).toBeInTheDocument();
     });
 
@@ -86,17 +86,17 @@ describe('CreateEventSchedule — pricing toggle', () => {
         setCurrentDraftId(DRAFT_ID);
         const user = userEvent.setup();
         render(<CreateEventSchedule {...props} />);
-        await waitFor(() => screen.getByText('Paid Event'));
-        await user.click(screen.getByText('Paid Event'));
+        await waitFor(() => screen.getByText('Paid event'));
+        await user.click(screen.getByText('Paid event'));
         expect(screen.getByText(/switching pricing type/i)).toBeInTheDocument();
     });
 
-    it('hides capacity field when Paid Event is selected', async () => {
+    it('hides capacity field when Paid event is selected', async () => {
         setCurrentDraftId(DRAFT_ID);
         const user = userEvent.setup();
         render(<CreateEventSchedule {...props} />);
-        await waitFor(() => screen.getByText('Paid Event'));
-        await user.click(screen.getByText('Paid Event'));
+        await waitFor(() => screen.getByText('Paid event'));
+        await user.click(screen.getByText('Paid event'));
         expect(screen.queryByPlaceholderText(/e\.g\. 100/i)).not.toBeInTheDocument();
     });
 });
@@ -106,8 +106,8 @@ describe('CreateEventSchedule — ticket management', () => {
         setCurrentDraftId(DRAFT_ID);
         const user = userEvent.setup();
         render(<CreateEventSchedule {...props} />);
-        await waitFor(() => screen.getByText('Paid Event'));
-        await user.click(screen.getByText('Paid Event'));
+        await waitFor(() => screen.getByText('Paid event'));
+        await user.click(screen.getByText('Paid event'));
         await user.click(screen.getByText(/add ticket tier/i));
         const tiers = screen.getAllByText(/tier \d/i);
         expect(tiers.length).toBeGreaterThan(0);
@@ -117,8 +117,8 @@ describe('CreateEventSchedule — ticket management', () => {
         setCurrentDraftId(DRAFT_ID);
         const user = userEvent.setup();
         render(<CreateEventSchedule {...props} />);
-        await waitFor(() => screen.getByText('Paid Event'));
-        await user.click(screen.getByText('Paid Event'));
+        await waitFor(() => screen.getByText('Paid event'));
+        await user.click(screen.getByText('Paid event'));
         // Add a second ticket
         await user.click(screen.getByText(/add ticket tier/i));
         const deleteButtons = document.querySelectorAll('button[aria-label="Remove ticket"]');

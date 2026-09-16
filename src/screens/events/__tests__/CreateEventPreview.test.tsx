@@ -222,8 +222,8 @@ describe('CreateEventPreview — navigation', () => {
         setCurrentDraftId(DRAFT_ID);
         const user = userEvent.setup();
         render(<CreateEventPreview {...props} />);
-        await waitFor(() => screen.getByText(/← back/i));
-        await user.click(screen.getByText(/← back/i));
+        await waitFor(() => screen.getByText('Back'));
+        await user.click(screen.getByText('Back'));
         expect(mockNavigate).toHaveBeenCalledWith('CREATE_EVENT_POLICIES');
     });
 });

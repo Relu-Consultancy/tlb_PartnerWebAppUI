@@ -72,7 +72,7 @@ describe('CreateEventDetails — pre-fill from existing draft', () => {
         // mockDraft has mode: 'offline'
         await waitFor(() => {
             const offlineBtn = screen.getByText('Offline').closest('button');
-            expect(offlineBtn?.className).toContain('border-blue-400');
+            expect(offlineBtn?.className).toContain('is-on');
         });
     });
 });
@@ -92,7 +92,7 @@ describe('CreateEventDetails — form interactions', () => {
         await waitFor(() => screen.getByText('Workshop'));
         const chip = screen.getByText('Workshop');
         await user.click(chip);
-        expect(chip.className).toContain('bg-purple-500');
+        expect(chip.className).toContain('is-active');
     });
 
     it('toggles format off when clicked again', async () => {
@@ -102,7 +102,7 @@ describe('CreateEventDetails — form interactions', () => {
         const chip = screen.getByText('Workshop');
         await user.click(chip);
         await user.click(chip);
-        expect(chip.className).not.toContain('bg-purple-500');
+        expect(chip.className).not.toContain('is-active');
     });
 
     it('shows the location picker and address box when offline mode is selected', async () => {

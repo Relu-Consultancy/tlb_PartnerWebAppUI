@@ -581,6 +581,91 @@
         color: var(--color-tlb-ink);
     }
 
+    /* ── Wizard stepper (multi-step creation flows) ── */
+    .pt-wiz-track {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .pt-wiz-seg {
+        flex: 1;
+        height: 6px;
+        border-radius: 999px;
+        background-color: var(--color-tlb-line);
+        overflow: hidden;
+    }
+    .pt-wiz-seg > span {
+        display: block;
+        height: 100%;
+        border-radius: 999px;
+        background-color: var(--color-tlb-amber);
+        transition: width 0.35s ease;
+    }
+    .pt-wiz-dot {
+        width: 9px;
+        height: 9px;
+        flex: none;
+        border-radius: 999px;
+        background-color: var(--color-tlb-edge);
+    }
+    .pt-wiz-dot.is-done {
+        background-color: var(--color-tlb-amber);
+    }
+    .pt-wiz-dot.is-active {
+        background-color: var(--color-tlb-amber);
+        box-shadow: 0 0 0 3px var(--color-tlb-amber-soft);
+    }
+
+    /* ── Selectable option tile (category / tag / mode / booking-type pickers) ── */
+    .pt-tile {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 16px 12px;
+        text-align: center;
+        background-color: #fff;
+        border: 1.5px solid var(--color-tlb-line);
+        border-radius: 14px;
+        font-size: 12.5px;
+        font-weight: 700;
+        color: var(--color-tlb-body);
+        cursor: pointer;
+        transition: border-color 0.15s, background-color 0.15s, color 0.15s;
+    }
+    .pt-tile:hover {
+        border-color: var(--color-tlb-edge);
+        background-color: var(--color-tlb-wash);
+    }
+    .pt-tile.is-on {
+        border-color: var(--color-tlb-amber);
+        background-color: var(--color-tlb-amber-soft);
+        color: var(--color-tlb-gold);
+    }
+    .pt-tile-check {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 18px;
+        height: 18px;
+        border-radius: 999px;
+        background-color: var(--color-tlb-amber);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    /* Wider option card (booking-type picker: icon + title + description, left-aligned) */
+    .pt-tile-wide {
+        flex-direction: row;
+        align-items: flex-start;
+        text-align: left;
+        padding: 14px 16px;
+        gap: 12px;
+    }
+
     /* ── Keyboard focus ── */
     .pt-btn:focus-visible,
     .pt-nav-item:focus-visible,
@@ -593,7 +678,8 @@
     .pt-vtab:focus-visible,
     .pt-seg:focus-visible,
     .pt-scope:focus-visible,
-    .pt-group-head:focus-visible {
+    .pt-group-head:focus-visible,
+    .pt-tile:focus-visible {
         outline: 2px solid var(--color-tlb-amber);
         outline-offset: 2px;
     }

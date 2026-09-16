@@ -1,20 +1,8 @@
 import { EntityType } from '../../types';
-import { Tone } from '../../components/portal';
 
-// Matches the client mock's own listing-service tag palette exactly.
-export const SERVICE_TONE: Record<EntityType, Tone> = {
-    Events: 'amber',
-    Classes: 'green',
-    Programs: 'purple',
-    Venues: 'blue',
-};
-
-export const SERVICE_LABEL: Record<EntityType, string> = {
-    Events: 'Event',
-    Classes: 'Class',
-    Programs: 'Program',
-    Venues: 'Venue',
-};
+// Re-exported for existing consumers — canonical source is src/constants/entityMeta.ts,
+// shared with the listing-creation wizards.
+export { SERVICE_TONE, SERVICE_LABEL } from '../../constants/entityMeta';
 
 export const MODEL_LABEL: Record<'ticketed' | 'enquiry', string> = {
     ticketed: 'Ticketed',

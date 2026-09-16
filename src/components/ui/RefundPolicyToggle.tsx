@@ -1,24 +1,12 @@
 import React from 'react';
-import { RotateCcw, Ban, Info } from 'lucide-react';
-
-export type RefundToggleAccent = 'blue' | 'amber' | 'emerald' | 'yellow' | 'purple';
+import { RotateCcw, Ban, Info, Check } from 'lucide-react';
 
 interface Props {
     /** true = refundable (the backend default when unset). */
     value: boolean;
     onChange: (value: boolean) => void;
-    /** Accent colour matching the wizard theme. */
-    accent?: RefundToggleAccent;
     disabled?: boolean;
 }
-
-const ACCENT: Record<RefundToggleAccent, { border: string; bg: string; text: string; badge: string }> = {
-    blue:    { border: 'border-blue-400',    bg: 'bg-blue-50',    text: 'text-blue-600',    badge: 'bg-blue-100 text-blue-700' },
-    amber:   { border: 'border-amber-400',   bg: 'bg-amber-50',   text: 'text-amber-600',   badge: 'bg-amber-100 text-amber-700' },
-    emerald: { border: 'border-emerald-400', bg: 'bg-emerald-50', text: 'text-emerald-600', badge: 'bg-emerald-100 text-emerald-700' },
-    yellow:  { border: 'border-tlb-yellow',  bg: 'bg-tlb-yellow/10', text: 'text-amber-600', badge: 'bg-tlb-yellow/20 text-amber-700' },
-    purple:  { border: 'border-purple-400',  bg: 'bg-purple-50',  text: 'text-purple-600',  badge: 'bg-purple-100 text-purple-700' },
-};
 
 /**
  * Refundable / Non-refundable selector for a listing.
@@ -28,9 +16,7 @@ const ACCENT: Record<RefundToggleAccent, { border: string; bg: string; text: str
  * existing cancellation-deadline logic runs regardless, so the helper text
  * below deliberately avoids promising otherwise.
  */
-export const RefundPolicyToggle: React.FC<Props> = ({ value, onChange, accent = 'blue', disabled = false }) => {
-    const a = ACCENT[accent];
-
+export const RefundPolicyToggle: React.FC<Props> = ({ value, onChange, disabled = false }) => {
     const options: { key: 'refundable' | 'non-refundable'; selected: boolean; icon: React.ElementType; title: string; sub: string }[] = [
         {
             key: 'refundable',
@@ -49,15 +35,11 @@ export const RefundPolicyToggle: React.FC<Props> = ({ value, onChange, accent = 
     ];
 
     return (
-        <div className="space-y-3">
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1 block">
-                    Refund Policy Type
-                </label>
-                <p className="text-[11px] text-gray-400">
-                    Shown as a badge on your listing so customers know before they pay.
-                </p>
-            </div>
+        <div className="pt-field">
+            <label className="pt-field-k">Refund policy type</label>
+            <p className="text-[11px] text-tlb-muted -mt-0.5 mb-1">
+                Shown as a badge on your listing so customers know before they pay.
+            </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {options.map(opt => {
@@ -69,31 +51,22 @@ export const RefundPolicyToggle: React.FC<Props> = ({ value, onChange, accent = 
                             disabled={disabled}
                             onClick={() => onChange(opt.key === 'refundable')}
                             aria-pressed={opt.selected}
-                            className={`text-left p-4 rounded-2xl border-2 transition-all disabled:opacity-60 ${
-                                opt.selected
-                                    ? `${a.border} ${a.bg}`
-                                    : 'border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm'
-                            }`}
+                            className={`pt-tile pt-tile-wide ${opt.selected ? 'is-on' : ''}`}
                         >
-                            <div className="flex items-center gap-2.5 mb-1.5">
-                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-                                    opt.selected ? a.badge : 'bg-gray-100 text-gray-400'
-                                }`}>
-                                    <Icon size={15} />
-                                </div>
-                                <span className={`text-sm font-black ${opt.selected ? a.text : 'text-gray-600'}`}>
-                                    {opt.title}
-                                </span>
-                            </div>
-                            <p className="text-[11px] text-gray-400 leading-snug">{opt.sub}</p>
+                            {opt.selected && <span className="pt-tile-check"><Check size={11} strokeWidth={3} /></span>}
+                            <Icon size={19} strokeWidth={2} className="flex-none mt-0.5" />
+                            <span className="min-w-0">
+                                <span className="block">{opt.title}</span>
+                                <span className="block text-[11px] font-medium text-tlb-muted mt-0.5 leading-snug">{opt.sub}</span>
+                            </span>
                         </button>
                     );
                 })}
             </div>
 
-            <div className="flex items-start gap-2 bg-gray-50 border border-gray-100 rounded-xl px-3.5 py-2.5">
-                <Info size={13} className="text-gray-400 shrink-0 mt-0.5" />
-                <p className="text-[11px] text-gray-500 leading-snug">
+            <div className="pt-note">
+                <Info size={13} strokeWidth={2.75} className="flex-none" />
+                <p>
                     This sets what customers see on the listing. Cancellation cut-off rules still
                     apply to bookings as normal — set those in your cancellation policy and terms.
                 </p>

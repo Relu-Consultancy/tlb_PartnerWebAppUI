@@ -19,8 +19,6 @@ interface FaqRow { id?: number; question: string; answer: string; documents?: Fa
 interface Props {
     listingId: string;
     faqApi: FaqApi;
-    /** Accent colour matching the wizard theme. */
-    accent?: 'blue' | 'amber' | 'emerald' | 'purple';
     /**
      * The listing type this FAQ list belongs to. Drives two things: the bulk
      * PUT .../faqs/bulk/ call the single "Save FAQs" button uses (without this,
@@ -50,18 +48,9 @@ const validateFaqDocument = (file: File): string | null => {
     return null;
 };
 
-const ACCENT: Record<NonNullable<Props['accent']>, { btn: string; soft: string; text: string; ring: string }> = {
-    blue:    { btn: 'bg-blue-500 hover:bg-blue-600',       soft: 'bg-blue-50 text-blue-600',       text: 'text-blue-600',    ring: 'focus:border-blue-300' },
-    amber:   { btn: 'bg-amber-500 hover:bg-amber-600',     soft: 'bg-amber-50 text-amber-600',     text: 'text-amber-600',   ring: 'focus:border-amber-300' },
-    emerald: { btn: 'bg-emerald-500 hover:bg-emerald-600', soft: 'bg-emerald-50 text-emerald-600', text: 'text-emerald-600', ring: 'focus:border-emerald-300' },
-    purple:  { btn: 'bg-purple-500 hover:bg-purple-600',   soft: 'bg-purple-50 text-purple-600',   text: 'text-purple-600',  ring: 'focus:border-purple-300' },
-};
-
 const MAX_DOC = 10 * 1024 * 1024;
 
-export const FaqTermsEditor: React.FC<Props> = ({ listingId, faqApi, accent = 'blue', faqDocumentsEntity }) => {
-    const a = ACCENT[accent];
-
+export const FaqTermsEditor: React.FC<Props> = ({ listingId, faqApi, faqDocumentsEntity }) => {
     const [faqs, setFaqs] = useState<FaqRow[]>([]);
     const [loadingFaqs, setLoadingFaqs] = useState(true);
     const [savingFaqs, setSavingFaqs] = useState(false);
@@ -272,73 +261,69 @@ export const FaqTermsEditor: React.FC<Props> = ({ listingId, faqApi, accent = 'b
         }
     };
 
-    const inputCls = `tlb-input w-full ${a.ring}`;
-
     return (
-        <div className="space-y-8">
+        <div className="flex flex-col gap-8">
             {/* FAQs */}
             <section>
-                <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${a.soft}`}><HelpCircle size={16} /></div>
-                        <div>
-                            <h3 className="font-black text-gray-900 leading-none">FAQs</h3>
-                            <p className="text-[11px] text-gray-400 mt-0.5">Answer common questions customers ask.</p>
-                        </div>
+                <div className="flex items-center gap-2.5 mb-3">
+                    <div className="pt-tile-md bg-tlb-amber-soft text-tlb-gold"><HelpCircle size={16} /></div>
+                    <div>
+                        <h3 className="pt-h-sec leading-none">FAQs</h3>
+                        <p className="text-[11px] text-tlb-muted mt-0.5">Answer common questions customers ask.</p>
                     </div>
                 </div>
 
                 {loadingFaqs ? (
-                    <div className="flex items-center gap-2 text-gray-400 text-xs font-bold py-6"><Loader2 size={14} className="animate-spin" /> Loading FAQs…</div>
+                    <div className="flex items-center gap-2 text-tlb-muted text-xs font-bold py-6"><Loader2 size={14} className="animate-spin" /> Loading FAQs…</div>
                 ) : (
-                    <div className="space-y-3">
+                    <div className="flex flex-col gap-3">
                         {faqs.length === 0 && (
-                            <p className="text-sm text-gray-400 bg-gray-50 rounded-xl px-4 py-3">No FAQs yet. Add your first one below.</p>
+                            <p className="text-sm text-tlb-muted bg-tlb-wash rounded-xl px-4 py-3">No FAQs yet. Add your first one below.</p>
                         )}
                         {faqs.map((f, idx) => (
-                            <div key={f.id ?? `new-${idx}`} className="bg-gray-50 rounded-2xl p-4 space-y-2.5">
+                            <div key={f.id ?? `new-${idx}`} className="bg-tlb-wash rounded-2xl p-4 flex flex-col gap-2.5">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">FAQ {idx + 1}</span>
-                                    <button onClick={() => removeFaq(idx)} className="text-gray-400 hover:text-red-500 p-1" aria-label="Delete FAQ">
+                                    <span className="pt-eyebrow">FAQ {idx + 1}</span>
+                                    <button onClick={() => removeFaq(idx)} className="text-tlb-muted hover:text-tlb-red-deep p-1" aria-label="Delete FAQ">
                                         <Trash2 size={14} />
                                     </button>
                                 </div>
                                 <input
-                                    className={inputCls}
+                                    className="pt-input"
                                     placeholder="Question (e.g. Is parking available?)"
                                     value={f.question}
                                     onChange={e => setRow(idx, { question: e.target.value })}
                                 />
                                 <textarea
-                                    className={`${inputCls} min-h-[72px] resize-y`}
+                                    className="pt-input min-h-[72px]"
                                     placeholder="Answer"
                                     value={f.answer}
                                     onChange={e => setRow(idx, { answer: e.target.value })}
                                 />
                                 {faqDocumentsEntity && (
-                                    <div className="pt-2.5 border-t border-gray-200/70">
+                                    <div className="pt-2.5 border-t border-tlb-divider">
                                         {!f.id ? (
-                                            <p className="text-[11px] text-gray-400">Save your FAQs below to attach documents to this one.</p>
+                                            <p className="text-[11px] text-tlb-muted">Save your FAQs below to attach documents to this one.</p>
                                         ) : (
-                                            <div className="space-y-2">
+                                            <div className="flex flex-col gap-2">
                                                 {(f.documents || []).length > 0 && (
-                                                    <div className="space-y-1.5">
+                                                    <div className="flex flex-col gap-1.5">
                                                         {(f.documents || []).map(doc => (
-                                                            <div key={doc.id} className="flex items-center gap-2 bg-white rounded-lg px-2.5 py-1.5 border border-gray-100">
-                                                                <FileText size={13} className={`shrink-0 ${a.text}`} />
+                                                            <div key={doc.id} className="flex items-center gap-2 bg-white rounded-lg px-2.5 py-1.5 border border-tlb-line">
+                                                                <FileText size={13} className="shrink-0 text-tlb-gold" />
                                                                 <div className="min-w-0 flex-1">
                                                                     {doc.url ? (
-                                                                        <a href={doc.url} target="_blank" rel="noreferrer" className="text-xs font-bold text-gray-700 hover:underline truncate block">
+                                                                        <a href={doc.url} target="_blank" rel="noreferrer" className="text-xs font-bold text-tlb-ink hover:underline truncate block">
                                                                             {doc.title || doc.file_name}
                                                                         </a>
                                                                     ) : (
-                                                                        <span className="text-xs font-bold text-gray-400 truncate block">{doc.title || doc.file_name} (file unavailable)</span>
+                                                                        <span className="text-xs font-bold text-tlb-muted truncate block">{doc.title || doc.file_name} (file unavailable)</span>
                                                                     )}
-                                                                    <span className="text-[10px] text-gray-400">{fmtBytes(doc.size_bytes)}</span>
+                                                                    <span className="text-[10px] text-tlb-muted">{fmtBytes(doc.size_bytes)}</span>
                                                                 </div>
                                                                 <button
                                                                     onClick={() => removeFaqRowDoc(idx, doc.id)}
-                                                                    className="text-gray-300 hover:text-red-500 p-0.5 shrink-0"
+                                                                    className="text-tlb-faint hover:text-tlb-red-deep p-0.5 shrink-0"
                                                                     aria-label={`Remove ${doc.title || doc.file_name}`}
                                                                 >
                                                                     <X size={13} />
@@ -348,7 +333,7 @@ export const FaqTermsEditor: React.FC<Props> = ({ listingId, faqApi, accent = 'b
                                                     </div>
                                                 )}
                                                 {(f.documents?.length || 0) < FAQ_DOCUMENT_MAX_COUNT ? (
-                                                    <label className="inline-flex items-center gap-1.5 text-[11px] font-bold text-gray-500 hover:text-gray-700 cursor-pointer">
+                                                    <label className="inline-flex items-center gap-1.5 text-[11px] font-bold text-tlb-sub hover:text-tlb-ink cursor-pointer w-fit">
                                                         {f.uploadingDoc ? <Loader2 size={12} className="animate-spin" /> : <Paperclip size={12} />}
                                                         {f.uploadingDoc ? 'Uploading…' : 'Attach document'}
                                                         <input
@@ -360,7 +345,7 @@ export const FaqTermsEditor: React.FC<Props> = ({ listingId, faqApi, accent = 'b
                                                         />
                                                     </label>
                                                 ) : (
-                                                    <p className="text-[10px] text-gray-400">Maximum {FAQ_DOCUMENT_MAX_COUNT} documents reached.</p>
+                                                    <p className="text-[10px] text-tlb-muted">Maximum {FAQ_DOCUMENT_MAX_COUNT} documents reached.</p>
                                                 )}
                                             </div>
                                         )}
@@ -368,38 +353,28 @@ export const FaqTermsEditor: React.FC<Props> = ({ listingId, faqApi, accent = 'b
                                 )}
                             </div>
                         ))}
-                        <button
-                            onClick={addFaq}
-                            className="w-full border-2 border-dashed border-gray-200 rounded-2xl py-3 text-sm font-bold text-gray-500 hover:border-gray-300 hover:text-gray-700 transition-colors flex items-center justify-center gap-2"
-                        >
-                            <Plus size={16} /> Add FAQ
+                        <button type="button" onClick={addFaq} className="pt-btn pt-btn-o w-full justify-center border-dashed">
+                            <Plus size={14} strokeWidth={2.75} /> Add FAQ
                         </button>
 
                         {faqs.length > 0 && faqDocumentsEntity && (
                             <>
                                 {anyDocsAttached && !confirmBulkSave && (
-                                    <p className="text-[11px] text-amber-600 bg-amber-50 border border-amber-100 rounded-xl px-3.5 py-2.5">
+                                    <p className="text-[11px] text-tlb-gold bg-tlb-amber-soft border border-tlb-amber-line rounded-xl px-3.5 py-2.5">
                                         Saving replaces every FAQ, which removes the documents currently attached to
                                         them — even ones you didn't change. Re-attach after saving if needed.
                                     </p>
                                 )}
                                 {confirmBulkSave && (
-                                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-red-50 border border-red-100 rounded-xl px-3.5 py-3">
-                                        <p className="text-xs font-bold text-red-700 flex-1">
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-tlb-red-soft border border-tlb-red/20 rounded-xl px-3.5 py-3">
+                                        <p className="text-xs font-bold text-tlb-red-deep flex-1">
                                             This will remove the documents attached to your FAQs. Continue?
                                         </p>
                                         <div className="flex gap-2 shrink-0">
-                                            <button
-                                                onClick={() => setConfirmBulkSave(false)}
-                                                className="text-xs font-bold text-gray-500 hover:text-gray-700 px-3 py-2"
-                                            >
+                                            <button type="button" onClick={() => setConfirmBulkSave(false)} className="pt-btn pt-btn-o pt-btn-sm">
                                                 Cancel
                                             </button>
-                                            <button
-                                                onClick={() => saveAllFaqs(true)}
-                                                disabled={savingFaqs}
-                                                className="inline-flex items-center gap-1.5 text-white text-xs font-bold px-3.5 py-2 rounded-xl bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-50"
-                                            >
+                                            <button type="button" onClick={() => saveAllFaqs(true)} disabled={savingFaqs} className="pt-btn pt-btn-sm bg-tlb-red text-white">
                                                 {savingFaqs ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
                                                 Save anyway
                                             </button>
@@ -407,57 +382,49 @@ export const FaqTermsEditor: React.FC<Props> = ({ listingId, faqApi, accent = 'b
                                     </div>
                                 )}
                                 <div className="flex justify-end">
-                                    <button
-                                        onClick={() => saveAllFaqs()}
-                                        disabled={savingFaqs}
-                                        className={`inline-flex items-center gap-1.5 text-white text-sm font-bold px-4 py-2.5 rounded-xl transition-colors disabled:opacity-50 ${a.btn}`}
-                                    >
-                                        {savingFaqs ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+                                    <button type="button" onClick={() => saveAllFaqs()} disabled={savingFaqs} className="pt-btn pt-btn-y">
+                                        {savingFaqs ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                                         Save FAQs
                                     </button>
                                 </div>
                             </>
                         )}
-                        
+
                         {/* FAQ Document Upload */}
-                        <div className="pt-4 border-t border-gray-100 mt-6">
-                            <p className="text-sm font-bold text-gray-700 mb-2">Or upload an FAQ document</p>
+                        <div className="pt-4 border-t border-tlb-divider mt-2">
+                            <p className="text-sm font-bold text-tlb-ink mb-2">Or upload an FAQ document</p>
                             {!faqDocLoaded ? (
-                                <div className="flex items-center gap-2 text-gray-400 text-xs font-bold py-2"><Loader2 size={14} className="animate-spin" /> Loading…</div>
+                                <div className="flex items-center gap-2 text-tlb-muted text-xs font-bold py-2"><Loader2 size={14} className="animate-spin" /> Loading…</div>
                             ) : (
-                                <div className="space-y-3">
+                                <div className="flex flex-col gap-3">
                                     <div className="flex flex-wrap items-center gap-3">
-                                        <label className="inline-flex items-center gap-2 text-sm font-bold text-gray-600 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl px-3.5 py-2.5 cursor-pointer transition-colors">
-                                            <Upload size={15} /> {faqFile ? 'Change document' : 'Attach FAQ document'}
+                                        <label className="pt-btn pt-btn-o cursor-pointer">
+                                            <Upload size={14} strokeWidth={2.75} /> {faqFile ? 'Change document' : 'Attach FAQ document'}
                                             <input type="file" accept=".pdf,.doc,.docx" className="hidden" onChange={pickFaqDoc} />
                                         </label>
                                         {faqFile && (
-                                            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-600">
+                                            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-tlb-sub">
                                                 {faqFile.name}
-                                                <button onClick={() => setFaqFile(null)} className="text-gray-400 hover:text-red-500"><X size={13} /></button>
+                                                <button onClick={() => setFaqFile(null)} className="text-tlb-muted hover:text-tlb-red-deep"><X size={13} /></button>
                                             </span>
                                         )}
                                         {!faqFile && faqDocUrl && (
-                                            <a href={faqDocUrl} target="_blank" rel="noreferrer" className={`text-xs font-bold underline ${a.text}`}>
+                                            <a href={faqDocUrl} target="_blank" rel="noreferrer" className="pt-link">
                                                 View current document
                                             </a>
                                         )}
                                     </div>
                                     <div className="flex items-center gap-3">
-                                        <button
-                                            onClick={saveFaqDoc}
-                                            disabled={savingFaqDoc || !faqFile}
-                                            className={`inline-flex items-center gap-1.5 text-white text-sm font-bold px-4 py-2.5 rounded-xl transition-colors disabled:opacity-50 ${a.btn}`}
-                                        >
-                                            {savingFaqDoc ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Save Document
+                                        <button type="button" onClick={saveFaqDoc} disabled={savingFaqDoc || !faqFile} className="pt-btn pt-btn-y">
+                                            {savingFaqDoc ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save document
                                         </button>
                                         {hasFaqDoc && (
-                                            <button onClick={removeFaqDoc} className="inline-flex items-center gap-1.5 text-sm font-bold text-red-500 hover:text-red-600 px-3 py-2.5">
-                                                <Trash2 size={15} /> Remove
+                                            <button type="button" onClick={removeFaqDoc} className="pt-btn pt-btn-o text-tlb-red-deep">
+                                                <Trash2 size={13} /> Remove
                                             </button>
                                         )}
                                     </div>
-                                    <p className="text-[10px] text-gray-400">PDF/DOC · Max 10 MB.</p>
+                                    <p className="text-[10px] text-tlb-muted">PDF/DOC · Max 10 MB.</p>
                                 </div>
                             )}
                         </div>
@@ -467,20 +434,20 @@ export const FaqTermsEditor: React.FC<Props> = ({ listingId, faqApi, accent = 'b
 
             {/* Terms & Conditions */}
             <section>
-                <div className="flex items-center gap-2 mb-3">
-                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${a.soft}`}><FileText size={16} /></div>
+                <div className="flex items-center gap-2.5 mb-3">
+                    <div className="pt-tile-md bg-tlb-amber-soft text-tlb-gold"><FileText size={16} /></div>
                     <div>
-                        <h3 className="font-black text-gray-900 leading-none">Terms &amp; Conditions</h3>
-                        <p className="text-[11px] text-gray-400 mt-0.5">Refund, cancellation and booking policies.</p>
+                        <h3 className="pt-h-sec leading-none">Terms &amp; conditions</h3>
+                        <p className="text-[11px] text-tlb-muted mt-0.5">Refund, cancellation and booking policies.</p>
                     </div>
                 </div>
 
                 {!termsLoaded ? (
-                    <div className="flex items-center gap-2 text-gray-400 text-xs font-bold py-6"><Loader2 size={14} className="animate-spin" /> Loading…</div>
+                    <div className="flex items-center gap-2 text-tlb-muted text-xs font-bold py-6"><Loader2 size={14} className="animate-spin" /> Loading…</div>
                 ) : (
-                    <div className="space-y-3">
+                    <div className="flex flex-col gap-3">
                         <textarea
-                            className={`${inputCls} min-h-[120px] resize-y`}
+                            className="pt-input min-h-[120px]"
                             placeholder="Write your terms & conditions (Markdown supported)…"
                             value={termsContent}
                             onChange={e => setTermsContent(e.target.value)}
@@ -488,38 +455,34 @@ export const FaqTermsEditor: React.FC<Props> = ({ listingId, faqApi, accent = 'b
 
                         {/* Document upload */}
                         <div className="flex flex-wrap items-center gap-3">
-                            <label className="inline-flex items-center gap-2 text-sm font-bold text-gray-600 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl px-3.5 py-2.5 cursor-pointer transition-colors">
-                                <Upload size={15} /> {termsFile ? 'Change document' : 'Attach document'}
+                            <label className="pt-btn pt-btn-o cursor-pointer">
+                                <Upload size={14} strokeWidth={2.75} /> {termsFile ? 'Change document' : 'Attach document'}
                                 <input type="file" accept=".pdf,.doc,.docx" className="hidden" onChange={pickDoc} />
                             </label>
                             {termsFile && (
-                                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-600">
+                                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-tlb-sub">
                                     {termsFile.name}
-                                    <button onClick={() => setTermsFile(null)} className="text-gray-400 hover:text-red-500"><X size={13} /></button>
+                                    <button onClick={() => setTermsFile(null)} className="text-tlb-muted hover:text-tlb-red-deep"><X size={13} /></button>
                                 </span>
                             )}
                             {!termsFile && termsDocUrl && (
-                                <a href={termsDocUrl} target="_blank" rel="noreferrer" className={`text-xs font-bold underline ${a.text}`}>
+                                <a href={termsDocUrl} target="_blank" rel="noreferrer" className="pt-link">
                                     View current document
                                 </a>
                             )}
                         </div>
 
                         <div className="flex items-center gap-3">
-                            <button
-                                onClick={saveTerms}
-                                disabled={savingTerms}
-                                className={`inline-flex items-center gap-1.5 text-white text-sm font-bold px-4 py-2.5 rounded-xl transition-colors disabled:opacity-50 ${a.btn}`}
-                            >
-                                {savingTerms ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Save Terms
+                            <button type="button" onClick={saveTerms} disabled={savingTerms} className="pt-btn pt-btn-y">
+                                {savingTerms ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save terms
                             </button>
                             {hasTerms && (
-                                <button onClick={removeTerms} className="inline-flex items-center gap-1.5 text-sm font-bold text-red-500 hover:text-red-600 px-3 py-2.5">
-                                    <Trash2 size={15} /> Remove
+                                <button type="button" onClick={removeTerms} className="pt-btn pt-btn-o text-tlb-red-deep">
+                                    <Trash2 size={13} /> Remove
                                 </button>
                             )}
                         </div>
-                        <p className="text-[10px] text-gray-400">Provide text, a document, or both. PDF/DOC · Max 10 MB.</p>
+                        <p className="text-[10px] text-tlb-muted">Provide text, a document, or both. PDF/DOC · Max 10 MB.</p>
                     </div>
                 )}
             </section>

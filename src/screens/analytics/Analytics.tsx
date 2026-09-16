@@ -159,7 +159,7 @@ export const Analytics: React.FC<Props> = ({ onNavigate }) => {
                         <p className="text-[12.5px] text-tlb-muted mb-5">Where customers drop off · {getDateRangeOption(dateRange).phrase}</p>
                         <DemandFunnel stages={stages} uncontacted={uncontacted} uncontactedValue={uncontactedValue} avgResponseHours={stats.enquiries?.avg_response_hours ?? null} />
                     </div>
-                    <TrafficSourcesCard />
+                    <TrafficSourcesCard traffic={stats.traffic} onViewDetail={() => onNavigate('TRAFFIC_ANALYTICS')} />
                 </div>
             )}
 

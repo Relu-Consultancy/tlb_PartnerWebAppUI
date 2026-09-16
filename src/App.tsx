@@ -117,6 +117,7 @@ const BookingsEnquiries = lazyImport(() => import('./screens/bookings-enquiries'
 
 // Analytics (audience & growth)
 const Analytics = lazy(() => import('./screens/analytics'));
+const TrafficAnalytics = lazy(() => import('./screens/traffic-analytics'));
 
 // Coupons
 const CreateCoupon = lazyImport(() => import('./screens/coupons'), 'CreateCoupon');
@@ -152,6 +153,7 @@ const SCREEN_CHUNKS = [
   () => import('./screens/enquiries'),
 
   () => import('./screens/analytics'),
+  () => import('./screens/traffic-analytics'),
   () => import('./screens/coupons'),
   () => import('./screens/support'),
   () => import('./screens/network'),
@@ -247,6 +249,7 @@ const routes: Record<Screen, RouteConfig> = {
   FINANCIAL_HUB: { component: FinancialHub, hasSidebar: true },
 
   ANALYTICS: { component: Analytics, hasSidebar: true },
+  TRAFFIC_ANALYTICS: { component: TrafficAnalytics, hasSidebar: true },
   ALL_COUPONS: { component: Coupons, hasSidebar: true },
   CREATE_COUPON: { component: CreateCoupon, hasSidebar: true },
   HELP_SUPPORT: { component: Support, hasSidebar: true },

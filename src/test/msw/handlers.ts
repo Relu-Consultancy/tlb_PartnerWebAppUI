@@ -371,6 +371,38 @@ export const mockStatsReviews = {
     recent_reviews: [],
 };
 
+export const mockStatsTraffic = {
+    period: { type: 'this_month', date_from: '2026-09-01', date_to: '2026-09-15', label: 'This Month' },
+    totals: { views: 340, unique_viewers: 210, enquiries: 28 },
+    daily_trend: [
+        { date: '2026-09-01', views: 12 },
+        { date: '2026-09-02', views: 18 },
+        { date: '2026-09-03', views: 0 },
+    ],
+    by_source: [
+        { source: 'instagram', views: 140 },
+        { source: 'organic/direct', views: 90 },
+        { source: 'google', views: 60 },
+    ],
+};
+
+export const mockTrafficDetailByDay = {
+    count: 3, page: 1, page_size: 20, next: null, previous: null,
+    results: [
+        { date: '2026-09-01', views: 12, unique_viewers: 10, enquiries: 2 },
+        { date: '2026-09-02', views: 18, unique_viewers: 15, enquiries: 3 },
+        { date: '2026-09-03', views: 0, unique_viewers: 0, enquiries: 0 },
+    ],
+};
+
+export const mockTrafficDetailByListing = {
+    count: 2, page: 1, page_size: 20, next: null, previous: null,
+    results: [
+        { listing_id: 'l1', listing_name: 'Beginners Pottery', views: 210, unique_viewers: 140, enquiries: 19, conversion_rate: 9.05 },
+        { listing_id: 'l2', listing_name: 'Studio Rental — Hourly', views: 130, unique_viewers: 70, enquiries: 9, conversion_rate: 6.92 },
+    ],
+};
+
 // ─── Followers fixtures ───────────────────────────────────────────────────────
 
 export const mockFollowers = [
@@ -695,6 +727,12 @@ export const handlers = [
         HttpResponse.json({ success: true, data: mockStatsReviews })),
     http.post(`${BASE}/api/v1/partner/:id/track-view/`, () =>
         HttpResponse.json({ success: true, data: { message: 'tracked' } })),
+    http.get(`${BASE}/api/v1/partner/stats/traffic/`, () =>
+        HttpResponse.json({ success: true, data: mockStatsTraffic })),
+    http.get(`${BASE}/api/v1/partner/stats/traffic/detail/`, ({ request }) => {
+        const groupBy = new URL(request.url).searchParams.get('group_by');
+        return HttpResponse.json({ success: true, data: groupBy === 'listing' ? mockTrafficDetailByListing : mockTrafficDetailByDay });
+    }),
 
     // ─── Followers ───
     http.get(`${BASE}/api/v1/partner/:id/followers/count/`, () =>

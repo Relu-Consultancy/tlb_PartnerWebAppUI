@@ -67,7 +67,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen
     },
     { kind: 'link', label: 'My listings', screen: 'SERVICE_LISTINGS', activeOn: ['SERVICE_LISTINGS'], count: counts.listings },
     { kind: 'link', label: 'Coupons', screen: 'ALL_COUPONS', activeOn: ['ALL_COUPONS', 'CREATE_COUPON'], count: counts.coupons },
-    { kind: 'link', label: 'Analytics', screen: 'ANALYTICS', activeOn: ['ANALYTICS'] },
+    { kind: 'link', label: 'Analytics', screen: 'ANALYTICS', activeOn: ['ANALYTICS', 'TRAFFIC_ANALYTICS'] },
     { kind: 'link', label: 'Revenue & payouts', screen: 'FINANCIAL_HUB', activeOn: ['FINANCIAL_HUB'] },
     { kind: 'link', label: 'Reviews', screen: 'REVIEWS', activeOn: ['REVIEWS'] },
     { kind: 'soon', label: 'Packages' },

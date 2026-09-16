@@ -173,6 +173,101 @@ export const getStatsReviews = async (): Promise<StatsReviews> => {
     return unwrap<StatsReviews>(res, 'Failed to load review stats');
 };
 
+// ── Traffic analytics (calendar-relative periods — distinct from RevenuePeriod) ──
+// Adopts the admin-side period system: today/yesterday/this_week/last_week/this_month,
+// or an explicit custom range. Not the same vocabulary as the rolling 7d/30d/90d/1y/all
+// windows above — see src/screens/traffic-analytics/types.ts for the TrafficPeriod type.
+export type TrafficPeriodKey = 'today' | 'yesterday' | 'this_week' | 'last_week' | 'this_month' | 'custom';
+
+export interface TrafficPeriodParams {
+    period?: TrafficPeriodKey;
+    date_from?: string; // YYYY-MM-DD, required together with date_to when period === 'custom'
+    date_to?: string;
+}
+
+export interface TrafficPeriodInfo {
+    type: TrafficPeriodKey;
+    date_from: string;
+    date_to: string;
+    label: string;
+}
+
+export interface DailyTrafficPoint {
+    date: string;
+    views: number;
+}
+
+export interface TrafficSourceSlice {
+    source: string; // e.g. "instagram", "organic/direct"
+    views: number;
+}
+
+export interface StatsTraffic {
+    period: TrafficPeriodInfo;
+    totals: { views: number; unique_viewers: number; enquiries: number };
+    daily_trend: DailyTrafficPoint[];
+    by_source: TrafficSourceSlice[];
+}
+
+export type TrafficGroupBy = 'day' | 'listing';
+
+export interface TrafficDetailByDayRow {
+    date: string;
+    views: number;
+    unique_viewers: number;
+    enquiries: number;
+}
+
+export interface TrafficDetailByListingRow {
+    listing_id: string;
+    listing_name: string;
+    views: number;
+    unique_viewers: number;
+    enquiries: number;
+    conversion_rate: number;
+}
+
+export interface PaginatedTrafficDetail<T> {
+    count: number;
+    page: number;
+    page_size: number;
+    next: string | null;
+    previous: string | null;
+    results: T[];
+}
+
+const trafficQuery = (params: TrafficPeriodParams): URLSearchParams => {
+    const query = new URLSearchParams();
+    if (params.period) query.set('period', params.period);
+    if (params.date_from) query.set('date_from', params.date_from);
+    if (params.date_to) query.set('date_to', params.date_to);
+    return query;
+};
+
+export const getStatsTraffic = async (params: TrafficPeriodParams = {}): Promise<StatsTraffic> => {
+    const qs = trafficQuery(params).toString();
+    const res = await apiClient(`/api/v1/partner/stats/traffic/${qs ? `?${qs}` : ''}`);
+    return unwrap<StatsTraffic>(res, 'Failed to load traffic stats');
+};
+
+interface TrafficDetailParams extends TrafficPeriodParams {
+    group_by?: TrafficGroupBy;
+    page?: number;
+    page_size?: number;
+}
+
+export async function getStatsTrafficDetail(params: TrafficDetailParams & { group_by: 'listing' }): Promise<PaginatedTrafficDetail<TrafficDetailByListingRow>>;
+export async function getStatsTrafficDetail(params?: TrafficDetailParams): Promise<PaginatedTrafficDetail<TrafficDetailByDayRow>>;
+export async function getStatsTrafficDetail(params: TrafficDetailParams = {}): Promise<PaginatedTrafficDetail<any>> {
+    const query = trafficQuery(params);
+    if (params.group_by) query.set('group_by', params.group_by);
+    if (params.page) query.set('page', String(params.page));
+    if (params.page_size) query.set('page_size', String(params.page_size));
+    const qs = query.toString();
+    const res = await apiClient(`/api/v1/partner/stats/traffic/detail/${qs ? `?${qs}` : ''}`);
+    return unwrap<PaginatedTrafficDetail<any>>(res, 'Failed to load traffic detail');
+}
+
 // ── POST /api/v1/partner/<partner_id>/track-view/ ──
 // No auth required. Call on every public profile page load.
 // Returns 200 on success; we treat failure as best-effort silent fail.

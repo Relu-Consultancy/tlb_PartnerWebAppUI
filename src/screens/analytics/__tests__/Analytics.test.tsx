@@ -39,6 +39,7 @@ describe('Analytics — loading and error states', () => {
             http.get(`${BASE}/api/v1/partner/stats/enquiries/`, () => HttpResponse.json({}, { status: 500 })),
             http.get(`${BASE}/api/v1/partner/stats/revenue/`, () => HttpResponse.json({}, { status: 500 })),
             http.get(`${BASE}/api/v1/partner/stats/reviews/`, () => HttpResponse.json({}, { status: 500 })),
+            http.get(`${BASE}/api/v1/partner/stats/traffic/`, () => HttpResponse.json({}, { status: 500 })),
         );
         renderScreen();
         await waitFor(() => expect(screen.getByText(/could not load analytics/i)).toBeInTheDocument());
@@ -69,6 +70,17 @@ describe('Analytics — tab switching', () => {
         expect(screen.getByText('Profile views')).toBeInTheDocument();
         // new_leads 100 - contacted 60 = 40 uncontacted
         expect(screen.getByText(/40 enquiries have not been contacted yet/i)).toBeInTheDocument();
+    });
+
+    it('shows real traffic-source shares and links to the full traffic report', async () => {
+        renderScreen();
+        const user = userEvent.setup();
+        await waitFor(() => screen.getByText('Revenue by service'));
+        await user.click(screen.getByRole('tab', { name: 'Demand funnel' }));
+        expect(screen.getByText('Instagram')).toBeInTheDocument();
+        expect(screen.getByText('Organic / direct')).toBeInTheDocument();
+        await user.click(screen.getByRole('button', { name: /full report/i }));
+        expect(mockNavigate).toHaveBeenCalledWith('TRAFFIC_ANALYTICS');
     });
 
     it('shows the reports tab with real, downloadable CSV reports', async () => {

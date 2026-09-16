@@ -66,6 +66,7 @@ export type Screen =
   | 'FINANCIAL_HUB'
 
   | 'ANALYTICS'
+  | 'TRAFFIC_ANALYTICS'
   | 'ALL_COUPONS'
   | 'CREATE_COUPON'
   | 'HELP_SUPPORT'

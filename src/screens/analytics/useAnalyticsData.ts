@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-    getStatsOverview, getStatsEvents, getStatsVenues, getStatsEnquiries, getStatsRevenue, getStatsReviews,
-    StatsOverview, StatsEvents, StatsVenues, StatsEnquiries, StatsRevenue, StatsReviews,
+    getStatsOverview, getStatsEvents, getStatsVenues, getStatsEnquiries, getStatsRevenue, getStatsReviews, getStatsTraffic,
+    StatsOverview, StatsEvents, StatsVenues, StatsEnquiries, StatsRevenue, StatsReviews, StatsTraffic,
 } from '../../api/stats';
 import { DateRangeKey } from '../../constants/dateRange';
 
@@ -19,6 +19,7 @@ interface State {
     enquiries: StatsEnquiries | null;
     revenue: StatsRevenue | null;
     reviews: StatsReviews | null;
+    traffic: StatsTraffic | null;
     error: boolean;
 }
 
@@ -26,13 +27,13 @@ const settled = <T,>(r: PromiseSettledResult<T>): T | null => (r.status === 'ful
 
 export const useAnalyticsData = (range: DateRangeKey) => {
     const [state, setState] = useState<State>({
-        loading: true, overview: null, events: null, venues: null, enquiries: null, revenue: null, reviews: null, error: false,
+        loading: true, overview: null, events: null, venues: null, enquiries: null, revenue: null, reviews: null, traffic: null, error: false,
     });
 
     const load = useCallback(async () => {
         setState(s => ({ ...s, loading: true }));
-        const [oRes, eRes, vRes, enqRes, revRes, rwRes] = await Promise.allSettled([
-            getStatsOverview(), getStatsEvents(), getStatsVenues(), getStatsEnquiries(), getStatsRevenue(range), getStatsReviews(),
+        const [oRes, eRes, vRes, enqRes, revRes, rwRes, trRes] = await Promise.allSettled([
+            getStatsOverview(), getStatsEvents(), getStatsVenues(), getStatsEnquiries(), getStatsRevenue(range), getStatsReviews(), getStatsTraffic(),
         ]);
         setState({
             loading: false,
@@ -42,7 +43,8 @@ export const useAnalyticsData = (range: DateRangeKey) => {
             enquiries: settled(enqRes),
             revenue: settled(revRes),
             reviews: settled(rwRes),
-            error: [oRes, eRes, vRes, enqRes, revRes, rwRes].every(r => r.status === 'rejected'),
+            traffic: settled(trRes),
+            error: [oRes, eRes, vRes, enqRes, revRes, rwRes, trRes].every(r => r.status === 'rejected'),
         });
     }, [range]);
 

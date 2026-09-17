@@ -6,9 +6,11 @@ import { RevenueTypeSlice } from '../types';
 interface RevenueByServiceProps {
     slices: RevenueTypeSlice[];
     grossLabel: string;
+    /** "service" on the All-services scope, "listing" when scoped to one service (revenue_by_listing). */
+    footerNoun?: string;
 }
 
-export const RevenueByService: React.FC<RevenueByServiceProps> = ({ slices, grossLabel }) => {
+export const RevenueByService: React.FC<RevenueByServiceProps> = ({ slices, grossLabel, footerNoun = 'service' }) => {
     if (slices.length === 0) {
         return <p className="text-[12.5px] text-tlb-muted">No revenue recorded for this window yet.</p>;
     }
@@ -34,7 +36,7 @@ export const RevenueByService: React.FC<RevenueByServiceProps> = ({ slices, gros
             <div className="border-t border-tlb-divider pt-3.5">
                 <p className="pt-eyebrow mb-2.5">Fastest growing</p>
                 <div className="flex items-center justify-between text-[13px]">
-                    <span className="text-tlb-muted">Month-over-month, per service</span>
+                    <span className="text-tlb-muted">Month-over-month, per {footerNoun}</span>
                     <Pill tone="neutral">Coming soon</Pill>
                 </div>
             </div>

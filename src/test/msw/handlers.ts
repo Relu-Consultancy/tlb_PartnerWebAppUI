@@ -361,6 +361,66 @@ export const mockStatsRevenue = {
     ],
 };
 
+export const mockStatsOverviewAll = {
+    period: '30d',
+    listing_type: null,
+    gross_revenue: '124600.00',
+    revenue_growth_pct: 26.0,
+    confirmed_bookings: 57,
+    bookings_growth_pct: 20.0,
+    avg_order_value: '2186.00',
+    conversion_rate: 67.0,
+    repeat_customers_pct: 31.0,
+    revenue_by_type: [
+        { type: 'event', amount: '47300.00', count: 22 },
+        { type: 'class', amount: '38150.00', count: 18 },
+        { type: 'venue', amount: '26200.00', count: 9 },
+    ],
+    revenue_by_listing: null,
+    demand_funnel: { listing_views: 3077, enquiries: 84, confirmed_bookings: 57 },
+    weekly_trend: [
+        { week_start: '2026-07-27', revenue: '8200.00', bookings: 6 },
+        { week_start: '2026-08-03', revenue: '11400.00', bookings: 8 },
+    ],
+};
+
+export const mockStatsOverviewAllVenue = {
+    period: '30d',
+    listing_type: 'venue',
+    gross_revenue: '26200.00',
+    revenue_growth_pct: 10.0,
+    confirmed_bookings: 9,
+    bookings_growth_pct: 5.0,
+    avg_order_value: '2911.00',
+    conversion_rate: 45.0,
+    repeat_customers_pct: 22.0,
+    revenue_by_type: null,
+    revenue_by_listing: [
+        { listing_id: 'v1', listing_title: 'Grand Hall', amount: '18000.00', count: 5 },
+        { listing_id: 'v2', listing_title: 'Rooftop Lounge', amount: '8200.00', count: 4 },
+    ],
+    demand_funnel: { listing_views: 500, enquiries: 20, confirmed_bookings: 9 },
+    weekly_trend: [],
+};
+
+export const mockStatsOverviewAllEvent = {
+    period: '30d',
+    listing_type: 'event',
+    gross_revenue: '47300.00',
+    revenue_growth_pct: 8.0,
+    confirmed_bookings: 22,
+    bookings_growth_pct: 4.0,
+    avg_order_value: '2150.00',
+    conversion_rate: 0.0,
+    repeat_customers_pct: 12.0,
+    revenue_by_type: null,
+    revenue_by_listing: [
+        { listing_id: 'e1', listing_title: 'Summer Fest', amount: '30000.00', count: 14 },
+    ],
+    demand_funnel: { listing_views: 1200, enquiries: 0, confirmed_bookings: 22 },
+    weekly_trend: [],
+};
+
 export const mockStatsReviews = {
     avg_rating: 4.6,
     total_reviews: 46,
@@ -723,6 +783,12 @@ export const handlers = [
         HttpResponse.json({ success: true, data: mockStatsEnquiries })),
     http.get(`${BASE}/api/v1/partner/stats/revenue/`, () =>
         HttpResponse.json({ success: true, data: mockStatsRevenue })),
+    http.get(`${BASE}/api/v1/partner/stats/overview-all/`, ({ request }) => {
+        const listingType = new URL(request.url).searchParams.get('listing_type');
+        if (listingType === 'venue') return HttpResponse.json({ success: true, data: mockStatsOverviewAllVenue });
+        if (listingType === 'event') return HttpResponse.json({ success: true, data: mockStatsOverviewAllEvent });
+        return HttpResponse.json({ success: true, data: mockStatsOverviewAll });
+    }),
     http.get(`${BASE}/api/v1/partner/stats/reviews/`, () =>
         HttpResponse.json({ success: true, data: mockStatsReviews })),
     http.post(`${BASE}/api/v1/partner/:id/track-view/`, () =>

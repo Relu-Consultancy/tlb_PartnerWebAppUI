@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-    funnelStages, listingPerformance, retentionMetric, revenueTypeSlices, trendPoints, uncontactedLeadValue,
+    funnelStages, listingPerformance, overviewFunnelStages, revenueByListingSlices, revenueTypeSlices,
+    trendPoints, uncontactedLeadValue, weeklyTrendPoints,
 } from '../model';
 import { BookingEntry, EnquiryEntry } from '../../bookings-enquiries/types';
 import { PartnerListing } from '../../../api/portalSummary';
@@ -66,19 +67,43 @@ describe('uncontactedLeadValue', () => {
     });
 });
 
-describe('retentionMetric', () => {
-    it('prefers student retention when the partner offers Classes/Programs', () => {
-        expect(retentionMetric(['Classes'], null, { student_retention_pct: 72 } as any))
-            .toEqual({ label: 'student retention', value: '72%' });
+describe('weeklyTrendPoints', () => {
+    it('maps week_start to a short date label', () => {
+        const points = weeklyTrendPoints([{ week_start: '2026-07-27', revenue: '8200.00', bookings: 6 }]);
+        expect(points).toEqual([{ label: '27 Jul', revenue: 8200, bookings: 6 }]);
     });
 
-    it('falls back to repeat venue clients when only Venues is offered', () => {
-        expect(retentionMetric(['Venues'], { repeat_clients: 4 } as any, null))
-            .toEqual({ label: 'repeat venue clients', value: '4' });
+    it('returns an empty array for an empty window', () => {
+        expect(weeklyTrendPoints([])).toEqual([]);
+    });
+});
+
+describe('revenueByListingSlices', () => {
+    it('computes percentages and sorts by amount desc, labeling by listing title', () => {
+        const slices = revenueByListingSlices([
+            { listing_id: 'v1', listing_title: 'Grand Hall', amount: '18000.00', count: 5 },
+            { listing_id: 'v2', listing_title: 'Rooftop Lounge', amount: '8200.00', count: 4 },
+        ]);
+        expect(slices[0]).toMatchObject({ type: 'v1', label: 'Grand Hall', amount: 18000, count: 5 });
+        expect(slices[0].pct + slices[1].pct).toBe(100);
     });
 
-    it('reports no data rather than fabricating a blended figure', () => {
-        expect(retentionMetric(['Events'], null, null)).toEqual({ label: 'no repeat-customer data yet', value: '—' });
+    it('never divides by zero when there is no revenue at all', () => {
+        expect(revenueByListingSlices([{ listing_id: 'v1', listing_title: 'Grand Hall', amount: '0', count: 0 }])[0].pct).toBe(0);
+    });
+});
+
+describe('overviewFunnelStages', () => {
+    it('builds a real 3-stage funnel (no placeholder stages) as a percentage of listing views', () => {
+        const stages = overviewFunnelStages({ listing_views: 1000, enquiries: 84, confirmed_bookings: 57 });
+        expect(stages).toHaveLength(3);
+        expect(stages.every(s => s.available)).toBe(true);
+        expect(stages.map(s => s.pctOfFirst)).toEqual([100, 8, 6]);
+    });
+
+    it('never divides by zero with no listing views', () => {
+        const stages = overviewFunnelStages({ listing_views: 0, enquiries: 0, confirmed_bookings: 0 });
+        expect(stages.every(s => Number.isFinite(s.pctOfFirst))).toBe(true);
     });
 });
 

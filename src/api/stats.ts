@@ -104,6 +104,61 @@ export interface StatsRevenue {
     revenue_trend: RevenueBucket[];
 }
 
+// ── Combined overview — powers the Overview tab's All services/Events/Classes/Venues scope ──
+// Distinct from every single-vertical stats/* endpoint above: one consistent card set,
+// re-scoped by `listing_type` instead of a different response shape per vertical.
+export type OverviewAllListingType = 'event' | 'venue' | 'class' | 'program';
+
+export interface RevenueByListingRow {
+    listing_id: string;
+    listing_title: string;
+    amount: string; // decimal as string
+    count: number;
+}
+
+export interface OverviewDemandFunnel {
+    listing_views: number;
+    enquiries: number;
+    confirmed_bookings: number;
+}
+
+export interface OverviewWeeklyTrendPoint {
+    week_start: string; // ISO date, Monday-start
+    revenue: string;    // decimal as string
+    bookings: number;
+}
+
+export interface StatsOverviewAll {
+    period: string;
+    listing_type: OverviewAllListingType | null;
+    gross_revenue: string;
+    revenue_growth_pct: number;
+    confirmed_bookings: number;
+    bookings_growth_pct: number;
+    avg_order_value: string;
+    /** Confirmed bookings ÷ enquiries raised in the same window — a period-level correlation,
+     * not a per-lead conversion (no stored link from a specific enquiry to the booking it led
+     * to). Always 0 on the Events scope — Events has no enquiry flow to divide by. */
+    conversion_rate: number;
+    repeat_customers_pct: number;
+    /** Non-null only when `listing_type` is omitted (the "All services" scope). */
+    revenue_by_type: RevenueByType[] | null;
+    /** Non-null only when `listing_type` is set — per-listing rows within that one service. */
+    revenue_by_listing: RevenueByListingRow[] | null;
+    /** Always 3 real, raw counts — no percentages, no "Detail opens"/"Replied within SLA"
+     * stages (not tracked yet). Compute any stage-to-stage percentage on the client. */
+    demand_funnel: OverviewDemandFunnel;
+    /** Last 8 calendar weeks, Monday-start, zero-filled — no gaps to fill client-side. */
+    weekly_trend: OverviewWeeklyTrendPoint[];
+}
+
+export const getStatsOverviewAll = async (period: RevenuePeriod = '30d', listingType?: OverviewAllListingType): Promise<StatsOverviewAll> => {
+    const params = new URLSearchParams({ period });
+    if (listingType) params.set('listing_type', listingType);
+    const res = await apiClient(`/api/v1/partner/stats/overview-all/?${params.toString()}`);
+    return unwrap<StatsOverviewAll>(res, 'Failed to load overview stats');
+};
+
 // ── Reviews ──
 export interface RatingBucket {
     rating: number;

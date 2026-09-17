@@ -10,12 +10,15 @@ import { downloadTextFile } from '../../utils/download';
 import { useEnquiriesData } from '../bookings-enquiries/useEnquiriesData';
 import { useBookingsData } from '../bookings-enquiries/useBookingsData';
 import { useAnalyticsData } from './useAnalyticsData';
+import { useOverviewAllData } from './useOverviewAllData';
+import { OverviewAllListingType } from '../../api/stats';
 import {
-    funnelStages, listingPerformance, retentionMetric, revenueTypeSlices, trendPoints, uncontactedLeadValue,
+    funnelStages, listingPerformance, overviewFunnelStages, revenueByListingSlices,
+    revenueTypeSlices, trendPoints, uncontactedLeadValue, weeklyTrendPoints,
 } from './model';
 import { buildEarningsStatementCsv } from './csv';
 import { AnalyticsTab } from './types';
-import { MetricsStrip } from './components/MetricsStrip';
+import { OverviewAllMetrics } from './components/OverviewAllMetrics';
 import { RevenueChart } from './components/RevenueChart';
 import { RevenueByService } from './components/RevenueByService';
 import { DemandFunnel } from './components/DemandFunnel';
@@ -24,6 +27,13 @@ import { CustomersPanel } from './components/CustomersPanel';
 import { ReportsPanel } from './components/ReportsPanel';
 import { TrafficSourcesCard } from './components/TrafficSourcesCard';
 import { formatRupees, toNumber } from '../../utils/format';
+
+const OVERVIEW_LISTING_TYPE: Partial<Record<EntityType, OverviewAllListingType>> = {
+    Events: 'event',
+    Classes: 'class',
+    Venues: 'venue',
+    Programs: 'program',
+};
 
 interface Props {
     onNavigate: (screen: Screen) => void;
@@ -50,9 +60,12 @@ export const Analytics: React.FC<Props> = ({ onNavigate }) => {
     const { allowedEntities, dateRange } = usePartner();
     const [tab, setTab] = useState<AnalyticsTab>('overview');
     const [scope, setScope] = useState<EntityType | 'all'>('all');
+    const [overviewScope, setOverviewScope] = useState<EntityType | 'all'>('all');
     const [listings, setListings] = useState<PartnerListing[]>([]);
 
     const stats = useAnalyticsData(dateRange);
+    const overviewListingType = overviewScope === 'all' ? undefined : OVERVIEW_LISTING_TYPE[overviewScope];
+    const overviewAll = useOverviewAllData(dateRange, overviewListingType);
     const enquiries = useEnquiriesData(allowedEntities);
     const bookings = useBookingsData(allowedEntities);
 
@@ -74,7 +87,6 @@ export const Analytics: React.FC<Props> = ({ onNavigate }) => {
     const trend = trendPoints({ revenue_trend: stats.revenue?.revenue_trend || [] });
     const stages = funnelStages(stats.overview, stats.enquiries);
     const { uncontacted, value: uncontactedValue } = uncontactedLeadValue(stats.enquiries, stats.revenue);
-    const retention = retentionMetric(allowedEntities, stats.venues, stats.enquiries);
 
     const scopedListings = scope === 'all' ? listings : listings.filter(l => l.entityType === scope);
     const performanceRows = listingPerformance(scopedListings, bookings.entries, enquiries.entries);
@@ -83,6 +95,21 @@ export const Analytics: React.FC<Props> = ({ onNavigate }) => {
         { key: 'all' as const, label: 'All services' },
         ...allowedEntities.map(e => ({ key: e, label: e })),
     ];
+
+    // No "Programs" tab in this design yet — the endpoint supports listing_type=program,
+    // but the current Overview scope is deliberately All services/Events/Classes/Venues only.
+    const overviewScopeOptions = [
+        { key: 'all' as const, label: 'All services' },
+        ...allowedEntities.filter(e => e !== 'Programs').map(e => ({ key: e, label: e })),
+    ];
+    const overviewSlices = overviewAll.overview?.revenue_by_type
+        ? revenueTypeSlices(overviewAll.overview.revenue_by_type)
+        : overviewAll.overview?.revenue_by_listing
+            ? revenueByListingSlices(overviewAll.overview.revenue_by_listing)
+            : [];
+    const overviewTrend = weeklyTrendPoints(overviewAll.overview?.weekly_trend || []);
+    const overviewFunnel = overviewAll.overview ? overviewFunnelStages(overviewAll.overview.demand_funnel) : [];
+    const revenueByListingCard = overviewAll.overview?.revenue_by_listing != null;
 
     const exportCsv = () => downloadTextFile(`tlb-analytics-${Date.now()}.csv`, buildEarningsStatementCsv(stats.revenue?.revenue_trend || []));
 
@@ -109,26 +136,43 @@ export const Analytics: React.FC<Props> = ({ onNavigate }) => {
 
             {tab === 'overview' && (
                 <div className="flex flex-col gap-4">
-                    <MetricsStrip revenue={stats.revenue} enquiries={stats.enquiries} retention={retention} />
-                    <div className="grid grid-cols-1 lg:grid-cols-[1.85fr_1fr] gap-[18px] items-stretch">
-                        <div className="pt-card p-5">
-                            <div className="flex items-start justify-between mb-1">
-                                <div>
-                                    <p className="pt-h-sec">Revenue &amp; bookings</p>
-                                    <p className="text-[12.5px] text-tlb-muted mt-0.5">Monthly · {getDateRangeOption(dateRange).phrase}</p>
+                    <SegBar options={overviewScopeOptions} value={overviewScope} onChange={setOverviewScope} />
+
+                    {overviewAll.error ? (
+                        <div className="pt-note bg-tlb-red-soft text-tlb-red-deep">{overviewAll.error}</div>
+                    ) : (
+                        <>
+                            <OverviewAllMetrics overview={overviewAll.overview} isEventsScope={overviewScope === 'Events'} />
+                            <div className="grid grid-cols-1 lg:grid-cols-[1.85fr_1fr] gap-[18px] items-stretch">
+                                <div className="pt-card p-5">
+                                    <div className="flex items-start justify-between mb-1">
+                                        <div>
+                                            <p className="pt-h-sec">Revenue &amp; bookings</p>
+                                            <p className="text-[12.5px] text-tlb-muted mt-0.5">Weekly · last 8 weeks</p>
+                                        </div>
+                                        <div className="flex gap-3.5 text-[12px] text-tlb-body">
+                                            <span className="flex items-center gap-1.5"><span className="w-[9px] h-[9px] rounded-[3px] bg-tlb-amber" />Revenue</span>
+                                            <span className="flex items-center gap-1.5"><span className="w-[9px] h-[9px] rounded-[3px] bg-tlb-ink" />Bookings</span>
+                                        </div>
+                                    </div>
+                                    <RevenueChart points={overviewTrend} />
                                 </div>
-                                <div className="flex gap-3.5 text-[12px] text-tlb-body">
-                                    <span className="flex items-center gap-1.5"><span className="w-[9px] h-[9px] rounded-[3px] bg-tlb-amber" />Revenue</span>
-                                    <span className="flex items-center gap-1.5"><span className="w-[9px] h-[9px] rounded-[3px] bg-tlb-ink" />Bookings</span>
+                                <div className="pt-card p-5">
+                                    <p className="pt-h-sec mb-1">{revenueByListingCard ? `Revenue by ${overviewScope === 'all' ? 'listing' : overviewScope.slice(0, -1).toLowerCase()}` : 'Revenue by service'}</p>
+                                    <RevenueByService
+                                        slices={overviewSlices}
+                                        grossLabel={overviewAll.overview ? formatRupees(toNumber(overviewAll.overview.gross_revenue)) : '—'}
+                                        footerNoun={revenueByListingCard ? 'listing' : 'service'}
+                                    />
                                 </div>
                             </div>
-                            <RevenueChart points={trend} />
-                        </div>
-                        <div className="pt-card p-5">
-                            <p className="pt-h-sec mb-1">Revenue by service</p>
-                            <RevenueByService slices={slices} grossLabel={stats.revenue ? formatRupees(toNumber(stats.revenue.gross_revenue)) : '—'} />
-                        </div>
-                    </div>
+                            <div className="pt-card p-5">
+                                <p className="pt-h-sec">Demand funnel</p>
+                                <p className="text-[12.5px] text-tlb-muted mb-5">Listing views → enquiries → confirmed bookings · {getDateRangeOption(dateRange).phrase}</p>
+                                <DemandFunnel stages={overviewFunnel} uncontacted={0} uncontactedValue={0} avgResponseHours={null} />
+                            </div>
+                        </>
+                    )}
                 </div>
             )}
 

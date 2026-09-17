@@ -1,5 +1,7 @@
-import { EntityType } from '../../types';
-import { StatsEnquiries, StatsOverview, StatsRevenue, StatsVenues, RevenueByType } from '../../api/stats';
+import {
+    StatsEnquiries, StatsOverview, StatsRevenue, RevenueByType,
+    OverviewDemandFunnel, OverviewWeeklyTrendPoint, RevenueByListingRow,
+} from '../../api/stats';
 import { PartnerListing } from '../../api/portalSummary';
 import { BookingEntry, EnquiryEntry } from '../bookings-enquiries/types';
 import { toNumber } from '../../utils/format';
@@ -46,6 +48,47 @@ export const trendPoints = (revenue: Pick<StatsRevenue, 'revenue_trend'>): Trend
         bookings: r.count ?? 0,
     }));
 
+// ── Overview tab (stats/overview-all/) — real weekly trend, this endpoint does give one ──
+
+const LISTING_PALETTE = ['#F5B301', '#1A1917', '#7C3AED', '#2E9E5B', '#3A63C9', '#B22222', '#8A6D00', '#0891B2'];
+
+export const weeklyTrendPoints = (weekly: OverviewWeeklyTrendPoint[]): TrendPoint[] =>
+    weekly.map(w => {
+        const d = new Date(w.week_start);
+        const label = Number.isNaN(d.getTime())
+            ? w.week_start
+            : d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+        return { label, revenue: toNumber(w.revenue), bookings: w.bookings };
+    });
+
+/** "Revenue by service" on the All-services scope, or "revenue by listing" within one service — same slice shape either way. */
+export const revenueByListingSlices = (rows: RevenueByListingRow[]): RevenueTypeSlice[] => {
+    const amounts = rows.map(r => toNumber(r.amount));
+    const total = amounts.reduce((a, b) => a + b, 0);
+    return rows
+        .map((r, i) => ({
+            type: r.listing_id,
+            label: r.listing_title,
+            color: LISTING_PALETTE[i % LISTING_PALETTE.length],
+            amount: amounts[i],
+            count: r.count,
+            pct: total > 0 ? Math.round((amounts[i] / total) * 100) : 0,
+        }))
+        .sort((a, b) => b.amount - a.amount);
+};
+
+/** The overview-all endpoint's real 3-stage funnel (Listing views → Enquiries → Bookings confirmed) —
+ * no "Detail opens"/"Replied within SLA" stages here, those aren't tracked by this endpoint at all. */
+export const overviewFunnelStages = (funnel: OverviewDemandFunnel): FunnelStage[] => {
+    const stages: { key: string; label: string; count: number; color: string }[] = [
+        { key: 'views', label: 'Listing views', count: funnel.listing_views, color: '#1A1917' },
+        { key: 'enquiries', label: 'Enquiries', count: funnel.enquiries, color: '#F5B301' },
+        { key: 'bookings', label: 'Bookings confirmed', count: funnel.confirmed_bookings, color: '#2E9E5B' },
+    ];
+    const first = stages[0].count || 1;
+    return stages.map(s => ({ ...s, available: true, pctOfFirst: Math.round((s.count / first) * 100) }));
+};
+
 // ── Demand funnel — real 4-stage funnel from profile views + the enquiry CRM funnel ──
 
 // Mirrors the mock's 5-row funnel shape exactly. "Detail opens" has no
@@ -78,22 +121,6 @@ export const uncontactedLeadValue = (
     const uncontacted = Math.max(0, (funnel?.new_leads ?? 0) - (funnel?.contacted ?? 0));
     const aov = toNumber(revenue?.avg_order_value);
     return { uncontacted, value: uncontacted * aov };
-};
-
-/** Whichever real repeat/retention metric applies to this partner's services — never a blended, fabricated single number. */
-export const retentionMetric = (
-    allowedEntities: EntityType[],
-    venues: Pick<StatsVenues, 'repeat_clients'> | null,
-    enquiries: Pick<StatsEnquiries, 'student_retention_pct'> | null,
-): { label: string; value: string } => {
-    const hasClassOrProgram = allowedEntities.includes('Classes') || allowedEntities.includes('Programs');
-    if (hasClassOrProgram && enquiries?.student_retention_pct != null) {
-        return { label: 'student retention', value: `${Math.round(enquiries.student_retention_pct)}%` };
-    }
-    if (allowedEntities.includes('Venues') && venues?.repeat_clients != null) {
-        return { label: 'repeat venue clients', value: String(venues.repeat_clients) };
-    }
-    return { label: 'no repeat-customer data yet', value: '—' };
 };
 
 // ── Per-listing performance — real bookings/enquiries/revenue rollup ───────

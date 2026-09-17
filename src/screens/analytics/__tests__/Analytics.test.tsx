@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../../test/msw/server';
@@ -46,13 +46,38 @@ describe('Analytics — loading and error states', () => {
     });
 });
 
-describe('Analytics — Overview tab', () => {
-    it('shows the real revenue metrics and revenue-by-service breakdown', async () => {
+describe('Analytics — Overview tab (stats/overview-all/)', () => {
+    it('shows the real combined KPIs and revenue-by-service breakdown for All services', async () => {
         renderScreen();
         await waitFor(() => expect(screen.getByText('Rs 1,24,600')).toBeInTheDocument());
-        expect(screen.getByText('Rs 1,05,910')).toBeInTheDocument();
-        expect(screen.getByText('Revenue by service')).toBeInTheDocument();
-        expect(screen.getByText('Events')).toBeInTheDocument();
+        const metricsGrid = screen.getByText('Gross revenue').closest('.grid') as HTMLElement;
+        expect(within(metricsGrid).getByText('57')).toBeInTheDocument(); // confirmed_bookings
+        expect(within(metricsGrid).getByText('67%')).toBeInTheDocument(); // conversion_rate
+        expect(within(metricsGrid).getByText('31%')).toBeInTheDocument(); // repeat_customers_pct
+        const revenueCard = screen.getByText('Revenue by service').closest('.pt-card') as HTMLElement;
+        expect(within(revenueCard).getByText('Events')).toBeInTheDocument();
+        // No Net Payout tile — its "after platform fee" framing doesn't match how settlement works yet.
+        expect(screen.queryByText(/net payout/i)).not.toBeInTheDocument();
+    });
+
+    it('re-scopes to a single service and swaps in revenue-by-listing', async () => {
+        renderScreen();
+        const user = userEvent.setup();
+        await waitFor(() => screen.getByText('Revenue by service'));
+        await user.click(screen.getByRole('tab', { name: 'Venues' }));
+        await waitFor(() => expect(screen.getByText('Grand Hall')).toBeInTheDocument());
+        expect(screen.getByText('Rooftop Lounge')).toBeInTheDocument();
+        expect(screen.getByText(/revenue by venue/i)).toBeInTheDocument();
+    });
+
+    it('hides the literal conversion rate on the Events scope instead of showing a permanent 0%', async () => {
+        renderScreen();
+        const user = userEvent.setup();
+        await waitFor(() => screen.getByText('Revenue by service'));
+        await user.click(screen.getByRole('tab', { name: 'Events' }));
+        await waitFor(() => expect(screen.getByText(/no enquiry data for events/i)).toBeInTheDocument());
+        const metricsGrid = screen.getByText('Gross revenue').closest('.grid') as HTMLElement;
+        expect(within(metricsGrid).queryByText('0%')).not.toBeInTheDocument();
     });
 
     it('shows the My listings heading and title', async () => {

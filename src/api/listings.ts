@@ -1105,13 +1105,17 @@ export const markBookingAttended = async (bookingId: string) => {
     return response.json();
 };
 
-// NOTE: Partners cannot cancel attendee bookings — POST /cancel/ returns 403
-// PARTNER_BOOKING_CANCEL_FORBIDDEN. Only customers can cancel their own bookings.
-// `cancelBooking` is kept for reference/tests but is no longer wired into the UI.
-export const cancelBooking = async (bookingId: string, reason?: string) => {
+// UPDATE (Sep 2026): partners can now cancel+refund a customer's own booking directly (previously
+// forbidden — this endpoint used to 403 PARTNER_BOOKING_CANCEL_FORBIDDEN; that restriction is gone).
+// Only works on the partner's own listing, requires the booking to be CONFIRMED+PAID, and respects
+// the same cancellation deadline the customer flow uses (no partner bypass). Response is the full
+// booking detail with status "cancelled" and a new `refund` object at status "processing".
+// Real error codes to branch on: BOOKING_NOT_REFUNDABLE, CANCELLATION_DEADLINE_PASSED,
+// INVALID_BOOKING_STATUS, BOOKING_NOT_FOUND, VALIDATION_ERROR (all exposed via ApiError.code).
+export const cancelBooking = async (bookingId: string, reason: string) => {
     const response = await apiClient(`/api/v1/partner/bookings/${bookingId}/cancel/`, {
         method: 'POST',
-        body: JSON.stringify({ reason: reason || 'partner_cancellation' }),
+        body: JSON.stringify({ reason }),
     });
     if (!response.ok) await handleError(response, 'Failed to cancel booking');
     return response.json();

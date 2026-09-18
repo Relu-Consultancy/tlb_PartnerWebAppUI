@@ -1,6 +1,6 @@
 import { EnquiryStatus } from '../../types';
 import { Tone } from '../../components/portal/primitives';
-import { BookingEntity, BookingEntry, BookingStatus, EnquiryEntity } from './types';
+import { BookingEntity, BookingEntry, BookingStatus, EnquiryEntity, RefundStatus } from './types';
 
 export { LISTING_STATUS_META } from '../../components/portal/listingStatus';
 
@@ -62,6 +62,17 @@ const bookingStatusMeta = (entry: Pick<BookingEntry, 'status' | 'paymentStatus'>
     return META[entry.status];
 };
 export { bookingStatusMeta };
+
+// A refund is asynchronous (Razorpay can take hours to days) — "processing" is a normal resting
+// state, not a stuck request, and must never read as "Refunded" (only "settled" means the money
+// has actually landed). "Requested" is included for completeness but is very short-lived in
+// practice — it flips to "processing" almost immediately.
+export const REFUND_STATUS_META: Record<RefundStatus, { label: string; sub?: string; tone: Tone }> = {
+    requested: { label: 'Refund requested', tone: 'amber' },
+    processing: { label: 'Refund in progress', sub: 'Usually settles in 3–7 days', tone: 'amber' },
+    settled: { label: 'Refunded', tone: 'green' },
+    failed: { label: 'Refund failed', sub: 'Needs manual follow-up', tone: 'red' },
+};
 
 const AVATAR_PALETTE = ['#3A63C9', '#7C3AED', '#2E9E5B', '#B45309', '#C2410C', '#0891B2'];
 

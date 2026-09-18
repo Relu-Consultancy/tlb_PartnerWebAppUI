@@ -1,7 +1,7 @@
 import React from 'react';
 import { LISTING_STATUS_META, Pill } from '../../../components/portal';
 import { ListingDemand, ListingRow } from '../types';
-import { SERVICE_LABEL, SERVICE_TONE, MODEL_LABEL } from '../presentation';
+import { SERVICE_LABEL, SERVICE_TONE, MODEL_LABEL, refundTagMeta } from '../presentation';
 import { nextSlotLabel } from '../model';
 import { RowActions } from './RowActions';
 
@@ -40,7 +40,12 @@ export const ListingsTable: React.FC<ListingsTableProps> = ({ rows, demandOf, no
                             {row.coverUrl && <img src={row.coverUrl} alt="" className="w-full h-full object-cover" />}
                         </div>
                         <div className="min-w-0">
-                            <p className="font-bold text-tlb-ink truncate">{row.title}</p>
+                            <div className="flex items-center gap-1.5 min-w-0">
+                                <p className="font-bold text-tlb-ink truncate">{row.title}</p>
+                                {row.enriched && !row.isRefundable && (
+                                    <Pill tone={refundTagMeta(row.isRefundable).tone}>{refundTagMeta(row.isRefundable).label}</Pill>
+                                )}
+                            </div>
                             <p className="text-[11.5px] text-tlb-muted truncate mt-0.5">
                                 {row.location}{row.capacityLabel !== '—' ? ` · ${row.capacityLabel}` : ''}
                             </p>

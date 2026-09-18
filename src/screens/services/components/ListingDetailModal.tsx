@@ -7,7 +7,7 @@ import { formatRupees } from '../../../utils/format';
 import { BookingEntry, EnquiryEntry } from '../../bookings-enquiries/types';
 import { ENQUIRY_STATUS_META } from '../../bookings-enquiries/presentation';
 import { ListingDemand, ListingRow } from '../types';
-import { SERVICE_LABEL, SERVICE_TONE, MODEL_LABEL } from '../presentation';
+import { SERVICE_LABEL, SERVICE_TONE, MODEL_LABEL, refundTagMeta } from '../presentation';
 import { nextSlotLabel } from '../model';
 
 interface ListingDetailModalProps {
@@ -54,6 +54,7 @@ export const ListingDetailModal: React.FC<ListingDetailModalProps> = ({
             <div className="flex flex-wrap items-center gap-2 -mt-1 mb-1">
                 <Pill tone={SERVICE_TONE[row.entityType]}>{SERVICE_LABEL[row.entityType]}</Pill>
                 <Pill tone={LISTING_STATUS_META[row.state].tone}>{LISTING_STATUS_META[row.state].label}</Pill>
+                <Pill tone={refundTagMeta(row.isRefundable).tone}>{refundTagMeta(row.isRefundable).label}</Pill>
             </div>
             <div className="flex flex-wrap items-center gap-2 mb-4 text-[12.5px] text-tlb-sub">
                 <span className="pt-code">{row.code}</span>

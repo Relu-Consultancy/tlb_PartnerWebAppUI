@@ -106,12 +106,28 @@ describe('enrichFromDetail — Classes and Programs', () => {
     });
 });
 
+describe('enrichFromDetail — is_refundable', () => {
+    it('defaults to refundable when the field is absent, across every entity type', () => {
+        expect(enrichFromDetail('Events', {}, null, NOW).isRefundable).toBe(true);
+        expect(enrichFromDetail('Venues', {}, null, NOW).isRefundable).toBe(true);
+        expect(enrichFromDetail('Classes', {}, null, NOW).isRefundable).toBe(true);
+        expect(enrichFromDetail('Programs', {}, null, NOW).isRefundable).toBe(true);
+    });
+
+    it('reads is_refundable: false, across every entity type', () => {
+        expect(enrichFromDetail('Events', { is_refundable: false }, null, NOW).isRefundable).toBe(false);
+        expect(enrichFromDetail('Venues', { is_refundable: false }, null, NOW).isRefundable).toBe(false);
+        expect(enrichFromDetail('Classes', { is_refundable: false }, null, NOW).isRefundable).toBe(false);
+        expect(enrichFromDetail('Programs', { is_refundable: false }, null, NOW).isRefundable).toBe(false);
+    });
+});
+
 describe('filterListings', () => {
     const row = (overrides: Partial<ListingRow> = {}): ListingRow => ({
         id: '1', title: 'Pottery Term', entityType: 'Classes', code: 'LST-100000', state: 'live',
         coverUrl: null, createdAt: null, reviewMessage: '', startsAt: null, enriched: true,
         model: 'enquiry', priceLabel: '—', capacityLabel: '—', location: '—', category: '',
-        description: '', galleryUrls: [], ...overrides,
+        description: '', galleryUrls: [], isRefundable: true, ...overrides,
     });
     const rows = [
         row({ id: 'a', title: 'Pottery Term', entityType: 'Classes', state: 'live' }),

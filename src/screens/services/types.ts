@@ -31,6 +31,8 @@ export interface ListingRow {
     description: string;
     /** Gallery image URLs from the listing's detail payload (cover excluded), for the detail modal. */
     galleryUrls: string[];
+    /** Partner-set, informational only — defaults true until enrichment resolves the real value. */
+    isRefundable: boolean;
 }
 
 export interface ListingDemand {

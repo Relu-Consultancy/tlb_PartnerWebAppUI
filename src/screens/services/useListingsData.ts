@@ -86,6 +86,7 @@ export const useListingsData = (allowedEntities: EntityType[]) => {
                 category: item?.category?.name || item?.subcategory?.name || '',
                 description: '',
                 galleryUrls: [],
+                isRefundable: true,
             }));
 
             setState({ loading: false, rows: baseRows, error: null });

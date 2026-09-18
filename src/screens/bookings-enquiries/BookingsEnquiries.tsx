@@ -149,6 +149,7 @@ export const BookingsEnquiries: React.FC<Props> = ({ onNavigate }) => {
                 now={now}
                 onClose={() => setSelectedBooking(null)}
                 onMarkAttended={bookings.markAttended}
+                onCancelBooking={bookings.cancel}
             />
         </div>
     );

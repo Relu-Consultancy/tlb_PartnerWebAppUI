@@ -43,6 +43,7 @@ interface EnrichedFields {
     startsAt: string | null;
     description: string;
     galleryUrls: string[];
+    isRefundable: boolean;
 }
 
 const earliestUpcoming = (dates: (string | null | undefined)[], now: Date): string | null => {
@@ -60,6 +61,8 @@ const galleryUrlsOf = (media: any[]): string[] =>
 export const enrichFromDetail = (entityType: EntityType, raw: any, fallbackStartsAt: string | null, now: Date): EnrichedFields => {
     const location = locationOf(raw);
     const description = raw?.description || raw?.short_description || '';
+    // Partner-set, defaults to true — purely informational, doesn't affect refund processing itself.
+    const isRefundable = raw?.is_refundable !== false;
 
     if (entityType === 'Events') {
         const tickets: any[] = raw?.tickets || [];
@@ -79,6 +82,7 @@ export const enrichFromDetail = (entityType: EntityType, raw: any, fallbackStart
             startsAt: raw?.start_datetime || fallbackStartsAt,
             description,
             galleryUrls: galleryUrlsOf(raw?.media || []),
+            isRefundable,
         };
     }
 
@@ -92,7 +96,7 @@ export const enrichFromDetail = (entityType: EntityType, raw: any, fallbackStart
             : maxCap != null ? `Up to ${maxCap} guests` : minCap != null ? `${minCap}+ guests` : '—';
         const slots: any[] = raw?.availability || [];
         const startsAt = earliestUpcoming(slots.map(s => s?.date), now) || fallbackStartsAt;
-        return { priceLabel, capacityLabel, location, startsAt, description, galleryUrls: galleryUrlsOf(raw?.media || []) };
+        return { priceLabel, capacityLabel, location, startsAt, description, galleryUrls: galleryUrlsOf(raw?.media || []), isRefundable };
     }
 
     // Classes and Programs share the batch-based shape (fee + total_seats per batch).
@@ -115,6 +119,7 @@ export const enrichFromDetail = (entityType: EntityType, raw: any, fallbackStart
         startsAt,
         description: description || service.description || '',
         galleryUrls: galleryUrlsOf(service.media || raw?.media || []),
+        isRefundable,
     };
 };
 

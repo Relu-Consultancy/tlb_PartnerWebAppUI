@@ -36,6 +36,19 @@ export interface EnquiryEntry {
 export type BookingStatus = 'confirmed' | 'awaiting_payment' | 'attended' | 'cancelled';
 export type PaymentStatus = 'paid' | 'pending' | 'refunded';
 
+/** REQUESTED is very short-lived (flips to processing almost immediately) — rarely seen in practice. */
+export type RefundStatus = 'requested' | 'processing' | 'settled' | 'failed';
+
+export interface Refund {
+    id: string;
+    status: RefundStatus;
+    amount: number;
+    currency: string;
+    requested_at: string;
+    settled_at: string | null;
+    failed_at: string | null;
+}
+
 export interface BookingEntry {
     id: string;
     entity: BookingEntity;

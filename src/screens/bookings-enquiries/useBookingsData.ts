@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { EntityType } from '../../types';
 import { loadPartnerListings } from '../../api/portalSummary';
-import { getAllBookings, markBookingAttended } from '../../api/listings';
+import { ApiError, cancelBooking, getAllBookings, markBookingAttended } from '../../api/listings';
 import { toast } from '../../components/ui';
 import { toNumber } from '../../utils/format';
 import { BookingEntity, BookingEntry, BookingStatus, PaymentStatus } from './types';
@@ -75,5 +75,18 @@ export const useBookingsData = (allowedEntities: EntityType[]) => {
         }
     };
 
-    return { loading: state.loading, entries: state.entries, reload: load, markAttended };
+    // Returns a result rather than throwing/toasting — the cancel confirmation UI shows
+    // code-specific inline messaging (deadline passed, not refundable, etc.), not just a toast.
+    const cancel = async (id: string, reason: string): Promise<{ success: true } | { success: false; code: string; message: string }> => {
+        try {
+            await cancelBooking(id, reason);
+            setState(s => ({ ...s, entries: s.entries.map(e => (e.id === id ? { ...e, status: 'cancelled' } : e)) }));
+            return { success: true };
+        } catch (err: any) {
+            const code = err instanceof ApiError ? err.code : '';
+            return { success: false, code, message: err?.message || 'Failed to cancel this booking. Please try again.' };
+        }
+    };
+
+    return { loading: state.loading, entries: state.entries, reload: load, markAttended, cancel };
 };

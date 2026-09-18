@@ -15,3 +15,7 @@ export const SCOPE_HINT: Record<EntityType, string> = {
     Programs: 'Enquiry-led — you confirm each enrolment.',
     Venues: 'Some listings sell slots directly, others take enquiries.',
 };
+
+// Informational only — set in the listing's Policies step, doesn't gate refund processing itself.
+export const refundTagMeta = (isRefundable: boolean): { label: string; tone: 'neutral' | 'amber' } =>
+    isRefundable ? { label: 'Refundable', tone: 'neutral' } : { label: 'Non-refundable', tone: 'amber' };

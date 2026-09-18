@@ -101,6 +101,22 @@ describe('ServiceListings — search', () => {
     });
 });
 
+describe('ServiceListings — refundable tag', () => {
+    it('shows a Non-refundable badge once enrichment resolves a listing with is_refundable: false', async () => {
+        server.use(http.get(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, () =>
+            HttpResponse.json({ success: true, data: { id: DRAFT_ID, listing_type: 'event', title: 'Test Event', is_refundable: false } })));
+        renderWithPartner();
+        await waitFor(() => expect(screen.getByText('Non-refundable')).toBeInTheDocument());
+    });
+
+    it('shows no refund badge on the row for a refundable (default) listing', async () => {
+        renderWithPartner();
+        await waitFor(() => screen.getByText('Test Event'));
+        expect(screen.queryByText('Non-refundable')).not.toBeInTheDocument();
+        expect(screen.queryByText('Refundable')).not.toBeInTheDocument();
+    });
+});
+
 describe('ServiceListings — edit and create navigation', () => {
     it('sets the draft id and navigates to CREATE_EVENT_DETAILS on Edit', async () => {
         renderWithPartner();

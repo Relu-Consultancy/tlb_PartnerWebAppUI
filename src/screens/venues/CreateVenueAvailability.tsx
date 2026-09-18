@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, Calendar as CalendarIcon, Clock, Plus, Trash2, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation, toast } from '../../components/ui';
+import { toast } from '../../components/ui';
+import { WizardShell, WizardNav, WizardField } from '../../components/portal/wizard';
 import {
     getVenueAvailability,
     createVenueAvailabilitySlot,
@@ -90,123 +91,118 @@ export const CreateVenueAvailability: React.FC<Props> = ({ onNavigate }) => {
 
     if (loading) {
         return (
-            <WizardLayout title="Availability" stepText="Step 3 of 7" subtitle="Schedule" progressPercentage={43} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_OCCASIONS')}>
-                <div className="flex items-center justify-center gap-2 text-gray-400 text-xs font-bold py-12">
+            <WizardShell title="New venue" entityType="Venues" step={3} totalSteps={7} stepLabel="Availability" onBack={() => onNavigate('CREATE_VENUE_OCCASIONS')}>
+                <div className="pt-card p-5 sm:p-6 flex items-center justify-center gap-2 text-tlb-muted text-xs font-bold py-12">
                     <Loader2 size={16} className="animate-spin" /> Loading availability…
                 </div>
-            </WizardLayout>
+            </WizardShell>
         );
     }
 
     if (loadError) {
         return (
-            <WizardLayout title="Availability" stepText="Step 3 of 7" subtitle="Schedule" progressPercentage={43} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_OCCASIONS')}>
-                <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-xs font-bold text-red-600">{loadError}</div>
-            </WizardLayout>
+            <WizardShell title="New venue" entityType="Venues" step={3} totalSteps={7} stepLabel="Availability" onBack={() => onNavigate('CREATE_VENUE_OCCASIONS')}>
+                <div className="pt-note bg-tlb-red-soft text-tlb-red-deep">{loadError}</div>
+            </WizardShell>
         );
     }
 
     return (
-        <WizardLayout title="Availability" stepText="Step 3 of 7" subtitle="Schedule" progressPercentage={43} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_OCCASIONS')}>
-            <div className="space-y-1">
-                <h2 className="text-2xl font-black">Schedule & Availability</h2>
-                <p className="text-sm text-gray-400">Add time slots when your venue can be booked.</p>
-            </div>
+        <WizardShell title="New venue" entityType="Venues" step={3} totalSteps={7} stepLabel="Availability" onBack={() => onNavigate('CREATE_VENUE_OCCASIONS')}>
+            <div className="pt-card p-5 sm:p-6 flex flex-col gap-5">
+                <div>
+                    <h2 className="pt-h-sec">Schedule &amp; availability</h2>
+                    <p className="text-[13px] text-tlb-sub mt-0.5">Add time slots when your venue can be booked.</p>
+                </div>
 
-            {/* Slots List */}
-            {slots.length > 0 && (
-                <div className="space-y-3">
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
-                        <CalendarIcon size={14} /> Available Slots ({slots.length})
-                    </label>
-                    {slots.map(slot => (
-                        <div key={slot.id} className="bg-white border border-gray-100 rounded-2xl px-4 py-3 flex items-center justify-between shadow-sm">
-                            <div className="flex items-center gap-3">
-                                <div className="bg-amber-50 p-2 rounded-xl text-amber-500 shrink-0">
-                                    <CalendarIcon size={16} />
+                {slots.length > 0 && (
+                    <WizardField label={`Available slots (${slots.length})`}>
+                        <div className="flex flex-col gap-3">
+                            {slots.map(slot => (
+                                <div key={slot.id} className="pt-card px-4 py-3 flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="pt-tile-md bg-tlb-amber-soft text-tlb-gold shrink-0">
+                                            <CalendarIcon size={16} />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-bold text-tlb-ink">{fmtSlotDate(slot.date)}</p>
+                                            <p className="text-xs text-tlb-muted flex items-center gap-1 mt-0.5">
+                                                <Clock size={10} /> {slot.start_time} – {slot.end_time}
+                                                {slot.note && <span className="ml-1 text-tlb-faint">· {slot.note}</span>}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => handleDelete(slot.id)}
+                                        disabled={deleting === slot.id}
+                                        className="text-tlb-faint hover:text-tlb-red-deep p-2 disabled:opacity-50 transition-colors"
+                                        aria-label="Delete slot"
+                                    >
+                                        {deleting === slot.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                                    </button>
                                 </div>
-                                <div>
-                                    <p className="text-sm font-bold text-gray-800">{fmtSlotDate(slot.date)}</p>
-                                    <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
-                                        <Clock size={10} /> {slot.start_time} – {slot.end_time}
-                                        {slot.note && <span className="ml-1 text-gray-300">· {slot.note}</span>}
-                                    </p>
-                                </div>
-                            </div>
+                            ))}
+                        </div>
+                    </WizardField>
+                )}
+
+                {slots.length === 0 && !showForm && (
+                    <div className="pt-note bg-tlb-amber-soft text-tlb-gold flex-col items-center text-center gap-2 py-8">
+                        <CalendarIcon size={32} />
+                        <p className="text-sm font-bold">No slots yet</p>
+                        <p className="text-xs">Add available time slots for customers to book.</p>
+                    </div>
+                )}
+
+                {showForm ? (
+                    <div className="pt-card p-5 flex flex-col gap-4">
+                        <h3 className="pt-h-sec flex items-center gap-2">
+                            <Plus size={16} className="text-tlb-gold" /> Add availability slot
+                        </h3>
+                        <WizardField label="Date">
+                            <input type="date" className="pt-input" value={newDate} onChange={e => setNewDate(e.target.value)} />
+                        </WizardField>
+                        <div className="grid grid-cols-2 gap-3">
+                            <WizardField label="Start time">
+                                <input type="time" className="pt-input" value={newStart} onChange={e => setNewStart(e.target.value)} />
+                            </WizardField>
+                            <WizardField label="End time">
+                                <input type="time" className="pt-input" value={newEnd} onChange={e => setNewEnd(e.target.value)} />
+                            </WizardField>
+                        </div>
+                        <WizardField label="Note (optional)">
+                            <input className="pt-input" placeholder="e.g. Weekend special" value={newNote} onChange={e => setNewNote(e.target.value)} />
+                        </WizardField>
+                        <div className="flex gap-3">
                             <button
-                                onClick={() => handleDelete(slot.id)}
-                                disabled={deleting === slot.id}
-                                className="text-gray-300 hover:text-red-500 p-2 disabled:opacity-50 transition-colors"
-                                aria-label="Delete slot"
+                                type="button"
+                                onClick={() => { setShowForm(false); setNewDate(''); setNewStart(''); setNewEnd(''); setNewNote(''); }}
+                                className="pt-btn pt-btn-o flex-1 justify-center"
                             >
-                                {deleting === slot.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                                Cancel
+                            </button>
+                            <button type="button" onClick={handleAdd} disabled={adding} className="pt-btn pt-btn-y flex-1 justify-center">
+                                {adding ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+                                {adding ? 'Adding…' : 'Add slot'}
                             </button>
                         </div>
-                    ))}
-                </div>
-            )}
+                    </div>
+                ) : (
+                    <button type="button" onClick={() => setShowForm(true)} className="pt-btn pt-btn-o w-full justify-center border-dashed py-3.5">
+                        <Plus size={18} /> Add availability slot
+                    </button>
+                )}
 
-            {slots.length === 0 && !showForm && (
-                <div className="bg-amber-50 border border-amber-100 rounded-2xl p-8 text-center">
-                    <CalendarIcon size={32} className="text-amber-300 mx-auto mb-2" />
-                    <p className="text-sm font-bold text-amber-700">No slots yet</p>
-                    <p className="text-xs text-amber-500 mt-1">Add available time slots for customers to book.</p>
-                </div>
-            )}
-
-            {/* Add Slot Form */}
-            {showForm ? (
-                <div className="bg-white border-2 border-amber-200 rounded-3xl p-5 space-y-4">
-                    <h3 className="font-black text-gray-800 text-sm flex items-center gap-2">
-                        <Plus size={16} className="text-amber-500" /> Add Availability Slot
-                    </h3>
-                    <div>
-                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">Date</label>
-                        <input type="date" className="tlb-input w-full" value={newDate} onChange={e => setNewDate(e.target.value)} />
-                    </div>
-                    <div className="flex gap-4">
-                        <div className="flex-1">
-                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">Start Time</label>
-                            <input type="time" className="tlb-input w-full" value={newStart} onChange={e => setNewStart(e.target.value)} />
-                        </div>
-                        <div className="flex-1">
-                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">End Time</label>
-                            <input type="time" className="tlb-input w-full" value={newEnd} onChange={e => setNewEnd(e.target.value)} />
-                        </div>
-                    </div>
-                    <div>
-                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">Note (optional)</label>
-                        <input className="tlb-input w-full" placeholder="e.g. Weekend special" value={newNote} onChange={e => setNewNote(e.target.value)} />
-                    </div>
-                    <div className="flex gap-3">
-                        <button onClick={() => { setShowForm(false); setNewDate(''); setNewStart(''); setNewEnd(''); setNewNote(''); }} className="flex-1 py-3 rounded-2xl border-2 border-gray-200 text-sm font-bold text-gray-500 hover:bg-gray-50">
-                            Cancel
-                        </button>
-                        <button onClick={handleAdd} disabled={adding} className="flex-1 py-3 rounded-2xl bg-amber-400 text-sm font-bold text-amber-900 hover:brightness-95 disabled:opacity-50 flex items-center justify-center gap-2">
-                            {adding ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-                            {adding ? 'Adding…' : 'Add Slot'}
-                        </button>
-                    </div>
-                </div>
-            ) : (
-                <button
-                    onClick={() => setShowForm(true)}
-                    className="w-full py-4 border-2 border-dashed border-gray-200 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold text-gray-500 hover:border-amber-400 hover:text-amber-500 hover:bg-amber-50 transition-colors"
-                >
-                    <Plus size={18} /> Add Availability Slot
-                </button>
-            )}
-
-            <WizardNavigation
-                onBack={() => onNavigate('CREATE_VENUE_OCCASIONS')}
-                onNext={() => {
-                    if (slots.length === 0) { toast.warning('Add at least one availability slot before continuing.'); return; }
-                    onNavigate('CREATE_VENUE_PACKAGES');
-                }}
-                nextText="Next: Packages & Pricing"
-                nextIcon={<ArrowRight size={20} />}
-                themeColor="amber"
-            />
-        </WizardLayout>
+                <WizardNav
+                    onBack={() => onNavigate('CREATE_VENUE_OCCASIONS')}
+                    onNext={() => {
+                        if (slots.length === 0) { toast.warning('Add at least one availability slot before continuing.'); return; }
+                        onNavigate('CREATE_VENUE_PACKAGES');
+                    }}
+                    nextText="Next: Packages & pricing"
+                    nextIcon={<ArrowRight size={14} strokeWidth={2.75} />}
+                />
+            </div>
+        </WizardShell>
     );
 };

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowRight, Plus, Trash2, Clock, Users, Calendar, DollarSign, Loader2 } from 'lucide-react';
+import { ArrowRight, Plus, Trash2, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation, toast } from '../../components/ui';
+import { toast } from '../../components/ui';
+import { WizardShell, WizardNav, WizardField } from '../../components/portal/wizard';
 import {
     getCurrentProgramDraftId,
     getProgramBatches,
@@ -162,170 +163,133 @@ export const CreateProgramBatch: React.FC<Props> = ({ onNavigate }) => {
     };
 
     return (
-        <WizardLayout
-            title="New Program"
-            stepText="Stage 2 of 5"
-            subtitle="Batch & Schedule"
-            progressPercentage={40}
-            themeColor="emerald"
-            onBack={() => onNavigate('CREATE_PROGRAM_IDENTITY')}
-        >
-            <div className="space-y-1">
-                <h2 className="text-2xl font-black">Batch & Schedule</h2>
-                <p className="text-sm text-gray-400">Define when your program runs. Add as many batches as needed.</p>
-            </div>
-
-            {loading ? (
-                <div className="flex justify-center py-10">
-                    <Loader2 size={28} className="animate-spin text-emerald-500" />
+        <WizardShell title="New program" entityType="Programs" step={2} totalSteps={5} stepLabel="Batches" onBack={() => onNavigate('CREATE_PROGRAM_IDENTITY')}>
+            <div className="pt-card p-5 sm:p-6 flex flex-col gap-5">
+                <div>
+                    <h2 className="pt-h-sec">Batch &amp; schedule</h2>
+                    <p className="text-[13px] text-tlb-sub mt-0.5">Define when your program runs. Add as many batches as needed.</p>
                 </div>
-            ) : (
-                <>
-                    {batches.map((batch, idx) => (
-                        <div key={batch.key} className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
-                            <div className="flex items-center justify-between">
-                                <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Batch {idx + 1}</p>
-                                {batches.length > 1 && (
-                                    <button onClick={() => removeBatch(batch.key)} className="text-red-400 hover:text-red-600 p-1">
-                                        <Trash2 size={16} />
-                                    </button>
-                                )}
-                            </div>
 
-                            {/* Batch Name */}
-                            <div>
-                                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">Batch Name</label>
-                                <input
-                                    className="tlb-input w-full"
-                                    placeholder="e.g. Morning Batch"
-                                    maxLength={150}
-                                    value={batch.name}
-                                    onChange={(e) => update(batch.key, { name: e.target.value })}
-                                />
-                            </div>
-
-                            {/* Start Date / End Date */}
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">
-                                        <Calendar size={10} className="inline mr-1" /> Start Date <span className="text-red-400">*</span>
-                                    </label>
-                                    <input
-                                        type="date"
-                                        className="tlb-input w-full"
-                                        value={batch.startDate}
-                                        onChange={(e) => update(batch.key, { startDate: e.target.value })}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">
-                                        <Calendar size={10} className="inline mr-1" /> End Date <span className="text-red-400">*</span>
-                                    </label>
-                                    <input
-                                        type="date"
-                                        className="tlb-input w-full"
-                                        value={batch.endDate}
-                                        min={batch.startDate}
-                                        onChange={(e) => update(batch.key, { endDate: e.target.value })}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Days of Week */}
-                            <div>
-                                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">Days</label>
-                                <div className="flex gap-2">
-                                    {DAY_OPTIONS.map((day) => (
-                                        <button
-                                            key={day.value}
-                                            onClick={() => toggleDay(batch.key, day.value)}
-                                            className={`w-10 h-10 rounded-xl text-xs font-bold transition-all ${
-                                                batch.daysOfWeek.includes(day.value)
-                                                    ? 'bg-emerald-500 text-white shadow-sm'
-                                                    : 'bg-gray-50 border border-gray-200 text-gray-400 hover:border-emerald-300'
-                                            }`}
-                                        >
-                                            {day.label}
+                {loading ? (
+                    <div className="flex items-center justify-center gap-2 text-tlb-muted text-xs font-bold py-12">
+                        <Loader2 size={16} className="animate-spin" /> Loading batches…
+                    </div>
+                ) : (
+                    <>
+                        {batches.map((batch, idx) => (
+                            <div key={batch.key} className="pt-card p-4 flex flex-col gap-3">
+                                <div className="flex items-center justify-between">
+                                    <p className="pt-eyebrow">Batch {idx + 1}</p>
+                                    {batches.length > 1 && (
+                                        <button type="button" onClick={() => removeBatch(batch.key)} className="text-tlb-red hover:text-tlb-red-deep p-1" aria-label="Remove batch">
+                                            <Trash2 size={15} />
                                         </button>
-                                    ))}
+                                    )}
+                                </div>
+
+                                <WizardField label="Batch name">
+                                    <input
+                                        className="pt-input"
+                                        placeholder="e.g. Morning Batch"
+                                        maxLength={150}
+                                        value={batch.name}
+                                        onChange={(e) => update(batch.key, { name: e.target.value })}
+                                    />
+                                </WizardField>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <WizardField label="Start date" required>
+                                        <input
+                                            type="date"
+                                            className="pt-input"
+                                            value={batch.startDate}
+                                            onChange={(e) => update(batch.key, { startDate: e.target.value })}
+                                        />
+                                    </WizardField>
+                                    <WizardField label="End date" required>
+                                        <input
+                                            type="date"
+                                            className="pt-input"
+                                            value={batch.endDate}
+                                            min={batch.startDate}
+                                            onChange={(e) => update(batch.key, { endDate: e.target.value })}
+                                        />
+                                    </WizardField>
+                                </div>
+
+                                <WizardField label="Days">
+                                    <div className="flex flex-wrap gap-2">
+                                        {DAY_OPTIONS.map((day) => (
+                                            <button
+                                                key={day.value}
+                                                type="button"
+                                                onClick={() => toggleDay(batch.key, day.value)}
+                                                className={`pt-scope ${batch.daysOfWeek.includes(day.value) ? 'is-active' : ''}`}
+                                            >
+                                                {day.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </WizardField>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <WizardField label="Start time" required>
+                                        <input
+                                            type="time"
+                                            className="pt-input"
+                                            value={batch.startTime}
+                                            onChange={(e) => update(batch.key, { startTime: e.target.value })}
+                                        />
+                                    </WizardField>
+                                    <WizardField label="End time" required>
+                                        <input
+                                            type="time"
+                                            className="pt-input"
+                                            value={batch.endTime}
+                                            onChange={(e) => update(batch.key, { endTime: e.target.value })}
+                                        />
+                                    </WizardField>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <WizardField label="Fee (₹)" required>
+                                        <input
+                                            type="number"
+                                            className="pt-input"
+                                            placeholder="e.g. 2500"
+                                            min={0}
+                                            step="0.01"
+                                            value={batch.fee}
+                                            onChange={(e) => update(batch.key, { fee: e.target.value })}
+                                        />
+                                    </WizardField>
+                                    <WizardField label="Total seats" required>
+                                        <input
+                                            type="number"
+                                            className="pt-input"
+                                            placeholder="e.g. 30"
+                                            min={1}
+                                            value={batch.totalSeats}
+                                            onChange={(e) => update(batch.key, { totalSeats: e.target.value })}
+                                        />
+                                    </WizardField>
                                 </div>
                             </div>
+                        ))}
 
-                            {/* Start Time / End Time */}
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">
-                                        <Clock size={10} className="inline mr-1" /> Start Time <span className="text-red-400">*</span>
-                                    </label>
-                                    <input
-                                        type="time"
-                                        className="tlb-input w-full"
-                                        value={batch.startTime}
-                                        onChange={(e) => update(batch.key, { startTime: e.target.value })}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">
-                                        <Clock size={10} className="inline mr-1" /> End Time <span className="text-red-400">*</span>
-                                    </label>
-                                    <input
-                                        type="time"
-                                        className="tlb-input w-full"
-                                        value={batch.endTime}
-                                        onChange={(e) => update(batch.key, { endTime: e.target.value })}
-                                    />
-                                </div>
-                            </div>
+                        <button type="button" onClick={() => setBatches(prev => [...prev, blankBatch()])} className="pt-btn pt-btn-o w-full justify-center border-dashed">
+                            <Plus size={14} strokeWidth={2.75} /> Add new batch
+                        </button>
+                    </>
+                )}
 
-                            {/* Fee + Total Seats */}
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">
-                                        <DollarSign size={10} className="inline mr-1" /> Fee (₹) <span className="text-red-400">*</span>
-                                    </label>
-                                    <input
-                                        type="number"
-                                        className="tlb-input w-full"
-                                        placeholder="e.g. 2500"
-                                        min={0}
-                                        step="0.01"
-                                        value={batch.fee}
-                                        onChange={(e) => update(batch.key, { fee: e.target.value })}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">
-                                        <Users size={10} className="inline mr-1" /> Total Seats <span className="text-red-400">*</span>
-                                    </label>
-                                    <input
-                                        type="number"
-                                        className="tlb-input w-full"
-                                        placeholder="e.g. 30"
-                                        min={1}
-                                        value={batch.totalSeats}
-                                        onChange={(e) => update(batch.key, { totalSeats: e.target.value })}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-
-                    <button
-                        onClick={() => setBatches(prev => [...prev, blankBatch()])}
-                        className="w-full py-3 border-2 border-dashed border-emerald-300/40 rounded-2xl text-sm font-bold text-emerald-500 flex items-center justify-center gap-2 hover:bg-emerald-50 transition-colors"
-                    >
-                        <Plus size={18} /> Add New Batch
-                    </button>
-                </>
-            )}
-
-            <WizardNavigation
-                onBack={() => onNavigate('CREATE_PROGRAM_IDENTITY')}
-                onNext={handleNext}
-                nextText={saving ? 'Saving...' : 'Next: Media'}
-                nextIcon={saving ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={18} />}
-                themeColor="emerald"
-            />
-        </WizardLayout>
+                <WizardNav
+                    onBack={() => onNavigate('CREATE_PROGRAM_IDENTITY')}
+                    onNext={saving ? () => {} : handleNext}
+                    nextText={saving ? 'Saving…' : 'Next: Media'}
+                    nextIcon={saving ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} strokeWidth={2.75} />}
+                />
+            </div>
+        </WizardShell>
     );
 };

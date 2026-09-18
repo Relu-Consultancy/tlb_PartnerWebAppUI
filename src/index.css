@@ -11,5 +11,8 @@
 /* Reusable component classes */
 @import "./styles/components.css";
 
+/* Partner portal primitives (client mock design language) */
+@import "./styles/portal.css";
+
 /* Custom utility classes */
 @import "./styles/utilities.css";

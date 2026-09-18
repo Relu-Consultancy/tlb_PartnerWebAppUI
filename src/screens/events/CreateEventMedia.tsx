@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowRight, Camera, Play, Trash2, Loader2, Image as ImageIcon } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation, toast } from '../../components/ui';
+import { toast } from '../../components/ui';
+import { WizardShell, WizardNav, WizardField } from '../../components/portal/wizard';
 import {
     getListingMedia,
     uploadListingMedia,
@@ -170,182 +171,130 @@ export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => {
 
     if (loading) {
         return (
-            <WizardLayout
-                title="New Event"
-                stepText="Step 3 of 5"
-                subtitle="Media"
-                progressPercentage={60}
-                themeColor="blue"
-                onBack={() => onNavigate('CREATE_EVENT_SCHEDULE')}
-            >
-                <div className="flex items-center justify-center gap-2 text-gray-400 text-xs font-bold py-12">
+            <WizardShell title="New event" entityType="Events" step={3} totalSteps={5} stepLabel="Media" onBack={() => onNavigate('CREATE_EVENT_SCHEDULE')}>
+                <div className="pt-card p-5 sm:p-6 flex items-center justify-center gap-2 text-tlb-muted text-xs font-bold py-12">
                     <Loader2 size={16} className="animate-spin" /> Loading media…
                 </div>
-            </WizardLayout>
+            </WizardShell>
         );
     }
 
     if (loadError) {
         return (
-            <WizardLayout
-                title="New Event"
-                stepText="Step 3 of 5"
-                subtitle="Media"
-                progressPercentage={60}
-                themeColor="blue"
-                onBack={() => onNavigate('CREATE_EVENT_SCHEDULE')}
-            >
-                <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-xs font-bold text-red-600">
-                    {loadError}
-                </div>
-            </WizardLayout>
+            <WizardShell title="New event" entityType="Events" step={3} totalSteps={5} stepLabel="Media" onBack={() => onNavigate('CREATE_EVENT_SCHEDULE')}>
+                <div className="pt-note bg-tlb-red-soft text-tlb-red-deep">{loadError}</div>
+            </WizardShell>
         );
     }
 
     return (
-        <WizardLayout
-            title="New Event"
-            stepText="Step 3 of 5"
-            subtitle="Media"
-            progressPercentage={60}
-            themeColor="blue"
-            onBack={() => onNavigate('CREATE_EVENT_SCHEDULE')}
-        >
-            <div className="space-y-1">
-                <h2 className="text-2xl font-black">Event Visuals</h2>
-                <p className="text-sm text-gray-400">High-quality images drive more registrations. Cover image required.</p>
-            </div>
+        <WizardShell title="New event" entityType="Events" step={3} totalSteps={5} stepLabel="Media" onBack={() => onNavigate('CREATE_EVENT_SCHEDULE')}>
+            <div className="pt-card p-5 sm:p-6 flex flex-col gap-5">
+                <div>
+                    <h2 className="pt-h-sec">Event visuals</h2>
+                    <p className="text-[13px] text-tlb-sub mt-0.5">High-quality images drive more registrations. Cover image required.</p>
+                </div>
 
-            {/* Cover */}
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">
-                    Cover Banner <span className="text-red-400">*</span>
-                </label>
-                <input ref={coverInputRef} type="file" accept="image/jpeg,image/png,video/mp4,video/quicktime" className="hidden" onChange={handleCoverPick} />
-                {cover ? (
-                    <div className="relative w-full sm:w-80 aspect-[16/9] rounded-2xl overflow-hidden border border-gray-200">
-                        {isVideoUrl(resolveUrl(cover.file_url)) ? (
-                            <video src={resolveUrl(cover.file_url)} autoPlay muted loop playsInline className="w-full h-full object-cover" />
-                        ) : (
-                            <img src={resolveUrl(cover.file_url)} alt="Cover" className="w-full h-full object-cover" />
-                        )}
-                        <button
-                            onClick={handleDeleteCover}
-                            className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-lg shadow text-red-500 hover:bg-white"
-                            aria-label="Remove cover"
-                        >
-                            <Trash2 size={14} />
-                        </button>
+                <WizardField label="Cover banner" required>
+                    <input ref={coverInputRef} type="file" accept="image/jpeg,image/png,video/mp4,video/quicktime" className="hidden" onChange={handleCoverPick} />
+                    {cover ? (
+                        <div className="relative w-full sm:w-80 aspect-[16/9] rounded-2xl overflow-hidden border border-tlb-line">
+                            {isVideoUrl(resolveUrl(cover.file_url)) ? (
+                                <video src={resolveUrl(cover.file_url)} autoPlay muted loop playsInline className="w-full h-full object-cover" />
+                            ) : (
+                                <img src={resolveUrl(cover.file_url)} alt="Cover" className="w-full h-full object-cover" />
+                            )}
+                            <button onClick={handleDeleteCover} className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-lg shadow text-tlb-red hover:bg-white" aria-label="Remove cover">
+                                <Trash2 size={14} />
+                            </button>
+                            <button
+                                onClick={() => coverInputRef.current?.click()}
+                                disabled={busyKind === 'cover'}
+                                className="absolute bottom-2 right-2 bg-white/90 px-3 py-1.5 rounded-lg shadow text-xs font-bold text-tlb-link hover:bg-white disabled:opacity-50"
+                            >
+                                {busyKind === 'cover' ? 'Uploading…' : 'Change'}
+                            </button>
+                        </div>
+                    ) : (
                         <button
                             onClick={() => coverInputRef.current?.click()}
                             disabled={busyKind === 'cover'}
-                            className="absolute bottom-2 right-2 bg-white/90 px-3 py-1.5 rounded-lg shadow text-xs font-bold text-blue-600 hover:bg-white disabled:opacity-50"
+                            className="w-full sm:w-80 aspect-[16/9] bg-tlb-amber-soft rounded-2xl border-2 border-dashed border-tlb-amber-line flex flex-col items-center justify-center text-tlb-gold hover:bg-tlb-cream transition-colors disabled:opacity-60"
                         >
-                            {busyKind === 'cover' ? 'Uploading…' : 'Change'}
-                        </button>
-                    </div>
-                ) : (
-                    <button
-                        onClick={() => coverInputRef.current?.click()}
-                        disabled={busyKind === 'cover'}
-                        className="w-full sm:w-80 aspect-[16/9] bg-blue-50 rounded-2xl border-2 border-dashed border-blue-200 flex flex-col items-center justify-center text-blue-500 hover:bg-blue-100 transition-colors disabled:opacity-60"
-                    >
-                        {busyKind === 'cover' ? <Loader2 size={28} className="animate-spin" /> : <Camera size={28} />}
-                        <span className="text-xs font-bold mt-2">{busyKind === 'cover' ? 'Uploading…' : 'Upload Cover'}</span>
-                        <span className="text-[10px] text-blue-400 mt-1">JPG/PNG or MP4/MOV · Image 5MB / Video 15MB</span>
-                    </button>
-                )}
-            </div>
-
-            {/* Gallery */}
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">
-                    Gallery Photos <span className="text-gray-300 font-normal normal-case ml-1">({gallery.length}/{GALLERY_LIMIT})</span>
-                </label>
-                <input
-                    ref={galleryInputRef}
-                    type="file"
-                    accept="image/jpeg,image/png"
-                    multiple
-                    className="hidden"
-                    onChange={handleGalleryPick}
-                />
-                <div className="flex flex-wrap gap-3">
-                    {gallery.map((g) => (
-                        <div key={g.id} className="relative w-24 h-24 rounded-2xl overflow-hidden border border-gray-200 group">
-                            <img src={resolveUrl(g.file_url)} alt="Gallery" className="w-full h-full object-cover" />
-                            <button
-                                onClick={() => handleDeleteGallery(g.id)}
-                                className="absolute top-1 right-1 bg-white/90 p-1 rounded-md text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                                aria-label="Remove image"
-                            >
-                                <Trash2 size={12} />
-                            </button>
-                        </div>
-                    ))}
-                    {gallery.length < GALLERY_LIMIT && (
-                        <button
-                            onClick={() => galleryInputRef.current?.click()}
-                            disabled={busyKind === 'gallery'}
-                            className="w-24 h-24 bg-blue-50 rounded-2xl border-2 border-dashed border-blue-200 flex flex-col items-center justify-center text-blue-500 hover:bg-blue-100 disabled:opacity-60"
-                        >
-                            {busyKind === 'gallery'
-                                ? <Loader2 size={20} className="animate-spin" />
-                                : <ImageIcon size={20} />}
-                            <span className="text-[10px] font-bold mt-1">{busyKind === 'gallery' ? 'Uploading…' : 'Add'}</span>
+                            {busyKind === 'cover' ? <Loader2 size={28} className="animate-spin" /> : <Camera size={28} />}
+                            <span className="text-xs font-bold mt-2">{busyKind === 'cover' ? 'Uploading…' : 'Upload cover'}</span>
+                            <span className="text-[10px] mt-1 opacity-80">JPG/PNG or MP4/MOV · Image 5MB / Video 15MB</span>
                         </button>
                     )}
-                </div>
-                <p className="text-[10px] text-gray-400 mt-2">JPG/PNG · Max 5MB each · Up to {GALLERY_LIMIT}</p>
-            </div>
+                </WizardField>
 
-            {/* Video */}
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 block">
-                    Promo Video <span className="text-gray-300 font-normal normal-case ml-1">(optional)</span>
-                </label>
-                <input ref={videoInputRef} type="file" accept="video/mp4,video/quicktime" className="hidden" onChange={handleVideoPick} />
-                {video ? (
-                    <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 flex items-center gap-3">
-                        <div className="bg-purple-100 p-3 rounded-xl text-blue-500"><Play size={20} /></div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-bold truncate">Video uploaded</p>
-                            <a href={resolveUrl(video.file_url)} target="_blank" rel="noreferrer" className="text-[10px] text-blue-500 truncate block hover:underline">
-                                {video.file_url}
-                            </a>
-                        </div>
-                        <button onClick={handleDeleteVideo} className="text-red-500 p-2"><Trash2 size={16} /></button>
+                <WizardField label={`Gallery photos (${gallery.length}/${GALLERY_LIMIT})`} hint={`JPG/PNG · Max 5MB each · Up to ${GALLERY_LIMIT}`}>
+                    <input ref={galleryInputRef} type="file" accept="image/jpeg,image/png" multiple className="hidden" onChange={handleGalleryPick} />
+                    <div className="flex flex-wrap gap-3">
+                        {gallery.map((g) => (
+                            <div key={g.id} className="relative w-24 h-24 rounded-2xl overflow-hidden border border-tlb-line group">
+                                <img src={resolveUrl(g.file_url)} alt="Gallery" className="w-full h-full object-cover" />
+                                <button
+                                    onClick={() => handleDeleteGallery(g.id)}
+                                    className="absolute top-1 right-1 bg-white/90 p-1 rounded-md text-tlb-red opacity-0 group-hover:opacity-100 transition-opacity"
+                                    aria-label="Remove image"
+                                >
+                                    <Trash2 size={12} />
+                                </button>
+                            </div>
+                        ))}
+                        {gallery.length < GALLERY_LIMIT && (
+                            <button
+                                onClick={() => galleryInputRef.current?.click()}
+                                disabled={busyKind === 'gallery'}
+                                className="w-24 h-24 bg-tlb-amber-soft rounded-2xl border-2 border-dashed border-tlb-amber-line flex flex-col items-center justify-center text-tlb-gold hover:bg-tlb-cream disabled:opacity-60"
+                            >
+                                {busyKind === 'gallery' ? <Loader2 size={20} className="animate-spin" /> : <ImageIcon size={20} />}
+                                <span className="text-[10px] font-bold mt-1">{busyKind === 'gallery' ? 'Uploading…' : 'Add'}</span>
+                            </button>
+                        )}
                     </div>
-                ) : (
-                    <button
-                        onClick={() => videoInputRef.current?.click()}
-                        disabled={busyKind === 'video'}
-                        className="w-full bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200 p-4 flex items-center gap-4 hover:bg-gray-100 disabled:opacity-60"
-                    >
-                        <div className="bg-gray-200 p-3 rounded-xl text-gray-500">
-                            {busyKind === 'video' ? <Loader2 size={20} className="animate-spin" /> : <Play size={20} />}
+                </WizardField>
+
+                <WizardField label="Promo video (optional)">
+                    <input ref={videoInputRef} type="file" accept="video/mp4,video/quicktime" className="hidden" onChange={handleVideoPick} />
+                    {video ? (
+                        <div className="pt-card p-4 flex items-center gap-3">
+                            <div className="pt-tile-md bg-tlb-amber-soft text-tlb-gold"><Play size={18} /></div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-bold truncate">Video uploaded</p>
+                                <a href={resolveUrl(video.file_url)} target="_blank" rel="noreferrer" className="pt-link truncate block">
+                                    {video.file_url}
+                                </a>
+                            </div>
+                            <button onClick={handleDeleteVideo} className="text-tlb-red p-2"><Trash2 size={16} /></button>
                         </div>
-                        <div className="flex-1 text-left">
-                            <p className="text-sm font-bold">{busyKind === 'video' ? 'Uploading…' : 'Upload Video'}</p>
-                            <p className="text-[10px] text-gray-400">MP4 / MOV · Max 100MB</p>
-                        </div>
-                    </button>
-                )}
+                    ) : (
+                        <button
+                            onClick={() => videoInputRef.current?.click()}
+                            disabled={busyKind === 'video'}
+                            className="w-full bg-tlb-wash rounded-2xl border-2 border-dashed border-tlb-edge p-4 flex items-center gap-4 hover:bg-tlb-hover disabled:opacity-60"
+                        >
+                            <div className="pt-tile-md bg-white text-tlb-muted">
+                                {busyKind === 'video' ? <Loader2 size={20} className="animate-spin" /> : <Play size={20} />}
+                            </div>
+                            <div className="flex-1 text-left">
+                                <p className="text-sm font-bold text-tlb-ink">{busyKind === 'video' ? 'Uploading…' : 'Upload video'}</p>
+                                <p className="text-[10px] text-tlb-muted">MP4 / MOV · Max 100MB</p>
+                            </div>
+                        </button>
+                    )}
+                </WizardField>
+
+                {!cover && <div className="pt-note bg-tlb-amber-soft text-tlb-gold">Cover banner is required to submit this event.</div>}
+
+                <WizardNav
+                    onBack={() => onNavigate('CREATE_EVENT_SCHEDULE')}
+                    onNext={() => onNavigate('CREATE_EVENT_POLICIES')}
+                    nextText="Next: FAQs & Terms"
+                    nextIcon={<ArrowRight size={14} strokeWidth={2.75} />}
+                />
             </div>
-
-            {!cover && (
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-[11px] font-bold text-amber-700">
-                    Cover banner is required to submit this event.
-                </div>
-            )}
-
-            <WizardNavigation
-                onBack={() => onNavigate('CREATE_EVENT_SCHEDULE')}
-                onNext={() => onNavigate('CREATE_EVENT_POLICIES')}
-                nextText="Next: FAQs & Terms"
-                nextIcon={<ArrowRight size={18} />}
-                themeColor="blue"
-            />
-        </WizardLayout>
+        </WizardShell>
     );
 };

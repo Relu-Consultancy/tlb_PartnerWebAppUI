@@ -1,138 +1,132 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import {
-  Home,
-  UserCircle,
-  CalendarDays,
-  LogOut,
-  X,
-  DollarSign,
-  Package,
-  LineChart,
-  LifeBuoy,
-  Network,
-  Star,
-  Heart,
-  Bell,
-  ChevronRight,
-  PanelLeftClose,
-} from 'lucide-react';
-import { Screen } from '../types';
+import { X } from 'lucide-react';
+import { EntityType, Screen } from '../types';
 import { usePartner } from '../context/PartnerContext';
+import { loadPartnerListings, loadPartnerEnquiries, loadCouponCount, isUnanswered } from '../api/portalSummary';
+import { CountBadge } from './portal';
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
   currentScreen: Screen;
   onNavigate: (screen: Screen) => void;
-  desktopOpen?: boolean;
-  onToggleDesktop?: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen, onNavigate, desktopOpen = true, onToggleDesktop }) => {
+interface NavCounts {
+  listings: number | null;
+  unansweredEnquiries: number;
+  coupons: number | null;
+}
+
+type NavEntry =
+  | { kind: 'link'; label: string; screen: Screen; activeOn: Screen[]; alert?: number; count?: number | null }
+  | { kind: 'soon'; label: string };
+
+// Badge counts refresh as the partner moves around; portalSummary memoises the
+// underlying reads, so this stays cheap and shares calls with the Dashboard.
+const useNavCounts = (entities: EntityType[], currentScreen: Screen): NavCounts => {
+  const [counts, setCounts] = useState<NavCounts>({ listings: null, unansweredEnquiries: 0, coupons: null });
+  const scopeKey = entities.join(',');
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.allSettled([loadPartnerListings(entities), loadPartnerEnquiries(entities), loadCouponCount()])
+      .then(([listings, enquiries, coupons]) => {
+        if (cancelled) return;
+        setCounts({
+          listings: listings.status === 'fulfilled' ? listings.value.length : null,
+          unansweredEnquiries: enquiries.status === 'fulfilled' ? enquiries.value.filter(isUnanswered).length : 0,
+          coupons: coupons.status === 'fulfilled' ? coupons.value : null,
+        });
+      });
+    return () => { cancelled = true; };
+  }, [scopeKey, currentScreen]);
+
+  return counts;
+};
+
+const Brand: React.FC = () => (
+  <div className="flex items-center gap-[11px] px-2 pb-[22px]">
+    <div className="w-9 h-9 rounded-[10px] bg-tlb-amber text-tlb-dark flex items-center justify-center flex-none text-[13px] font-extrabold tracking-[-0.03em]">
+      tlb
+    </div>
+    <span className="text-[17px] font-bold tracking-[-0.02em] text-tlb-ink">TLB partner</span>
+  </div>
+);
+
+export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen, onNavigate }) => {
   const { allowedEntities } = usePartner();
+  const counts = useNavCounts(allowedEntities, currentScreen);
 
-  const listingsLabel = (() => {
-    if (allowedEntities.length === 0) return 'My Listings';
-    if (allowedEntities.length === 1) {
-      const e = allowedEntities[0];
-      if (e === 'Classes') return 'My Services';
-      if (e === 'Events') return 'My Events';
-      if (e === 'Programs') return 'My Programs';
-      if (e === 'Venues') return 'My Venues';
-    }
-    return 'My Listings';
-  })();
-
-  const menuItems = [
-    { id: 'ACCOUNTS', label: 'Accounts', icon: UserCircle, visible: true },
-    { id: 'HOME', label: 'Dashboard', icon: Home, visible: true },
-    { id: 'MESSAGES', label: 'Messages', icon: Bell, visible: false },
-    { id: 'ANALYTICS', label: 'Analytics', icon: LineChart, visible: true },
-    { id: 'SERVICE_LISTINGS', label: listingsLabel, icon: CalendarDays, visible: true },
-    { id: 'REVIEWS', label: 'Reviews', icon: Star, visible: true },
-    { id: 'FOLLOWERS', label: 'Followers', icon: Heart, visible: true },
-    { id: 'PACKAGES', label: 'Packages', icon: Package, visible: false },
-    { id: 'PARTNER_NETWORK', label: 'Partner Network', icon: Network, visible: true },
-    { id: 'FINANCIAL_HUB', label: 'Finance', icon: DollarSign, visible: true },
-    { id: 'HELP_SUPPORT', label: 'Help & Support', icon: LifeBuoy, visible: true },
+  const entries: NavEntry[] = [
+    { kind: 'link', label: 'Dashboard', screen: 'HOME', activeOn: ['HOME'] },
+    {
+      kind: 'link', label: 'Bookings/Enquiries', screen: 'BOOKINGS_ENQUIRIES',
+      activeOn: ['BOOKINGS_ENQUIRIES', 'BOOKINGS', 'ENQUIRIES', 'ATTENDEES'], alert: counts.unansweredEnquiries,
+    },
+    { kind: 'link', label: 'My listings', screen: 'SERVICE_LISTINGS', activeOn: ['SERVICE_LISTINGS'], count: counts.listings },
+    { kind: 'link', label: 'Coupons', screen: 'ALL_COUPONS', activeOn: ['ALL_COUPONS', 'CREATE_COUPON'], count: counts.coupons },
+    { kind: 'link', label: 'Analytics', screen: 'ANALYTICS', activeOn: ['ANALYTICS', 'TRAFFIC_ANALYTICS'] },
+    { kind: 'link', label: 'Revenue & payouts', screen: 'FINANCIAL_HUB', activeOn: ['FINANCIAL_HUB'] },
+    { kind: 'link', label: 'Reviews', screen: 'REVIEWS', activeOn: ['REVIEWS'] },
+    { kind: 'soon', label: 'Packages' },
+    { kind: 'soon', label: 'Connections' },
   ];
-
-  const visibleItems = menuItems.filter(item => item.visible);
 
   const handleNav = (screen: Screen) => {
     onNavigate(screen);
     onClose();
   };
 
+  const renderEntry = (entry: NavEntry) => {
+    if (entry.kind === 'soon') {
+      return (
+        <button key={entry.label} type="button" disabled className="pt-nav-item">
+          <span className="pt-dot" />
+          {entry.label}
+          <span className="ml-auto text-[10px] font-medium text-tlb-muted">Coming soon</span>
+        </button>
+      );
+    }
+    const active = entry.activeOn.includes(currentScreen);
+    return (
+      <button
+        key={entry.label}
+        type="button"
+        onClick={() => handleNav(entry.screen)}
+        className={`pt-nav-item ${active ? 'is-active' : ''}`}
+        aria-current={active ? 'page' : undefined}
+      >
+        <span className="pt-dot" />
+        {entry.label}
+        {entry.alert
+          ? <CountBadge count={entry.alert} small className="ml-auto" label={`${entry.alert} unanswered`} />
+          : entry.count != null && <span className="ml-auto pt-num text-[11px] font-medium text-tlb-muted">{entry.count}</span>}
+      </button>
+    );
+  };
+
   const sidebarContent = (
-    <div className="flex flex-col h-full bg-tlb-dark text-white">
-      {/* Logo header */}
-      <div className="px-5 py-5 flex items-center justify-between border-b border-white/10">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-tlb-yellow flex items-center justify-center">
-            <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5">
-              <path d="M9 12l2 2 4-4" stroke="#141414" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-              <circle cx="12" cy="12" r="10" stroke="#141414" strokeWidth="2" />
-            </svg>
-          </div>
-          <div>
-            <h1 className="font-black text-base tracking-tight leading-none">TLB PARTNER</h1>
-          </div>
-        </div>
-        <button onClick={onClose} className="lg:hidden p-1.5 hover:bg-white/10 rounded-lg transition-colors">
+    <div className="flex flex-col h-full w-full bg-tlb-chrome border-r border-tlb-line px-3.5 pt-[22px] pb-[18px]">
+      <div className="flex items-start justify-between">
+        <Brand />
+        <button type="button" onClick={onClose} aria-label="Close menu" className="lg:hidden p-1.5 -mr-1 rounded-lg text-tlb-muted hover:bg-tlb-hover">
           <X size={18} />
         </button>
-        {onToggleDesktop && (
-          <button onClick={onToggleDesktop} className="hidden lg:flex p-1.5 hover:bg-white/10 rounded-lg transition-colors">
-            <PanelLeftClose size={18} />
-          </button>
-        )}
       </div>
-
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-        {visibleItems.map((item) => {
-          const isActive = currentScreen === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => handleNav(item.id as Screen)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all group ${
-                isActive
-                  ? 'bg-tlb-yellow text-tlb-dark'
-                  : 'text-gray-400 hover:bg-white/5 hover:text-white'
-              }`}
-            >
-              <item.icon size={18} className={isActive ? 'text-tlb-dark' : 'text-gray-500 group-hover:text-gray-300'} />
-              <span className={`text-sm font-semibold flex-1 ${isActive ? 'text-tlb-dark' : ''}`}>{item.label}</span>
-              {isActive && <ChevronRight size={14} className="text-tlb-dark/50" />}
-            </button>
-          );
-        })}
+      <nav aria-label="Main" className="flex-1 overflow-y-auto flex flex-col gap-0.5">
+        {entries.map(renderEntry)}
       </nav>
-
-      {/* Footer */}
-      <div className="px-3 pb-4 pt-2 border-t border-white/10 mt-auto">
-        <button
-          onClick={() => handleNav('LANDING')}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 hover:bg-white/5 hover:text-red-400 transition-all"
-        >
-          <LogOut size={18} />
-          <span className="text-sm font-semibold">Logout</span>
-        </button>
-      </div>
     </div>
   );
 
   return (
     <>
       {/* Desktop: fixed sidebar */}
-      {desktopOpen && (
-        <aside className="hidden lg:flex fixed top-0 left-0 bottom-0 w-60 z-40">
-          {sidebarContent}
-        </aside>
-      )}
+      <aside className="hidden lg:flex fixed top-0 left-0 bottom-0 w-[220px] z-40">
+        {sidebarContent}
+      </aside>
 
       {/* Mobile: animated drawer */}
       <AnimatePresence>
@@ -143,14 +137,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={onClose}
-              className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm lg:hidden"
+              className="fixed inset-0 bg-[rgba(20,19,18,0.45)] z-40 lg:hidden"
             />
             <motion.aside
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed top-0 left-0 bottom-0 w-[280px] z-50 lg:hidden"
+              className="fixed top-0 left-0 bottom-0 w-[260px] z-50 lg:hidden"
             >
               {sidebarContent}
             </motion.aside>

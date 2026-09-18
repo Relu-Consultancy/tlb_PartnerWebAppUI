@@ -90,7 +90,7 @@ describe('CreateClassBatch — navigation', () => {
     it('navigates back to CREATE_CLASS_IDENTITY on back', async () => {
         renderComponent();
         await waitFor(() => screen.getByDisplayValue('Batch A'));
-        const backBtn = screen.getByRole('button', { name: /back/i });
+        const backBtn = screen.getByText('Back');
         await userEvent.setup().click(backBtn);
         expect(mockNavigate).toHaveBeenCalledWith('CREATE_CLASS_IDENTITY');
     });

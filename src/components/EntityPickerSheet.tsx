@@ -41,6 +41,9 @@ const entityConfig: Record<EntityType, { icon: any; subtitle: string; color: str
     },
 };
 
+/** First wizard screen for creating a listing of the given service type. */
+export const createListingScreen = (entity: EntityType): Screen => entityConfig[entity].screen;
+
 export const EntityPickerSheet: React.FC<Props> = ({ isOpen, onClose, allowedEntities, onNavigate }) => {
     const handleSelect = (entity: EntityType) => {
         const config = entityConfig[entity];

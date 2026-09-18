@@ -881,6 +881,28 @@ export const deleteVenueFaq = async (listingId: string, faqId: number) => {
     return response.status === 204 ? {} : response.json().catch(() => ({}));
 };
 
+// ─── Class FAQs ─────────────────────────────────────────────────────────────
+export const getClassFaqs = async (listingId: string) => {
+    const response = await apiClient(`/api/v1/partner/listings/classes/${listingId}/faqs/`);
+    if (!response.ok) await handleError(response, 'Failed to load class FAQs');
+    return response.json();
+};
+export const createClassFaq = async (listingId: string, data: { question: string; answer: string; sort_order?: number }) => {
+    const response = await apiClient(`/api/v1/partner/listings/classes/${listingId}/faqs/`, { method: 'POST', body: JSON.stringify(data) });
+    if (!response.ok) await handleError(response, 'Failed to create class FAQ');
+    return response.json();
+};
+export const updateClassFaq = async (listingId: string, faqId: number, data: { question: string; answer: string; sort_order?: number }) => {
+    const response = await apiClient(`/api/v1/partner/listings/classes/${listingId}/faqs/${faqId}/`, { method: 'PUT', body: JSON.stringify(data) });
+    if (!response.ok) await handleError(response, 'Failed to update class FAQ');
+    return response.json();
+};
+export const deleteClassFaq = async (listingId: string, faqId: number) => {
+    const response = await apiClient(`/api/v1/partner/listings/classes/${listingId}/faqs/${faqId}/`, { method: 'DELETE' });
+    if (!response.ok) await handleError(response, 'Failed to delete class FAQ');
+    return response.status === 204 ? {} : response.json().catch(() => ({}));
+};
+
 // ─── Terms & Conditions (generic — works for all listing types) ─────────────
 export const getListingTerms = async (listingId: string) => {
     const response = await apiClient(`/api/v1/partner/listings/${listingId}/terms/`);
@@ -923,12 +945,9 @@ export const deleteListingFaqDoc = async (listingId: string) => {
 };
 
 // ─── Per-FAQ Documents ──────────────────────────────────────────────────────
-// Live for Venues today. The URL shape mirrors the per-entity FAQ CRUD above
-// (`/listings/<entity>/<id>/faqs/<faqId>/`) — if the backend ships the same
-// sub-resource for Events/Programs, passing that entity key here is enough
-// to wire it up. Classes have no per-FAQ id (inline `faqs[]` array on the
-// listing PATCH), so this cannot apply to Classes until that changes.
-export type FaqDocumentEntity = 'venues' | 'events' | 'programs';
+// Live for Venues, Events, Programs, and Classes. The URL shape mirrors the
+// per-entity FAQ CRUD above (`/listings/<entity>/<id>/faqs/<faqId>/`).
+export type FaqDocumentEntity = 'venues' | 'events' | 'programs' | 'classes';
 
 export interface FaqDocument {
     id: number;
@@ -980,6 +999,26 @@ export const deleteFaqDocument = async (
     if (!response.ok) await handleError(response, 'Failed to delete FAQ document');
 };
 
+// ─── Bulk FAQ save (replace-all) ──────────────────────────────────────────
+// One PUT for a "build the list, then Save" form. The array sent becomes the
+// complete FAQ list — anything not included is deleted, and every FAQ (even
+// ones whose text is unchanged) is dropped and recreated with a new id, which
+// also deletes any documents attached to it. Prefer this for the main FAQ
+// editor's single Save action; use the per-FAQ CRUD above only for inline
+// edit/delete of one row without touching the others.
+export const bulkSaveFaqs = async (
+    entity: FaqDocumentEntity,
+    listingId: string,
+    faqs: { question: string; answer: string; sort_order?: number }[],
+): Promise<any> => {
+    const response = await apiClient(`/api/v1/partner/listings/${entity}/${listingId}/faqs/bulk/`, {
+        method: 'PUT',
+        body: JSON.stringify({ faqs }),
+    });
+    if (!response.ok) await handleError(response, 'Failed to save FAQs');
+    return response.json();
+};
+
 // ─── Program Media ─────────────────────────────────────────────────────────
 
 export const getProgramMedia = async (listingId: string) => {
@@ -1028,6 +1067,30 @@ export const getBookings = async (params?: { status?: string; listing_id?: strin
     return response.json();
 };
 
+/** Follows `getBookings` pagination for one filter set (bounded to `maxPages`). */
+const fetchAllBookingPages = async (
+    params: { status?: string; listing_id?: string },
+    maxPages: number,
+): Promise<any[]> => {
+    const all: any[] = [];
+    for (let page = 1; page <= maxPages; page++) {
+        const json = await getBookings({ ...params, page });
+        const data = json?.data ?? json;
+        const rows: any[] = Array.isArray(data) ? data : (data?.results ?? []);
+        all.push(...rows);
+        if (!(json?.next ?? data?.next) || rows.length === 0) break;
+    }
+    return all;
+};
+
+/** Every booking for one listing, following pagination (bounded to `maxPages`). */
+export const getAllListingBookings = async (listingId: string, maxPages = 20): Promise<any[]> =>
+    fetchAllBookingPages({ listing_id: listingId }, maxPages);
+
+/** Every booking across the partner's listings, following pagination (bounded to `maxPages`). */
+export const getAllBookings = async (maxPages = 30): Promise<any[]> =>
+    fetchAllBookingPages({}, maxPages);
+
 export const getBookingDetail = async (bookingId: string) => {
     const response = await apiClient(`/api/v1/partner/bookings/${bookingId}/`);
     if (!response.ok) await handleError(response, 'Failed to load booking detail');
@@ -1042,13 +1105,17 @@ export const markBookingAttended = async (bookingId: string) => {
     return response.json();
 };
 
-// NOTE: Partners cannot cancel attendee bookings — POST /cancel/ returns 403
-// PARTNER_BOOKING_CANCEL_FORBIDDEN. Only customers can cancel their own bookings.
-// `cancelBooking` is kept for reference/tests but is no longer wired into the UI.
-export const cancelBooking = async (bookingId: string, reason?: string) => {
+// UPDATE (Sep 2026): partners can now cancel+refund a customer's own booking directly (previously
+// forbidden — this endpoint used to 403 PARTNER_BOOKING_CANCEL_FORBIDDEN; that restriction is gone).
+// Only works on the partner's own listing, requires the booking to be CONFIRMED+PAID, and respects
+// the same cancellation deadline the customer flow uses (no partner bypass). Response is the full
+// booking detail with status "cancelled" and a new `refund` object at status "processing".
+// Real error codes to branch on: BOOKING_NOT_REFUNDABLE, CANCELLATION_DEADLINE_PASSED,
+// INVALID_BOOKING_STATUS, BOOKING_NOT_FOUND, VALIDATION_ERROR (all exposed via ApiError.code).
+export const cancelBooking = async (bookingId: string, reason: string) => {
     const response = await apiClient(`/api/v1/partner/bookings/${bookingId}/cancel/`, {
         method: 'POST',
-        body: JSON.stringify({ reason: reason || 'partner_cancellation' }),
+        body: JSON.stringify({ reason }),
     });
     if (!response.ok) await handleError(response, 'Failed to cancel booking');
     return response.json();

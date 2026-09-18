@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, Calendar, Clock, DollarSign, Users, Plus, Trash2, Tag, Loader2 } from 'lucide-react';
+import { ArrowRight, Plus, Trash2, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation, toast } from '../../components/ui';
+import { toast } from '../../components/ui';
+import { WizardShell, WizardNav, WizardField } from '../../components/portal/wizard';
 import {
     getListingDetail,
     updateListing,
@@ -191,215 +192,146 @@ export const CreateEventSchedule: React.FC<Props> = ({ onNavigate }) => {
 
     if (loading) {
         return (
-            <WizardLayout
-                title="New Event"
-                stepText="Step 2 of 5"
-                subtitle="Schedule & Pricing"
-                progressPercentage={40}
-                themeColor="blue"
-                onBack={() => onNavigate('CREATE_EVENT_DETAILS')}
-            >
-                <div className="flex items-center justify-center gap-2 text-gray-400 text-xs font-bold py-12">
+            <WizardShell title="New event" entityType="Events" step={2} totalSteps={5} stepLabel="Schedule & pricing" onBack={() => onNavigate('CREATE_EVENT_DETAILS')}>
+                <div className="pt-card p-5 sm:p-6 flex items-center justify-center gap-2 text-tlb-muted text-xs font-bold py-12">
                     <Loader2 size={16} className="animate-spin" /> Loading draft…
                 </div>
-            </WizardLayout>
+            </WizardShell>
         );
     }
 
     if (loadError) {
         return (
-            <WizardLayout
-                title="New Event"
-                stepText="Step 2 of 5"
-                subtitle="Schedule & Pricing"
-                progressPercentage={40}
-                themeColor="blue"
-                onBack={() => onNavigate('CREATE_EVENT_DETAILS')}
-            >
-                <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-xs font-bold text-red-600">
-                    {loadError}
-                </div>
-            </WizardLayout>
+            <WizardShell title="New event" entityType="Events" step={2} totalSteps={5} stepLabel="Schedule & pricing" onBack={() => onNavigate('CREATE_EVENT_DETAILS')}>
+                <div className="pt-note bg-tlb-red-soft text-tlb-red-deep">{loadError}</div>
+            </WizardShell>
         );
     }
 
     return (
-        <WizardLayout
-            title="New Event"
-            stepText="Step 2 of 5"
-            subtitle="Schedule & Pricing"
-            progressPercentage={40}
-            themeColor="blue"
-            onBack={() => onNavigate('CREATE_EVENT_DETAILS')}
-        >
-            <div className="space-y-1">
-                <h2 className="text-2xl font-black">Schedule & Pricing</h2>
-                <p className="text-sm text-gray-400">When does your event happen and how much does it cost?</p>
-            </div>
-
-            {/* Start */}
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                    <Calendar size={12} /> Event Start
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                    <input type="date" className="tlb-input w-full" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-                    <input type="time" className="tlb-input w-full" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
-                </div>
-            </div>
-
-            {/* End */}
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                    <Clock size={12} /> Event End
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                    <input type="date" className="tlb-input w-full" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-                    <input type="time" className="tlb-input w-full" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
-                </div>
-            </div>
-
-            {/* Pricing Toggle */}
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                    <DollarSign size={12} /> Pricing
-                </label>
-                <div className="grid grid-cols-2 gap-3 mb-4">
-                    <button
-                        onClick={() => setPriceType('free')}
-                        className={`p-4 rounded-2xl border-2 text-center transition-all ${priceType === 'free'
-                            ? 'border-emerald-400 bg-emerald-50'
-                            : 'border-gray-100 bg-white hover:border-gray-200'
-                        }`}
-                    >
-                        <span className="text-lg">🎉</span>
-                        <p className={`text-sm font-bold mt-1 ${priceType === 'free' ? 'text-emerald-600' : 'text-gray-500'}`}>Free Event</p>
-                    </button>
-                    <button
-                        onClick={() => setPriceType('paid')}
-                        className={`p-4 rounded-2xl border-2 text-center transition-all ${priceType === 'paid'
-                            ? 'border-blue-400 bg-blue-50'
-                            : 'border-gray-100 bg-white hover:border-gray-200'
-                        }`}
-                    >
-                        <span className="text-lg">🎟️</span>
-                        <p className={`text-sm font-bold mt-1 ${priceType === 'paid' ? 'text-blue-600' : 'text-gray-500'}`}>Paid Event</p>
-                    </button>
-                </div>
-                {priceType !== originalPriceType && (
-                    <p className="text-[10px] text-amber-600 font-bold bg-amber-50 border border-amber-200 rounded-xl p-2.5">
-                        ⚠️ Switching pricing type will clear all existing tickets when saved.
-                    </p>
-                )}
-            </div>
-
-            {/* Free → capacity */}
-            {priceType === 'free' && (
+        <WizardShell title="New event" entityType="Events" step={2} totalSteps={5} stepLabel="Schedule & pricing" onBack={() => onNavigate('CREATE_EVENT_DETAILS')}>
+            <div className="pt-card p-5 sm:p-6 flex flex-col gap-5">
                 <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                        <Users size={12} /> Capacity
-                    </label>
-                    <input
-                        type="number"
-                        min={1}
-                        className="tlb-input w-full"
-                        placeholder="e.g. 100"
-                        value={capacity}
-                        onChange={(e) => setCapacity(e.target.value)}
-                    />
-                    <p className="text-[10px] text-gray-400 mt-1">Backend auto-creates a "Free Entry" ticket on submit.</p>
+                    <h2 className="pt-h-sec">Schedule &amp; pricing</h2>
+                    <p className="text-[13px] text-tlb-sub mt-0.5">When does your event happen and how much does it cost?</p>
                 </div>
-            )}
 
-            {/* Paid → tickets */}
-            {priceType === 'paid' && (
-                <div className="space-y-4">
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
-                        <Tag size={12} /> Ticket Tiers
-                    </label>
-                    {tickets.length === 0 && (
-                        <p className="text-xs text-gray-400">No tickets yet. Add at least one before submitting.</p>
+                <WizardField label="Event start">
+                    <div className="grid grid-cols-2 gap-3">
+                        <input type="date" className="pt-input" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                        <input type="time" className="pt-input" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+                    </div>
+                </WizardField>
+
+                <WizardField label="Event end">
+                    <div className="grid grid-cols-2 gap-3">
+                        <input type="date" className="pt-input" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                        <input type="time" className="pt-input" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+                    </div>
+                </WizardField>
+
+                <WizardField label="Pricing">
+                    <div className="grid grid-cols-2 gap-3">
+                        <button type="button" onClick={() => setPriceType('free')} className={`pt-tile ${priceType === 'free' ? 'is-on' : ''}`}>
+                            <span className="text-lg">🎉</span>
+                            <span>Free event</span>
+                        </button>
+                        <button type="button" onClick={() => setPriceType('paid')} className={`pt-tile ${priceType === 'paid' ? 'is-on' : ''}`}>
+                            <span className="text-lg">🎟️</span>
+                            <span>Paid event</span>
+                        </button>
+                    </div>
+                    {priceType !== originalPriceType && (
+                        <p className="pt-note bg-tlb-amber-soft text-tlb-gold mt-1">Switching pricing type will clear all existing tickets when saved.</p>
                     )}
-                    {tickets.map((ticket, idx) => (
-                        <div key={ticket.id ?? `new-${idx}`} className="bg-white rounded-2xl border border-gray-100 p-5 space-y-3">
-                            <div className="flex items-center justify-between">
-                                <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">
-                                    Tier {idx + 1} {ticket.id === null && '(new)'}
-                                </p>
-                                <button
-                                    onClick={() => removeTicket(idx)}
-                                    className="text-red-400 hover:text-red-600 p-1"
-                                    aria-label="Remove ticket"
-                                >
-                                    <Trash2 size={16} />
-                                </button>
-                            </div>
-                            <input
-                                className="tlb-input w-full"
-                                placeholder="e.g. General Admission, VIP Pass"
-                                maxLength={100}
-                                value={ticket.name}
-                                onChange={(e) => updateTicketField(idx, 'name', e.target.value)}
-                            />
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-[10px] font-bold text-gray-300 uppercase tracking-widest mb-1 block">Price (₹)</label>
+                </WizardField>
+
+                {priceType === 'free' && (
+                    <WizardField label="Capacity" hint='Backend auto-creates a "Free Entry" ticket on submit.'>
+                        <input
+                            type="number"
+                            min={1}
+                            className="pt-input"
+                            placeholder="e.g. 100"
+                            value={capacity}
+                            onChange={(e) => setCapacity(e.target.value)}
+                        />
+                    </WizardField>
+                )}
+
+                {priceType === 'paid' && (
+                    <WizardField label="Ticket tiers">
+                        <div className="flex flex-col gap-3">
+                            {tickets.length === 0 && (
+                                <p className="text-xs text-tlb-muted">No tickets yet. Add at least one before submitting.</p>
+                            )}
+                            {tickets.map((ticket, idx) => (
+                                <div key={ticket.id ?? `new-${idx}`} className="pt-card p-4 flex flex-col gap-3">
+                                    <div className="flex items-center justify-between">
+                                        <p className="pt-eyebrow">Tier {idx + 1} {ticket.id === null && '(new)'}</p>
+                                        <button type="button" onClick={() => removeTicket(idx)} className="text-tlb-red hover:text-tlb-red-deep p-1" aria-label="Remove ticket">
+                                            <Trash2 size={15} />
+                                        </button>
+                                    </div>
                                     <input
-                                        type="number"
-                                        min={0}
-                                        step="0.01"
-                                        className="tlb-input w-full"
-                                        placeholder="499"
-                                        value={ticket.price}
-                                        onChange={(e) => updateTicketField(idx, 'price', e.target.value)}
+                                        className="pt-input"
+                                        placeholder="e.g. General Admission, VIP Pass"
+                                        maxLength={100}
+                                        value={ticket.name}
+                                        onChange={(e) => updateTicketField(idx, 'name', e.target.value)}
+                                    />
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <WizardField label="Price (₹)">
+                                            <input
+                                                type="number"
+                                                min={0}
+                                                step="0.01"
+                                                className="pt-input"
+                                                placeholder="499"
+                                                value={ticket.price}
+                                                onChange={(e) => updateTicketField(idx, 'price', e.target.value)}
+                                            />
+                                        </WizardField>
+                                        <WizardField label="Quantity">
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                className="pt-input"
+                                                placeholder="50"
+                                                value={ticket.quantity}
+                                                onChange={(e) => updateTicketField(idx, 'quantity', e.target.value)}
+                                            />
+                                        </WizardField>
+                                    </div>
+                                    <input
+                                        className="pt-input"
+                                        placeholder="Short description (optional)"
+                                        value={ticket.description}
+                                        onChange={(e) => updateTicketField(idx, 'description', e.target.value)}
                                     />
                                 </div>
-                                <div>
-                                    <label className="text-[10px] font-bold text-gray-300 uppercase tracking-widest mb-1 block">Quantity</label>
-                                    <input
-                                        type="number"
-                                        min={1}
-                                        className="tlb-input w-full"
-                                        placeholder="50"
-                                        value={ticket.quantity}
-                                        onChange={(e) => updateTicketField(idx, 'quantity', e.target.value)}
-                                    />
-                                </div>
-                            </div>
-                            <input
-                                className="tlb-input w-full"
-                                placeholder="Short description (optional)"
-                                value={ticket.description}
-                                onChange={(e) => updateTicketField(idx, 'description', e.target.value)}
-                            />
+                            ))}
+                            <button type="button" onClick={addTicket} className="pt-btn pt-btn-o w-full justify-center border-dashed">
+                                <Plus size={14} strokeWidth={2.75} /> Add ticket tier
+                            </button>
                         </div>
-                    ))}
-                    <button
-                        onClick={addTicket}
-                        className="w-full py-3 border-2 border-dashed border-blue-200 rounded-2xl text-sm font-bold text-purple-400 flex items-center justify-center gap-2 hover:bg-blue-50 transition-colors"
-                    >
-                        <Plus size={18} /> Add Ticket Tier
-                    </button>
-                </div>
-            )}
+                    </WizardField>
+                )}
 
-            {/* Registration Deadline */}
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Registration Deadline</label>
-                <div className="grid grid-cols-2 gap-3">
-                    <input type="date" className="tlb-input w-full" value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} />
-                    <input type="time" className="tlb-input w-full" value={deadlineTime} onChange={(e) => setDeadlineTime(e.target.value)} />
-                </div>
-                <p className="text-[10px] text-gray-400 mt-1">Must be on or before the event start.</p>
+                <WizardField label="Registration deadline" hint="Must be on or before the event start.">
+                    <div className="grid grid-cols-2 gap-3">
+                        <input type="date" className="pt-input" value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} />
+                        <input type="time" className="pt-input" value={deadlineTime} onChange={(e) => setDeadlineTime(e.target.value)} />
+                    </div>
+                </WizardField>
+
+                <WizardNav
+                    onBack={() => onNavigate('CREATE_EVENT_DETAILS')}
+                    onNext={saving ? () => {} : handleNext}
+                    nextText={saving ? 'Saving…' : 'Next: Media'}
+                    nextIcon={saving ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} strokeWidth={2.75} />}
+                />
             </div>
-
-            <WizardNavigation
-                onBack={() => onNavigate('CREATE_EVENT_DETAILS')}
-                onNext={saving ? () => {} : handleNext}
-                nextText={saving ? 'Saving…' : 'Next: Media'}
-                nextIcon={saving ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={18} />}
-                themeColor="blue"
-            />
-        </WizardLayout>
+        </WizardShell>
     );
 };

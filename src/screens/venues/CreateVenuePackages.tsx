@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle2, Plus, Trash2, Loader2, Star } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation, toast } from '../../components/ui';
+import { toast } from '../../components/ui';
+import { WizardShell, WizardNav, WizardField } from '../../components/portal/wizard';
 import {
     getVenuePackages,
     createVenuePackage,
@@ -122,131 +123,125 @@ export const CreateVenuePackages: React.FC<Props> = ({ onNavigate }) => {
 
     if (loading) {
         return (
-            <WizardLayout title="Packages & Pricing" stepText="Step 4 of 7" subtitle="Packages" progressPercentage={57} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_AVAILABILITY')}>
-                <div className="flex items-center justify-center gap-2 text-gray-400 text-xs font-bold py-12">
+            <WizardShell title="New venue" entityType="Venues" step={4} totalSteps={7} stepLabel="Packages" onBack={() => onNavigate('CREATE_VENUE_AVAILABILITY')}>
+                <div className="pt-card p-5 sm:p-6 flex items-center justify-center gap-2 text-tlb-muted text-xs font-bold py-12">
                     <Loader2 size={16} className="animate-spin" /> Loading packages…
                 </div>
-            </WizardLayout>
+            </WizardShell>
         );
     }
 
     if (loadError) {
         return (
-            <WizardLayout title="Packages & Pricing" stepText="Step 4 of 7" subtitle="Packages" progressPercentage={57} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_AVAILABILITY')}>
-                <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-xs font-bold text-red-600">{loadError}</div>
-            </WizardLayout>
+            <WizardShell title="New venue" entityType="Venues" step={4} totalSteps={7} stepLabel="Packages" onBack={() => onNavigate('CREATE_VENUE_AVAILABILITY')}>
+                <div className="pt-note bg-tlb-red-soft text-tlb-red-deep">{loadError}</div>
+            </WizardShell>
         );
     }
 
     return (
-        <WizardLayout title="Packages & Pricing" stepText="Step 4 of 7" subtitle="Packages" progressPercentage={57} themeColor="amber" onBack={() => onNavigate('CREATE_VENUE_AVAILABILITY')}>
-            <div className="space-y-1">
-                <h2 className="text-2xl font-black">Build Your Packages</h2>
-                <p className="text-sm text-gray-400">Offer different tiers for customers to choose from.</p>
-            </div>
-
-            {packages.length === 0 && (
-                <div className="bg-amber-50 border border-amber-100 rounded-2xl p-8 text-center">
-                    <Star size={32} className="text-amber-300 mx-auto mb-2" />
-                    <p className="text-sm font-bold text-amber-700">No packages yet</p>
-                    <p className="text-xs text-amber-500 mt-1">Add at least one package for customers to book.</p>
+        <WizardShell title="New venue" entityType="Venues" step={4} totalSteps={7} stepLabel="Packages" onBack={() => onNavigate('CREATE_VENUE_AVAILABILITY')}>
+            <div className="pt-card p-5 sm:p-6 flex flex-col gap-5">
+                <div>
+                    <h2 className="pt-h-sec">Build your packages</h2>
+                    <p className="text-[13px] text-tlb-sub mt-0.5">Offer different tiers for customers to choose from.</p>
                 </div>
-            )}
 
-            <div className="space-y-6">
-                {packages.map((pkg, index) => (
-                    <div key={pkg.localKey} className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm relative">
-                        {packages.length > 0 && (
-                            <button
-                                onClick={() => handleDelete(pkg)}
-                                disabled={pkg.saving}
-                                className="absolute top-4 right-4 p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors disabled:opacity-50"
-                                aria-label="Remove package"
-                            >
-                                {pkg.saving ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
-                            </button>
-                        )}
+                {packages.length === 0 && (
+                    <div className="pt-note bg-tlb-amber-soft text-tlb-gold flex-col items-center text-center gap-2 py-8">
+                        <Star size={32} />
+                        <p className="text-sm font-bold">No packages yet</p>
+                        <p className="text-xs">Add at least one package for customers to book.</p>
+                    </div>
+                )}
 
-                        <div className="flex items-center gap-2 mb-4">
-                            <div className="w-6 h-6 rounded-full bg-amber-100 text-amber-600 font-black text-xs flex items-center justify-center">
-                                {index + 1}
+                <div className="flex flex-col gap-5">
+                    {packages.map((pkg, index) => (
+                        <div key={pkg.localKey} className="pt-card p-5 relative flex flex-col gap-4">
+                            {packages.length > 0 && (
+                                <button
+                                    onClick={() => handleDelete(pkg)}
+                                    disabled={pkg.saving}
+                                    className="absolute top-4 right-4 p-2 text-tlb-faint hover:text-tlb-red-deep hover:bg-tlb-red-soft rounded-full transition-colors disabled:opacity-50"
+                                    aria-label="Remove package"
+                                >
+                                    {pkg.saving ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
+                                </button>
+                            )}
+
+                            <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-full bg-tlb-amber-soft text-tlb-gold font-black text-xs flex items-center justify-center">
+                                    {index + 1}
+                                </div>
+                                <h3 className="pt-h-sec">Package details</h3>
                             </div>
-                            <h3 className="font-bold text-gray-700">Package Details</h3>
-                        </div>
 
-                        <div className="space-y-4">
-                            <div>
-                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">Package Name</label>
+                            <WizardField label="Package name">
                                 <input
-                                    className="tlb-input w-full bg-gray-50 border-transparent focus:bg-white"
+                                    className="pt-input"
                                     placeholder="e.g. Premium Party"
                                     value={pkg.name}
                                     onChange={e => updateField(pkg.localKey, 'name', e.target.value)}
                                 />
-                            </div>
+                            </WizardField>
 
-                            <div className="flex gap-4">
-                                <div className="flex-1">
-                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">Price (₹)</label>
+                            <div className="grid grid-cols-2 gap-3">
+                                <WizardField label="Price (₹)">
                                     <input
                                         type="number"
-                                        className="tlb-input w-full bg-gray-50 border-transparent focus:bg-white font-black text-lg text-amber-600"
+                                        className="pt-input font-black text-lg text-tlb-gold"
                                         placeholder="0"
                                         value={pkg.price}
                                         onChange={e => updateField(pkg.localKey, 'price', e.target.value)}
                                     />
-                                </div>
-                                <div className="flex-1">
-                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">Duration (min)</label>
+                                </WizardField>
+                                <WizardField label="Duration (min)">
                                     <input
                                         type="number"
-                                        className="tlb-input w-full bg-gray-50 border-transparent focus:bg-white"
+                                        className="pt-input"
                                         placeholder="e.g. 180"
                                         value={pkg.duration_minutes}
                                         onChange={e => updateField(pkg.localKey, 'duration_minutes', e.target.value)}
                                     />
-                                </div>
+                                </WizardField>
                             </div>
 
-                            <div>
-                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">Max Guests</label>
+                            <WizardField label="Max guests">
                                 <input
                                     type="number"
-                                    className="tlb-input w-full bg-gray-50 border-transparent focus:bg-white"
+                                    className="pt-input"
                                     placeholder="e.g. 50"
                                     value={pkg.max_guests}
                                     onChange={e => updateField(pkg.localKey, 'max_guests', e.target.value)}
                                 />
-                            </div>
+                            </WizardField>
 
-                            <div>
-                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 block">What's Included?</label>
+                            <WizardField label="What's included?">
                                 <textarea
-                                    className="tlb-input w-full min-h-[80px] resize-y bg-gray-50 border-transparent focus:bg-white text-sm"
+                                    className="pt-input min-h-[80px]"
                                     placeholder="List the features, decorations, food, etc."
                                     value={pkg.description}
                                     onChange={e => updateField(pkg.localKey, 'description', e.target.value)}
                                 />
-                            </div>
+                            </WizardField>
                         </div>
-                    </div>
-                ))}
+                    ))}
+                </div>
+
+                <button
+                    onClick={() => setPackages(prev => [...prev, newPkgForm()])}
+                    className="pt-btn pt-btn-o w-full justify-center border-dashed py-3.5"
+                >
+                    <Plus size={18} /> Add another package
+                </button>
+
+                <WizardNav
+                    onBack={() => onNavigate('CREATE_VENUE_AVAILABILITY')}
+                    onNext={handleNext}
+                    nextText={proceeding ? 'Saving…' : 'Next: Amenities'}
+                    nextIcon={proceeding ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} strokeWidth={2.75} />}
+                />
             </div>
-
-            <button
-                onClick={() => setPackages(prev => [...prev, newPkgForm()])}
-                className="w-full py-4 border-2 border-dashed border-gray-200 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold text-gray-500 hover:border-amber-400 hover:text-amber-500 hover:bg-amber-50 transition-colors"
-            >
-                <Plus size={18} /> Add Another Package
-            </button>
-
-            <WizardNavigation
-                onBack={() => onNavigate('CREATE_VENUE_AVAILABILITY')}
-                onNext={handleNext}
-                nextText={proceeding ? 'Saving…' : 'Next: Amenities'}
-                nextIcon={proceeding ? <Loader2 size={20} className="animate-spin" /> : <CheckCircle2 size={20} />}
-                themeColor="amber"
-            />
-        </WizardLayout>
+        </WizardShell>
     );
 };

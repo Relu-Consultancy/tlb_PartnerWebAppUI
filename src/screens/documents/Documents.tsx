@@ -2,10 +2,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import {
     ShieldCheck, Clock, AlertCircle, Loader2, CheckCircle2, RefreshCw,
-    Image as ImageIcon, UploadCloud, Trash2, FileText, Landmark, BadgeCheck,
+    Image as ImageIcon, UploadCloud, Trash2, FileText, Landmark, BadgeCheck, ArrowLeft,
 } from 'lucide-react';
 import { Screen } from '../../types';
 import { toast } from '../../components/ui';
+import { requestProfileSection } from '../../constants/profileSections';
 import {
     getCurrentPartner,
     getPartnerMedia, uploadPartnerMedia, deletePartnerMedia, submitVerification,
@@ -23,7 +24,13 @@ const resolveUrl = (url?: string) => {
 const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
 const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 
-const Documents: React.FC<Props> = ({ onOpenSidebar }) => {
+const Documents: React.FC<Props> = ({ onNavigate }) => {
+    // Documents lives under My profile → return to its Documents & KYC section.
+    const backToProfile = () => {
+        requestProfileSection('documents');
+        onNavigate('BRAND_PROFILE');
+    };
+
     const [loading, setLoading] = useState(true);
     const [partner, setPartner] = useState<any>(null);
     const [media, setMedia] = useState<any[]>([]);
@@ -122,9 +129,22 @@ const Documents: React.FC<Props> = ({ onOpenSidebar }) => {
 
     return (
         <div className="min-h-screen bg-gray-50">
-            <header className="bg-white px-6 md:px-10 py-5 flex items-center gap-4 sticky top-0 z-30 border-b border-gray-100">
-                
+            <header className="bg-white px-6 md:px-10 py-5 flex items-center gap-4 border-b border-gray-100">
+                <button
+                    type="button"
+                    onClick={backToProfile}
+                    aria-label="Back to My profile"
+                    className="w-10 h-10 flex-none rounded-[10px] border border-tlb-line bg-white flex items-center justify-center text-tlb-ink hover:bg-tlb-wash transition-colors"
+                >
+                    <ArrowLeft size={18} strokeWidth={2.5} />
+                </button>
                 <div>
+                    <nav aria-label="Breadcrumb" className="text-xs text-tlb-muted mb-1">
+                        <button type="button" onClick={() => onNavigate('HOME')} className="text-tlb-link hover:text-tlb-gold transition-colors">Dashboard</button>
+                        {' · '}
+                        <button type="button" onClick={backToProfile} className="text-tlb-link hover:text-tlb-gold transition-colors">My Profile</button>
+                        {' · '}Documents
+                    </nav>
                     <h1 className="tlb-page-title">Documents</h1>
                     <p className="tlb-page-sub">View &amp; update your verification documents</p>
                 </div>

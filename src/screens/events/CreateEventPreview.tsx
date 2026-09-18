@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Rocket, Clock, Loader2, AlertCircle, CheckCircle2, ShieldCheck, LockKeyhole } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation, AppListingPreview } from '../../components/ui';
+import { AppListingPreview, formatLanguages } from '../../components/ui';
 import type { AppListingPreviewModel, PreviewFact } from '../../components/ui';
+import { WizardShell, WizardNav } from '../../components/portal/wizard';
 import {
     getListingDetail,
     submitListing,
@@ -274,6 +275,7 @@ export const CreateEventPreview: React.FC<Props> = ({ onNavigate }) => {
     const isOnline = event?.mode === 'online';
     const minTicket = event?.tickets && event.tickets.length
         ? Math.min(...event.tickets.map(t => Number(t.price) || 0)) : undefined;
+    const langLine = event ? formatLanguages(event.languages, event.other_language) : '';
     const previewModel: AppListingPreviewModel | null = event ? {
         typeLabel: 'Event',
         title: event.title || '',
@@ -286,6 +288,7 @@ export const CreateEventPreview: React.FC<Props> = ({ onNavigate }) => {
         description: event.description || '',
         aboutTitle: 'About Event',
         facts: [
+            langLine ? { icon: 'language', label: 'Language', value: langLine } : null,
             event.age_group ? { icon: 'age', label: 'Age Group', value: `${event.age_group.min_age}–${event.age_group.max_age} yrs` } : null,
             event.format ? { icon: 'format', label: 'Format', value: titleCase(event.format) } : null,
             event.mode ? { icon: 'mode', label: 'Mode', value: titleCase(event.mode) } : null,
@@ -325,86 +328,62 @@ export const CreateEventPreview: React.FC<Props> = ({ onNavigate }) => {
 
     if (loading) {
         return (
-            <WizardLayout
-                title="New Event"
-                stepText="Step 5 of 5"
-                subtitle="Preview & Publish"
-                progressPercentage={100}
-                themeColor="blue"
-                onBack={() => onNavigate('CREATE_EVENT_POLICIES')}
-            >
-                <div className="flex items-center justify-center gap-2 text-gray-400 text-xs font-bold py-12">
+            <WizardShell title="New event" entityType="Events" step={5} totalSteps={5} stepLabel="Preview & publish" onBack={() => onNavigate('CREATE_EVENT_POLICIES')}>
+                <div className="pt-card p-5 sm:p-6 flex items-center justify-center gap-2 text-tlb-muted text-xs font-bold py-12">
                     <Loader2 size={16} className="animate-spin" /> Loading preview…
                 </div>
-            </WizardLayout>
+            </WizardShell>
         );
     }
 
     if (loadError || !event) {
         return (
-            <WizardLayout
-                title="New Event"
-                stepText="Step 5 of 5"
-                subtitle="Preview & Publish"
-                progressPercentage={100}
-                themeColor="blue"
-                onBack={() => onNavigate('CREATE_EVENT_POLICIES')}
-            >
-                <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-xs font-bold text-red-600">
-                    {loadError || 'Could not load event.'}
-                </div>
-            </WizardLayout>
+            <WizardShell title="New event" entityType="Events" step={5} totalSteps={5} stepLabel="Preview & publish" onBack={() => onNavigate('CREATE_EVENT_POLICIES')}>
+                <div className="pt-note bg-tlb-red-soft text-tlb-red-deep">{loadError || 'Could not load event.'}</div>
+            </WizardShell>
         );
     }
 
     return (
-        <WizardLayout
-            title="New Event"
-            stepText="Step 5 of 5"
-            subtitle="Preview & Publish"
-            progressPercentage={100}
-            themeColor="blue"
-            onBack={() => onNavigate('CREATE_EVENT_MEDIA')}
-        >
-            <div className="text-center space-y-1">
-                <h2 className="text-2xl font-black">Preview Your Event</h2>
-                <p className="text-sm text-gray-400">This is how attendees will see your event.</p>
-            </div>
+        <WizardShell title="New event" entityType="Events" step={5} totalSteps={5} stepLabel="Preview & publish" onBack={() => onNavigate('CREATE_EVENT_MEDIA')}>
+            <div className="pt-card p-5 sm:p-6 flex flex-col gap-5">
+                <div className="text-center">
+                    <h2 className="pt-h-sec">Preview your event</h2>
+                    <p className="text-[13px] text-tlb-sub mt-0.5">This is how attendees will see your event.</p>
+                </div>
 
-            {previewModel && <AppListingPreview model={previewModel} listingId={draftId || undefined} />}
+                {previewModel && <AppListingPreview model={previewModel} listingId={draftId || undefined} />}
 
-            {/* Submission readiness */}
-            {missing.length > 0 ? (
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-2">
-                    <div className="flex items-center gap-2 text-amber-700">
-                        <AlertCircle size={16} />
-                        <p className="text-xs font-black uppercase tracking-widest">Missing for submission</p>
+                {/* Submission readiness */}
+                {missing.length > 0 ? (
+                    <div className="pt-note bg-tlb-amber-soft text-tlb-gold flex-col items-start gap-2">
+                        <div className="flex items-center gap-2">
+                            <AlertCircle size={15} strokeWidth={2.75} />
+                            <p className="pt-eyebrow !text-tlb-gold">Missing for submission</p>
+                        </div>
+                        <ul className="text-xs list-disc pl-5 space-y-0.5">
+                            {missing.map(m => <li key={m}>{m}</li>)}
+                        </ul>
                     </div>
-                    <ul className="text-xs text-amber-700 list-disc pl-5 space-y-0.5">
-                        {missing.map(m => <li key={m}>{m}</li>)}
-                    </ul>
-                </div>
-            ) : event.status === 'draft' ? (
-                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-2 text-emerald-700">
-                    <CheckCircle2 size={16} />
-                    <p className="text-xs font-black uppercase tracking-widest">Ready to submit for review</p>
-                </div>
-            ) : (
-                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-center gap-2 text-blue-700">
-                    <CheckCircle2 size={16} />
-                    <p className="text-xs font-black uppercase tracking-widest">
-                        Event is {event.status} — already submitted.
-                    </p>
-                </div>
-            )}
+                ) : event.status === 'draft' ? (
+                    <div className="pt-note bg-tlb-green-soft text-tlb-green">
+                        <CheckCircle2 size={15} strokeWidth={2.75} />
+                        <p className="pt-eyebrow !text-tlb-green">Ready to submit for review</p>
+                    </div>
+                ) : (
+                    <div className="pt-note bg-tlb-blue-soft text-tlb-blue">
+                        <CheckCircle2 size={15} strokeWidth={2.75} />
+                        <p className="pt-eyebrow !text-tlb-blue">Event is {event.status} — already submitted.</p>
+                    </div>
+                )}
 
-            <WizardNavigation
-                onBack={() => onNavigate('CREATE_EVENT_POLICIES')}
-                onNext={canSubmit && !submitting ? handleSubmit : () => {}}
-                nextText={submitting ? 'Submitting…' : event.status === 'draft' ? 'Submit for Review' : 'Done'}
-                nextIcon={submitting ? <Loader2 size={20} className="animate-spin" /> : <Rocket size={20} />}
-                themeColor="blue"
-            />
+                <WizardNav
+                    onBack={() => onNavigate('CREATE_EVENT_POLICIES')}
+                    onNext={canSubmit && !submitting ? handleSubmit : () => {}}
+                    nextText={submitting ? 'Submitting…' : event.status === 'draft' ? 'Submit for review' : 'Done'}
+                    nextIcon={submitting ? <Loader2 size={14} className="animate-spin" /> : <Rocket size={14} strokeWidth={2.75} />}
+                />
+            </div>
 
             {modal && (
                 <ResultModal
@@ -413,6 +392,6 @@ export const CreateEventPreview: React.FC<Props> = ({ onNavigate }) => {
                     onClose={handleModalClose}
                 />
             )}
-        </WizardLayout>
+        </WizardShell>
     );
 };

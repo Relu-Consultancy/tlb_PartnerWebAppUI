@@ -56,6 +56,11 @@ export const BankSetup: React.FC<OnboardingProps> = ({ onNavigate }) => {
                 ifsc_code: ifsc,
                 agreement_accepted: true,
             });
+            // PAN/GST are only needed transiently to carry them across this two-step
+            // flow — clear them now that they've been submitted, rather than leaving
+            // them in sessionStorage until the user eventually logs out.
+            sessionStorage.removeItem('pan_number');
+            sessionStorage.removeItem('gst_number');
             onNavigate('ONBOARDING_COMPLETE');
         } catch (err: any) {
             showToast(err?.message || 'Failed to submit. Please try again.', 'error');

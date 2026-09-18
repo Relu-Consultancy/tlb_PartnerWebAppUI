@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Rocket, Clock, Loader2, AlertCircle, CheckCircle2, ShieldCheck, GraduationCap } from 'lucide-react';
 import { Screen } from '../../types';
-import { WizardLayout, WizardNavigation, AppListingPreview } from '../../components/ui';
+import { AppListingPreview, formatLanguages } from '../../components/ui';
 import type { AppListingPreviewModel, PreviewFact } from '../../components/ui';
+import { WizardShell, WizardNav } from '../../components/portal/wizard';
 import {
     getClassListingDetail,
     submitClassListing,
@@ -195,6 +196,7 @@ export const CreateClassPreview: React.FC<Props> = ({ onNavigate }) => {
     const clsLoc = srv.location || listing?.location;
     const firstBatch = batches[0];
     const clsPrice = listing?.price ?? srv.price ?? listing?.fee ?? srv.fee;
+    const langLine = listing ? formatLanguages((listing.languages ? listing : srv).languages, (listing.languages ? listing : srv).other_language) : '';
     const previewModel: AppListingPreviewModel | null = listing ? {
         typeLabel: 'Class',
         title: listing.title || '',
@@ -207,6 +209,7 @@ export const CreateClassPreview: React.FC<Props> = ({ onNavigate }) => {
         description: listing.description || listing.short_description || '',
         aboutTitle: 'About Class',
         facts: [
+            langLine ? { icon: 'language', label: 'Language', value: langLine } : null,
             (minAge != null || maxAge != null) ? { icon: 'age', label: 'Age Group', value: `${minAge ?? '?'}–${maxAge ?? '?'} yrs` } : null,
             mode ? { icon: 'mode', label: 'Mode', value: titleCase(mode) } : null,
             batches.length ? { icon: 'schedule', label: 'Batches', value: `${batches.length} batch${batches.length > 1 ? 'es' : ''}` } : null,
@@ -241,77 +244,67 @@ export const CreateClassPreview: React.FC<Props> = ({ onNavigate }) => {
 
     if (loading) {
         return (
-            <WizardLayout title="New Listing" stepText="Stage 5 of 5" subtitle="Preview & Publish" progressPercentage={100} themeColor="yellow" onBack={() => onNavigate('CREATE_CLASS_POLICIES')}>
-                <div className="flex items-center justify-center gap-2 text-gray-400 text-xs font-bold py-12">
+            <WizardShell title="New class" entityType="Classes" step={5} totalSteps={5} stepLabel="Preview & publish" onBack={() => onNavigate('CREATE_CLASS_POLICIES')}>
+                <div className="pt-card p-5 sm:p-6 flex items-center justify-center gap-2 text-tlb-muted text-xs font-bold py-12">
                     <Loader2 size={16} className="animate-spin" /> Loading preview…
                 </div>
-            </WizardLayout>
+            </WizardShell>
         );
     }
 
     if (loadError || !listing) {
         return (
-            <WizardLayout title="New Listing" stepText="Stage 5 of 5" subtitle="Preview & Publish" progressPercentage={100} themeColor="yellow" onBack={() => onNavigate('CREATE_CLASS_POLICIES')}>
-                <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-xs font-bold text-red-600">
-                    {loadError || 'Could not load class.'}
-                </div>
-            </WizardLayout>
+            <WizardShell title="New class" entityType="Classes" step={5} totalSteps={5} stepLabel="Preview & publish" onBack={() => onNavigate('CREATE_CLASS_POLICIES')}>
+                <div className="pt-note bg-tlb-red-soft text-tlb-red-deep">{loadError || 'Could not load class.'}</div>
+            </WizardShell>
         );
     }
 
     return (
-        <WizardLayout
-            title="New Listing"
-            stepText="Stage 5 of 5"
-            subtitle="Preview & Publish"
-            progressPercentage={100}
-            themeColor="yellow"
-            onBack={() => onNavigate('CREATE_CLASS_POLICIES')}
-        >
-            <div className="text-center space-y-1">
-                <h2 className="text-2xl font-black">Preview Your Listing</h2>
-                <p className="text-sm text-gray-400">This is how parents will see your class. Review everything before publishing.</p>
+        <WizardShell title="New class" entityType="Classes" step={5} totalSteps={5} stepLabel="Preview & publish" onBack={() => onNavigate('CREATE_CLASS_POLICIES')}>
+            <div className="pt-card p-5 sm:p-6 flex flex-col gap-5">
+                <div className="text-center">
+                    <h2 className="pt-h-sec">Preview your listing</h2>
+                    <p className="text-[13px] text-tlb-sub mt-0.5">This is how parents will see your class. Review everything before publishing.</p>
+                </div>
+
+                {previewModel && <AppListingPreview model={previewModel} listingId={draftId || undefined} />}
+
+                {/* Submission readiness */}
+                {missing.length > 0 ? (
+                    <div className="pt-note bg-tlb-amber-soft text-tlb-gold flex-col items-start gap-2">
+                        <div className="flex items-center gap-2">
+                            <AlertCircle size={15} strokeWidth={2.75} />
+                            <p className="pt-eyebrow !text-tlb-gold">Missing for submission</p>
+                        </div>
+                        <ul className="text-xs list-disc pl-5 space-y-0.5">
+                            {missing.map(m => <li key={m}>{m}</li>)}
+                        </ul>
+                    </div>
+                ) : listing.status === 'draft' ? (
+                    <div className="pt-note bg-tlb-green-soft text-tlb-green">
+                        <CheckCircle2 size={15} strokeWidth={2.75} />
+                        <p className="pt-eyebrow !text-tlb-green">Ready to submit for review</p>
+                    </div>
+                ) : (
+                    <div className="pt-note bg-tlb-blue-soft text-tlb-blue">
+                        <CheckCircle2 size={15} strokeWidth={2.75} />
+                        <p className="pt-eyebrow !text-tlb-blue">Class is {listing.status} — already submitted.</p>
+                    </div>
+                )}
+
+                <WizardNav
+                    onBack={() => onNavigate('CREATE_CLASS_POLICIES')}
+                    onNext={canSubmit && !submitting ? handleSubmit : () => {
+                        clearCurrentClassDraftId();
+                        onNavigate('SERVICE_LISTINGS');
+                    }}
+                    nextText={submitting ? 'Submitting…' : canSubmit ? 'Submit for review' : 'Back to listings'}
+                    nextIcon={submitting ? <Loader2 size={14} className="animate-spin" /> : <Rocket size={14} strokeWidth={2.75} />}
+                />
             </div>
 
-            {previewModel && <AppListingPreview model={previewModel} listingId={draftId || undefined} />}
-
-            {/* Submission readiness */}
-            {missing.length > 0 ? (
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-2">
-                    <div className="flex items-center gap-2 text-amber-700">
-                        <AlertCircle size={16} />
-                        <p className="text-xs font-black uppercase tracking-widest">Missing for submission</p>
-                    </div>
-                    <ul className="text-xs text-amber-700 list-disc pl-5 space-y-0.5">
-                        {missing.map(m => <li key={m}>{m}</li>)}
-                    </ul>
-                </div>
-            ) : listing.status === 'draft' ? (
-                <div className="bg-tlb-yellow/10 border border-tlb-yellow/30 rounded-2xl p-4 flex items-center gap-2 text-tlb-yellow">
-                    <CheckCircle2 size={16} />
-                    <p className="text-xs font-black uppercase tracking-widest">Ready to submit for review</p>
-                </div>
-            ) : (
-                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-center gap-2 text-blue-700">
-                    <CheckCircle2 size={16} />
-                    <p className="text-xs font-black uppercase tracking-widest">
-                        Class is {listing.status} — already submitted.
-                    </p>
-                </div>
-            )}
-
-            <WizardNavigation
-                onBack={() => onNavigate('CREATE_CLASS_POLICIES')}
-                onNext={canSubmit && !submitting ? handleSubmit : () => {
-                    clearCurrentClassDraftId();
-                    onNavigate('SERVICE_LISTINGS');
-                }}
-                nextText={submitting ? 'Submitting…' : canSubmit ? 'Submit for Review' : 'Back to Listings'}
-                nextIcon={submitting ? <Loader2 size={20} className="animate-spin" /> : <Rocket size={20} />}
-                themeColor="yellow"
-            />
-
             {modal && <ResultModal variant={modal.variant} message={modal.message} onClose={handleModalClose} />}
-        </WizardLayout>
+        </WizardShell>
     );
 };

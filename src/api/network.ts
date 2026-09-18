@@ -86,10 +86,25 @@ const normalizeMessage = (m: any): NetworkMessage => ({
 
 const unwrap = (json: any) => json?.data ?? json;
 
+// Lets callers distinguish a specific error (BLOCKED, chiefly) from a generic
+// failure — starting a conversation and sending into an existing one now both
+// 403 with this same { code: 'BLOCKED' } shape whenever either participant
+// has blocked the other.
+export class NetworkApiError extends Error {
+    status: number;
+    code?: string;
+    constructor(message: string, status: number, code?: string) {
+        super(message);
+        this.status = status;
+        this.code = code;
+    }
+}
+
 const ensureOk = async (res: Response, fallback: string) => {
     if (!res.ok) {
         const err = await res.json().catch(() => null);
-        throw new Error(err?.error?.message || err?.message || err?.detail || `${fallback} (HTTP ${res.status})`);
+        const message = err?.error?.message || err?.message || err?.detail || `${fallback} (HTTP ${res.status})`;
+        throw new NetworkApiError(message, res.status, err?.error?.code);
     }
 };
 

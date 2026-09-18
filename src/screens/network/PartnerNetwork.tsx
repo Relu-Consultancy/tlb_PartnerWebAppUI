@@ -11,7 +11,7 @@ import { getPartnerCategories, getCurrentPartner } from '../../api/onboarding';
 import {
     listNetworkPartners, getNetworkPartner, blockPartner, unblockPartner, listBlockedPartners,
     listConversations, startConversation, sendConversationMessage,
-    NetworkPartner, NetworkPartnerDetail, NetworkListing, Conversation,
+    NetworkApiError, NetworkPartner, NetworkPartnerDetail, NetworkListing, Conversation,
 } from '../../api/network';
 
 interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
@@ -192,6 +192,16 @@ export const PartnerNetwork: React.FC<Props> = ({ onOpenSidebar }) => {
             setPingOpen(false);
             toast.success('Message sent! Your enquiry has been delivered.');
         } catch (e: any) {
+            // BLOCKED is terminal — either side has blocked the other, so retrying
+            // won't help. Reflect the block in the UI immediately (same handling
+            // whether it came from starting the conversation or sending into it)
+            // and close the composer instead of leaving it open to retry.
+            if (e instanceof NetworkApiError && e.code === 'BLOCKED') {
+                setBlockedIds(prev => new Set(prev).add(profile.id));
+                setPingOpen(false);
+                toast.error(e.message || 'You can no longer message this partner.');
+                return;
+            }
             toast.error(e?.message || 'Could not send message');
         } finally {
             setPinging(false);
@@ -313,13 +323,13 @@ export const PartnerNetwork: React.FC<Props> = ({ onOpenSidebar }) => {
                                         <Ban size={16} /> {isBlocked ? 'Unblock' : 'Block'}
                                     </button>
                                 </div>
-                                {!isBlocked && (
-                                    <p className="text-[11px] text-gray-400 mt-2">
-                                        {alreadyPinged
+                                <p className="text-[11px] text-gray-400 mt-2">
+                                    {isBlocked
+                                        ? 'You can no longer message this partner.'
+                                        : alreadyPinged
                                             ? 'You’ve already sent this partner a message.'
                                             : 'Send a single message (like an enquiry). This is a one-time message, not a chat.'}
-                                    </p>
-                                )}
+                                </p>
                             </div>
                         </motion.div>
 

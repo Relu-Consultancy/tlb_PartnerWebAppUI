@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
     Search, Filter, Lock, Phone, MessageCircle, X, StickyNote, Inbox, Loader2,
-    Users, Sparkles, CheckCircle2, CalendarClock, Check, Mail, Clock,
-    IndianRupee, ClipboardList, Calendar, MapPin,
+    Users, Sparkles, CheckCircle2, CalendarClock, Check,
+    ClipboardList, MapPin,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Screen } from '../../types';
@@ -15,12 +15,6 @@ interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => voi
 type VenueEnquiryStatus = 'new' | 'contacted' | 'site_visit_scheduled' | 'closed';
 
 interface ProjectDetails {
-    occasion: string | null;
-    guest_count: number | null;
-    event_date: string | null;
-    budget: string | null;
-    duration_hours: number | null;
-    requirements: string | null;
     message: string | null;
     preferred_slot: { id: number; date: string; start_time: string; end_time: string } | null;
 }
@@ -29,10 +23,6 @@ interface Lead {
     id: string;
     venueTitle: string;
     customerName: string;
-    email?: string;
-    occasion?: string;
-    guests: string;
-    eventDate?: string;
     dateTime: string;
     contact: string;
     isUnlocked: boolean;
@@ -82,13 +72,6 @@ const fmtDate = (iso?: string | null) => {
     return Number.isNaN(d.getTime()) ? String(iso) : d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
-const fmtCurrency = (val?: string | null) => {
-    if (!val) return null;
-    const n = parseFloat(val);
-    if (isNaN(n)) return val;
-    return n.toLocaleString('en-IN', { maximumFractionDigits: 0 });
-};
-
 const fmtTime = (t?: string | null) => {
     if (!t) return '';
     const [h, m] = t.split(':').map(Number);
@@ -105,11 +88,7 @@ const normalizeStatus = (s: string): VenueEnquiryStatus => {
 const parseLead = (item: any): Lead => ({
     id: String(item.id),
     venueTitle: item.venue_title || item.listing_title || item.listing?.title || '',
-    customerName: item.customer_name || item.name || item.contact_name || 'Unknown',
-    email: item.email || undefined,
-    occasion: item.occasion || item.project_details?.occasion || undefined,
-    guests: item.guest_count != null ? String(item.guest_count) : (item.project_details?.guest_count != null ? String(item.project_details.guest_count) : 'N/A'),
-    eventDate: fmtDate(item.event_date || item.project_details?.event_date) || undefined,
+    customerName: item.attendee_name || item.customer_name || item.name || item.contact_name || 'Unknown',
     dateTime: item.created_at ? new Date(item.created_at).toLocaleString() : '',
     contact: item.mobile || item.contact_number || 'Hidden',
     isUnlocked: !!item.is_contact_unlocked,
@@ -222,7 +201,6 @@ export const VenueEnquiries: React.FC<Props> = () => {
     ];
 
     const pd = selectedLead?.projectDetails;
-    const hasBrief = pd && (pd.occasion || pd.guest_count || pd.event_date || pd.budget || pd.duration_hours || pd.requirements);
 
     return (
         <>
@@ -301,8 +279,7 @@ export const VenueEnquiries: React.FC<Props> = () => {
                             <thead>
                                 <tr className="bg-gray-50/70 border-b border-gray-100">
                                     <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest">Customer</th>
-                                    <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest">Venue / Occasion</th>
-                                    <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest text-center">Guests</th>
+                                    <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest">Venue</th>
                                     <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest">Received</th>
                                     <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest">Contact</th>
                                     <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest">Status</th>
@@ -353,15 +330,12 @@ export const VenueEnquiries: React.FC<Props> = () => {
                                                             </span>
                                                         )}
                                                     </div>
-                                                    {lead.eventDate && <p className="text-[11px] text-gray-400 truncate">Event: {lead.eventDate}</p>}
                                                 </div>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
                                             {lead.venueTitle && <p className="text-xs font-bold text-gray-700">{lead.venueTitle}</p>}
-                                            <p className="text-xs text-gray-400">{lead.occasion || 'General enquiry'}</p>
                                         </td>
-                                        <td className="px-6 py-4 text-center"><span className="text-sm text-gray-500">{lead.guests}</span></td>
                                         <td className="px-6 py-4"><span className="text-[11px] font-bold text-gray-400">{lead.dateTime}</span></td>
                                         <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                                             {!lead.isUnlocked ? (
@@ -470,86 +444,25 @@ export const VenueEnquiries: React.FC<Props> = () => {
                             </div>
                         </div>
 
-                        {/* Project Details Card */}
-                        {hasBrief && (
-                            <div className="bg-amber-50/50 border border-amber-100 rounded-2xl p-4 space-y-3">
-                                <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest flex items-center gap-1.5">
-                                    <ClipboardList size={12} /> Project Brief
+                        {/* Preferred slot — the only structured detail the API still returns */}
+                        {pd?.preferred_slot && (
+                            <div className="bg-amber-50/50 border border-amber-100 rounded-2xl p-4">
+                                <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest flex items-center gap-1.5 mb-3">
+                                    <ClipboardList size={12} /> Preferred Slot
                                 </p>
-                                <div className="grid grid-cols-2 gap-2.5">
-                                    {pd!.occasion && (
-                                        <div className="bg-white rounded-xl px-3 py-2.5 border border-amber-100/60">
-                                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Occasion</p>
-                                            <p className="text-sm font-bold text-gray-800 mt-0.5">{pd!.occasion}</p>
-                                        </div>
-                                    )}
-                                    {pd!.guest_count && (
-                                        <div className="bg-white rounded-xl px-3 py-2.5 border border-amber-100/60">
-                                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1"><Users size={10} /> Guests</p>
-                                            <p className="text-sm font-bold text-gray-800 mt-0.5">{pd!.guest_count}</p>
-                                        </div>
-                                    )}
-                                    {pd!.event_date && (
-                                        <div className="bg-white rounded-xl px-3 py-2.5 border border-amber-100/60">
-                                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1"><Calendar size={10} /> Event Date</p>
-                                            <p className="text-sm font-bold text-gray-800 mt-0.5">{fmtDate(pd!.event_date)}</p>
-                                        </div>
-                                    )}
-                                    {pd!.budget && (
-                                        <div className="bg-white rounded-xl px-3 py-2.5 border border-amber-100/60">
-                                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1"><IndianRupee size={10} /> Budget</p>
-                                            <p className="text-sm font-bold text-gray-800 mt-0.5">{fmtCurrency(pd!.budget)}</p>
-                                        </div>
-                                    )}
-                                    {pd!.duration_hours && (
-                                        <div className="bg-white rounded-xl px-3 py-2.5 border border-amber-100/60">
-                                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1"><Clock size={10} /> Duration</p>
-                                            <p className="text-sm font-bold text-gray-800 mt-0.5">{pd!.duration_hours}h</p>
-                                        </div>
-                                    )}
+                                <div className="bg-white rounded-xl px-3 py-2.5 border border-amber-100/60 flex items-center gap-2">
+                                    <MapPin size={12} className="text-gray-400 shrink-0" />
+                                    <p className="text-sm font-bold text-gray-800">
+                                        {fmtDate(pd.preferred_slot.date)} &middot; {fmtTime(pd.preferred_slot.start_time)} - {fmtTime(pd.preferred_slot.end_time)}
+                                    </p>
                                 </div>
-                                {pd!.requirements && (
-                                    <div className="bg-white rounded-xl px-3 py-2.5 border border-amber-100/60">
-                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Requirements</p>
-                                        <p className="text-sm text-gray-700 mt-0.5 leading-relaxed">{pd!.requirements}</p>
-                                    </div>
-                                )}
-                                {pd!.preferred_slot && (
-                                    <div className="bg-white rounded-xl px-3 py-2.5 border border-amber-100/60">
-                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1"><MapPin size={10} /> Preferred Slot</p>
-                                        <p className="text-sm font-bold text-gray-800 mt-0.5">
-                                            {fmtDate(pd!.preferred_slot.date)} &middot; {fmtTime(pd!.preferred_slot.start_time)} - {fmtTime(pd!.preferred_slot.end_time)}
-                                        </p>
-                                    </div>
-                                )}
                             </div>
                         )}
 
-                        {/* Basic details (when no project brief) */}
-                        {!hasBrief && (
-                            <div className="space-y-3">
-                                {selectedLead.venueTitle && (
-                                    <div className="bg-gray-50 rounded-xl px-4 py-3">
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Venue</p>
-                                        <p className="text-sm font-bold mt-0.5">{selectedLead.venueTitle}</p>
-                                    </div>
-                                )}
-                                {selectedLead.occasion && (
-                                    <div className="bg-gray-50 rounded-xl px-4 py-3">
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Occasion</p>
-                                        <p className="text-sm font-bold mt-0.5">{selectedLead.occasion}</p>
-                                    </div>
-                                )}
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="bg-gray-50 rounded-xl px-4 py-3">
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Guests</p>
-                                        <p className="text-sm font-bold mt-0.5">{selectedLead.guests}</p>
-                                    </div>
-                                    <div className="bg-gray-50 rounded-xl px-4 py-3">
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Event Date</p>
-                                        <p className="text-sm font-bold mt-0.5">{selectedLead.eventDate || '--'}</p>
-                                    </div>
-                                </div>
+                        {selectedLead.venueTitle && (
+                            <div className="bg-gray-50 rounded-xl px-4 py-3">
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Venue</p>
+                                <p className="text-sm font-bold mt-0.5">{selectedLead.venueTitle}</p>
                             </div>
                         )}
 
@@ -564,17 +477,6 @@ export const VenueEnquiries: React.FC<Props> = () => {
                                 <p className="text-sm font-bold mt-0.5">{selectedLead.respondedAt ? fmtDate(selectedLead.respondedAt) : 'Not yet'}</p>
                             </div>
                         </div>
-
-                        {/* Email */}
-                        {selectedLead.email && (
-                            <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center gap-3">
-                                <Mail size={14} className="text-gray-400 shrink-0" />
-                                <div className="min-w-0">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Email</p>
-                                    <p className="text-sm font-bold mt-0.5 truncate">{selectedLead.email}</p>
-                                </div>
-                            </div>
-                        )}
 
                         {selectedLead.message && (
                             <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4">

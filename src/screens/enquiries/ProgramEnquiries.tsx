@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
     Search, Phone, MessageCircle, X, StickyNote, Inbox, Loader2,
-    Users, Sparkles, CheckCircle2, GraduationCap, Mail, Check,
+    Users, Sparkles, CheckCircle2, GraduationCap, Check,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Screen, EnquiryStatus } from '../../types';
@@ -23,7 +23,6 @@ interface ProgramLead {
     age: string;
     receivedOn: string;
     contact: string;
-    email?: string;
     status: EnquiryStatus;
     message?: string;
     area?: string;
@@ -111,14 +110,13 @@ export const ProgramEnquiries: React.FC<Props> = () => {
             const formatted: ProgramLead[] = Array.isArray(data) ? data.map((item: any) => ({
                 id: item.id,
                 listingId,
-                studentName: item.student_name || 'Unknown Student',
+                studentName: item.attendee_name || item.student_name || 'Unknown Student',
                 parentName: item.parent_name,
                 program: item.program_title || item.listing_title || selectedProgram?.title || '',
                 format: item.program_format || item.format || selectedProgram?.format || '',
                 age: item.student_age != null ? String(item.student_age) : 'N/A',
                 receivedOn: item.created_at ? new Date(item.created_at).toLocaleDateString() : '',
                 contact: item.contact_number || '',
-                email: item.email || '',
                 status: (item.status || 'new') as EnquiryStatus,
                 message: item.message,
                 area: item.area,
@@ -435,12 +433,6 @@ export const ProgramEnquiries: React.FC<Props> = () => {
                                 <div className="bg-gray-50 rounded-xl px-4 py-3">
                                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Area / Locality</p>
                                     <p className="text-sm font-bold mt-0.5">{selectedLead.area}</p>
-                                </div>
-                            )}
-                            {selectedLead.email && (
-                                <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center gap-2">
-                                    <Mail size={14} className="text-gray-400 shrink-0" />
-                                    <span className="text-sm font-bold truncate">{selectedLead.email}</span>
                                 </div>
                             )}
                         </div>

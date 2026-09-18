@@ -1,0 +1,686 @@
+/* ---------------------------------------------------------------------------
+   Partner portal primitives — the visual language of the client mocks
+   (warm neutral chrome, white cards, amber accent). Colours come from the
+   `tlb-*` tokens in theme.css. Prefer these classes over ad-hoc styles on
+   portal screens; Tailwind utilities still override them where needed.
+   --------------------------------------------------------------------------- */
+@layer components {
+    /* ── Surfaces ── */
+    .pt-card {
+        background-color: #fff;
+        border: 1px solid var(--color-tlb-line);
+        border-radius: 14px;
+    }
+    .pt-popover {
+        background-color: #fff;
+        border: 1px solid var(--color-tlb-line);
+        border-radius: 14px;
+        box-shadow: var(--shadow-pop);
+    }
+    .pt-note {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background-color: var(--color-tlb-wash);
+        border-radius: 12px;
+        padding: 12px 16px;
+        font-size: 12px;
+        line-height: 1.5;
+        color: var(--color-tlb-sub);
+    }
+
+    /* ── Type ── */
+    .pt-h1 {
+        font-size: 26px;
+        line-height: 1.15;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        color: var(--color-tlb-ink);
+    }
+    .pt-h2 {
+        font-size: 19px;
+        line-height: 1.2;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        color: var(--color-tlb-ink);
+    }
+    .pt-h-sec {
+        font-size: 16px;
+        line-height: 1.3;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        color: var(--color-tlb-ink);
+    }
+    .pt-lbl {
+        display: block;
+        font-size: 10.5px;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        color: var(--color-tlb-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .pt-eyebrow {
+        font-size: 10.5px;
+        font-weight: 700;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        color: var(--color-tlb-muted);
+    }
+    .pt-num {
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -0.03em;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+    .pt-link {
+        font-size: 12.5px;
+        font-weight: 700;
+        color: var(--color-tlb-link);
+        white-space: nowrap;
+        cursor: pointer;
+        transition: color 0.15s;
+    }
+    .pt-link:hover {
+        color: var(--color-tlb-gold);
+    }
+
+    /* ── Navigation rows (sidebar, account menu) ── */
+    .pt-nav-item {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        width: 100%;
+        padding: 9px 13px;
+        border-radius: 10px;
+        font-size: 13.5px;
+        font-weight: 600;
+        text-align: left;
+        color: var(--color-tlb-body);
+        cursor: pointer;
+        transition: background-color 0.15s, color 0.15s;
+    }
+    .pt-nav-item:hover:not(:disabled) {
+        background-color: var(--color-tlb-hover);
+        color: var(--color-tlb-ink);
+    }
+    .pt-nav-item.is-active {
+        background-color: var(--color-tlb-amber-soft);
+        color: var(--color-tlb-gold);
+    }
+    .pt-nav-item:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+    }
+    .pt-nav-item.is-danger {
+        color: var(--color-tlb-red-deep);
+    }
+    .pt-dot {
+        width: 6px;
+        height: 6px;
+        flex: none;
+        border-radius: 999px;
+        background-color: #D6D2C8;
+    }
+    .pt-nav-item.is-active .pt-dot {
+        background-color: var(--color-tlb-amber);
+    }
+    .pt-nav-item.is-danger .pt-dot {
+        background-color: var(--color-tlb-red);
+    }
+
+    /* ── Tabs (profile section switcher) ── */
+    .pt-tab {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        padding: 9px 13px;
+        border-radius: 10px;
+        font-size: 13px;
+        font-weight: 600;
+        text-align: left;
+        white-space: nowrap;
+        color: var(--color-tlb-body);
+        cursor: pointer;
+        transition: background-color 0.15s, color 0.15s;
+    }
+    .pt-tab:hover {
+        background-color: var(--color-tlb-hover);
+    }
+    .pt-tab.is-active {
+        background-color: var(--color-tlb-amber-soft);
+        color: var(--color-tlb-gold);
+    }
+
+    /* ── Chips, badges, icon tiles ── */
+    .pt-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        border-radius: 999px;
+        padding: 2px 9px;
+        font-size: 10.5px;
+        font-weight: 700;
+        line-height: 1.5;
+        white-space: nowrap;
+    }
+    .pt-count {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: none;
+        min-width: 20px;
+        height: 20px;
+        padding: 0 5px;
+        border-radius: 999px;
+        background-color: var(--color-tlb-red);
+        color: #fff;
+        font-size: 10.5px;
+        font-weight: 700;
+    }
+    .pt-count.is-sm {
+        min-width: 18px;
+        height: 17px;
+        font-size: 10px;
+    }
+    .pt-tile-sm,
+    .pt-tile-md {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: none;
+    }
+    .pt-tile-sm {
+        width: 26px;
+        height: 26px;
+        border-radius: 8px;
+    }
+    .pt-tile-md {
+        width: 32px;
+        height: 32px;
+        border-radius: 9px;
+    }
+
+    /* ── Buttons ── */
+    .pt-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 8px 16px;
+        border: 1px solid transparent;
+        border-radius: 999px;
+        font-size: 12.5px;
+        font-weight: 700;
+        white-space: nowrap;
+        cursor: pointer;
+        transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+    }
+    .pt-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    .pt-btn-y {
+        background-color: var(--color-tlb-amber);
+        color: var(--color-tlb-ink);
+    }
+    .pt-btn-y:hover:not(:disabled) {
+        background-color: var(--color-tlb-amber-deep);
+    }
+    .pt-btn-d {
+        background-color: var(--color-tlb-ink);
+        color: #fff;
+    }
+    .pt-btn-d:hover:not(:disabled) {
+        background-color: #000;
+    }
+    .pt-btn-o {
+        background-color: #fff;
+        color: var(--color-tlb-ink);
+        border-color: var(--color-tlb-edge);
+        padding: 7px 14px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    .pt-btn-o:hover:not(:disabled) {
+        background-color: var(--color-tlb-wash);
+    }
+    .pt-btn-sm {
+        padding: 5px 12px;
+        font-size: 11.5px;
+    }
+
+    /* ── Menus & list rows ── */
+    .pt-opt {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        padding: 10px 14px;
+        border-radius: 10px;
+        font-size: 13.5px;
+        font-weight: 600;
+        text-align: left;
+        color: var(--color-tlb-sub);
+        cursor: pointer;
+    }
+    .pt-opt:hover {
+        background-color: var(--color-tlb-wash);
+        color: var(--color-tlb-ink);
+    }
+    .pt-opt.is-on {
+        background-color: var(--color-tlb-cream);
+        color: var(--color-tlb-ink);
+        font-weight: 700;
+    }
+    .pt-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--color-tlb-divider);
+    }
+    .pt-row:last-child {
+        border-bottom: none;
+    }
+    .pt-action {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+        padding: 11px 13px;
+        text-align: left;
+        background-color: #fff;
+        border: 1px solid var(--color-tlb-line);
+        border-radius: 14px;
+        cursor: pointer;
+        transition: background-color 0.15s, border-color 0.15s;
+    }
+    .pt-action:hover {
+        border-color: var(--color-tlb-amber);
+        background-color: var(--color-tlb-highlight);
+    }
+
+    /* ── Form fields ── */
+    .pt-field {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        min-width: 0;
+    }
+    .pt-field-k {
+        font-size: 11.5px;
+        font-weight: 600;
+        color: var(--color-tlb-sub);
+    }
+    .pt-field-v {
+        min-height: 40px;
+        padding: 9px 13px;
+        border: 1px solid var(--color-tlb-edge);
+        border-radius: 10px;
+        background-color: #fff;
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--color-tlb-ink);
+        overflow-wrap: anywhere;
+    }
+    .pt-field-v.is-locked {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        background-color: var(--color-tlb-wash);
+        color: var(--color-tlb-sub);
+    }
+    .pt-field-v.is-empty {
+        color: var(--color-tlb-faint);
+    }
+    .pt-input {
+        width: 100%;
+        padding: 9px 13px;
+        border: 1px solid var(--color-tlb-edge);
+        border-radius: 10px;
+        background-color: #fff;
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--color-tlb-ink);
+        outline: none;
+        transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .pt-input:focus {
+        border-color: var(--color-tlb-amber);
+        box-shadow: 0 0 0 3px rgba(245, 179, 1, 0.18);
+    }
+    textarea.pt-input {
+        min-height: 96px;
+        resize: vertical;
+    }
+
+    /* ── Toggles ── */
+    .pt-switch {
+        position: relative;
+        flex: none;
+        width: 38px;
+        height: 22px;
+        border-radius: 999px;
+        background-color: var(--color-tlb-edge);
+        cursor: pointer;
+        transition: background-color 0.15s;
+    }
+    .pt-switch::after {
+        content: "";
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 16px;
+        height: 16px;
+        border-radius: 999px;
+        background-color: #fff;
+        transition: transform 0.15s;
+    }
+    .pt-switch[aria-checked="true"] {
+        background-color: var(--color-tlb-amber);
+    }
+    .pt-switch[aria-checked="true"]::after {
+        transform: translateX(16px);
+    }
+    .pt-switch:disabled,
+    .pt-check:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    .pt-check {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 19px;
+        height: 19px;
+        border-radius: 6px;
+        background-color: var(--color-tlb-hover);
+        color: var(--color-tlb-ink);
+        cursor: pointer;
+    }
+    .pt-check[aria-checked="true"] {
+        background-color: var(--color-tlb-amber);
+    }
+
+    /* ── Underline tabs (top-level Enquiries / Bookings switch) ── */
+    .pt-vtab {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 2px;
+        border: none;
+        border-bottom: 2.5px solid transparent;
+        background: none;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--color-tlb-sub);
+        white-space: nowrap;
+        cursor: pointer;
+        transition: color 0.15s, border-color 0.15s;
+    }
+    .pt-vtab:hover {
+        color: var(--color-tlb-ink);
+    }
+    .pt-vtab.is-active {
+        color: var(--color-tlb-ink);
+        font-weight: 700;
+        border-bottom-color: var(--color-tlb-amber);
+    }
+    .pt-vtab-count {
+        min-width: 18px;
+        height: 18px;
+        padding: 0 5px;
+        border-radius: 999px;
+        background-color: var(--color-tlb-hover);
+        color: var(--color-tlb-sub);
+        font-size: 10.5px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .pt-vtab-count.is-alert {
+        background-color: var(--color-tlb-red);
+        color: #fff;
+    }
+
+    /* ── Segmented pill bar (service scope: All / Classes / Venues …) ── */
+    .pt-segbar {
+        align-self: flex-start;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 5px;
+        border-radius: 14px;
+        background-color: #fff;
+        border: 1px solid var(--color-tlb-line);
+        flex-wrap: wrap;
+    }
+    .pt-seg {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 9px 17px;
+        border: none;
+        border-radius: 10px;
+        background: none;
+        font-size: 13.5px;
+        font-weight: 600;
+        color: var(--color-tlb-body);
+        white-space: nowrap;
+        cursor: pointer;
+        transition: background-color 0.15s, color 0.15s;
+    }
+    .pt-seg:hover {
+        background-color: var(--color-tlb-wash);
+        color: var(--color-tlb-ink);
+    }
+    .pt-seg.is-active {
+        background-color: var(--color-tlb-amber);
+        color: var(--color-tlb-ink);
+        font-weight: 700;
+    }
+    .pt-seg.is-active:hover {
+        background-color: var(--color-tlb-amber-deep);
+    }
+    .pt-seg-count {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--color-tlb-faint);
+        font-variant-numeric: tabular-nums;
+    }
+    .pt-seg.is-active .pt-seg-count {
+        color: var(--color-tlb-gold);
+    }
+
+    /* ── Standalone toggle pill (stage / when filters) ── */
+    .pt-scope {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 7px 14px;
+        border-radius: 999px;
+        border: 1.5px solid var(--color-tlb-line);
+        background-color: #fff;
+        color: var(--color-tlb-body);
+        font-size: 12.5px;
+        font-weight: 600;
+        white-space: nowrap;
+        cursor: pointer;
+        transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+    }
+    .pt-scope:hover {
+        border-color: var(--color-tlb-edge);
+    }
+    .pt-scope.is-active {
+        background-color: var(--color-tlb-ink);
+        border-color: var(--color-tlb-ink);
+        color: #fff;
+    }
+
+    /* ── Monospace booking / enquiry code chip ── */
+    .pt-code {
+        display: inline-flex;
+        align-items: center;
+        white-space: nowrap;
+        flex: none;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        color: var(--color-tlb-gold);
+        background-color: var(--color-tlb-cream);
+        border: 1px solid var(--color-tlb-cream-line);
+        border-radius: 6px;
+        padding: 1px 6px;
+    }
+
+    /* ── Collapsible listing-group header (enquiry / booking tables) ── */
+    .pt-group-head {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        width: 100%;
+        padding: 9px 17px;
+        background-color: var(--color-tlb-highlight);
+        border-bottom: 1px solid var(--color-tlb-line);
+        text-align: left;
+        cursor: pointer;
+    }
+    .pt-group-head:hover {
+        background-color: var(--color-tlb-wash);
+    }
+    .pt-group-caret {
+        flex: none;
+        color: var(--color-tlb-muted);
+        transition: transform 0.15s;
+    }
+    .pt-group-head[aria-expanded="true"] .pt-group-caret {
+        transform: rotate(90deg);
+    }
+
+    /* ── Inline stat block (row of headline figures inside a card) ── */
+    .pt-stat {
+        flex: 1;
+        min-width: 0;
+        padding: 14px 17px;
+    }
+    .pt-stat + .pt-stat {
+        border-left: 1px solid var(--color-tlb-divider);
+    }
+    .pt-stat-n {
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        margin-top: 5px;
+        font-variant-numeric: tabular-nums;
+        color: var(--color-tlb-ink);
+    }
+
+    /* ── Wizard stepper (multi-step creation flows) ── */
+    .pt-wiz-track {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .pt-wiz-seg {
+        flex: 1;
+        height: 6px;
+        border-radius: 999px;
+        background-color: var(--color-tlb-line);
+        overflow: hidden;
+    }
+    .pt-wiz-seg > span {
+        display: block;
+        height: 100%;
+        border-radius: 999px;
+        background-color: var(--color-tlb-amber);
+        transition: width 0.35s ease;
+    }
+    .pt-wiz-dot {
+        width: 9px;
+        height: 9px;
+        flex: none;
+        border-radius: 999px;
+        background-color: var(--color-tlb-edge);
+    }
+    .pt-wiz-dot.is-done {
+        background-color: var(--color-tlb-amber);
+    }
+    .pt-wiz-dot.is-active {
+        background-color: var(--color-tlb-amber);
+        box-shadow: 0 0 0 3px var(--color-tlb-amber-soft);
+    }
+
+    /* ── Selectable option tile (category / tag / mode / booking-type pickers) ── */
+    .pt-tile {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 16px 12px;
+        text-align: center;
+        background-color: #fff;
+        border: 1.5px solid var(--color-tlb-line);
+        border-radius: 14px;
+        font-size: 12.5px;
+        font-weight: 700;
+        color: var(--color-tlb-body);
+        cursor: pointer;
+        transition: border-color 0.15s, background-color 0.15s, color 0.15s;
+    }
+    .pt-tile:hover {
+        border-color: var(--color-tlb-edge);
+        background-color: var(--color-tlb-wash);
+    }
+    .pt-tile.is-on {
+        border-color: var(--color-tlb-amber);
+        background-color: var(--color-tlb-amber-soft);
+        color: var(--color-tlb-gold);
+    }
+    .pt-tile-check {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 18px;
+        height: 18px;
+        border-radius: 999px;
+        background-color: var(--color-tlb-amber);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    /* Wider option card (booking-type picker: icon + title + description, left-aligned) */
+    .pt-tile-wide {
+        flex-direction: row;
+        align-items: flex-start;
+        text-align: left;
+        padding: 14px 16px;
+        gap: 12px;
+    }
+
+    /* ── Keyboard focus ── */
+    .pt-btn:focus-visible,
+    .pt-nav-item:focus-visible,
+    .pt-tab:focus-visible,
+    .pt-opt:focus-visible,
+    .pt-action:focus-visible,
+    .pt-link:focus-visible,
+    .pt-switch:focus-visible,
+    .pt-check:focus-visible,
+    .pt-vtab:focus-visible,
+    .pt-seg:focus-visible,
+    .pt-scope:focus-visible,
+    .pt-group-head:focus-visible,
+    .pt-tile:focus-visible {
+        outline: 2px solid var(--color-tlb-amber);
+        outline-offset: 2px;
+    }
+}

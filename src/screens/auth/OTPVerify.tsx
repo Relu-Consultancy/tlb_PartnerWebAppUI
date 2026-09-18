@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { ChevronRight, Smartphone, ArrowRight } from 'lucide-react';
 import { Screen } from '../../types';
-import { verifyOtp, requestOtp } from '../../api/auth';
+import { verifyOtp, requestOtp, AuthApiError } from '../../api/auth';
 import { setAuthToken, setRefreshToken, clearTokens } from '../../api/client';
 import { getCurrentPartner } from '../../api/onboarding';
 import { ToastContainer, useToasts } from '../../components/ui';
@@ -44,8 +44,9 @@ export const OTPVerify: React.FC<AuthProps> = ({ onNavigate, authData }) => {
             setCountdown(30);
             inputRefs.current[0]?.focus();
             showToast('A new OTP has been sent.', 'success', 3000);
-        } catch {
-            showToast('Failed to resend OTP. Please try again.', 'error');
+        } catch (err) {
+            const message = err instanceof AuthApiError && err.status === 429 ? err.message : 'Failed to resend OTP. Please try again.';
+            showToast(message, 'error');
         } finally {
             setResending(false);
         }
@@ -95,7 +96,8 @@ export const OTPVerify: React.FC<AuthProps> = ({ onNavigate, authData }) => {
             onNavigate('HOME');
         } catch (error) {
             console.error('Failed to verify OTP', error);
-            showToast('Invalid OTP. Please try again.', 'error');
+            const message = error instanceof AuthApiError && error.status === 429 ? error.message : 'Invalid OTP. Please try again.';
+            showToast(message, 'error');
         } finally {
             setLoading(false);
         }

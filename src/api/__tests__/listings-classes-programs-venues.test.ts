@@ -71,6 +71,7 @@ import {
     createProgramFaq,
     updateProgramFaq,
     deleteProgramFaq,
+    bulkSaveFaqs,
     // Program media
     uploadProgramMedia,
     deleteProgramMedia,
@@ -873,6 +874,49 @@ describe('deleteProgramFaq', () => {
             HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'FAQ not found' } }, { status: 404 })));
         const err = await deleteProgramFaq(PROGRAM_DRAFT_ID, 999).catch(e => e);
         expect(err.code).toBe('NOT_FOUND');
+    });
+});
+
+describe('bulkSaveFaqs', () => {
+    it('PUTs the full FAQ array to the bulk endpoint and returns the new list', async () => {
+        let captured: any = null;
+        server.use(http.put(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/faqs/bulk/`, async ({ request }) => {
+            captured = await request.json();
+            return HttpResponse.json({
+                success: true,
+                data: [
+                    { id: 41, question: 'Is parking available?', answer: 'Yes, free parking for 50 cars.', sort_order: 0, documents: [] },
+                    { id: 42, question: 'Can I reschedule?', answer: 'Yes, up to 48 hours before.', sort_order: 1, documents: [] },
+                ],
+            });
+        }));
+        const res = await bulkSaveFaqs('programs', PROGRAM_DRAFT_ID, [
+            { question: 'Is parking available?', answer: 'Yes, free parking for 50 cars.', sort_order: 0 },
+            { question: 'Can I reschedule?', answer: 'Yes, up to 48 hours before.', sort_order: 1 },
+        ]);
+        expect(captured.faqs).toHaveLength(2);
+        expect(captured.faqs[0].question).toBe('Is parking available?');
+        const data = res.data || res;
+        expect(data).toHaveLength(2);
+        expect(data[1].id).toBe(42);
+    });
+
+    it('sending an empty array is a valid request (deletes all FAQs)', async () => {
+        let captured: any = null;
+        server.use(http.put(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/faqs/bulk/`, async ({ request }) => {
+            captured = await request.json();
+            return HttpResponse.json({ success: true, data: [] });
+        }));
+        const res = await bulkSaveFaqs('programs', PROGRAM_DRAFT_ID, []);
+        expect(captured.faqs).toEqual([]);
+        expect(res.data || res).toEqual([]);
+    });
+
+    it('rejects the whole batch on a validation error, throwing ApiError', async () => {
+        server.use(http.put(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/faqs/bulk/`, () =>
+            HttpResponse.json({ error: { code: 'VALIDATION_ERROR', message: 'answer is required' } }, { status: 400 })));
+        const err = await bulkSaveFaqs('programs', PROGRAM_DRAFT_ID, [{ question: 'Q?', answer: '' }]).catch(e => e);
+        expect(err.code).toBe('VALIDATION_ERROR');
     });
 });
 

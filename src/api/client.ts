@@ -9,6 +9,43 @@ export const clearTokens = () => {
     localStorage.removeItem('refresh_token');
 };
 
+// Single source of truth for the refresh-token exchange — used by apiClient's own
+// 401-retry below, and by App.tsx's session-restore-on-load effect. Never re-implement
+// this fetch elsewhere; both callers must share this exact logic.
+export const refreshAccessToken = async (): Promise<string | null> => {
+    const refresh_token = getRefreshToken();
+    if (!refresh_token) {
+        clearTokens();
+        return null;
+    }
+    try {
+        const refreshResponse = await fetch(`${BASE_URL}/api/v1/auth/refresh-token/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token }),
+        });
+        if (!refreshResponse.ok) {
+            // A 429 here is a transient rate limit, not an invalid/expired refresh
+            // token — keep the session tokens intact so the caller can retry shortly
+            // instead of the user being logged out mid-burst.
+            if (refreshResponse.status !== 429) clearTokens();
+            return null;
+        }
+        const res = await refreshResponse.json();
+        const payload = res.data || res;
+        const access = payload.access_token || payload.access;
+        if (!access) {
+            clearTokens();
+            return null;
+        }
+        setAuthToken(access);
+        return access;
+    } catch {
+        clearTokens();
+        return null;
+    }
+};
+
 export const apiClient = async (endpoint: string, options: RequestInit = {}) => {
     let token = getAuthToken();
     const headers: HeadersInit = {
@@ -29,39 +66,14 @@ export const apiClient = async (endpoint: string, options: RequestInit = {}) => 
     });
 
     if (response.status === 401 && endpoint !== '/api/v1/auth/refresh-token/') {
-        const refresh_token = getRefreshToken();
-        if (refresh_token) {
-            try {
-                const refreshResponse = await fetch(`${BASE_URL}/api/v1/auth/refresh-token/`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ refresh_token })
-                });
-
-                if (refreshResponse.ok) {
-                    const res = await refreshResponse.json();
-                    const payload = res.data || res;
-                    const access = payload.access_token || payload.access;
-                    
-                    if (access) {
-                        setAuthToken(access);
-                        // Retry original request
-                        headers['Authorization'] = `Bearer ${access}`;
-                        response = await fetch(`${BASE_URL}${endpoint}`, {
-                            ...options,
-                            headers,
-                        });
-                    } else {
-                        clearTokens();
-                    }
-                } else {
-                    clearTokens();
-                }
-            } catch (err) {
-                clearTokens();
-            }
-        } else {
-            clearTokens();
+        const access = await refreshAccessToken();
+        if (access) {
+            // Retry original request
+            headers['Authorization'] = `Bearer ${access}`;
+            response = await fetch(`${BASE_URL}${endpoint}`, {
+                ...options,
+                headers,
+            });
         }
     }
 

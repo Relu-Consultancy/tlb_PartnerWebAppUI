@@ -150,6 +150,17 @@ export interface StatsOverviewAll {
     demand_funnel: OverviewDemandFunnel;
     /** Last 8 calendar weeks, Monday-start, zero-filled — no gaps to fill client-side. */
     weekly_trend: OverviewWeeklyTrendPoint[];
+    /** null until a booking in scope has a resolved city — hide the tile entirely, don't show a zeroed placeholder. */
+    top_city: TopCity | null;
+}
+
+export interface TopCity {
+    city: string;
+    /** Share of bookings that have a KNOWN city, not of all bookings in scope — label accordingly
+     * ("of bookings with known location"), never as "of all your bookings". City resolution is an
+     * async, opt-in, best-effort geocode of the customer's location at booking time; a booking whose
+     * customer never granted location access will never get one — expected, not a bug. */
+    pct: number;
 }
 
 export const getStatsOverviewAll = async (period: RevenuePeriod = '30d', listingType?: OverviewAllListingType): Promise<StatsOverviewAll> => {
@@ -157,6 +168,60 @@ export const getStatsOverviewAll = async (period: RevenuePeriod = '30d', listing
     if (listingType) params.set('listing_type', listingType);
     const res = await apiClient(`/api/v1/partner/stats/overview-all/?${params.toString()}`);
     return unwrap<StatsOverviewAll>(res, 'Failed to load overview stats');
+};
+
+// ── Listing performance (paginated, sortable Top/Underperforming/All) ──
+export type ListingPerformanceTab = 'top' | 'underperforming' | 'all';
+
+export interface ListingPerformanceRow {
+    listing_id: string;
+    listing_title: string;
+    listing_type: OverviewAllListingType;
+    /** First media item for the listing (any type), or null if none uploaded yet. */
+    thumbnail_url: string | null;
+    /** Lowest available price as a plain numeric string, no currency/unit — "0" for free events.
+     * null when unavailable (e.g. no tickets/packages/batches configured yet). */
+    price: string | null;
+    /** null when the listing has no reviews yet — there is no zero-rating row before the first review. */
+    average_rating: string | null;
+    views: number;
+    enquiries: number;
+    /** Confirmed/attended bookings in the period — same booking-status scope as everywhere else in stats/*. */
+    booked: number;
+    /** enquiries ÷ views — the same view-to-enquiry rate already used by stats/traffic/detail/?group_by=listing.
+     * NOT a booking-conversion rate (booked ÷ views or booked ÷ enquiries) — label accordingly. */
+    conversion_rate: number;
+    revenue: string;
+}
+
+export interface PaginatedListingPerformance {
+    count: number;
+    page: number;
+    page_size: number;
+    next: string | null;
+    previous: string | null;
+    results: ListingPerformanceRow[];
+}
+
+export interface ListingPerformanceParams {
+    period?: RevenuePeriod;
+    /** top sorts by revenue desc; underperforming sorts by conversion_rate asc (a brand-new listing
+     * with 0 views/enquiries sorts to the top at 0% — intentional, surfaces listings needing attention,
+     * not just proven poor performers). Default 'all'. */
+    tab?: ListingPerformanceTab;
+    page?: number;
+    page_size?: number;
+}
+
+export const getStatsListingPerformance = async (params: ListingPerformanceParams = {}): Promise<PaginatedListingPerformance> => {
+    const q = new URLSearchParams();
+    if (params.period) q.set('period', params.period);
+    if (params.tab) q.set('tab', params.tab);
+    if (params.page) q.set('page', String(params.page));
+    if (params.page_size) q.set('page_size', String(params.page_size));
+    const qs = q.toString();
+    const res = await apiClient(`/api/v1/partner/stats/listing-performance/${qs ? `?${qs}` : ''}`);
+    return unwrap<PaginatedListingPerformance>(res, 'Failed to load listing performance');
 };
 
 // ── Reviews ──

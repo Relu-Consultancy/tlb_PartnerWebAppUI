@@ -4,6 +4,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../../test/msw/server';
+import { mockListingPerformance } from '../../../test/msw/handlers';
 import { Analytics } from '../Analytics';
 import { PartnerProvider } from '../../../context/PartnerContext';
 
@@ -40,6 +41,7 @@ describe('Analytics — loading and error states', () => {
             http.get(`${BASE}/api/v1/partner/stats/revenue/`, () => HttpResponse.json({}, { status: 500 })),
             http.get(`${BASE}/api/v1/partner/stats/reviews/`, () => HttpResponse.json({}, { status: 500 })),
             http.get(`${BASE}/api/v1/partner/stats/traffic/`, () => HttpResponse.json({}, { status: 500 })),
+            http.get(`${BASE}/api/v1/partner/stats/overview-all/`, () => HttpResponse.json({}, { status: 500 })),
         );
         renderScreen();
         await waitFor(() => expect(screen.getByText(/could not load analytics/i)).toBeInTheDocument());
@@ -108,7 +110,59 @@ describe('Analytics — tab switching', () => {
         expect(mockNavigate).toHaveBeenCalledWith('TRAFFIC_ANALYTICS');
     });
 
-    it('shows the reports tab with real, downloadable CSV reports', async () => {
+    it('shows the real Top city tile with the known-location caveat, not an all-bookings percentage', async () => {
+        renderScreen();
+        const user = userEvent.setup();
+        await waitFor(() => screen.getByText('Revenue by service'));
+        await user.click(screen.getByRole('tab', { name: 'Demand funnel' }));
+        expect(screen.getByText('Top city')).toBeInTheDocument();
+        expect(screen.getByText('Bengaluru')).toBeInTheDocument();
+        expect(screen.getByText(/86% of bookings with known location/i)).toBeInTheDocument();
+    });
+
+    it('hides the Top city tile entirely when no booking has a resolved city yet', async () => {
+        server.use(http.get(`${BASE}/api/v1/partner/stats/overview-all/`, ({ request }) => {
+            const listingType = new URL(request.url).searchParams.get('listing_type');
+            if (listingType) return HttpResponse.json({ success: true, data: { listing_type: listingType, top_city: null } });
+            return HttpResponse.json({ success: true, data: { period: '30d', listing_type: null, gross_revenue: '0', revenue_growth_pct: 0, confirmed_bookings: 0, bookings_growth_pct: 0, avg_order_value: '0', conversion_rate: 0, repeat_customers_pct: 0, revenue_by_type: [], revenue_by_listing: null, demand_funnel: { listing_views: 0, enquiries: 0, confirmed_bookings: 0 }, weekly_trend: [], top_city: null } });
+        }));
+        renderScreen();
+        const user = userEvent.setup();
+        await waitFor(() => screen.getByText('Revenue by service'));
+        await user.click(screen.getByRole('tab', { name: 'Demand funnel' }));
+        await waitFor(() => expect(screen.getByText('Peak day')).toBeInTheDocument());
+        expect(screen.queryByText('Top city')).not.toBeInTheDocument();
+    });
+
+    it('shows the listings tab with real per-listing performance rows and their price/rating states', async () => {
+        renderScreen();
+        const user = userEvent.setup();
+        await waitFor(() => screen.getByText('Revenue by service'));
+        await user.click(screen.getByRole('tab', { name: 'Listings' }));
+        await waitFor(() => expect(screen.getByText('Indigo Dyeing Evening')).toBeInTheDocument());
+        expect(screen.getByText('4.9')).toBeInTheDocument();
+        expect(screen.getByText('3.1%')).toBeInTheDocument();
+        // Second row has no price/rating yet — must show honest placeholders, not fabricated values.
+        expect(screen.getByText('Beginners Pottery')).toBeInTheDocument();
+        expect(screen.getByText('No reviews yet')).toBeInTheDocument();
+    });
+
+    it('re-sorts the listings tab via the Top/Underperforming/All control', async () => {
+        let capturedTab: string | null = null;
+        server.use(http.get(`${BASE}/api/v1/partner/stats/listing-performance/`, ({ request }) => {
+            capturedTab = new URL(request.url).searchParams.get('tab');
+            return HttpResponse.json({ success: true, data: mockListingPerformance });
+        }));
+        renderScreen();
+        const user = userEvent.setup();
+        await waitFor(() => screen.getByText('Revenue by service'));
+        await user.click(screen.getByRole('tab', { name: 'Listings' }));
+        await waitFor(() => screen.getByText('Indigo Dyeing Evening'));
+        await user.click(screen.getByRole('tab', { name: 'Underperforming' }));
+        await waitFor(() => expect(capturedTab).toBe('underperforming'));
+    });
+
+    it('shows the reports tab with 4 real, downloadable CSV reports and GST as the only placeholder', async () => {
         renderScreen();
         const user = userEvent.setup();
         await waitFor(() => screen.getByText('Revenue by service'));
@@ -116,10 +170,12 @@ describe('Analytics — tab switching', () => {
         expect(screen.getByText('Monthly earnings statement')).toBeInTheDocument();
         expect(screen.getByText('Booking register')).toBeInTheDocument();
         expect(screen.getByText('Reviews & ratings export')).toBeInTheDocument();
-        // GST summary and the enquiry/response SLA log render as design placeholders, not real downloads.
-        expect(screen.getByText(/GST summary/i)).toBeInTheDocument();
+        // Enquiry & response log is now real too (backend shipped it) — only GST summary has no endpoint.
         expect(screen.getByText(/Enquiry & response log/i)).toBeInTheDocument();
-        expect(screen.getAllByText('Coming soon').length).toBeGreaterThanOrEqual(2);
+        expect(screen.getAllByRole('button', { name: 'Download' })).toHaveLength(4);
+        expect(screen.getByText(/GST summary/i)).toBeInTheDocument();
+        // 2 "Coming soon" pills: GST's row, and the unrelated "Schedule a report" button next to it.
+        expect(screen.getAllByText('Coming soon')).toHaveLength(2);
     });
 
     it('shows the customers tab with whichever real retention metric applies', async () => {

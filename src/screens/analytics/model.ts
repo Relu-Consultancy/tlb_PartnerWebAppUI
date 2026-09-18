@@ -2,10 +2,8 @@ import {
     StatsEnquiries, StatsOverview, StatsRevenue, RevenueByType,
     OverviewDemandFunnel, OverviewWeeklyTrendPoint, RevenueByListingRow,
 } from '../../api/stats';
-import { PartnerListing } from '../../api/portalSummary';
-import { BookingEntry, EnquiryEntry } from '../bookings-enquiries/types';
 import { toNumber } from '../../utils/format';
-import { FunnelStage, ListingPerformanceRow, RevenueTypeSlice, TrendPoint } from './types';
+import { FunnelStage, RevenueTypeSlice, TrendPoint } from './types';
 
 // ---------------------------------------------------------------------------
 // Pure derivations for Analytics. No React, no I/O, unit-tested directly.
@@ -95,6 +93,12 @@ export const overviewFunnelStages = (funnel: OverviewDemandFunnel): FunnelStage[
 // backing event anywhere in this app (no per-listing click-through tracking)
 // so it renders as a design placeholder, not a fabricated count; every other
 // row is real.
+//
+// `converted` is the count of enquiries with status "closed" (Class/Program/Venue
+// combined) — NOT enquiries that reached an in-progress stage like trial_booked/
+// enrolled/site_visit_scheduled, and NOT a literal booking count. Labeled "Enquiries
+// closed" rather than "Bookings confirmed" (the old, incorrect label) since reaching
+// "closed" doesn't by itself guarantee the enquiry ended in a booking.
 export const funnelStages = (
     overview: Pick<StatsOverview, 'profile_views'> | null,
     enquiries: Pick<StatsEnquiries, 'conversion_funnel'> | null,
@@ -106,7 +110,7 @@ export const funnelStages = (
         { key: 'detail', label: 'Detail opens', count: 0, color: '#6E6C66', available: false },
         { key: 'leads', label: 'Enquiries sent', count: funnel?.new_leads ?? 0, color: '#F5B301', available: true },
         { key: 'contacted', label: 'Replied to enquiry', count: funnel?.contacted ?? 0, color: '#3A63C9', available: true },
-        { key: 'converted', label: 'Bookings confirmed', count: funnel?.converted ?? 0, color: '#2E9E5B', available: true },
+        { key: 'converted', label: 'Enquiries closed', count: funnel?.converted ?? 0, color: '#2E9E5B', available: true },
     ];
     const first = stages[0].count || 1;
     return stages.map(s => ({ ...s, pctOfFirst: s.available ? Math.round((s.count / first) * 100) : 0 }));
@@ -123,24 +127,3 @@ export const uncontactedLeadValue = (
     return { uncontacted, value: uncontacted * aov };
 };
 
-// ── Per-listing performance — real bookings/enquiries/revenue rollup ───────
-
-export const listingPerformance = (
-    listings: PartnerListing[],
-    bookings: BookingEntry[],
-    enquiries: EnquiryEntry[],
-): ListingPerformanceRow[] => {
-    const rows = listings.map((l): ListingPerformanceRow => {
-        const listingBookings = bookings.filter(b => b.listingId === l.id && b.status !== 'cancelled');
-        const listingEnquiries = enquiries.filter(e => e.listingId === l.id);
-        return {
-            id: l.id,
-            title: l.title,
-            entityType: l.entityType,
-            bookings: listingBookings.length,
-            enquiries: listingEnquiries.length,
-            revenue: listingBookings.reduce((sum, b) => sum + b.amount, 0),
-        };
-    });
-    return rows.sort((a, b) => b.revenue - a.revenue || b.bookings - a.bookings);
-};

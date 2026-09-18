@@ -1,5 +1,3 @@
-import { EntityType } from '../../types';
-
 // ---------------------------------------------------------------------------
 // Analytics — the client mock's tab layout (Overview / Revenue / Demand
 // funnel / Listings / Customers / Reports) reorganizes this app's existing
@@ -32,13 +30,4 @@ export interface FunnelStage {
     color: string;
     /** false for a mock stage this API doesn't track at all (shown as a design placeholder, not a fabricated number). */
     available: boolean;
-}
-
-export interface ListingPerformanceRow {
-    id: string;
-    title: string;
-    entityType: EntityType;
-    bookings: number;
-    enquiries: number;
-    revenue: number;
 }

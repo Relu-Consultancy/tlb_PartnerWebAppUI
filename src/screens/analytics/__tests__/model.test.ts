@@ -1,10 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
-    funnelStages, listingPerformance, overviewFunnelStages, revenueByListingSlices, revenueTypeSlices,
+    funnelStages, overviewFunnelStages, revenueByListingSlices, revenueTypeSlices,
     trendPoints, uncontactedLeadValue, weeklyTrendPoints,
 } from '../model';
-import { BookingEntry, EnquiryEntry } from '../../bookings-enquiries/types';
-import { PartnerListing } from '../../../api/portalSummary';
 
 describe('revenueTypeSlices', () => {
     it('labels known types, computes percentages, and sorts by amount desc', () => {
@@ -41,6 +39,17 @@ describe('funnelStages', () => {
         // [views, detail opens (placeholder), leads, contacted, converted]
         expect(stages.map(s => s.pctOfFirst)).toEqual([100, 0, 10, 6, 4]);
         expect(stages.find(s => s.key === 'detail')?.available).toBe(false);
+    });
+
+    it('labels the final stage "Enquiries closed", not a literal booking count', () => {
+        // conversion_funnel.converted is a count of status="closed" enquiries (Class/Program/Venue
+        // combined) — reaching an in-progress stage like trial_booked/enrolled doesn't count, and
+        // "closed" doesn't itself guarantee a booking resulted, so this must not read as a booking count.
+        const stages = funnelStages(
+            { profile_views: 1000 },
+            { conversion_funnel: { new_leads: 100, contacted: 60, converted: 40, conversion_rate: 40 } },
+        );
+        expect(stages.find(s => s.key === 'converted')?.label).toBe('Enquiries closed');
     });
 
     it('never divides by zero with no profile views', () => {
@@ -107,28 +116,3 @@ describe('overviewFunnelStages', () => {
     });
 });
 
-describe('listingPerformance', () => {
-    const listing = (overrides: Partial<PartnerListing> = {}): PartnerListing => ({
-        id: 'l1', title: 'Pottery Term', entityType: 'Classes', state: 'live', coverUrl: null,
-        startsAt: null, reviewedAt: null, reviewMessage: '', ...overrides,
-    });
-    const booking = (overrides: Partial<BookingEntry> = {}): BookingEntry => ({
-        id: '1', entity: 'Events', listingId: 'l1', listingTitle: '', bookingReference: '', customerName: '',
-        amount: 1000, currency: 'INR', status: 'confirmed', paymentStatus: 'paid', createdAt: null, listingStartsAt: null,
-        ...overrides,
-    });
-    const enquiry = (overrides: Partial<EnquiryEntry> = {}): EnquiryEntry => ({
-        id: '1', entity: 'Classes', listingId: 'l1', listingTitle: '', name: '', detail: '', contact: '',
-        isUnlocked: false, status: 'new', message: '', notes: '', createdAt: null, ...overrides,
-    });
-
-    it('sums non-cancelled booking amounts per listing and counts enquiries, sorted by revenue', () => {
-        const rows = listingPerformance(
-            [listing({ id: 'l1', title: 'A' }), listing({ id: 'l2', title: 'B' })],
-            [booking({ listingId: 'l1', amount: 500 }), booking({ listingId: 'l1', amount: 500 }), booking({ listingId: 'l1', amount: 999, status: 'cancelled' }), booking({ listingId: 'l2', amount: 2000 })],
-            [enquiry({ listingId: 'l1' }), enquiry({ listingId: 'l1' })],
-        );
-        expect(rows[0]).toMatchObject({ id: 'l2', bookings: 1, revenue: 2000 });
-        expect(rows[1]).toMatchObject({ id: 'l1', bookings: 2, enquiries: 2, revenue: 1000 });
-    });
-});

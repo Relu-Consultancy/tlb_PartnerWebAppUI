@@ -1,23 +1,25 @@
 import React from 'react';
 import { Pill } from '../../../components/portal';
-import { StatsTraffic } from '../../../api/stats';
+import { StatsTraffic, TopCity } from '../../../api/stats';
 import { sourceSlices } from '../../traffic-analytics/model';
 
 // ---------------------------------------------------------------------------
 // The mock's "Where customers come from" card, now backed by the real
 // GET /stats/traffic/ endpoint. by_source only reflects views (enquiries
-// aren't source-attributed yet), so the per-city/day/hour highlights stay
-// "Coming soon" — that breakdown isn't in the traffic API's response at all.
+// aren't source-attributed yet). Top city is real too (stats/overview-all/,
+// unscoped "all services" — see useAnalyticsData); Peak day/Peak hour stay
+// "Coming soon" — neither is in any API response yet.
 // ---------------------------------------------------------------------------
 
-const HIGHLIGHTS = ['Top city', 'Peak day', 'Peak hour'];
+const REMAINING_HIGHLIGHTS = ['Peak day', 'Peak hour'];
 
 interface Props {
     traffic: StatsTraffic | null;
+    topCity: TopCity | null;
     onViewDetail: () => void;
 }
 
-export const TrafficSourcesCard: React.FC<Props> = ({ traffic, onViewDetail }) => {
+export const TrafficSourcesCard: React.FC<Props> = ({ traffic, topCity, onViewDetail }) => {
     const slices = sourceSlices(traffic?.by_source || []).slice(0, 5);
 
     return (
@@ -47,7 +49,14 @@ export const TrafficSourcesCard: React.FC<Props> = ({ traffic, onViewDetail }) =
                 <p className="text-[12.5px] text-tlb-muted">No views recorded for this window yet.</p>
             )}
             <div className="border-t border-tlb-divider mt-5 pt-4 grid grid-cols-3 gap-4">
-                {HIGHLIGHTS.map(label => (
+                {topCity && (
+                    <div>
+                        <p className="pt-eyebrow">Top city</p>
+                        <p className="pt-num text-[15px] mt-1 text-tlb-ink">{topCity.city}</p>
+                        <p className="text-[11px] text-tlb-muted mt-0.5">{Math.round(topCity.pct)}% of bookings with known location</p>
+                    </div>
+                )}
+                {REMAINING_HIGHLIGHTS.map(label => (
                     <div key={label}>
                         <p className="pt-eyebrow">{label}</p>
                         <p className="pt-num text-[15px] mt-1 text-tlb-muted">—</p>

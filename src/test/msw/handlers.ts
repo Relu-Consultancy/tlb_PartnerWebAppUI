@@ -382,6 +382,7 @@ export const mockStatsOverviewAll = {
         { week_start: '2026-07-27', revenue: '8200.00', bookings: 6 },
         { week_start: '2026-08-03', revenue: '11400.00', bookings: 8 },
     ],
+    top_city: { city: 'Bengaluru', pct: 86.0 },
 };
 
 export const mockStatsOverviewAllVenue = {
@@ -419,6 +420,22 @@ export const mockStatsOverviewAllEvent = {
     ],
     demand_funnel: { listing_views: 1200, enquiries: 0, confirmed_bookings: 22 },
     weekly_trend: [],
+};
+
+export const mockListingPerformance = {
+    count: 2, page: 1, page_size: 10, next: null, previous: null,
+    results: [
+        {
+            listing_id: 'l1', listing_title: 'Indigo Dyeing Evening', listing_type: 'event',
+            thumbnail_url: 'https://example.com/indigo.jpg', price: '1100', average_rating: '4.9',
+            views: 1243, enquiries: 39, booked: 42, conversion_rate: 3.1, revenue: '47300.00',
+        },
+        {
+            listing_id: 'l2', listing_title: 'Beginners Pottery', listing_type: 'class',
+            thumbnail_url: null, price: null, average_rating: null,
+            views: 300, enquiries: 0, booked: 0, conversion_rate: 0, revenue: '0.00',
+        },
+    ],
 };
 
 export const mockStatsReviews = {
@@ -789,6 +806,27 @@ export const handlers = [
         if (listingType === 'event') return HttpResponse.json({ success: true, data: mockStatsOverviewAllEvent });
         return HttpResponse.json({ success: true, data: mockStatsOverviewAll });
     }),
+    http.get(`${BASE}/api/v1/partner/stats/listing-performance/`, () =>
+        HttpResponse.json({ success: true, data: mockListingPerformance })),
+
+    // ─── CSV report downloads — raw text/csv, not the {success,data} envelope ───
+    http.get(`${BASE}/api/v1/partner/reports/earnings-statement/`, () =>
+        new HttpResponse('period_start,period_end,gross_amount,commission_percent,commission_amount,net_payable,status,paid_at\n2026-08-01,2026-08-31,50000.00,15,7500.00,42500.00,paid,2026-09-05', {
+            headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="earnings-statement_20260917.csv"' },
+        })),
+    http.get(`${BASE}/api/v1/partner/reports/booking-register/`, () =>
+        new HttpResponse('booking_reference,created_at,customer_name,customer_email,listing_title,booking_type,status,total_amount\nBKG-1,2026-08-10,Asha Rao,asha@example.com,Indigo Dyeing Evening,event,confirmed,1100.00', {
+            headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="booking-register_20260917.csv"' },
+        })),
+    http.get(`${BASE}/api/v1/partner/reports/enquiry-response-log/`, () =>
+        new HttpResponse('service_type,listing_title,attendee_name,status,created_at,responded_at,response_hours,within_sla\nclass,Beginners Pottery,Neha Rao,closed,2026-08-10,2026-08-11,20,true', {
+            headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="enquiry-response-log_20260917.csv"' },
+        })),
+    http.get(`${BASE}/api/v1/partner/reports/reviews-export/`, () =>
+        new HttpResponse('listing_title,rating,comment,created_at\nIndigo Dyeing Evening,5,Loved it,2026-08-12', {
+            headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="reviews-export_20260917.csv"' },
+        })),
+
     http.get(`${BASE}/api/v1/partner/stats/reviews/`, () =>
         HttpResponse.json({ success: true, data: mockStatsReviews })),
     http.post(`${BASE}/api/v1/partner/:id/track-view/`, () =>

@@ -1,22 +1,20 @@
-import React, { useEffect, useState } from 'react';
-import { Download } from 'lucide-react';
+import React, { useState } from 'react';
+import { Download, Loader2 } from 'lucide-react';
 import { EntityType, Screen } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
-import { loadPartnerListings, PartnerListing } from '../../api/portalSummary';
 import { getDateRangeOption } from '../../constants/dateRange';
 import { Pill, SegBar } from '../../components/portal';
-import { Skeleton } from '../../components/ui';
+import { Skeleton, toast } from '../../components/ui';
 import { downloadTextFile } from '../../utils/download';
-import { useEnquiriesData } from '../bookings-enquiries/useEnquiriesData';
-import { useBookingsData } from '../bookings-enquiries/useBookingsData';
+import { getEarningsStatementReport } from '../../api/reports';
 import { useAnalyticsData } from './useAnalyticsData';
 import { useOverviewAllData } from './useOverviewAllData';
-import { OverviewAllListingType } from '../../api/stats';
+import { useListingPerformanceData } from './useListingPerformanceData';
+import { ListingPerformanceTab, OverviewAllListingType } from '../../api/stats';
 import {
-    funnelStages, listingPerformance, overviewFunnelStages, revenueByListingSlices,
+    funnelStages, overviewFunnelStages, revenueByListingSlices,
     revenueTypeSlices, trendPoints, uncontactedLeadValue, weeklyTrendPoints,
 } from './model';
-import { buildEarningsStatementCsv } from './csv';
 import { AnalyticsTab } from './types';
 import { OverviewAllMetrics } from './components/OverviewAllMetrics';
 import { RevenueChart } from './components/RevenueChart';
@@ -39,6 +37,12 @@ interface Props {
     onNavigate: (screen: Screen) => void;
 }
 
+const PERF_TAB_OPTIONS: { key: ListingPerformanceTab; label: string }[] = [
+    { key: 'all', label: 'All' },
+    { key: 'top', label: 'Top performing' },
+    { key: 'underperforming', label: 'Underperforming' },
+];
+
 const TABS: { key: AnalyticsTab; label: string }[] = [
     { key: 'overview', label: 'Overview' },
     { key: 'revenue', label: 'Revenue' },
@@ -59,19 +63,14 @@ const SkeletonBody: React.FC = () => (
 export const Analytics: React.FC<Props> = ({ onNavigate }) => {
     const { allowedEntities, dateRange } = usePartner();
     const [tab, setTab] = useState<AnalyticsTab>('overview');
-    const [scope, setScope] = useState<EntityType | 'all'>('all');
     const [overviewScope, setOverviewScope] = useState<EntityType | 'all'>('all');
-    const [listings, setListings] = useState<PartnerListing[]>([]);
+    const [perfTab, setPerfTab] = useState<ListingPerformanceTab>('all');
+    const [exportingCsv, setExportingCsv] = useState(false);
 
     const stats = useAnalyticsData(dateRange);
     const overviewListingType = overviewScope === 'all' ? undefined : OVERVIEW_LISTING_TYPE[overviewScope];
     const overviewAll = useOverviewAllData(dateRange, overviewListingType);
-    const enquiries = useEnquiriesData(allowedEntities);
-    const bookings = useBookingsData(allowedEntities);
-
-    useEffect(() => {
-        loadPartnerListings(allowedEntities).then(setListings).catch(() => setListings([]));
-    }, [allowedEntities.join(',')]);
+    const listingPerf = useListingPerformanceData(dateRange, perfTab);
 
     if (stats.loading) return <SkeletonBody />;
 
@@ -88,14 +87,6 @@ export const Analytics: React.FC<Props> = ({ onNavigate }) => {
     const stages = funnelStages(stats.overview, stats.enquiries);
     const { uncontacted, value: uncontactedValue } = uncontactedLeadValue(stats.enquiries, stats.revenue);
 
-    const scopedListings = scope === 'all' ? listings : listings.filter(l => l.entityType === scope);
-    const performanceRows = listingPerformance(scopedListings, bookings.entries, enquiries.entries);
-
-    const scopeOptions = [
-        { key: 'all' as const, label: 'All services' },
-        ...allowedEntities.map(e => ({ key: e, label: e })),
-    ];
-
     // No "Programs" tab in this design yet — the endpoint supports listing_type=program,
     // but the current Overview scope is deliberately All services/Events/Classes/Venues only.
     const overviewScopeOptions = [
@@ -111,7 +102,17 @@ export const Analytics: React.FC<Props> = ({ onNavigate }) => {
     const overviewFunnel = overviewAll.overview ? overviewFunnelStages(overviewAll.overview.demand_funnel) : [];
     const revenueByListingCard = overviewAll.overview?.revenue_by_listing != null;
 
-    const exportCsv = () => downloadTextFile(`tlb-analytics-${Date.now()}.csv`, buildEarningsStatementCsv(stats.revenue?.revenue_trend || []));
+    const exportCsv = async () => {
+        setExportingCsv(true);
+        try {
+            const { filename, content } = await getEarningsStatementReport(dateRange);
+            downloadTextFile(filename, content);
+        } catch (err: any) {
+            toast.error(err?.message || "Couldn't export the earnings statement. Please try again.");
+        } finally {
+            setExportingCsv(false);
+        }
+    };
 
     return (
         <div className="px-4 sm:px-[26px] pt-5 pb-9 flex flex-col gap-4">
@@ -127,8 +128,8 @@ export const Analytics: React.FC<Props> = ({ onNavigate }) => {
                         {stats.revenue ? ` · ${formatRupees(toNumber(stats.revenue.gross_revenue))} gross` : ''}
                     </p>
                 </div>
-                <button type="button" onClick={exportCsv} className="pt-btn pt-btn-d flex-none">
-                    <Download size={14} strokeWidth={2.75} /> Export CSV
+                <button type="button" onClick={exportCsv} disabled={exportingCsv} className="pt-btn pt-btn-d flex-none">
+                    {exportingCsv ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} strokeWidth={2.75} />} Export CSV
                 </button>
             </div>
 
@@ -203,7 +204,7 @@ export const Analytics: React.FC<Props> = ({ onNavigate }) => {
                         <p className="text-[12.5px] text-tlb-muted mb-5">Where customers drop off · {getDateRangeOption(dateRange).phrase}</p>
                         <DemandFunnel stages={stages} uncontacted={uncontacted} uncontactedValue={uncontactedValue} avgResponseHours={stats.enquiries?.avg_response_hours ?? null} />
                     </div>
-                    <TrafficSourcesCard traffic={stats.traffic} onViewDetail={() => onNavigate('TRAFFIC_ANALYTICS')} />
+                    <TrafficSourcesCard traffic={stats.traffic} topCity={stats.overviewAll?.top_city ?? null} onViewDetail={() => onNavigate('TRAFFIC_ANALYTICS')} />
                 </div>
             )}
 
@@ -212,11 +213,20 @@ export const Analytics: React.FC<Props> = ({ onNavigate }) => {
                     <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
                         <div>
                             <p className="pt-h-sec">Listing performance</p>
-                            <p className="text-[12.5px] text-tlb-muted mt-0.5">{scopedListings.length} listing{scopedListings.length === 1 ? '' : 's'} · sorted by revenue</p>
+                            <p className="text-[12.5px] text-tlb-muted mt-0.5">
+                                {listingPerf.total} listing{listingPerf.total === 1 ? '' : 's'}
+                                {perfTab === 'top' ? ' · sorted by revenue' : perfTab === 'underperforming' ? ' · sorted by enquiry rate' : ''}
+                            </p>
                         </div>
-                        <SegBar options={scopeOptions} value={scope} onChange={setScope} />
+                        <SegBar options={PERF_TAB_OPTIONS} value={perfTab} onChange={setPerfTab} />
                     </div>
-                    <ListingsPerformanceTable rows={performanceRows} />
+                    <ListingsPerformanceTable
+                        rows={listingPerf.rows}
+                        total={listingPerf.total}
+                        loading={listingPerf.loading}
+                        error={listingPerf.error}
+                        onLoadMore={listingPerf.loadMore}
+                    />
                 </div>
             )}
 
@@ -238,7 +248,7 @@ export const Analytics: React.FC<Props> = ({ onNavigate }) => {
                             Schedule a report <Pill tone="neutral">Coming soon</Pill>
                         </button>
                     </div>
-                    <ReportsPanel revenue={stats.revenue} />
+                    <ReportsPanel period={dateRange} />
                 </div>
             )}
         </div>

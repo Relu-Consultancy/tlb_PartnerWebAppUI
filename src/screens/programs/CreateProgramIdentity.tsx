@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
-import { Select, LocationPicker, LanguagePicker, validateLanguages } from '../../components/ui';
+import { toast, Select, LocationPicker, LanguagePicker, validateLanguages } from '../../components/ui';
 import { PickedLocation } from '../../components/ui/LocationPicker';
 import { WizardShell, WizardNav, WizardField, OptionTileGrid, BookingTypeCards } from '../../components/portal/wizard';
 import {
@@ -66,6 +66,7 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
     const [metaLoading, setMetaLoading] = useState(true);
     const [metaError, setMetaError] = useState('');
     const [saving, setSaving] = useState(false);
+    const [savingDraft, setSavingDraft] = useState(false);
     const [error, setError] = useState('');
 
     useEffect(() => {
@@ -148,6 +149,69 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
     const selectedCategory = categories.find(c => c.id === selectedCategoryId);
     const needsAddress = deliveryMode === 'offline' || deliveryMode === 'hybrid';
 
+    // Shared by "Next" and "Save as draft" — creates the draft if needed and
+    // persists whatever's currently filled in. Neither caller requires the step
+    // to be complete; only "Next" additionally validates before calling this.
+    const persist = async (): Promise<string> => {
+        let draftId = getCurrentProgramDraftId();
+        if (!draftId) {
+            const res = await createProgramDraft({
+                title: title.trim(),
+                short_description: shortDesc.trim() || undefined,
+                description: description.trim() || undefined,
+                booking_type: bookingType,
+            });
+            const d = res.data || res;
+            draftId = d.id;
+            if (!draftId) throw new Error('Server did not return a draft id.');
+            setCurrentProgramDraftId(draftId);
+        }
+
+        // Build PATCH payload per API 11.4
+        const payload: Record<string, any> = {
+            title: title.trim(),
+            short_description: shortDesc.trim(),
+            description: description.trim(),
+            delivery_mode: deliveryMode,
+            booking_type: bookingType,
+        };
+        if (programFormat) payload.program_format = programFormat;
+        if (minAge) payload.min_age = Number(minAge);
+        if (maxAge) payload.max_age = Number(maxAge);
+        if (maxCapacity) payload.max_capacity = Number(maxCapacity);
+        if (totalHours) payload.total_hours = Number(totalHours);
+        if (moduleCount) payload.module_count = Number(moduleCount);
+        if (needsAddress) {
+            if (city.trim()) payload.city = city.trim();
+            if (address.trim()) payload.address = address.trim();
+            // Best-effort — not yet confirmed on the Programs endpoint, but
+            // harmless to send (unrecognized fields are dropped, not rejected).
+            if (latitude != null && longitude != null) {
+                payload.latitude = latitude.toFixed(6);
+                payload.longitude = longitude.toFixed(6);
+            }
+        }
+        if ((deliveryMode === 'online' || deliveryMode === 'hybrid') && meetingLink.trim()) {
+            payload.meeting_link = meetingLink.trim();
+        }
+        // Send IDs, not strings
+        if (selectedCategoryId != null) {
+            payload.category_id = selectedCategoryId;
+            payload.subcategory_id = selectedSubcategoryId; // always send alongside category to clear any stale subcategory on the backend
+        } else if (selectedSubcategoryId != null) {
+            payload.subcategory_id = selectedSubcategoryId;
+        }
+        if (selectedTagId != null) payload.tag_ids = [selectedTagId];
+
+        if (languages.length) {
+            payload.languages = languages;
+            if (languages.includes('other')) payload.other_language = otherLanguage.trim();
+        }
+
+        await updateProgramListing(draftId!, payload);
+        return draftId!;
+    };
+
     const handleNext = async () => {
         if (!title.trim()) { setError('Program title is required.'); return; }
         if (selectedCategoryId != null && selectedSubcategoryId == null) {
@@ -161,66 +225,29 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
         setError('');
         setSaving(true);
         try {
-            let draftId = getCurrentProgramDraftId();
-            if (!draftId) {
-                const res = await createProgramDraft({
-                    title: title.trim(),
-                    short_description: shortDesc.trim() || undefined,
-                    description: description.trim() || undefined,
-                    booking_type: bookingType,
-                });
-                const d = res.data || res;
-                draftId = d.id;
-                setCurrentProgramDraftId(draftId!);
-            }
-
-            // Build PATCH payload per API 11.4
-            const payload: Record<string, any> = {
-                title: title.trim(),
-                short_description: shortDesc.trim(),
-                description: description.trim(),
-                delivery_mode: deliveryMode,
-                booking_type: bookingType,
-            };
-            if (programFormat) payload.program_format = programFormat;
-            if (minAge) payload.min_age = Number(minAge);
-            if (maxAge) payload.max_age = Number(maxAge);
-            if (maxCapacity) payload.max_capacity = Number(maxCapacity);
-            if (totalHours) payload.total_hours = Number(totalHours);
-            if (moduleCount) payload.module_count = Number(moduleCount);
-            if (needsAddress) {
-                if (city.trim()) payload.city = city.trim();
-                if (address.trim()) payload.address = address.trim();
-                // Best-effort — not yet confirmed on the Programs endpoint, but
-                // harmless to send (unrecognized fields are dropped, not rejected).
-                if (latitude != null && longitude != null) {
-                    payload.latitude = latitude.toFixed(6);
-                    payload.longitude = longitude.toFixed(6);
-                }
-            }
-            if ((deliveryMode === 'online' || deliveryMode === 'hybrid') && meetingLink.trim()) {
-                payload.meeting_link = meetingLink.trim();
-            }
-            // Send IDs, not strings
-            if (selectedCategoryId != null) {
-                payload.category_id = selectedCategoryId;
-                payload.subcategory_id = selectedSubcategoryId; // always send alongside category to clear any stale subcategory on the backend
-            } else if (selectedSubcategoryId != null) {
-                payload.subcategory_id = selectedSubcategoryId;
-            }
-            if (selectedTagId != null) payload.tag_ids = [selectedTagId];
-
-            if (languages.length) {
-                payload.languages = languages;
-                if (languages.includes('other')) payload.other_language = otherLanguage.trim();
-            }
-
-            await updateProgramListing(draftId!, payload);
+            await persist();
             onNavigate('CREATE_PROGRAM_BATCH');
         } catch (e: any) {
             setError(e?.message || 'Failed to save. Please try again.');
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleSaveDraft = async () => {
+        if (!title.trim()) { setError('Program title is required before saving.'); return; }
+        if (savingDraft) return;
+        setError('');
+        setSavingDraft(true);
+        try {
+            await persist();
+            toast.success('Draft saved. Resume anytime from My Listings.');
+            onNavigate('SERVICE_LISTINGS');
+        } catch (e: any) {
+            console.error('Failed to save draft', e);
+            toast.error(e?.message || 'Failed to save draft. Please try again.');
+        } finally {
+            setSavingDraft(false);
         }
     };
 
@@ -426,6 +453,8 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                     onNext={saving ? () => {} : handleNext}
                     nextText={saving ? 'Saving…' : 'Next: Batch & schedule'}
                     nextIcon={saving ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} strokeWidth={2.75} />}
+                    onSaveDraft={saving ? undefined : handleSaveDraft}
+                    savingDraft={savingDraft}
                 />
             </div>
         </WizardShell>

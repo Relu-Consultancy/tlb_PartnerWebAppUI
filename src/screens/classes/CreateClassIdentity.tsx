@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, MapPin, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
-import { LocationPicker, LanguagePicker, validateLanguages } from '../../components/ui';
+import { toast, LocationPicker, LanguagePicker, validateLanguages } from '../../components/ui';
 import { PickedLocation } from '../../components/ui/LocationPicker';
 import { WizardShell, WizardNav, WizardField, OptionTileGrid, BookingTypeCards } from '../../components/portal/wizard';
 import {
@@ -60,6 +60,7 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
     const [metaLoading, setMetaLoading] = useState(true);
     const [metaError, setMetaError] = useState('');
     const [saving, setSaving] = useState(false);
+    const [savingDraft, setSavingDraft] = useState(false);
     const [saveError, setSaveError] = useState('');
 
     useEffect(() => {
@@ -138,6 +139,64 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
     const selectedCategory = categories.find(c => c.id === selectedCategoryId);
     const needsAddress = mode === 'offline' || mode === 'hybrid';
 
+    // Shared by "Next" and "Save as draft" — creates the draft if needed and
+    // persists whatever's currently filled in. Neither caller requires the step
+    // to be complete; only "Next" additionally validates before calling this.
+    const persist = async (): Promise<string> => {
+        let draftId = getCurrentClassDraftId();
+        if (!draftId) {
+            const res = await createClassDraft({
+                title: title.trim(),
+                short_description: shortDesc.trim(),
+                description: description.trim(),
+                booking_type: bookingType,
+            });
+            const d = res.data || res;
+            draftId = d.id;
+            if (!draftId) throw new Error('Server did not return a draft id.');
+            setCurrentClassDraftId(draftId);
+        }
+        const payload: Record<string, any> = {
+            title: title.trim(),
+            short_description: shortDesc.trim(),
+            description: description.trim(),
+            mode,
+            booking_type: bookingType,
+        };
+
+        if (minAge) payload.min_age = Number(minAge);
+        if (maxAge) payload.max_age = Number(maxAge);
+        if (needsAddress) {
+            if (city.trim()) payload.city = city.trim();
+            if (address.trim()) payload.address = address.trim();
+            // Best-effort — not yet confirmed on the Classes endpoint, but
+            // harmless to send (unrecognized fields are dropped, not rejected).
+            if (latitude != null && longitude != null) {
+                payload.latitude = latitude.toFixed(6);
+                payload.longitude = longitude.toFixed(6);
+            }
+        }
+        if ((mode === 'online' || mode === 'hybrid') && meetingLink.trim()) {
+            payload.meeting_link = meetingLink.trim();
+        }
+        if (price.trim()) payload.price = price.trim();
+        if (tag) payload.tags = [tag];
+        if (selectedCategoryId != null) {
+            payload.category_id = selectedCategoryId;
+            payload.subcategory_id = selectedSubcategoryId; // always send alongside category to clear any stale subcategory on the backend
+        } else if (selectedSubcategoryId != null) {
+            payload.subcategory_id = selectedSubcategoryId;
+        }
+
+        if (languages.length) {
+            payload.languages = languages;
+            if (languages.includes('other')) payload.other_language = otherLanguage.trim();
+        }
+
+        await updateClassListing(draftId, payload);
+        return draftId;
+    };
+
     const handleNext = async () => {
         if (!title.trim()) { setSaveError('Class title is required.'); return; }
         if (selectedCategoryId != null && selectedSubcategoryId == null) {
@@ -151,61 +210,27 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
         setSaveError('');
         setSaving(true);
         try {
-            let draftId = getCurrentClassDraftId();
-            if (!draftId) {
-                const res = await createClassDraft({
-                    title: title.trim(),
-                    short_description: shortDesc.trim(),
-                    description: description.trim(),
-                    booking_type: bookingType,
-                });
-                const d = res.data || res;
-                draftId = d.id;
-                setCurrentClassDraftId(draftId!);
-            }
-            const payload: Record<string, any> = {
-                title: title.trim(),
-                short_description: shortDesc.trim(),
-                description: description.trim(),
-                mode,
-                booking_type: bookingType,
-            };
-
-            if (minAge) payload.min_age = Number(minAge);
-            if (maxAge) payload.max_age = Number(maxAge);
-            if (needsAddress) {
-                if (city.trim()) payload.city = city.trim();
-                if (address.trim()) payload.address = address.trim();
-                // Best-effort — not yet confirmed on the Classes endpoint, but
-                // harmless to send (unrecognized fields are dropped, not rejected).
-                if (latitude != null && longitude != null) {
-                    payload.latitude = latitude.toFixed(6);
-                    payload.longitude = longitude.toFixed(6);
-                }
-            }
-            if ((mode === 'online' || mode === 'hybrid') && meetingLink.trim()) {
-                payload.meeting_link = meetingLink.trim();
-            }
-            if (price.trim()) payload.price = price.trim();
-            if (tag) payload.tags = [tag];
-            if (selectedCategoryId != null) {
-                payload.category_id = selectedCategoryId;
-                payload.subcategory_id = selectedSubcategoryId; // always send alongside category to clear any stale subcategory on the backend
-            } else if (selectedSubcategoryId != null) {
-                payload.subcategory_id = selectedSubcategoryId;
-            }
-
-            if (languages.length) {
-                payload.languages = languages;
-                if (languages.includes('other')) payload.other_language = otherLanguage.trim();
-            }
-
-            await updateClassListing(draftId!, payload);
+            await persist();
             onNavigate('CREATE_CLASS_BATCH');
         } catch (e: any) {
             setSaveError(e?.message || 'Failed to save. Please try again.');
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleSaveDraft = async () => {
+        if (!title.trim()) { toast.warning('Please enter a class title before saving.'); return; }
+        setSavingDraft(true);
+        try {
+            await persist();
+            toast.success('Draft saved. Resume anytime from My Listings.');
+            onNavigate('SERVICE_LISTINGS');
+        } catch (e: any) {
+            console.error('Failed to save draft', e);
+            toast.error(e?.message || 'Failed to save draft. Please try again.');
+        } finally {
+            setSavingDraft(false);
         }
     };
 
@@ -391,6 +416,8 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
                     onNext={saving ? () => {} : handleNext}
                     nextText={saving ? 'Saving…' : 'Next: Batch & schedule'}
                     nextIcon={saving ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} strokeWidth={2.75} />}
+                    onSaveDraft={saving ? undefined : handleSaveDraft}
+                    savingDraft={savingDraft}
                 />
             </div>
         </WizardShell>

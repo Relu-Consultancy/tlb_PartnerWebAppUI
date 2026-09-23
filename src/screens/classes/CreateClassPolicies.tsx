@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
-import { SkeletonList, FaqTermsEditor, FaqApi, RefundPolicyToggle } from '../../components/ui';
+import { SkeletonList, FaqTermsEditor, FaqApi, RefundPolicyToggle, toast } from '../../components/ui';
 import { WizardShell, WizardNav, WizardField } from '../../components/portal/wizard';
 import {
     getCurrentClassDraftId,
@@ -30,6 +30,7 @@ export const CreateClassPolicies: React.FC<Props> = ({ onNavigate }) => {
     const [isRefundable, setIsRefundable] = useState(true);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [savingDraft, setSavingDraft] = useState(false);
     const [error, setError] = useState('');
 
     useEffect(() => {
@@ -52,22 +53,46 @@ export const CreateClassPolicies: React.FC<Props> = ({ onNavigate }) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // Shared by "Next" and "Save as draft" — persists cancellation/refund
+    // policy state. The draft already exists by this step, so neither caller
+    // needs to create one; only "Next" additionally advances the step.
+    const persistPolicies = async () => {
+        if (!draftId) return;
+        await updateClassListing(draftId, {
+            ...(cancelPolicy.trim() ? { cancellation_policy: cancelPolicy.trim() } : {}),
+            ...(refundPolicy.trim() ? { refund_policy: refundPolicy.trim() } : {}),
+            is_refundable: isRefundable,
+        });
+    };
+
     const handleNext = async () => {
         if (saving) return;
         if (!draftId) { onNavigate('CREATE_CLASS_PREVIEW'); return; }
         setSaving(true);
         setError('');
         try {
-            await updateClassListing(draftId, {
-                ...(cancelPolicy.trim() ? { cancellation_policy: cancelPolicy.trim() } : {}),
-                ...(refundPolicy.trim() ? { refund_policy: refundPolicy.trim() } : {}),
-                is_refundable: isRefundable,
-            });
+            await persistPolicies();
             onNavigate('CREATE_CLASS_PREVIEW');
         } catch (e: any) {
             setError(e?.message || 'Failed to save. Please try again.');
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleSaveDraft = async () => {
+        if (savingDraft) return;
+        if (!draftId) { onNavigate('SERVICE_LISTINGS'); return; }
+        setSavingDraft(true);
+        try {
+            await persistPolicies();
+            toast.success('Draft saved. Resume anytime from My Listings.');
+            onNavigate('SERVICE_LISTINGS');
+        } catch (e: any) {
+            console.error('Failed to save draft', e);
+            toast.error(e?.message || 'Failed to save draft. Please try again.');
+        } finally {
+            setSavingDraft(false);
         }
     };
 
@@ -124,6 +149,8 @@ export const CreateClassPolicies: React.FC<Props> = ({ onNavigate }) => {
                     onNext={handleNext}
                     nextText={saving ? 'Saving…' : 'Preview & finish'}
                     nextIcon={saving ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} strokeWidth={2.75} />}
+                    onSaveDraft={saving ? undefined : handleSaveDraft}
+                    savingDraft={savingDraft}
                 />
             </div>
         </WizardShell>

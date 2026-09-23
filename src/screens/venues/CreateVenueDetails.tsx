@@ -92,6 +92,7 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
     // Draft
     const [draftId, setDraftId] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
+    const [savingDraft, setSavingDraft] = useState(false);
 
     // Media
     const [busyKind, setBusyKind] = useState<'cover' | 'gallery' | 'video' | null>(null);
@@ -245,57 +246,95 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
         catch (err: any) { toast.error(err?.message || 'Failed to delete video.'); }
     };
 
+    // Shared by "Next" and "Save as draft" — creates the draft if needed and
+    // persists whatever's currently filled in. Neither caller requires the step
+    // to be complete; only "Next" additionally validates before calling this.
+    const persist = async (): Promise<string> => {
+        let id = draftId;
+        if (!id) {
+            const res = await createVenueDraft({ title: title.trim() });
+            id = (res.data || res).id;
+            setCurrentVenueDraftId(id!);
+            setDraftId(id);
+        }
+
+        const payload: Record<string, any> = {
+            title: title.trim(),
+            description: description.trim(),
+            booking_type: bookingType,
+        };
+        if (selectedCategoryId != null) payload.category_id = selectedCategoryId;
+        if (selectedSubcategoryId != null) payload.subcategory_id = selectedSubcategoryId;
+        if (locationType) payload.location_type = locationType;
+        if (city.trim()) payload.city = city.trim();
+        if (address.trim()) payload.address = address.trim();
+        // Clamp to 6 decimal places — the backend rejects anything more
+        // precise, which a hand-typed or pasted coordinate can exceed.
+        if (latitude.trim()) {
+            const n = Number(latitude.trim());
+            payload.latitude = Number.isFinite(n) ? n.toFixed(6) : latitude.trim();
+        }
+        if (longitude.trim()) {
+            const n = Number(longitude.trim());
+            payload.longitude = Number.isFinite(n) ? n.toFixed(6) : longitude.trim();
+        }
+        if (minAge !== '') payload.min_age = parseInt(minAge, 10);
+        if (maxAge !== '') payload.max_age = parseInt(maxAge, 10);
+        if (minCapacity !== '') payload.min_capacity = parseInt(minCapacity, 10);
+        if (maxCapacity !== '') payload.max_capacity = parseInt(maxCapacity, 10);
+
+        if (languages.length) {
+            payload.languages = languages;
+            if (languages.includes('other')) payload.other_language = otherLanguage.trim();
+        }
+
+        await updateVenueListing(id!, payload);
+        return id!;
+    };
+
     const handleNext = async () => {
         if (!title.trim()) { toast.warning('Please enter a venue name.'); return; }
+
+        // Check every field this step requires before hitting the backend — surfacing
+        // all of them at once (instead of one opaque validation error per submit) so
+        // the user isn't stuck guessing what's missing.
+        const missingFields: string[] = [];
+        if (!description.trim()) missingFields.push('Description');
+        if (categories.length > 0 && selectedCategoryId == null) missingFields.push('Category');
+        if (selectedCategory && selectedCategory.subcategories.length > 0 && selectedSubcategoryId == null) missingFields.push('Sub-category');
+        if (!address.trim()) missingFields.push('Address');
+        if (!city.trim()) missingFields.push('City (pick a location on the map)');
+        if (!cover) missingFields.push('Cover banner');
+        if (missingFields.length > 0) {
+            toast.warning(`Please complete before continuing: ${missingFields.join(', ')}.`);
+            return;
+        }
+
         const langErr = validateLanguages(languages, otherLanguage);
         if (langErr) { setLangError(langErr); toast.warning(langErr); return; }
         setLangError('');
         setSaving(true);
         try {
-            let id = draftId;
-            if (!id) {
-                const res = await createVenueDraft({ title: title.trim() });
-                id = (res.data || res).id;
-                setCurrentVenueDraftId(id!);
-                setDraftId(id);
-            }
-
-            const payload: Record<string, any> = {
-                title: title.trim(),
-                description: description.trim(),
-                booking_type: bookingType,
-            };
-            if (selectedCategoryId != null) payload.category_id = selectedCategoryId;
-            if (selectedSubcategoryId != null) payload.subcategory_id = selectedSubcategoryId;
-            if (locationType) payload.location_type = locationType;
-            if (city.trim()) payload.city = city.trim();
-            if (address.trim()) payload.address = address.trim();
-            // Clamp to 6 decimal places — the backend rejects anything more
-            // precise, which a hand-typed or pasted coordinate can exceed.
-            if (latitude.trim()) {
-                const n = Number(latitude.trim());
-                payload.latitude = Number.isFinite(n) ? n.toFixed(6) : latitude.trim();
-            }
-            if (longitude.trim()) {
-                const n = Number(longitude.trim());
-                payload.longitude = Number.isFinite(n) ? n.toFixed(6) : longitude.trim();
-            }
-            if (minAge !== '') payload.min_age = parseInt(minAge, 10);
-            if (maxAge !== '') payload.max_age = parseInt(maxAge, 10);
-            if (minCapacity !== '') payload.min_capacity = parseInt(minCapacity, 10);
-            if (maxCapacity !== '') payload.max_capacity = parseInt(maxCapacity, 10);
-
-            if (languages.length) {
-                payload.languages = languages;
-                if (languages.includes('other')) payload.other_language = otherLanguage.trim();
-            }
-
-            await updateVenueListing(id!, payload);
+            await persist();
             onNavigate('CREATE_VENUE_OCCASIONS');
         } catch (err: any) {
             toast.error(err?.message || 'Failed to save venue details.');
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleSaveDraft = async () => {
+        if (!title.trim()) { toast.warning('Please enter a venue name before saving.'); return; }
+        setSavingDraft(true);
+        try {
+            await persist();
+            toast.success('Draft saved. Resume anytime from My Listings.');
+            onNavigate('SERVICE_LISTINGS');
+        } catch (err: any) {
+            toast.error(err?.message || 'Failed to save draft. Please try again.');
+        } finally {
+            setSavingDraft(false);
         }
     };
 
@@ -539,6 +578,8 @@ export const CreateVenueDetails: React.FC<Props> = ({ onNavigate }) => {
                     onNext={saving ? () => {} : handleNext}
                     nextText={saving ? 'Saving…' : 'Next: Occasions & discovery'}
                     nextIcon={saving ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} strokeWidth={2.75} />}
+                    onSaveDraft={saving ? undefined : handleSaveDraft}
+                    savingDraft={savingDraft}
                 />
             </div>
         </WizardShell>

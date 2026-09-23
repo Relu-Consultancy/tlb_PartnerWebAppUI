@@ -147,6 +147,30 @@ describe('CreateEventSchedule — date validation', () => {
         expect(toastSpy).toHaveBeenCalledWith(expect.stringMatching(/end date/i));
         toastSpy.mockRestore();
     });
+
+    it('shows a friendly message (not the raw backend error) when the registration deadline is after the event start', async () => {
+        setCurrentDraftId(DRAFT_ID);
+        const user = userEvent.setup();
+        const toastSpy = vi.spyOn(toast, 'warning').mockImplementation(() => 0);
+        let updateCalled = false;
+        server.use(http.patch(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, () => {
+            updateCalled = true;
+            return HttpResponse.json({ success: true, data: {} });
+        }));
+        render(<CreateEventSchedule {...props} />);
+        await waitFor(() => document.querySelectorAll('input[type="date"]').length > 0);
+
+        const dateInputs = document.querySelectorAll('input[type="date"]');
+        fireEvent.change(dateInputs[0], { target: { value: '2026-09-01' } }); // start
+        fireEvent.change(dateInputs[1], { target: { value: '2026-09-10' } }); // end
+        fireEvent.change(dateInputs[2], { target: { value: '2026-09-30' } }); // registration deadline
+        await user.click(screen.getByText(/next: media/i));
+
+        expect(toastSpy).toHaveBeenCalledWith('Registration deadline must be on or before the event start date.');
+        // The bad request should never reach the backend — this is caught client-side.
+        expect(updateCalled).toBe(false);
+        toastSpy.mockRestore();
+    });
 });
 
 describe('CreateEventSchedule — Next navigation', () => {

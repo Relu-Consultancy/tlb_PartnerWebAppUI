@@ -82,7 +82,7 @@ export const PartnerAccess: React.FC<AuthProps> = ({ onNavigate, setAuthData }) 
                         onKeyDown={(e) => e.key === 'Enter' && handleContinue()}
                     />
                     <div
-                        className={`absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-colors ${
+                        className={`absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg flex items-center justify-center transition-colors ${
                             valid ? 'bg-emerald-50 text-emerald-500' : 'bg-tlb-yellow/10 text-tlb-yellow'
                         }`}
                     >

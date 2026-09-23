@@ -100,6 +100,7 @@ export const CreateVenueAmenities: React.FC<Props> = ({ onNavigate }) => {
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
+    const [savingDraft, setSavingDraft] = useState(false);
 
     const [catalog, setCatalog] = useState<AmenityGroup[]>([]);
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -171,16 +172,36 @@ export const CreateVenueAmenities: React.FC<Props> = ({ onNavigate }) => {
         setCustomAmenities(prev => prev.filter((_, i) => i !== index));
     }, []);
 
+    // Shared by "Next" and "Save as draft" — the draft already exists by this
+    // step, and there's no completeness requirement for amenities either way.
+    const persist = async () => {
+        await updateVenueAmenities(draftId!, Array.from(selectedIds), customAmenities);
+    };
+
     const handleNext = async () => {
         if (!draftId) return;
         setSaving(true);
         try {
-            await updateVenueAmenities(draftId, Array.from(selectedIds), customAmenities);
+            await persist();
             onNavigate('CREATE_VENUE_POLICIES');
         } catch (err: any) {
             toast.error(err?.message || 'Failed to save amenities.');
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleSaveDraft = async () => {
+        if (!draftId) return;
+        setSavingDraft(true);
+        try {
+            await persist();
+            toast.success('Draft saved. Resume anytime from My Listings.');
+            onNavigate('SERVICE_LISTINGS');
+        } catch (err: any) {
+            toast.error(err?.message || 'Failed to save draft. Please try again.');
+        } finally {
+            setSavingDraft(false);
         }
     };
 
@@ -326,6 +347,8 @@ export const CreateVenueAmenities: React.FC<Props> = ({ onNavigate }) => {
                     onNext={saving ? () => {} : handleNext}
                     nextText={saving ? 'Saving…' : 'Next: FAQs & terms'}
                     nextIcon={saving ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} strokeWidth={2.75} />}
+                    onSaveDraft={saving ? undefined : handleSaveDraft}
+                    savingDraft={savingDraft}
                 />
             </div>
         </WizardShell>

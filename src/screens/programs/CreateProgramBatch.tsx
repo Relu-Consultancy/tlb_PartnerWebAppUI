@@ -62,6 +62,7 @@ export const CreateProgramBatch: React.FC<Props> = ({ onNavigate }) => {
     const [batches, setBatches] = useState<LocalBatch[]>([blankBatch()]);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [savingDraft, setSavingDraft] = useState(false);
     const deletedIds = useRef<number[]>([]);
 
     useEffect(() => {
@@ -114,51 +115,80 @@ export const CreateProgramBatch: React.FC<Props> = ({ onNavigate }) => {
         setBatches(prev => prev.filter(b => b.key !== key));
     };
 
+    // Shared by "Next" and "Save as draft" — applies deletions and pushes dirty
+    // batches to the API. In strict mode (Next), an incomplete dirty batch blocks
+    // the save with a warning; in draft mode, incomplete batches are simply
+    // skipped so the user's other progress still gets persisted.
+    const persistBatches = async (opts: { strict: boolean }): Promise<boolean> => {
+        const draftId = getCurrentProgramDraftId();
+        if (!draftId) return true;
+
+        for (const id of deletedIds.current) {
+            await deleteProgramBatch(draftId, id);
+        }
+        deletedIds.current = [];
+
+        for (const b of batches) {
+            if (!b.isDirty) continue;
+            // Validate required fields per API 11.10
+            if (!b.startDate || !b.endDate || !b.startTime || !b.endTime || !b.fee || !b.totalSeats) {
+                if (opts.strict) {
+                    toast.warning(`Batch "${b.name || 'Unnamed'}" is missing required fields (dates, times, fee, seats).`);
+                    return false;
+                }
+                continue;
+            }
+            const payload: Record<string, any> = {
+                name: b.name || undefined,
+                start_date: b.startDate,
+                end_date: b.endDate,
+                start_time: toApiTime(b.startTime),
+                end_time: toApiTime(b.endTime),
+                fee: b.fee,
+                total_seats: Number(b.totalSeats) || 1,
+                is_active: b.isActive,
+            };
+            if (b.daysOfWeek.length > 0) {
+                payload.days_of_week = b.daysOfWeek;
+            }
+            if (b.apiId) {
+                await updateProgramBatch(draftId, b.apiId, payload);
+            } else {
+                await createProgramBatch(draftId, payload);
+            }
+        }
+        return true;
+    };
+
     const handleNext = async () => {
         if (saving) return;
         const draftId = getCurrentProgramDraftId();
         if (!draftId) { onNavigate('CREATE_PROGRAM_MEDIA'); return; }
         try {
             setSaving(true);
-            // Delete removed batches
-            for (const id of deletedIds.current) {
-                await deleteProgramBatch(draftId, id);
-            }
-            deletedIds.current = [];
-            // Create or update dirty batches
-            for (const b of batches) {
-                if (!b.isDirty) continue;
-                // Validate required fields per API 11.10
-                if (!b.startDate || !b.endDate || !b.startTime || !b.endTime || !b.fee || !b.totalSeats) {
-                    toast.warning(`Batch "${b.name || 'Unnamed'}" is missing required fields (dates, times, fee, seats).`);
-                    setSaving(false);
-                    return;
-                }
-                const payload: Record<string, any> = {
-                    name: b.name || undefined,
-                    start_date: b.startDate,
-                    end_date: b.endDate,
-                    start_time: toApiTime(b.startTime),
-                    end_time: toApiTime(b.endTime),
-                    fee: b.fee,
-                    total_seats: Number(b.totalSeats) || 1,
-                    is_active: b.isActive,
-                };
-                if (b.daysOfWeek.length > 0) {
-                    payload.days_of_week = b.daysOfWeek;
-                }
-                if (b.apiId) {
-                    await updateProgramBatch(draftId, b.apiId, payload);
-                } else {
-                    await createProgramBatch(draftId, payload);
-                }
-            }
+            const ok = await persistBatches({ strict: true });
+            if (!ok) return;
             onNavigate('CREATE_PROGRAM_MEDIA');
         } catch (e: any) {
             console.error('Failed to save program batches', e);
             toast.error(e?.message || 'Failed to save batches. Please try again.');
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleSaveDraft = async () => {
+        if (savingDraft) return;
+        setSavingDraft(true);
+        try {
+            await persistBatches({ strict: false });
+            toast.success('Draft saved. Resume anytime from My Listings.');
+            onNavigate('SERVICE_LISTINGS');
+        } catch (e: any) {
+            console.error('Failed to save draft', e);
+            toast.error(e?.message || 'Failed to save draft. Please try again.');
+        } finally {
+            setSavingDraft(false);
         }
     };
 
@@ -288,6 +318,8 @@ export const CreateProgramBatch: React.FC<Props> = ({ onNavigate }) => {
                     onNext={saving ? () => {} : handleNext}
                     nextText={saving ? 'Saving…' : 'Next: Media'}
                     nextIcon={saving ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} strokeWidth={2.75} />}
+                    onSaveDraft={saving ? undefined : handleSaveDraft}
+                    savingDraft={savingDraft}
                 />
             </div>
         </WizardShell>

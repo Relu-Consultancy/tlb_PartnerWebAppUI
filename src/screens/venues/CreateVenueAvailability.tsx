@@ -201,6 +201,12 @@ export const CreateVenueAvailability: React.FC<Props> = ({ onNavigate }) => {
                     }}
                     nextText="Next: Packages & pricing"
                     nextIcon={<ArrowRight size={14} strokeWidth={2.75} />}
+                    onSaveDraft={() => {
+                        // Slots are already persisted immediately as they're added/deleted above —
+                        // nothing new to batch-save here, so this just exits.
+                        toast.success('Draft saved. Resume anytime from My Listings.');
+                        onNavigate('SERVICE_LISTINGS');
+                    }}
                 />
             </div>
         </WizardShell>

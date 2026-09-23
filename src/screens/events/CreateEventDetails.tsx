@@ -83,6 +83,7 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
     const editAddressManually = (v: string) => { setAddress(v); setPlaceId(undefined); setArea(''); };
 
     const [saving, setSaving] = useState(false);
+    const [savingDraft, setSavingDraft] = useState(false);
     const [draftLoading, setDraftLoading] = useState(false);
 
     // ─── Load metadata + existing draft (if any) ──────────────────────────
@@ -162,6 +163,63 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
         return { type: 'custom', min_age: min, max_age: max };
     };
 
+    // Shared by "Next" and "Save as draft" — creates the draft if needed and
+    // persists whatever's currently filled in. Neither caller requires the step
+    // to be complete; only "Next" additionally validates before calling this.
+    const persist = async (): Promise<string> => {
+        let draftId = getCurrentDraftId();
+        if (!draftId) {
+            const createRes = await createEventDraft({
+                title: title.trim(),
+                description: description.trim() || undefined,
+            });
+            const data = createRes.data || createRes;
+            draftId = data.id;
+            if (!draftId) throw new Error('Server did not return a draft id.');
+            setCurrentDraftId(draftId);
+        }
+
+        const payload: Record<string, any> = {
+            title: title.trim(),
+            description: description.trim(),
+            mode,
+        };
+        if (selectedCategoryId) payload.category_id = selectedCategoryId;
+        if (selectedSubcategoryId) payload.subcategory_id = selectedSubcategoryId;
+        if (selectedFormat) payload.format = selectedFormat;
+        const ageGroup = buildAgeGroup();
+        if (ageGroup) payload.age_group = ageGroup;
+        if (mode === 'offline' || mode === 'hybrid') {
+            // Google Maps location — prefer the place_id (server re-resolves
+            // it); otherwise fall back to the raw picked/typed coordinates.
+            // latitude/longitude must always be sent together.
+            if (placeId) {
+                payload.place_id = placeId;
+            } else {
+                if (city) payload.city = city;
+                if (address) payload.address = address;
+                if (area) payload.area = area;
+                if (latitude != null && longitude != null) {
+                    // Backend rejects more than 6 decimal places; Google's
+                    // resolved coordinates can come back with more than that.
+                    payload.latitude = latitude.toFixed(6);
+                    payload.longitude = longitude.toFixed(6);
+                }
+            }
+        }
+        if (mode === 'online' || mode === 'hybrid') {
+            if (meetingLink) payload.meeting_link = meetingLink;
+        }
+
+        if (languages.length) {
+            payload.languages = languages;
+            if (languages.includes('other')) payload.other_language = otherLanguage.trim();
+        }
+
+        await updateListing(draftId, payload);
+        return draftId;
+    };
+
     const handleNext = async () => {
         if (!title.trim()) {
             toast.warning('Please enter an event title.');
@@ -172,64 +230,28 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
         setLangError('');
         setSaving(true);
         try {
-            // 1. Create draft if none exists yet
-            let draftId = getCurrentDraftId();
-            if (!draftId) {
-                const createRes = await createEventDraft({
-                    title: title.trim(),
-                    description: description.trim() || undefined,
-                });
-                const data = createRes.data || createRes;
-                draftId = data.id;
-                if (!draftId) throw new Error('Server did not return a draft id.');
-                setCurrentDraftId(draftId);
-            }
-
-            // 2. Build update payload from current selections
-            const payload: Record<string, any> = {
-                title: title.trim(),
-                description: description.trim(),
-                mode,
-            };
-            if (selectedCategoryId) payload.category_id = selectedCategoryId;
-            if (selectedSubcategoryId) payload.subcategory_id = selectedSubcategoryId;
-            if (selectedFormat) payload.format = selectedFormat;
-            const ageGroup = buildAgeGroup();
-            if (ageGroup) payload.age_group = ageGroup;
-            if (mode === 'offline' || mode === 'hybrid') {
-                // Google Maps location — prefer the place_id (server re-resolves
-                // it); otherwise fall back to the raw picked/typed coordinates.
-                // latitude/longitude must always be sent together.
-                if (placeId) {
-                    payload.place_id = placeId;
-                } else {
-                    if (city) payload.city = city;
-                    if (address) payload.address = address;
-                    if (area) payload.area = area;
-                    if (latitude != null && longitude != null) {
-                        // Backend rejects more than 6 decimal places; Google's
-                        // resolved coordinates can come back with more than that.
-                        payload.latitude = latitude.toFixed(6);
-                        payload.longitude = longitude.toFixed(6);
-                    }
-                }
-            }
-            if (mode === 'online' || mode === 'hybrid') {
-                if (meetingLink) payload.meeting_link = meetingLink;
-            }
-
-            if (languages.length) {
-                payload.languages = languages;
-                if (languages.includes('other')) payload.other_language = otherLanguage.trim();
-            }
-
-            await updateListing(draftId, payload);
+            await persist();
             onNavigate('CREATE_EVENT_SCHEDULE');
         } catch (err: any) {
             console.error('Failed to save draft', err);
             toast.error(err?.message || 'Failed to save event. Please try again.');
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleSaveDraft = async () => {
+        if (!title.trim()) { toast.warning('Please enter an event title before saving.'); return; }
+        setSavingDraft(true);
+        try {
+            await persist();
+            toast.success('Draft saved. Resume anytime from My Listings.');
+            onNavigate('SERVICE_LISTINGS');
+        } catch (err: any) {
+            console.error('Failed to save draft', err);
+            toast.error(err?.message || 'Failed to save draft. Please try again.');
+        } finally {
+            setSavingDraft(false);
         }
     };
 
@@ -430,6 +452,8 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
                     onNext={saving ? () => {} : handleNext}
                     nextText={saving ? 'Saving…' : 'Next: Schedule & pricing'}
                     nextIcon={saving ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} strokeWidth={2.75} />}
+                    onSaveDraft={saving ? undefined : handleSaveDraft}
+                    savingDraft={savingDraft}
                 />
             </div>
         </WizardShell>

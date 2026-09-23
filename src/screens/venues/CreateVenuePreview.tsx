@@ -231,7 +231,7 @@ export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
             slots.length ? { icon: 'schedule', label: 'Availability', value: `${slots.length} slot${slots.length > 1 ? 's' : ''}` } : null,
         ].filter(Boolean) as PreviewFact[],
         priceLabel: minPkg != null ? `₹${minPkg.toLocaleString()}` : '—',
-        ctaLabel: 'Enquire Now',
+        ctaLabel: venue.booking_type === 'direct_booking' ? 'Book Now' : 'Enquire Now',
     } : null;
 
     const handleSubmit = async () => {
@@ -314,6 +314,7 @@ export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
                     onNext={canSubmit && !submitting ? handleSubmit : () => {}}
                     nextText={submitting ? 'Submitting…' : venue.status === 'draft' ? 'Submit for review' : 'Done'}
                     nextIcon={submitting ? <Loader2 size={14} className="animate-spin" /> : <Rocket size={14} strokeWidth={2.75} />}
+                    onSaveDraft={() => onNavigate('SERVICE_LISTINGS')}
                 />
             </div>
 

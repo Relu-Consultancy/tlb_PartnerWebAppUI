@@ -284,6 +284,12 @@ export const CreateProgramMedia: React.FC<Props> = ({ onNavigate }) => {
                     onNext={() => onNavigate('CREATE_PROGRAM_POLICIES')}
                     nextText="Next: Policies"
                     nextIcon={<ArrowRight size={14} strokeWidth={2.75} />}
+                    onSaveDraft={() => {
+                        // Media uploads/deletes persist immediately per-file — nothing
+                        // batched to flush here, just exit back to My Listings.
+                        toast.success('Draft saved. Resume anytime from My Listings.');
+                        onNavigate('SERVICE_LISTINGS');
+                    }}
                 />
             </div>
         </WizardShell>

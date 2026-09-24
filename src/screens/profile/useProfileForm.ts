@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-    getBusinessProfile, getExtendedProfile, updateBusinessProfile, updateExtendedProfile,
-    getPartnerMedia, uploadPartnerMedia, deletePartnerMedia,
+    getBusinessProfile,
+    getExtendedProfile,
+    updateBusinessProfile,
+    updateExtendedProfile,
+    getPartnerMedia,
+    uploadPartnerMedia,
+    deletePartnerMedia,
 } from '../../api/onboarding';
 import { loadCurrentPartner, notifyPartnerUpdated } from '../../api/portalSummary';
 import { toast } from '../../components/ui';
@@ -26,8 +31,14 @@ export interface BusinessFields {
 type FieldKey = keyof BusinessFields;
 
 const EMPTY_FIELDS: BusinessFields = {
-    businessName: '', contactName: '', contactNumber: '', address: '',
-    bio: '', websiteUrl: '', instagramUrl: '', facebookUrl: '',
+    businessName: '',
+    contactName: '',
+    contactNumber: '',
+    address: '',
+    bio: '',
+    websiteUrl: '',
+    instagramUrl: '',
+    facebookUrl: '',
 };
 
 // /partner/profile/ (JSON) owns these; the rest live on /partner/extended-profile/ (FormData).
@@ -43,9 +54,8 @@ const unwrap = (json: any) => json?.data ?? json;
 const toMb = (bytes: number) => (bytes / 1024 / 1024).toFixed(1);
 
 const validateFile = (file: File, kind: 'image' | 'video'): boolean => {
-    const [types, max, formats] = kind === 'image'
-        ? [IMAGE_TYPES, MAX_IMAGE_BYTES, 'JPG or PNG']
-        : [VIDEO_TYPES, MAX_VIDEO_BYTES, 'MP4 or MOV'];
+    const [types, max, formats] =
+        kind === 'image' ? [IMAGE_TYPES, MAX_IMAGE_BYTES, 'JPG or PNG'] : [VIDEO_TYPES, MAX_VIDEO_BYTES, 'MP4 or MOV'];
     if (file.type && !types.includes(file.type)) {
         toast.warning(`${file.name}: unsupported format. Use ${formats}.`);
         return false;
@@ -82,7 +92,7 @@ export const useProfileForm = () => {
 
     // Object URLs for unsaved picks — revoked when replaced and on unmount.
     const previewUrls = useRef<Set<string>>(new Set());
-    useEffect(() => () => previewUrls.current.forEach(url => URL.revokeObjectURL(url)), []);
+    useEffect(() => () => previewUrls.current.forEach((url) => URL.revokeObjectURL(url)), []);
 
     useEffect(() => {
         let cancelled = false;
@@ -104,7 +114,9 @@ export const useProfileForm = () => {
                     instagramUrl: profile?.instagram_url || '',
                     facebookUrl: profile?.facebook_url || '',
                 };
-                setPartner(p);
+                // /partner/me/ doesn't reliably carry business_name — /partner/profile/
+                // is the canonical source, so identity matches the form field.
+                setPartner({ ...p, business_name: loaded.businessName || p?.business_name });
                 setFields(loaded);
                 setSaved(loaded);
                 setOperatingCities(Array.isArray(ext?.operating_cities) ? ext.operating_cities : []);
@@ -122,12 +134,16 @@ export const useProfileForm = () => {
                     }
                 }
             })
-            .finally(() => { if (!cancelled) setLoading(false); });
-        return () => { cancelled = true; };
+            .finally(() => {
+                if (!cancelled) setLoading(false);
+            });
+        return () => {
+            cancelled = true;
+        };
     }, []);
 
     const setField = useCallback((key: FieldKey, value: string) => {
-        setFields(prev => ({ ...prev, [key]: value }));
+        setFields((prev) => ({ ...prev, [key]: value }));
     }, []);
 
     const discardDetails = useCallback(() => setFields(saved), [saved]);
@@ -136,7 +152,7 @@ export const useProfileForm = () => {
         if (!validateFile(file, 'image')) return;
         const previewUrl = URL.createObjectURL(file);
         previewUrls.current.add(previewUrl);
-        setter(prev => {
+        setter((prev) => {
             if (prev.previewUrl) {
                 URL.revokeObjectURL(prev.previewUrl);
                 previewUrls.current.delete(prev.previewUrl);
@@ -147,7 +163,7 @@ export const useProfileForm = () => {
     const selectLogo = pickImage(setLogo);
     const selectCover = pickImage(setCover);
 
-    const changed = (keys: FieldKey[]) => keys.some(k => fields[k] !== saved[k]);
+    const changed = (keys: FieldKey[]) => keys.some((k) => fields[k] !== saved[k]);
     const businessChanged = changed(BUSINESS_KEYS);
     const extendedChanged = changed(EXTENDED_KEYS) || !!logo.file || !!cover.file;
     const dirty = businessChanged || extendedChanged;
@@ -171,7 +187,7 @@ export const useProfileForm = () => {
                 if (fields.address) form.append('address', fields.address);
                 if (logo.file) form.append('logo', logo.file);
                 if (cover.file) form.append('cover_image', cover.file);
-                operatingCities.forEach(city => form.append('operating_cities', city));
+                operatingCities.forEach((city) => form.append('operating_cities', city));
                 jobs.push(updateExtendedProfile(form));
             }
 
@@ -183,19 +199,32 @@ export const useProfileForm = () => {
                     facebook_url: fields.facebookUrl.trim(),
                 };
                 if (fields.contactName !== saved.contactName) payload.contact_person_name = fields.contactName.trim();
-                jobs.push(updateBusinessProfile(payload).catch((err: any) => {
-                    // Core brand details lock after verification; other edits still save.
-                    if (String(err?.message || '').toLowerCase().includes('locked')) { businessLocked = true; return; }
-                    throw err;
-                }));
+                jobs.push(
+                    updateBusinessProfile(payload).catch((err: any) => {
+                        // Core brand details lock after verification; other edits still save.
+                        if (
+                            String(err?.message || '')
+                                .toLowerCase()
+                                .includes('locked')
+                        ) {
+                            businessLocked = true;
+                            return;
+                        }
+                        throw err;
+                    })
+                );
             }
 
             await Promise.all(jobs);
 
             const stored: BusinessFields = { ...fields };
-            if (businessLocked) BUSINESS_KEYS.forEach(k => { stored[k] = saved[k]; });
+            if (businessLocked)
+                BUSINESS_KEYS.forEach((k) => {
+                    stored[k] = saved[k];
+                });
             setFields(stored);
             setSaved(stored);
+            setPartner((prev: any) => ({ ...prev, business_name: stored.businessName }));
             const commit = (asset: ImageAsset): ImageAsset =>
                 asset.file ? { savedUrl: asset.previewUrl, file: null, previewUrl: asset.previewUrl } : asset;
             setLogo(commit);
@@ -203,7 +232,9 @@ export const useProfileForm = () => {
             notifyPartnerUpdated();
 
             if (businessLocked) {
-                toast.warning('Your business name and links are locked after verification — contact support to change them. Other changes were saved.');
+                toast.warning(
+                    'Your business name and links are locked after verification — contact support to change them. Other changes were saved.'
+                );
             } else {
                 toast.success('Profile saved.');
             }
@@ -218,13 +249,13 @@ export const useProfileForm = () => {
     };
 
     const addImages = async (files: FileList | File[]) => {
-        const valid = Array.from(files).filter(f => validateFile(f, 'image'));
+        const valid = Array.from(files).filter((f) => validateFile(f, 'image'));
         if (valid.length === 0) return;
         setUploadingMedia(true);
         try {
             for (const file of valid) {
                 const res = await uploadPartnerMedia(file, 'image');
-                setImages(prev => [...prev, unwrap(res)]);
+                setImages((prev) => [...prev, unwrap(res)]);
             }
         } catch (err: any) {
             console.error('Image upload failed', err);
@@ -250,7 +281,7 @@ export const useProfileForm = () => {
     const deleteMedia = async (id: number, kind: 'image' | 'video') => {
         try {
             await deletePartnerMedia(id);
-            if (kind === 'image') setImages(prev => prev.filter(m => m.id !== id));
+            if (kind === 'image') setImages((prev) => prev.filter((m) => m.id !== id));
             else setVideo(null);
         } catch {
             toast.error('Couldn’t delete that file. Please try again.');
@@ -268,10 +299,25 @@ export const useProfileForm = () => {
     });
 
     return {
-        loading, saving, dirty, partner, fields, completion,
-        logoUrl, coverUrl, images, video, uploadingMedia,
-        setField, discardDetails, selectLogo, selectCover, save,
-        addImages, addVideo, deleteMedia,
+        loading,
+        saving,
+        dirty,
+        partner,
+        fields,
+        completion,
+        logoUrl,
+        coverUrl,
+        images,
+        video,
+        uploadingMedia,
+        setField,
+        discardDetails,
+        selectLogo,
+        selectCover,
+        save,
+        addImages,
+        addVideo,
+        deleteMedia,
     };
 };
 

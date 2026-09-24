@@ -31,11 +31,18 @@ export const mockDraft = {
     capacity: 50,
     available_seats: 50,
     tickets: [
-        { id: 1, name: 'Free Entry', price: 0, total_quantity: 50, available_quantity: 50, description: '', is_default: true, created_at: '2026-05-07T10:00:00Z' },
+        {
+            id: 1,
+            name: 'Free Entry',
+            price: 0,
+            total_quantity: 50,
+            available_quantity: 50,
+            description: '',
+            is_default: true,
+            created_at: '2026-05-07T10:00:00Z',
+        },
     ],
-    media: [
-        { id: 55, media_type: 'cover', file_url: 'https://example.com/cover.jpg', created_at: '2026-05-07T10:00:00Z' },
-    ],
+    media: [{ id: 55, media_type: 'cover', file_url: 'https://example.com/cover.jpg', created_at: '2026-05-07T10:00:00Z' }],
 };
 
 export const mockCategories = [
@@ -231,8 +238,26 @@ export const mockVenueDraft = {
 // ─── Reviews fixtures ─────────────────────────────────────────────────────────
 
 export const mockReviewsList = [
-    { id: 'rev-1', listing_id: 'l1', listing_title: 'Pottery Term — 6 weeks', listing_type: 'class', rating: 5, comment: 'Unhurried and warm.', reviewer_name: 'Meera K.', created_at: '2026-08-01T10:00:00Z' },
-    { id: 'rev-2', listing_id: 'l2', listing_title: 'Daylight Studio — Photoshoot hire', listing_type: 'venue', rating: 3, comment: 'Studio was nice but ran late opening.', reviewer_name: 'Arun V.', created_at: '2026-08-10T10:00:00Z' },
+    {
+        id: 'rev-1',
+        listing_id: 'l1',
+        listing_title: 'Pottery Term — 6 weeks',
+        listing_type: 'class',
+        rating: 5,
+        comment: 'Unhurried and warm.',
+        reviewer_name: 'Meera K.',
+        created_at: '2026-08-01T10:00:00Z',
+    },
+    {
+        id: 'rev-2',
+        listing_id: 'l2',
+        listing_title: 'Daylight Studio — Photoshoot hire',
+        listing_type: 'venue',
+        rating: 3,
+        comment: 'Studio was nice but ran late opening.',
+        reviewer_name: 'Arun V.',
+        created_at: '2026-08-10T10:00:00Z',
+    },
 ];
 
 // ─── Bank details fixture (Revenue & payouts screen) ───────────────────────────
@@ -415,25 +440,43 @@ export const mockStatsOverviewAllEvent = {
     conversion_rate: 0.0,
     repeat_customers_pct: 12.0,
     revenue_by_type: null,
-    revenue_by_listing: [
-        { listing_id: 'e1', listing_title: 'Summer Fest', amount: '30000.00', count: 14 },
-    ],
+    revenue_by_listing: [{ listing_id: 'e1', listing_title: 'Summer Fest', amount: '30000.00', count: 14 }],
     demand_funnel: { listing_views: 1200, enquiries: 0, confirmed_bookings: 22 },
     weekly_trend: [],
 };
 
 export const mockListingPerformance = {
-    count: 2, page: 1, page_size: 10, next: null, previous: null,
+    count: 2,
+    page: 1,
+    page_size: 10,
+    next: null,
+    previous: null,
     results: [
         {
-            listing_id: 'l1', listing_title: 'Indigo Dyeing Evening', listing_type: 'event',
-            thumbnail_url: 'https://example.com/indigo.jpg', price: '1100', average_rating: '4.9',
-            views: 1243, enquiries: 39, booked: 42, conversion_rate: 3.1, revenue: '47300.00',
+            listing_id: 'l1',
+            listing_title: 'Indigo Dyeing Evening',
+            listing_type: 'event',
+            thumbnail_url: 'https://example.com/indigo.jpg',
+            price: '1100',
+            average_rating: '4.9',
+            views: 1243,
+            enquiries: 39,
+            booked: 42,
+            conversion_rate: 3.1,
+            revenue: '47300.00',
         },
         {
-            listing_id: 'l2', listing_title: 'Beginners Pottery', listing_type: 'class',
-            thumbnail_url: null, price: null, average_rating: null,
-            views: 300, enquiries: 0, booked: 0, conversion_rate: 0, revenue: '0.00',
+            listing_id: 'l2',
+            listing_title: 'Beginners Pottery',
+            listing_type: 'class',
+            thumbnail_url: null,
+            price: null,
+            average_rating: null,
+            views: 300,
+            enquiries: 0,
+            booked: 0,
+            conversion_rate: 0,
+            revenue: '0.00',
         },
     ],
 };
@@ -443,7 +486,10 @@ export const mockStatsReviews = {
     total_reviews: 46,
     reviews_this_month: 5,
     reviews_prev_month: 3,
-    rating_distribution: [{ rating: 5, count: 30 }, { rating: 4, count: 10 }],
+    rating_distribution: [
+        { rating: 5, count: 30 },
+        { rating: 4, count: 10 },
+    ],
     avg_rating_trend: [{ month: 'Jul 2026', avg_rating: 4.6, count: 5 }],
     recent_reviews: [],
 };
@@ -464,7 +510,11 @@ export const mockStatsTraffic = {
 };
 
 export const mockTrafficDetailByDay = {
-    count: 3, page: 1, page_size: 20, next: null, previous: null,
+    count: 3,
+    page: 1,
+    page_size: 20,
+    next: null,
+    previous: null,
     results: [
         { date: '2026-09-01', views: 12, unique_viewers: 10, enquiries: 2 },
         { date: '2026-09-02', views: 18, unique_viewers: 15, enquiries: 3 },
@@ -473,7 +523,11 @@ export const mockTrafficDetailByDay = {
 };
 
 export const mockTrafficDetailByListing = {
-    count: 2, page: 1, page_size: 20, next: null, previous: null,
+    count: 2,
+    page: 1,
+    page_size: 20,
+    next: null,
+    previous: null,
     results: [
         { listing_id: 'l1', listing_name: 'Beginners Pottery', views: 210, unique_viewers: 140, enquiries: 19, conversion_rate: 9.05 },
         { listing_id: 'l2', listing_name: 'Studio Rental — Hourly', views: 130, unique_viewers: 70, enquiries: 9, conversion_rate: 6.92 },
@@ -499,340 +553,444 @@ export const mockFollowersList = [
 
 export const handlers = [
     // Auth endpoints
-    http.post(`${BASE}/api/v1/auth/request-otp/`, () =>
-        HttpResponse.json({ success: true, message: 'OTP sent' })),
+    http.post(`${BASE}/api/v1/auth/request-otp/`, () => HttpResponse.json({ success: true, message: 'OTP sent' })),
 
     http.post(`${BASE}/api/v1/auth/verify-otp/`, () =>
-        HttpResponse.json({ success: true, data: { access_token: 'test-access-token', refresh_token: 'test-refresh-token' } })),
+        HttpResponse.json({ success: true, data: { access_token: 'test-access-token', refresh_token: 'test-refresh-token' } })
+    ),
 
-    http.get(`${BASE}/api/v1/auth/me/`, () =>
-        HttpResponse.json({ success: true, data: { id: 1, email: 'test@example.com' } })),
+    http.get(`${BASE}/api/v1/auth/me/`, () => HttpResponse.json({ success: true, data: { id: 1, email: 'test@example.com' } })),
 
-    http.post(`${BASE}/api/v1/auth/logout/`, () =>
-        HttpResponse.json({ success: true })),
+    http.post(`${BASE}/api/v1/auth/logout/`, () => HttpResponse.json({ success: true })),
 
     // Partner endpoints
     http.get(`${BASE}/api/v1/partners/me/`, () =>
-        HttpResponse.json({ success: true, data: { id: 1, status: 'activated_limited', is_active: true, is_verified: false, business_name: 'Test Studio', bank_account: null } })),
+        HttpResponse.json({
+            success: true,
+            data: {
+                id: 1,
+                status: 'activated_limited',
+                is_active: true,
+                is_verified: false,
+                business_name: 'Test Studio',
+                bank_account: null,
+            },
+        })
+    ),
 
     // The api client actually hits the singular form (/partner/me/) — keep both so tests
     // that exercise getCurrentPartner via either codepath stay green.
     http.get(`${BASE}/api/v1/partner/me/`, () =>
-        HttpResponse.json({ success: true, data: { id: 1, status: 'activated_limited', is_active: true, is_verified: false, business_name: 'Test Studio', bank_account: null } })),
+        HttpResponse.json({
+            success: true,
+            data: {
+                id: 1,
+                status: 'activated_limited',
+                is_active: true,
+                is_verified: false,
+                business_name: 'Test Studio',
+                bank_account: null,
+            },
+        })
+    ),
 
-    http.post(`${BASE}/api/v1/partner/verification/`, () =>
-        HttpResponse.json({ success: true, data: { status: 'under_review' } })),
+    http.get(`${BASE}/api/v1/partner/profile/`, () => HttpResponse.json({ success: true, data: { business_name: 'Test Studio' } })),
+
+    http.post(`${BASE}/api/v1/partner/verification/`, () => HttpResponse.json({ success: true, data: { status: 'under_review' } })),
 
     // Event metadata
-    http.get(`${BASE}/api/v1/listings/events/metadata/categories/`, () =>
-        HttpResponse.json({ success: true, data: mockCategories })),
+    http.get(`${BASE}/api/v1/listings/events/metadata/categories/`, () => HttpResponse.json({ success: true, data: mockCategories })),
 
-    http.get(`${BASE}/api/v1/listings/events/metadata/formats/`, () =>
-        HttpResponse.json({ success: true, data: mockFormats })),
+    http.get(`${BASE}/api/v1/listings/events/metadata/formats/`, () => HttpResponse.json({ success: true, data: mockFormats })),
 
-    http.get(`${BASE}/api/v1/listings/events/metadata/age-groups/`, () =>
-        HttpResponse.json({ success: true, data: mockAgeGroups })),
+    http.get(`${BASE}/api/v1/listings/events/metadata/age-groups/`, () => HttpResponse.json({ success: true, data: mockAgeGroups })),
 
     // Venue metadata
-    http.get(`${BASE}/api/v1/listings/venues/metadata/categories/`, () =>
-        HttpResponse.json({ success: true, data: [] })),
+    http.get(`${BASE}/api/v1/listings/venues/metadata/categories/`, () => HttpResponse.json({ success: true, data: [] })),
 
-    http.get(`${BASE}/api/v1/listings/venues/metadata/discovery-enums/`, () =>
-        HttpResponse.json({ success: true, data: {} })),
+    http.get(`${BASE}/api/v1/listings/venues/metadata/discovery-enums/`, () => HttpResponse.json({ success: true, data: {} })),
 
-    http.get(`${BASE}/api/v1/listings/venues/metadata/occasions/`, () =>
-        HttpResponse.json({ success: true, data: [] })),
+    http.get(`${BASE}/api/v1/listings/venues/metadata/occasions/`, () => HttpResponse.json({ success: true, data: [] })),
 
     // Event listings
-    http.get(`${BASE}/api/v1/partner/listings/events/`, () =>
-        HttpResponse.json({ success: true, data: [mockListing] })),
+    http.get(`${BASE}/api/v1/partner/listings/events/`, () => HttpResponse.json({ success: true, data: [mockListing] })),
 
-    http.get(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, () =>
-        HttpResponse.json({ success: true, data: mockDraft })),
+    http.get(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, () => HttpResponse.json({ success: true, data: mockDraft })),
 
-    http.post(`${BASE}/api/v1/partner/listings/events/`, () =>
-        HttpResponse.json({ success: true, data: mockDraft }, { status: 201 })),
+    http.post(`${BASE}/api/v1/partner/listings/events/`, () => HttpResponse.json({ success: true, data: mockDraft }, { status: 201 })),
 
-    http.patch(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, () =>
-        HttpResponse.json({ success: true, data: mockDraft })),
+    http.patch(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, () => HttpResponse.json({ success: true, data: mockDraft })),
 
     http.post(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/submit/`, () =>
-        HttpResponse.json({ success: true, data: { ...mockDraft, status: 'pending' } })),
+        HttpResponse.json({ success: true, data: { ...mockDraft, status: 'pending' } })
+    ),
 
     // Event media
     http.get(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/media/`, () =>
-        HttpResponse.json({ success: true, data: mockDraft.media })),
+        HttpResponse.json({ success: true, data: mockDraft.media })
+    ),
 
     http.post(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/media/`, () =>
-        HttpResponse.json({ success: true, data: { id: 99, media_type: 'cover', file_url: 'https://example.com/new.jpg', created_at: '2026-05-07T12:00:00Z' } }, { status: 201 })),
+        HttpResponse.json(
+            {
+                success: true,
+                data: { id: 99, media_type: 'cover', file_url: 'https://example.com/new.jpg', created_at: '2026-05-07T12:00:00Z' },
+            },
+            { status: 201 }
+        )
+    ),
 
-    http.delete(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/media/:mediaId`, () =>
-        new HttpResponse(null, { status: 204 })),
+    http.delete(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/media/:mediaId`, () => new HttpResponse(null, { status: 204 })),
 
     // Event tickets
     http.get(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/tickets/`, () =>
-        HttpResponse.json({ success: true, data: mockDraft.tickets })),
+        HttpResponse.json({ success: true, data: mockDraft.tickets })
+    ),
 
     http.post(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/tickets/`, () =>
-        HttpResponse.json({ success: true, data: { id: 10, name: 'General', price: 499, total_quantity: 50, available_quantity: 50, description: '', is_default: false, created_at: '2026-05-07T12:00:00Z' } }, { status: 201 })),
+        HttpResponse.json(
+            {
+                success: true,
+                data: {
+                    id: 10,
+                    name: 'General',
+                    price: 499,
+                    total_quantity: 50,
+                    available_quantity: 50,
+                    description: '',
+                    is_default: false,
+                    created_at: '2026-05-07T12:00:00Z',
+                },
+            },
+            { status: 201 }
+        )
+    ),
 
-    http.put(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/tickets/:ticketId`, () =>
-        HttpResponse.json({ success: true, data: {} })),
+    http.put(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/tickets/:ticketId`, () => HttpResponse.json({ success: true, data: {} })),
 
-    http.delete(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/tickets/:ticketId`, () =>
-        new HttpResponse(null, { status: 204 })),
+    http.delete(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/tickets/:ticketId`, () => new HttpResponse(null, { status: 204 })),
 
     // Venue listings
-    http.get(`${BASE}/api/v1/partner/listings/venues/`, () =>
-        HttpResponse.json({ success: true, data: [] })),
+    http.get(`${BASE}/api/v1/partner/listings/venues/`, () => HttpResponse.json({ success: true, data: [] })),
 
     // ─── Class metadata ───────────────────────────────────────────────────────
 
-    http.get(`${BASE}/api/v1/listings/classes/metadata/categories/`, () =>
-        HttpResponse.json({ success: true, data: mockCategories })),
+    http.get(`${BASE}/api/v1/listings/classes/metadata/categories/`, () => HttpResponse.json({ success: true, data: mockCategories })),
 
     http.get(`${BASE}/api/v1/listings/classes/metadata/formats/`, () =>
-        HttpResponse.json({ success: true, data: { modes: [
-            { value: 'online', label: 'Online' },
-            { value: 'offline', label: 'Offline' },
-            { value: 'hybrid', label: 'Hybrid' },
-        ]}})),
+        HttpResponse.json({
+            success: true,
+            data: {
+                modes: [
+                    { value: 'online', label: 'Online' },
+                    { value: 'offline', label: 'Offline' },
+                    { value: 'hybrid', label: 'Hybrid' },
+                ],
+            },
+        })
+    ),
 
     // ─── Class fixtures ───────────────────────────────────────────────────────
 
-    http.get(`${BASE}/api/v1/partner/listings/classes/`, () =>
-        HttpResponse.json({ success: true, data: [mockClassListing] })),
+    http.get(`${BASE}/api/v1/partner/listings/classes/`, () => HttpResponse.json({ success: true, data: [mockClassListing] })),
 
     http.get(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/`, () =>
-        HttpResponse.json({ success: true, data: mockClassDraft })),
+        HttpResponse.json({ success: true, data: mockClassDraft })
+    ),
 
     http.post(`${BASE}/api/v1/partner/listings/classes/`, () =>
-        HttpResponse.json({ success: true, data: mockClassDraft }, { status: 201 })),
+        HttpResponse.json({ success: true, data: mockClassDraft }, { status: 201 })
+    ),
 
     http.patch(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/`, () =>
-        HttpResponse.json({ success: true, data: mockClassDraft })),
+        HttpResponse.json({ success: true, data: mockClassDraft })
+    ),
 
     http.post(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/submit/`, () =>
-        HttpResponse.json({ success: true, data: { ...mockClassDraft, status: 'pending' } })),
+        HttpResponse.json({ success: true, data: { ...mockClassDraft, status: 'pending' } })
+    ),
 
     http.post(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/live/`, () =>
-        HttpResponse.json({ success: true, data: { ...mockClassDraft, is_live: true } })),
+        HttpResponse.json({ success: true, data: { ...mockClassDraft, is_live: true } })
+    ),
 
     http.get(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/batches/`, () =>
-        HttpResponse.json({ success: true, data: mockClassBatches })),
+        HttpResponse.json({ success: true, data: mockClassBatches })
+    ),
 
     http.post(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/batches/`, () =>
-        HttpResponse.json({ success: true, data: mockClassBatches[0] }, { status: 201 })),
+        HttpResponse.json({ success: true, data: mockClassBatches[0] }, { status: 201 })
+    ),
 
     http.put(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/batches/:batchId`, () =>
-        HttpResponse.json({ success: true, data: mockClassBatches[0] })),
+        HttpResponse.json({ success: true, data: mockClassBatches[0] })
+    ),
 
-    http.delete(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/batches/:batchId`, () =>
-        new HttpResponse(null, { status: 204 })),
+    http.delete(
+        `${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/batches/:batchId`,
+        () => new HttpResponse(null, { status: 204 })
+    ),
 
-    http.get(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/media/`, () =>
-        HttpResponse.json({ success: true, data: [] })),
+    http.get(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/media/`, () => HttpResponse.json({ success: true, data: [] })),
 
     http.post(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/media/`, () =>
-        HttpResponse.json({ success: true, data: { id: 10, media_type: 'cover', file_url: 'https://example.com/class-cover.jpg', created_at: '' } }, { status: 201 })),
+        HttpResponse.json(
+            { success: true, data: { id: 10, media_type: 'cover', file_url: 'https://example.com/class-cover.jpg', created_at: '' } },
+            { status: 201 }
+        )
+    ),
 
-    http.delete(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/media/:mediaId`, () =>
-        new HttpResponse(null, { status: 204 })),
+    http.delete(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/media/:mediaId`, () => new HttpResponse(null, { status: 204 })),
 
-    http.get(`${BASE}/api/v1/partner/listings/classes/enquiries/`, () =>
-        HttpResponse.json({ success: true, data: [mockClassEnquiry] })),
+    http.get(`${BASE}/api/v1/partner/listings/classes/enquiries/`, () => HttpResponse.json({ success: true, data: [mockClassEnquiry] })),
 
     http.get(`${BASE}/api/v1/partner/listings/classes/enquiries/:enquiryId`, () =>
-        HttpResponse.json({ success: true, data: mockClassEnquiry })),
+        HttpResponse.json({ success: true, data: mockClassEnquiry })
+    ),
 
     http.put(`${BASE}/api/v1/partner/listings/classes/enquiries/:enquiryId`, () =>
-        HttpResponse.json({ success: true, data: { ...mockClassEnquiry, status: 'contacted' } })),
+        HttpResponse.json({ success: true, data: { ...mockClassEnquiry, status: 'contacted' } })
+    ),
 
     http.post(`${BASE}/api/v1/partner/listings/classes/enquiries/:enquiryId/unlock/`, () =>
-        HttpResponse.json({ success: true, data: { ...mockClassEnquiry, is_locked: false } })),
+        HttpResponse.json({ success: true, data: { ...mockClassEnquiry, is_locked: false } })
+    ),
 
     // ─── Program metadata ─────────────────────────────────────────────────────
 
-    http.get(`${BASE}/api/v1/listings/programs/metadata/categories/`, () =>
-        HttpResponse.json({ success: true, data: mockCategories })),
+    http.get(`${BASE}/api/v1/listings/programs/metadata/categories/`, () => HttpResponse.json({ success: true, data: mockCategories })),
 
-    http.get(`${BASE}/api/v1/listings/programs/metadata/formats/`, () =>
-        HttpResponse.json({ success: true, data: mockFormats })),
+    http.get(`${BASE}/api/v1/listings/programs/metadata/formats/`, () => HttpResponse.json({ success: true, data: mockFormats })),
 
     http.get(`${BASE}/api/v1/listings/programs/metadata/tags/`, () =>
-        HttpResponse.json({ success: true, data: [{ id: 1, name: 'STEM' }, { id: 2, name: 'Arts' }] })),
+        HttpResponse.json({
+            success: true,
+            data: [
+                { id: 1, name: 'STEM' },
+                { id: 2, name: 'Arts' },
+            ],
+        })
+    ),
 
     // ─── Program fixtures ─────────────────────────────────────────────────────
 
-    http.get(`${BASE}/api/v1/partner/listings/programs/`, () =>
-        HttpResponse.json({ success: true, data: [mockProgramListing] })),
+    http.get(`${BASE}/api/v1/partner/listings/programs/`, () => HttpResponse.json({ success: true, data: [mockProgramListing] })),
 
     http.get(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/`, () =>
-        HttpResponse.json({ success: true, data: mockProgramDraft })),
+        HttpResponse.json({ success: true, data: mockProgramDraft })
+    ),
 
     http.post(`${BASE}/api/v1/partner/listings/programs/`, () =>
-        HttpResponse.json({ success: true, data: mockProgramDraft }, { status: 201 })),
+        HttpResponse.json({ success: true, data: mockProgramDraft }, { status: 201 })
+    ),
 
     http.patch(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/`, () =>
-        HttpResponse.json({ success: true, data: mockProgramDraft })),
+        HttpResponse.json({ success: true, data: mockProgramDraft })
+    ),
 
-    http.delete(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/`, () =>
-        new HttpResponse(null, { status: 204 })),
+    http.delete(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/`, () => new HttpResponse(null, { status: 204 })),
 
     http.post(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/submit/`, () =>
-        HttpResponse.json({ success: true, data: { ...mockProgramDraft, status: 'pending' } })),
+        HttpResponse.json({ success: true, data: { ...mockProgramDraft, status: 'pending' } })
+    ),
 
     http.post(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/archive/`, () =>
-        HttpResponse.json({ success: true, data: { ...mockProgramDraft, status: 'archived' } })),
+        HttpResponse.json({ success: true, data: { ...mockProgramDraft, status: 'archived' } })
+    ),
 
     http.post(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/unarchive/`, () =>
-        HttpResponse.json({ success: true, data: { ...mockProgramDraft, status: 'draft' } })),
+        HttpResponse.json({ success: true, data: { ...mockProgramDraft, status: 'draft' } })
+    ),
 
     http.get(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/batches/`, () =>
-        HttpResponse.json({ success: true, data: mockProgramBatches })),
+        HttpResponse.json({ success: true, data: mockProgramBatches })
+    ),
 
     http.post(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/batches/`, () =>
-        HttpResponse.json({ success: true, data: mockProgramBatches[0] }, { status: 201 })),
+        HttpResponse.json({ success: true, data: mockProgramBatches[0] }, { status: 201 })
+    ),
 
     http.put(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/batches/:batchId`, () =>
-        HttpResponse.json({ success: true, data: mockProgramBatches[0] })),
+        HttpResponse.json({ success: true, data: mockProgramBatches[0] })
+    ),
 
-    http.delete(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/batches/:batchId`, () =>
-        new HttpResponse(null, { status: 204 })),
+    http.delete(
+        `${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/batches/:batchId`,
+        () => new HttpResponse(null, { status: 204 })
+    ),
 
     http.get(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/enquiries/`, () =>
-        HttpResponse.json({ success: true, data: [mockProgramEnquiry] })),
+        HttpResponse.json({ success: true, data: [mockProgramEnquiry] })
+    ),
 
     http.patch(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/enquiries/:enquiryId`, () =>
-        HttpResponse.json({ success: true, data: { ...mockProgramEnquiry, status: 'contacted' } })),
+        HttpResponse.json({ success: true, data: { ...mockProgramEnquiry, status: 'contacted' } })
+    ),
 
     http.get(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/faqs/`, () =>
-        HttpResponse.json({ success: true, data: mockProgramFaqs })),
+        HttpResponse.json({ success: true, data: mockProgramFaqs })
+    ),
 
     http.post(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/faqs/`, () =>
-        HttpResponse.json({ success: true, data: mockProgramFaqs[0] }, { status: 201 })),
+        HttpResponse.json({ success: true, data: mockProgramFaqs[0] }, { status: 201 })
+    ),
 
     http.put(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/faqs/:faqId`, () =>
-        HttpResponse.json({ success: true, data: mockProgramFaqs[0] })),
+        HttpResponse.json({ success: true, data: mockProgramFaqs[0] })
+    ),
 
-    http.delete(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/faqs/:faqId`, () =>
-        new HttpResponse(null, { status: 204 })),
+    http.delete(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/faqs/:faqId`, () => new HttpResponse(null, { status: 204 })),
 
-    http.get(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/media/`, () =>
-        HttpResponse.json({ success: true, data: [] })),
+    http.get(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/media/`, () => HttpResponse.json({ success: true, data: [] })),
 
     http.post(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/media/`, () =>
-        HttpResponse.json({ success: true, data: { id: 20, media_type: 'cover', file_url: 'https://example.com/program-cover.jpg', created_at: '' } }, { status: 201 })),
+        HttpResponse.json(
+            { success: true, data: { id: 20, media_type: 'cover', file_url: 'https://example.com/program-cover.jpg', created_at: '' } },
+            { status: 201 }
+        )
+    ),
 
-    http.delete(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/media/:mediaId`, () =>
-        new HttpResponse(null, { status: 204 })),
+    http.delete(
+        `${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/media/:mediaId`,
+        () => new HttpResponse(null, { status: 204 })
+    ),
 
     // ─── Venue fixtures ───────────────────────────────────────────────────────
 
-    http.get(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/`, () =>
-        HttpResponse.json({ success: true, data: mockVenueDraft })),
+    http.get(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/`, () => HttpResponse.json({ success: true, data: mockVenueDraft })),
 
-    http.post(`${BASE}/api/v1/partner/listings/venues/`, () =>
-        HttpResponse.json({ success: true, data: mockVenueDraft }, { status: 201 })),
+    http.post(`${BASE}/api/v1/partner/listings/venues/`, () => HttpResponse.json({ success: true, data: mockVenueDraft }, { status: 201 })),
 
     http.patch(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/`, () =>
-        HttpResponse.json({ success: true, data: mockVenueDraft })),
+        HttpResponse.json({ success: true, data: mockVenueDraft })
+    ),
 
-    http.delete(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/`, () =>
-        new HttpResponse(null, { status: 204 })),
+    http.delete(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/`, () => new HttpResponse(null, { status: 204 })),
 
     http.post(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/submit/`, () =>
-        HttpResponse.json({ success: true, data: { ...mockVenueDraft, status: 'pending' } })),
+        HttpResponse.json({ success: true, data: { ...mockVenueDraft, status: 'pending' } })
+    ),
 
-    http.get(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/media/`, () =>
-        HttpResponse.json({ success: true, data: [] })),
+    http.get(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/media/`, () => HttpResponse.json({ success: true, data: [] })),
 
     http.post(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/media/`, () =>
-        HttpResponse.json({ success: true, data: { id: 30, media_type: 'cover', file_url: 'https://example.com/venue-cover.jpg', created_at: '' } }, { status: 201 })),
+        HttpResponse.json(
+            { success: true, data: { id: 30, media_type: 'cover', file_url: 'https://example.com/venue-cover.jpg', created_at: '' } },
+            { status: 201 }
+        )
+    ),
 
-    http.delete(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/media/:mediaId`, () =>
-        new HttpResponse(null, { status: 204 })),
+    http.delete(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/media/:mediaId`, () => new HttpResponse(null, { status: 204 })),
 
     http.get(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/packages/`, () =>
-        HttpResponse.json({ success: true, data: mockVenuePackages })),
+        HttpResponse.json({ success: true, data: mockVenuePackages })
+    ),
 
     http.post(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/packages/`, () =>
-        HttpResponse.json({ success: true, data: mockVenuePackages[0] }, { status: 201 })),
+        HttpResponse.json({ success: true, data: mockVenuePackages[0] }, { status: 201 })
+    ),
 
     http.put(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/packages/:pkgId`, () =>
-        HttpResponse.json({ success: true, data: mockVenuePackages[0] })),
+        HttpResponse.json({ success: true, data: mockVenuePackages[0] })
+    ),
 
-    http.delete(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/packages/:pkgId`, () =>
-        new HttpResponse(null, { status: 204 })),
+    http.delete(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/packages/:pkgId`, () => new HttpResponse(null, { status: 204 })),
 
     http.get(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/availability/`, () =>
-        HttpResponse.json({ success: true, data: mockVenueSlots })),
+        HttpResponse.json({ success: true, data: mockVenueSlots })
+    ),
 
     http.post(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/availability/`, () =>
-        HttpResponse.json({ success: true, data: mockVenueSlots[0] }, { status: 201 })),
+        HttpResponse.json({ success: true, data: mockVenueSlots[0] }, { status: 201 })
+    ),
 
     http.put(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/availability/:slotId`, () =>
-        HttpResponse.json({ success: true, data: mockVenueSlots[0] })),
+        HttpResponse.json({ success: true, data: mockVenueSlots[0] })
+    ),
 
-    http.delete(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/availability/:slotId`, () =>
-        new HttpResponse(null, { status: 204 })),
+    http.delete(
+        `${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/availability/:slotId`,
+        () => new HttpResponse(null, { status: 204 })
+    ),
 
     http.get(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/attendee-fields/`, () =>
-        HttpResponse.json({ success: true, data: { fields: ['child_name', 'contact_number'] } })),
+        HttpResponse.json({ success: true, data: { fields: ['child_name', 'contact_number'] } })
+    ),
 
     http.put(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/attendee-fields/`, () =>
-        HttpResponse.json({ success: true, data: { fields: ['child_name', 'contact_number', 'email'] } })),
+        HttpResponse.json({ success: true, data: { fields: ['child_name', 'contact_number', 'email'] } })
+    ),
 
     http.get(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/discovery/`, () =>
-        HttpResponse.json({ success: true, data: { outing_types: [], activity_types: [], format_types: [] } })),
+        HttpResponse.json({ success: true, data: { outing_types: [], activity_types: [], format_types: [] } })
+    ),
 
     http.put(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/discovery/`, () =>
-        HttpResponse.json({ success: true, data: { outing_types: ['outdoor'], activity_types: ['sports'], format_types: ['group'] } })),
+        HttpResponse.json({ success: true, data: { outing_types: ['outdoor'], activity_types: ['sports'], format_types: ['group'] } })
+    ),
 
     // ─── Partner statistics ───
-    http.get(`${BASE}/api/v1/partner/stats/overview/`, () =>
-        HttpResponse.json({ success: true, data: mockStatsOverview })),
-    http.get(`${BASE}/api/v1/partner/stats/events/`, () =>
-        HttpResponse.json({ success: true, data: mockStatsEvents })),
-    http.get(`${BASE}/api/v1/partner/stats/venues/`, () =>
-        HttpResponse.json({ success: true, data: mockStatsVenues })),
-    http.get(`${BASE}/api/v1/partner/stats/enquiries/`, () =>
-        HttpResponse.json({ success: true, data: mockStatsEnquiries })),
-    http.get(`${BASE}/api/v1/partner/stats/revenue/`, () =>
-        HttpResponse.json({ success: true, data: mockStatsRevenue })),
+    http.get(`${BASE}/api/v1/partner/stats/overview/`, () => HttpResponse.json({ success: true, data: mockStatsOverview })),
+    http.get(`${BASE}/api/v1/partner/stats/events/`, () => HttpResponse.json({ success: true, data: mockStatsEvents })),
+    http.get(`${BASE}/api/v1/partner/stats/venues/`, () => HttpResponse.json({ success: true, data: mockStatsVenues })),
+    http.get(`${BASE}/api/v1/partner/stats/enquiries/`, () => HttpResponse.json({ success: true, data: mockStatsEnquiries })),
+    http.get(`${BASE}/api/v1/partner/stats/revenue/`, () => HttpResponse.json({ success: true, data: mockStatsRevenue })),
     http.get(`${BASE}/api/v1/partner/stats/overview-all/`, ({ request }) => {
         const listingType = new URL(request.url).searchParams.get('listing_type');
         if (listingType === 'venue') return HttpResponse.json({ success: true, data: mockStatsOverviewAllVenue });
         if (listingType === 'event') return HttpResponse.json({ success: true, data: mockStatsOverviewAllEvent });
         return HttpResponse.json({ success: true, data: mockStatsOverviewAll });
     }),
-    http.get(`${BASE}/api/v1/partner/stats/listing-performance/`, () =>
-        HttpResponse.json({ success: true, data: mockListingPerformance })),
+    http.get(`${BASE}/api/v1/partner/stats/listing-performance/`, () => HttpResponse.json({ success: true, data: mockListingPerformance })),
 
     // ─── CSV report downloads — raw text/csv, not the {success,data} envelope ───
-    http.get(`${BASE}/api/v1/partner/reports/earnings-statement/`, () =>
-        new HttpResponse('period_start,period_end,gross_amount,commission_percent,commission_amount,net_payable,status,paid_at\n2026-08-01,2026-08-31,50000.00,15,7500.00,42500.00,paid,2026-09-05', {
-            headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="earnings-statement_20260917.csv"' },
-        })),
-    http.get(`${BASE}/api/v1/partner/reports/booking-register/`, () =>
-        new HttpResponse('booking_reference,created_at,customer_name,customer_email,listing_title,booking_type,status,total_amount\nBKG-1,2026-08-10,Asha Rao,asha@example.com,Indigo Dyeing Evening,event,confirmed,1100.00', {
-            headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="booking-register_20260917.csv"' },
-        })),
-    http.get(`${BASE}/api/v1/partner/reports/enquiry-response-log/`, () =>
-        new HttpResponse('service_type,listing_title,attendee_name,status,created_at,responded_at,response_hours,within_sla\nclass,Beginners Pottery,Neha Rao,closed,2026-08-10,2026-08-11,20,true', {
-            headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="enquiry-response-log_20260917.csv"' },
-        })),
-    http.get(`${BASE}/api/v1/partner/reports/reviews-export/`, () =>
-        new HttpResponse('listing_title,rating,comment,created_at\nIndigo Dyeing Evening,5,Loved it,2026-08-12', {
-            headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="reviews-export_20260917.csv"' },
-        })),
+    http.get(
+        `${BASE}/api/v1/partner/reports/earnings-statement/`,
+        () =>
+            new HttpResponse(
+                'period_start,period_end,gross_amount,commission_percent,commission_amount,net_payable,status,paid_at\n2026-08-01,2026-08-31,50000.00,15,7500.00,42500.00,paid,2026-09-05',
+                {
+                    headers: {
+                        'Content-Type': 'text/csv',
+                        'Content-Disposition': 'attachment; filename="earnings-statement_20260917.csv"',
+                    },
+                }
+            )
+    ),
+    http.get(
+        `${BASE}/api/v1/partner/reports/booking-register/`,
+        () =>
+            new HttpResponse(
+                'booking_reference,created_at,customer_name,customer_email,listing_title,booking_type,status,total_amount\nBKG-1,2026-08-10,Asha Rao,asha@example.com,Indigo Dyeing Evening,event,confirmed,1100.00',
+                {
+                    headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="booking-register_20260917.csv"' },
+                }
+            )
+    ),
+    http.get(
+        `${BASE}/api/v1/partner/reports/enquiry-response-log/`,
+        () =>
+            new HttpResponse(
+                'service_type,listing_title,attendee_name,status,created_at,responded_at,response_hours,within_sla\nclass,Beginners Pottery,Neha Rao,closed,2026-08-10,2026-08-11,20,true',
+                {
+                    headers: {
+                        'Content-Type': 'text/csv',
+                        'Content-Disposition': 'attachment; filename="enquiry-response-log_20260917.csv"',
+                    },
+                }
+            )
+    ),
+    http.get(
+        `${BASE}/api/v1/partner/reports/reviews-export/`,
+        () =>
+            new HttpResponse('listing_title,rating,comment,created_at\nIndigo Dyeing Evening,5,Loved it,2026-08-12', {
+                headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="reviews-export_20260917.csv"' },
+            })
+    ),
 
-    http.get(`${BASE}/api/v1/partner/stats/reviews/`, () =>
-        HttpResponse.json({ success: true, data: mockStatsReviews })),
-    http.post(`${BASE}/api/v1/partner/:id/track-view/`, () =>
-        HttpResponse.json({ success: true, data: { message: 'tracked' } })),
-    http.get(`${BASE}/api/v1/partner/stats/traffic/`, () =>
-        HttpResponse.json({ success: true, data: mockStatsTraffic })),
+    http.get(`${BASE}/api/v1/partner/stats/reviews/`, () => HttpResponse.json({ success: true, data: mockStatsReviews })),
+    http.post(`${BASE}/api/v1/partner/:id/track-view/`, () => HttpResponse.json({ success: true, data: { message: 'tracked' } })),
+    http.get(`${BASE}/api/v1/partner/stats/traffic/`, () => HttpResponse.json({ success: true, data: mockStatsTraffic })),
     http.get(`${BASE}/api/v1/partner/stats/traffic/detail/`, ({ request }) => {
         const groupBy = new URL(request.url).searchParams.get('group_by');
         return HttpResponse.json({ success: true, data: groupBy === 'listing' ? mockTrafficDetailByListing : mockTrafficDetailByDay });
@@ -840,49 +998,44 @@ export const handlers = [
 
     // ─── Followers ───
     http.get(`${BASE}/api/v1/partner/:id/followers/count/`, () =>
-        HttpResponse.json({ success: true, data: { partner_id: 1, follower_count: 87 } })),
-    http.get(`${BASE}/api/v1/partner/:id/followers/`, () =>
-        HttpResponse.json({ success: true, data: mockFollowers })),
+        HttpResponse.json({ success: true, data: { partner_id: 1, follower_count: 87 } })
+    ),
+    http.get(`${BASE}/api/v1/partner/:id/followers/`, () => HttpResponse.json({ success: true, data: mockFollowers })),
     // Self-scoped list the Followers screen itself calls (src/api/followers.ts).
     http.get(`${BASE}/api/v1/partner/followers/`, ({ request }) => {
         const search = new URL(request.url).searchParams.get('search')?.toLowerCase() || '';
-        const results = search
-            ? mockFollowersList.filter(f => f.full_name.toLowerCase().includes(search))
-            : mockFollowersList;
+        const results = search ? mockFollowersList.filter((f) => f.full_name.toLowerCase().includes(search)) : mockFollowersList;
         return HttpResponse.json({ success: true, data: { count: 87, page: 1, page_size: 20, next: null, previous: null, results } });
     }),
 
     // ─── Coupons ───
-    http.get(`${BASE}/api/v1/partner/coupons/`, () =>
-        HttpResponse.json({ success: true, data: [] })),
+    http.get(`${BASE}/api/v1/partner/coupons/`, () => HttpResponse.json({ success: true, data: [] })),
     http.get(`${BASE}/api/v1/partner/coupons/:id/`, ({ params }) =>
-        HttpResponse.json({ success: true, data: { ...mockCoupon, id: params.id } })),
-    http.get(`${BASE}/api/v1/partner/coupons/:id/usages/`, () =>
-        HttpResponse.json({ success: true, data: [] })),
+        HttpResponse.json({ success: true, data: { ...mockCoupon, id: params.id } })
+    ),
+    http.get(`${BASE}/api/v1/partner/coupons/:id/usages/`, () => HttpResponse.json({ success: true, data: [] })),
     http.post(`${BASE}/api/v1/partner/coupons/`, async ({ request }) => {
-        const body = await request.json() as Record<string, unknown>;
+        const body = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ success: true, data: { ...mockCoupon, id: 'new-coupon-id', ...body } }, { status: 201 });
     }),
     http.patch(`${BASE}/api/v1/partner/coupons/:id/`, async ({ request, params }) => {
-        const body = await request.json() as Record<string, unknown>;
+        const body = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ success: true, data: { ...mockCoupon, id: params.id, ...body } });
     }),
 
     // ─── Reviews list (Reviews screen) ───
     http.get(`${BASE}/api/v1/partner/reviews/`, () =>
-        HttpResponse.json({ success: true, data: { count: mockReviewsList.length, next: null, previous: null, results: mockReviewsList } })),
+        HttpResponse.json({ success: true, data: { count: mockReviewsList.length, next: null, previous: null, results: mockReviewsList } })
+    ),
 
     // ─── Bank details (Revenue & payouts screen) ───
-    http.get(`${BASE}/api/v1/partner/bank-details/`, () =>
-        HttpResponse.json({ success: true, data: mockBankDetails })),
+    http.get(`${BASE}/api/v1/partner/bank-details/`, () => HttpResponse.json({ success: true, data: mockBankDetails })),
 
     // ─── Partner verticals (Services & categories self-service) ───
-    http.get(`${BASE}/api/v1/partner/verticals/`, () =>
-        HttpResponse.json({ success: true, data: mockVerticals })),
+    http.get(`${BASE}/api/v1/partner/verticals/`, () => HttpResponse.json({ success: true, data: mockVerticals })),
     http.post(`${BASE}/api/v1/partner/verticals/`, async ({ request }) => {
-        const body = await request.json() as { category: string };
+        const body = (await request.json()) as { category: string };
         return HttpResponse.json({ success: true, data: { id: 99, name: body.category } });
     }),
-    http.delete(`${BASE}/api/v1/partner/verticals/`, () =>
-        HttpResponse.json({ success: true, data: { message: 'removed' } })),
+    http.delete(`${BASE}/api/v1/partner/verticals/`, () => HttpResponse.json({ success: true, data: { message: 'removed' } })),
 ];

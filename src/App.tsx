@@ -179,6 +179,7 @@ const prefetchScreens = () => {
 
 import { Sidebar } from './components/Navigation';
 import { TopHeader } from './components/TopHeader';
+import { ApprovalGate } from './components/ApprovalGate';
 import { getAuthToken, getRefreshToken, clearTokens, refreshAccessToken } from './api/client';
 import { invalidatePortalSummary } from './api/portalSummary';
 import { getCurrentPartner } from './api/onboarding';
@@ -191,6 +192,12 @@ interface RouteConfig {
     hasSidebar: boolean;
     /** Optional: restrict this screen to partners with specific entity types */
     requiresEntities?: EntityType[];
+    /**
+     * Optional: the screen's backend requires an approved partner. The value is
+     * the feature name shown in the approval notice non-approved partners get
+     * instead of the screen (e.g. "Coupons").
+     */
+    requiresApproval?: string;
 }
 
 const routes: Record<Screen, RouteConfig> = {
@@ -262,10 +269,12 @@ const routes: Record<Screen, RouteConfig> = {
     PACKAGES: { component: Packages, hasSidebar: true },
     FINANCIAL_HUB: { component: FinancialHub, hasSidebar: true },
 
-    ANALYTICS: { component: Analytics, hasSidebar: true },
-    TRAFFIC_ANALYTICS: { component: TrafficAnalytics, hasSidebar: true },
-    ALL_COUPONS: { component: Coupons, hasSidebar: true },
-    CREATE_COUPON: { component: CreateCoupon, hasSidebar: true },
+    // Coupons + analytics endpoints are approved-partner only — gated so a
+    // pending partner gets a "finish verification" notice, not a 403 error.
+    ANALYTICS: { component: Analytics, hasSidebar: true, requiresApproval: 'Analytics' },
+    TRAFFIC_ANALYTICS: { component: TrafficAnalytics, hasSidebar: true, requiresApproval: 'Analytics' },
+    ALL_COUPONS: { component: Coupons, hasSidebar: true, requiresApproval: 'Coupons' },
+    CREATE_COUPON: { component: CreateCoupon, hasSidebar: true, requiresApproval: 'Coupons' },
     HELP_SUPPORT: { component: Support, hasSidebar: true },
     PARTNER_NETWORK: { component: PartnerNetwork, hasSidebar: true },
 };
@@ -418,6 +427,15 @@ function AppInner() {
 
     const route = routes[currentScreen] ?? routes.LANDING;
     const Component = route.component;
+    const screenElement = (
+        <Component
+            onNavigate={guardedNavigate}
+            previousScreen={previousScreen}
+            authData={authData}
+            setAuthData={setAuthData}
+            {...(route.hasSidebar ? { onOpenSidebar: () => setIsSidebarOpen(true) } : {})}
+        />
+    );
 
     return (
         <div className="font-sans text-tlb-dark">
@@ -442,13 +460,15 @@ function AppInner() {
                         transition={{ duration: 0.2, ease: 'easeOut' }}
                     >
                         <ScreenErrorBoundary>
-                            <Component
-                                onNavigate={guardedNavigate}
-                                previousScreen={previousScreen}
-                                authData={authData}
-                                setAuthData={setAuthData}
-                                {...(route.hasSidebar ? { onOpenSidebar: () => setIsSidebarOpen(true) } : {})}
-                            />
+                            {/* The lazy screen only loads once it actually mounts, so a gated
+                  screen fires none of its approved-partner-only calls. */}
+                            {route.requiresApproval ? (
+                                <ApprovalGate feature={route.requiresApproval} onNavigate={guardedNavigate}>
+                                    {screenElement}
+                                </ApprovalGate>
+                            ) : (
+                                screenElement
+                            )}
                         </ScreenErrorBoundary>
                     </motion.div>
                 </Suspense>

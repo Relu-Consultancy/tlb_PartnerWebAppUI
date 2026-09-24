@@ -47,7 +47,7 @@ export const refreshAccessToken = async (): Promise<string | null> => {
 };
 
 export const apiClient = async (endpoint: string, options: RequestInit = {}) => {
-    let token = getAuthToken();
+    const token = getAuthToken();
     const headers: HeadersInit = {
         ...(options.headers || {}),
     };

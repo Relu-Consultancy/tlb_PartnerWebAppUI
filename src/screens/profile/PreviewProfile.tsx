@@ -2,18 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, CheckCircle2, Star, Users, CalendarDays, Share2, Image as ImageIcon } from 'lucide-react';
 import { SkeletonProfile } from '../../components/ui';
 import { Screen } from '../../types';
-import { 
-    getCurrentPartner, 
-    getBusinessProfile, 
-    getExtendedProfile, 
-    getPartnerFollowerCount 
-} from '../../api/onboarding';
+import { getCurrentPartner, getBusinessProfile, getExtendedProfile, getPartnerFollowerCount } from '../../api/onboarding';
 import { getStatsReviews } from '../../api/stats';
-import { 
-    getClassListings, 
-    getEventListings, 
-    getProgramListings 
-} from '../../api/listings';
+import { getClassListings, getEventListings, getProgramListings } from '../../api/listings';
 import { usePartner } from '../../context/PartnerContext';
 
 const API_BASE = 'https://tlb-api.reluconsultancy.in';
@@ -49,7 +40,7 @@ export const PreviewProfile: React.FC<ProfileProps> = ({ onNavigate, previousScr
                     getCurrentPartner(),
                     getBusinessProfile(),
                     getExtendedProfile(),
-                    getStatsReviews()
+                    getStatsReviews(),
                 ]);
 
                 if (profileRes.status === 'fulfilled') {
@@ -69,7 +60,9 @@ export const PreviewProfile: React.FC<ProfileProps> = ({ onNavigate, previousScr
                         try {
                             const count = await getPartnerFollowerCount(pId);
                             setFollowersCount(count || 0);
-                        } catch (e) { }
+                        } catch {
+                            // Follower count is a nice-to-have on this screen — ignore failures.
+                        }
                     }
                 }
 
@@ -90,7 +83,6 @@ export const PreviewProfile: React.FC<ProfileProps> = ({ onNavigate, previousScr
                 // Sort by ID descending (newest first)
                 allListings.sort((a, b) => b.id - a.id);
                 setListings(allListings.slice(0, 10)); // Take top 10
-
             } catch (err) {
                 console.error('Preview fetch error', err);
             } finally {
@@ -150,9 +142,7 @@ export const PreviewProfile: React.FC<ProfileProps> = ({ onNavigate, previousScr
                         >
                             <ArrowLeft size={18} />
                         </button>
-                        <button 
-                            className="absolute top-7 right-4 w-9 h-9 rounded-full bg-white shadow flex items-center justify-center text-gray-800 transition-transform active:scale-95 z-20 hover:bg-gray-50"
-                        >
+                        <button className="absolute top-7 right-4 w-9 h-9 rounded-full bg-white shadow flex items-center justify-center text-gray-800 transition-transform active:scale-95 z-20 hover:bg-gray-50">
                             <Share2 size={16} />
                         </button>
                     </div>
@@ -192,7 +182,9 @@ export const PreviewProfile: React.FC<ProfileProps> = ({ onNavigate, previousScr
                         </div>
                         <div className="flex flex-col items-center text-center">
                             <div className="flex items-center gap-1">
-                                <span className="text-xl font-black text-gray-900 tracking-tight">{avgRating ? avgRating.toFixed(1) : '—'}</span>
+                                <span className="text-xl font-black text-gray-900 tracking-tight">
+                                    {avgRating ? avgRating.toFixed(1) : '—'}
+                                </span>
                                 <Star size={14} className="text-[#FFDE81] fill-[#FFDE81] -mt-0.5" />
                             </div>
                             <span className="text-[9px] font-bold text-gray-400 mt-1 uppercase tracking-wider">Rating</span>
@@ -223,11 +215,16 @@ export const PreviewProfile: React.FC<ProfileProps> = ({ onNavigate, previousScr
                             ) : (
                                 listings.map((listing, i) => {
                                     const cover = listing.media?.find((m: any) => m.media_type === 'cover')?.file_url;
-                                    const age = listing.age_group ? `${listing.age_group.min_age}-${listing.age_group.max_age} Yrs` : 'All Ages';
+                                    const age = listing.age_group
+                                        ? `${listing.age_group.min_age}-${listing.age_group.max_age} Yrs`
+                                        : 'All Ages';
                                     const dt = listing.start_datetime || listing.created_at;
 
                                     return (
-                                        <div key={listing.id || i} className="w-[240px] shrink-0 bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm snap-start">
+                                        <div
+                                            key={listing.id || i}
+                                            className="w-[240px] shrink-0 bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm snap-start"
+                                        >
                                             <div className="h-32 bg-gray-50 relative">
                                                 {cover ? (
                                                     <img src={resolveUrl(cover)} alt="Cover" className="w-full h-full object-cover" />
@@ -238,25 +235,41 @@ export const PreviewProfile: React.FC<ProfileProps> = ({ onNavigate, previousScr
                                                 )}
                                                 {/* Clip Icon (decorative from design) */}
                                                 <div className="absolute top-3 left-3 opacity-80">
-                                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                        <path d="M14.321 4.79289C15.6543 3.45956 17.8151 3.45956 19.1484 4.79289C20.4817 6.12623 20.4817 8.28704 19.1484 9.62037L9.62024 19.1485C7.62014 21.1486 4.3769 21.1486 2.3768 19.1485C0.376698 17.1484 0.376698 13.9052 2.3768 11.9051L9.12354 5.15832C9.48962 4.79224 10.0832 4.79224 10.4493 5.15832C10.8154 5.5244 10.8154 6.11797 10.4493 6.48406L3.70258 13.2309C2.43632 14.4971 2.43632 16.55 3.70258 17.8163C4.96884 19.0825 7.02175 19.0825 8.28801 17.8163L17.8162 8.28812C18.4162 7.68813 18.4162 6.71518 17.8162 6.11519C17.2162 5.5152 16.2433 5.5152 15.6433 6.11519L7.42436 14.3341C7.05828 14.7002 6.46471 14.7002 6.09862 14.3341C5.73254 13.9681 5.73254 13.3745 6.09862 13.0084L14.321 4.79289Z" fill="#FACC15"/>
+                                                    <svg
+                                                        width="24"
+                                                        height="24"
+                                                        viewBox="0 0 24 24"
+                                                        fill="none"
+                                                        xmlns="http://www.w3.org/2000/svg"
+                                                    >
+                                                        <path
+                                                            d="M14.321 4.79289C15.6543 3.45956 17.8151 3.45956 19.1484 4.79289C20.4817 6.12623 20.4817 8.28704 19.1484 9.62037L9.62024 19.1485C7.62014 21.1486 4.3769 21.1486 2.3768 19.1485C0.376698 17.1484 0.376698 13.9052 2.3768 11.9051L9.12354 5.15832C9.48962 4.79224 10.0832 4.79224 10.4493 5.15832C10.8154 5.5244 10.8154 6.11797 10.4493 6.48406L3.70258 13.2309C2.43632 14.4971 2.43632 16.55 3.70258 17.8163C4.96884 19.0825 7.02175 19.0825 8.28801 17.8163L17.8162 8.28812C18.4162 7.68813 18.4162 6.71518 17.8162 6.11519C17.2162 5.5152 16.2433 5.5152 15.6433 6.11519L7.42436 14.3341C7.05828 14.7002 6.46471 14.7002 6.09862 14.3341C5.73254 13.9681 5.73254 13.3745 6.09862 13.0084L14.321 4.79289Z"
+                                                            fill="#FACC15"
+                                                        />
                                                     </svg>
                                                 </div>
                                             </div>
                                             <div className="p-3.5">
-                                                <h3 className="font-bold text-[13px] text-gray-900 truncate mb-2.5 tracking-tight">{listing.title}</h3>
-                                                
+                                                <h3 className="font-bold text-[13px] text-gray-900 truncate mb-2.5 tracking-tight">
+                                                    {listing.title}
+                                                </h3>
+
                                                 <div className="flex items-center justify-between mb-2.5">
                                                     <div className="flex items-center text-[10px] text-gray-500 font-medium">
                                                         <Star size={11} className="text-[#FFDE81] fill-[#FFDE81] mr-1" />
-                                                        {listing.rating ? listing.rating.toFixed(1) : (avgRating ? avgRating.toFixed(1) : '—')} ({listing.review_count || totalReviews || 0})
+                                                        {listing.rating
+                                                            ? listing.rating.toFixed(1)
+                                                            : avgRating
+                                                              ? avgRating.toFixed(1)
+                                                              : '—'}{' '}
+                                                        ({listing.review_count || totalReviews || 0})
                                                     </div>
                                                     <div className="flex items-center text-[10px] text-gray-500 font-medium">
                                                         <Users size={11} className="mr-1" />
                                                         {age}
                                                     </div>
                                                 </div>
-                                                
+
                                                 <div className="flex items-end justify-between mt-1 pt-1">
                                                     <div className="flex items-start text-[9px] text-gray-400 font-medium mt-1">
                                                         <CalendarDays size={11} className="mr-1.5 shrink-0 mt-0.5" />
@@ -275,7 +288,7 @@ export const PreviewProfile: React.FC<ProfileProps> = ({ onNavigate, previousScr
                     </div>
                 </div>
             </div>
-            
+
             <style>{`
                 .custom-scrollbar::-webkit-scrollbar {
                     width: 4px;
@@ -296,8 +309,18 @@ export const PreviewProfile: React.FC<ProfileProps> = ({ onNavigate, previousScr
     );
 };
 
-const ChevronRightIcon = ({ size, className }: { size: number, className?: string }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+const ChevronRightIcon = ({ size, className }: { size: number; className?: string }) => (
+    <svg
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={className}
+    >
         <polyline points="9 18 15 12 9 6"></polyline>
     </svg>
 );

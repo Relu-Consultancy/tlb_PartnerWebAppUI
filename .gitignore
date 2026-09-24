@@ -6,6 +6,19 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+
+# AI Studio scaffold artifacts (not used by the Vite build)
+metadata.json
+
+# Dev reference screenshots — keep locally, never ship in the repo
+Development/*.png
+Development/*.jpg
+
 Frontend_Estimation.csv
 Backend_Estimation.csv
 Final_Frontend_Estimation.csv

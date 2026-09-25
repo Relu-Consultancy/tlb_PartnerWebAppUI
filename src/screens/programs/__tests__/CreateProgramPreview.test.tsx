@@ -47,6 +47,24 @@ describe('CreateProgramPreview — display', () => {
         await waitFor(() => screen.getByText('STEM Bootcamp'));
         expect(screen.getByRole('button', { name: /publish|submit/i })).toBeInTheDocument();
     });
+
+    it('shows "Book Now" in the preview CTA when booking_type is direct_booking', async () => {
+        server.use(http.get(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/`, () =>
+            HttpResponse.json({ success: true, data: { ...completeDraft, booking_type: 'direct_booking', price: 999 } })));
+        renderComponent();
+        await waitFor(() => screen.getByText('STEM Bootcamp'));
+        expect(screen.getByText('Book Now')).toBeInTheDocument();
+        expect(screen.queryByText('Enquire Now')).not.toBeInTheDocument();
+    });
+
+    it('shows "Enquire Now" in the preview CTA when booking_type is enquiry', async () => {
+        server.use(http.get(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/`, () =>
+            HttpResponse.json({ success: true, data: { ...completeDraft, booking_type: 'enquiry' } })));
+        renderComponent();
+        await waitFor(() => screen.getByText('STEM Bootcamp'));
+        expect(screen.getByText('Enquire Now')).toBeInTheDocument();
+        expect(screen.queryByText('Book Now')).not.toBeInTheDocument();
+    });
 });
 
 describe('CreateProgramPreview — readiness', () => {

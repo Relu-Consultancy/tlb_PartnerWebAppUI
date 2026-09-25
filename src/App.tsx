@@ -14,36 +14,46 @@ import { SkeletonPage, Toaster, NoInternetState } from './components/ui';
 // Error boundary — stops a single screen crash from blanking the whole app.
 // Keyed by screen so navigating away clears the error.
 // ---------------------------------------------------------------------------
-interface ErrorBoundaryProps { children: ReactNode }
-interface ErrorBoundaryState { error: Error | null }
+interface ErrorBoundaryProps {
+    children: ReactNode;
+}
+interface ErrorBoundaryState {
+    error: Error | null;
+}
 class ScreenErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  // `react` has no bundled types here, so the base class is untyped — declare members explicitly.
-  declare props: ErrorBoundaryProps;
-  state: ErrorBoundaryState = { error: null };
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState { return { error }; }
-  componentDidCatch(error: Error, info: ErrorInfo) { console.error('Screen crashed:', error, info); }
-  render() {
-    if (this.state.error) {
-      return (
-        <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-gray-50 p-6 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center text-2xl">⚠️</div>
-          <div>
-            <h2 className="text-lg font-black text-gray-900">Something went wrong</h2>
-            <p className="text-sm text-gray-500 mt-1 max-w-sm">This screen hit an unexpected error. Use the menu to switch screens, or reload.</p>
-          </div>
-          <button onClick={() => window.location.reload()} className="tlb-button px-6 py-3">Reload</button>
-        </div>
-      );
+    // `react` has no bundled types here, so the base class is untyped — declare members explicitly.
+    declare props: ErrorBoundaryProps;
+    state: ErrorBoundaryState = { error: null };
+    static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+        return { error };
     }
-    return this.props.children;
-  }
+    componentDidCatch(error: Error, info: ErrorInfo) {
+        console.error('Screen crashed:', error, info);
+    }
+    render() {
+        if (this.state.error) {
+            return (
+                <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-gray-50 p-6 text-center">
+                    <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center text-2xl">⚠️</div>
+                    <div>
+                        <h2 className="text-lg font-black text-gray-900">Something went wrong</h2>
+                        <p className="text-sm text-gray-500 mt-1 max-w-sm">
+                            This screen hit an unexpected error. Use the menu to switch screens, or reload.
+                        </p>
+                    </div>
+                    <button onClick={() => window.location.reload()} className="tlb-button px-6 py-3">
+                        Reload
+                    </button>
+                </div>
+            );
+        }
+        return this.props.children;
+    }
 }
 
 // Helper for lazy loading named exports
-const lazyImport = <T extends Record<string, any>>(
-  factory: () => Promise<T>,
-  name: keyof T
-) => lazy(() => factory().then((module) => ({ default: module[name] })));
+const lazyImport = <T extends Record<string, any>>(factory: () => Promise<T>, name: keyof T) =>
+    lazy(() => factory().then((module) => ({ default: module[name] })));
 
 // Auth screens
 const Landing = lazyImport(() => import('./screens/auth'), 'Landing');
@@ -132,39 +142,44 @@ const PartnerNetwork = lazyImport(() => import('./screens/network'), 'PartnerNet
 // Screen-module chunk factories — prefetched on idle so navigating to a slide
 // for the first time (or reopening it) doesn't flash the Suspense fallback.
 const SCREEN_CHUNKS = [
-  () => import('./screens/auth'),
-  () => import('./screens/onboarding'),
-  () => import('./screens/dashboard'),
-  () => import('./screens/account'),
-  () => import('./screens/attendees'),
-  () => import('./screens/reviews'),
-  () => import('./screens/followers'),
-  () => import('./screens/documents'),
-  () => import('./screens/messages'),
-  () => import('./screens/packages'),
-  () => import('./screens/financial'),
-  () => import('./screens/profile'),
-  () => import('./screens/services'),
-  () => import('./screens/bookings-enquiries'),
-  () => import('./screens/classes'),
-  () => import('./screens/events'),
-  () => import('./screens/programs'),
-  () => import('./screens/venues'),
-  () => import('./screens/enquiries'),
+    () => import('./screens/auth'),
+    () => import('./screens/onboarding'),
+    () => import('./screens/dashboard'),
+    () => import('./screens/account'),
+    () => import('./screens/attendees'),
+    () => import('./screens/reviews'),
+    () => import('./screens/followers'),
+    () => import('./screens/documents'),
+    () => import('./screens/messages'),
+    () => import('./screens/packages'),
+    () => import('./screens/financial'),
+    () => import('./screens/profile'),
+    () => import('./screens/services'),
+    () => import('./screens/bookings-enquiries'),
+    () => import('./screens/classes'),
+    () => import('./screens/events'),
+    () => import('./screens/programs'),
+    () => import('./screens/venues'),
+    () => import('./screens/enquiries'),
 
-  () => import('./screens/analytics'),
-  () => import('./screens/traffic-analytics'),
-  () => import('./screens/coupons'),
-  () => import('./screens/support'),
-  () => import('./screens/network'),
+    () => import('./screens/analytics'),
+    () => import('./screens/traffic-analytics'),
+    () => import('./screens/coupons'),
+    () => import('./screens/support'),
+    () => import('./screens/network'),
 ];
 
 const prefetchScreens = () => {
-  SCREEN_CHUNKS.forEach((load) => { load().catch(() => { /* best-effort */ }); });
+    SCREEN_CHUNKS.forEach((load) => {
+        load().catch(() => {
+            /* best-effort */
+        });
+    });
 };
 
 import { Sidebar } from './components/Navigation';
 import { TopHeader } from './components/TopHeader';
+import { ApprovalGate } from './components/ApprovalGate';
 import { getAuthToken, getRefreshToken, clearTokens, refreshAccessToken } from './api/client';
 import { invalidatePortalSummary } from './api/portalSummary';
 import { getCurrentPartner } from './api/onboarding';
@@ -173,287 +188,303 @@ import { getCurrentPartner } from './api/onboarding';
 // Route configuration
 // ---------------------------------------------------------------------------
 interface RouteConfig {
-  component: React.LazyExoticComponent<any>;
-  hasSidebar: boolean;
-  /** Optional: restrict this screen to partners with specific entity types */
-  requiresEntities?: EntityType[];
+    component: React.LazyExoticComponent<any>;
+    hasSidebar: boolean;
+    /** Optional: restrict this screen to partners with specific entity types */
+    requiresEntities?: EntityType[];
+    /**
+     * Optional: the screen's backend requires an approved partner. The value is
+     * the feature name shown in the approval notice non-approved partners get
+     * instead of the screen (e.g. "Coupons").
+     */
+    requiresApproval?: string;
 }
 
 const routes: Record<Screen, RouteConfig> = {
-  // Auth — no sidebar
-  LANDING: { component: Landing, hasSidebar: false },
-  LOGIN: { component: Login, hasSidebar: false },
-  OTP_VERIFY: { component: OTPVerify, hasSidebar: false },
-  PARTNER_ACCESS: { component: PartnerAccess, hasSidebar: false },
-  PARTNER_ACCESS_OTP: { component: PartnerAccessOTP, hasSidebar: false },
-  PARTNER_CATEGORY: { component: PartnerCategory, hasSidebar: false },
+    // Auth — no sidebar
+    LANDING: { component: Landing, hasSidebar: false },
+    LOGIN: { component: Login, hasSidebar: false },
+    OTP_VERIFY: { component: OTPVerify, hasSidebar: false },
+    PARTNER_ACCESS: { component: PartnerAccess, hasSidebar: false },
+    PARTNER_ACCESS_OTP: { component: PartnerAccessOTP, hasSidebar: false },
+    PARTNER_CATEGORY: { component: PartnerCategory, hasSidebar: false },
 
-  // Onboarding — no sidebar
-  REGISTRATION: { component: Registration, hasSidebar: false },
-  APP_SUBMITTED: { component: AppSubmitted, hasSidebar: false },
-  APP_APPROVED: { component: AppApproved, hasSidebar: false },
-  AGREEMENT_SUBMIT: { component: AgreementSubmit, hasSidebar: false },
-  IDENTITY_VERIFICATION: { component: IdentityVerification, hasSidebar: false },
-  BANK_SETUP: { component: BankSetup, hasSidebar: false },
-  ONBOARDING_COMPLETE: { component: OnboardingComplete, hasSidebar: false },
+    // Onboarding — no sidebar
+    REGISTRATION: { component: Registration, hasSidebar: false },
+    APP_SUBMITTED: { component: AppSubmitted, hasSidebar: false },
+    APP_APPROVED: { component: AppApproved, hasSidebar: false },
+    AGREEMENT_SUBMIT: { component: AgreementSubmit, hasSidebar: false },
+    IDENTITY_VERIFICATION: { component: IdentityVerification, hasSidebar: false },
+    BANK_SETUP: { component: BankSetup, hasSidebar: false },
+    ONBOARDING_COMPLETE: { component: OnboardingComplete, hasSidebar: false },
 
-  // Core App — has sidebar
-  ACCOUNTS: { component: Accounts, hasSidebar: true },
-  HOME: { component: Dashboard, hasSidebar: true },
-  BRAND_PROFILE: { component: BrandProfile, hasSidebar: true },
-  PREVIEW_PROFILE: { component: PreviewProfile, hasSidebar: true },
+    // Core App — has sidebar
+    ACCOUNTS: { component: Accounts, hasSidebar: true },
+    HOME: { component: Dashboard, hasSidebar: true },
+    BRAND_PROFILE: { component: BrandProfile, hasSidebar: true },
+    PREVIEW_PROFILE: { component: PreviewProfile, hasSidebar: true },
 
-  // Services / Listings — has sidebar
-  SERVICE_LISTINGS: { component: ServiceListings, hasSidebar: true },
-  BOOKINGS_ENQUIRIES: { component: BookingsEnquiries, hasSidebar: true },
-  CREATE_CLASS_IDENTITY: { component: CreateClassIdentity, hasSidebar: true, requiresEntities: ['Classes'] },
-  CREATE_CLASS_BATCH: { component: CreateClassBatch, hasSidebar: true, requiresEntities: ['Classes'] },
-  CREATE_CLASS_MEDIA: { component: CreateClassMedia, hasSidebar: true, requiresEntities: ['Classes'] },
-  CREATE_CLASS_POLICIES: { component: CreateClassPolicies, hasSidebar: true, requiresEntities: ['Classes'] },
-  CREATE_CLASS_PREVIEW: { component: CreateClassPreview, hasSidebar: false, requiresEntities: ['Classes'] },
+    // Services / Listings — has sidebar
+    SERVICE_LISTINGS: { component: ServiceListings, hasSidebar: true },
+    BOOKINGS_ENQUIRIES: { component: BookingsEnquiries, hasSidebar: true },
+    CREATE_CLASS_IDENTITY: { component: CreateClassIdentity, hasSidebar: true, requiresEntities: ['Classes'] },
+    CREATE_CLASS_BATCH: { component: CreateClassBatch, hasSidebar: true, requiresEntities: ['Classes'] },
+    CREATE_CLASS_MEDIA: { component: CreateClassMedia, hasSidebar: true, requiresEntities: ['Classes'] },
+    CREATE_CLASS_POLICIES: { component: CreateClassPolicies, hasSidebar: true, requiresEntities: ['Classes'] },
+    CREATE_CLASS_PREVIEW: { component: CreateClassPreview, hasSidebar: false, requiresEntities: ['Classes'] },
 
-  // Event creation — has sidebar
-  CREATE_EVENT_DETAILS: { component: CreateEventDetails, hasSidebar: true, requiresEntities: ['Events'] },
-  CREATE_EVENT_SCHEDULE: { component: CreateEventSchedule, hasSidebar: true, requiresEntities: ['Events'] },
-  CREATE_EVENT_MEDIA: { component: CreateEventMedia, hasSidebar: true, requiresEntities: ['Events'] },
-  CREATE_EVENT_POLICIES: { component: CreateEventPolicies, hasSidebar: true, requiresEntities: ['Events'] },
-  CREATE_EVENT_PREVIEW: { component: CreateEventPreview, hasSidebar: false, requiresEntities: ['Events'] },
+    // Event creation — has sidebar
+    CREATE_EVENT_DETAILS: { component: CreateEventDetails, hasSidebar: true, requiresEntities: ['Events'] },
+    CREATE_EVENT_SCHEDULE: { component: CreateEventSchedule, hasSidebar: true, requiresEntities: ['Events'] },
+    CREATE_EVENT_MEDIA: { component: CreateEventMedia, hasSidebar: true, requiresEntities: ['Events'] },
+    CREATE_EVENT_POLICIES: { component: CreateEventPolicies, hasSidebar: true, requiresEntities: ['Events'] },
+    CREATE_EVENT_PREVIEW: { component: CreateEventPreview, hasSidebar: false, requiresEntities: ['Events'] },
 
-  // Venue creation — has sidebar
-  CREATE_VENUE_DETAILS: { component: CreateVenueDetails, hasSidebar: true, requiresEntities: ['Venues'] },
-  CREATE_VENUE_OCCASIONS: { component: CreateVenueOccasions, hasSidebar: true, requiresEntities: ['Venues'] },
-  CREATE_VENUE_AVAILABILITY: { component: CreateVenueAvailability, hasSidebar: true, requiresEntities: ['Venues'] },
-  CREATE_VENUE_PACKAGES: { component: CreateVenuePackages, hasSidebar: true, requiresEntities: ['Venues'] },
-  CREATE_VENUE_AMENITIES: { component: CreateVenueAmenities, hasSidebar: true, requiresEntities: ['Venues'] },
-  CREATE_VENUE_POLICIES: { component: CreateVenuePolicies, hasSidebar: true, requiresEntities: ['Venues'] },
-  CREATE_VENUE_PREVIEW: { component: CreateVenuePreview, hasSidebar: false, requiresEntities: ['Venues'] },
+    // Venue creation — has sidebar
+    CREATE_VENUE_DETAILS: { component: CreateVenueDetails, hasSidebar: true, requiresEntities: ['Venues'] },
+    CREATE_VENUE_OCCASIONS: { component: CreateVenueOccasions, hasSidebar: true, requiresEntities: ['Venues'] },
+    CREATE_VENUE_AVAILABILITY: { component: CreateVenueAvailability, hasSidebar: true, requiresEntities: ['Venues'] },
+    CREATE_VENUE_PACKAGES: { component: CreateVenuePackages, hasSidebar: true, requiresEntities: ['Venues'] },
+    CREATE_VENUE_AMENITIES: { component: CreateVenueAmenities, hasSidebar: true, requiresEntities: ['Venues'] },
+    CREATE_VENUE_POLICIES: { component: CreateVenuePolicies, hasSidebar: true, requiresEntities: ['Venues'] },
+    CREATE_VENUE_PREVIEW: { component: CreateVenuePreview, hasSidebar: false, requiresEntities: ['Venues'] },
 
-  // Programs creation — has sidebar
-  CREATE_PROGRAM_IDENTITY: { component: CreateProgramIdentity, hasSidebar: true, requiresEntities: ['Programs'] },
-  CREATE_PROGRAM_BATCH: { component: CreateProgramBatch, hasSidebar: true, requiresEntities: ['Programs'] },
-  CREATE_PROGRAM_MEDIA: { component: CreateProgramMedia, hasSidebar: true, requiresEntities: ['Programs'] },
-  CREATE_PROGRAM_POLICIES: { component: CreateProgramPolicies, hasSidebar: true, requiresEntities: ['Programs'] },
-  CREATE_PROGRAM_PREVIEW: { component: CreateProgramPreview, hasSidebar: false, requiresEntities: ['Programs'] },
+    // Programs creation — has sidebar
+    CREATE_PROGRAM_IDENTITY: { component: CreateProgramIdentity, hasSidebar: true, requiresEntities: ['Programs'] },
+    CREATE_PROGRAM_BATCH: { component: CreateProgramBatch, hasSidebar: true, requiresEntities: ['Programs'] },
+    CREATE_PROGRAM_MEDIA: { component: CreateProgramMedia, hasSidebar: true, requiresEntities: ['Programs'] },
+    CREATE_PROGRAM_POLICIES: { component: CreateProgramPolicies, hasSidebar: true, requiresEntities: ['Programs'] },
+    CREATE_PROGRAM_PREVIEW: { component: CreateProgramPreview, hasSidebar: false, requiresEntities: ['Programs'] },
 
-  // Enquiries — accessible if partner has any of Classes/Programs/Venues
-  ENQUIRIES: { component: EnquiriesHub, hasSidebar: true, requiresEntities: ['Classes', 'Programs', 'Venues'] },
+    // Enquiries — accessible if partner has any of Classes/Programs/Venues
+    ENQUIRIES: { component: EnquiriesHub, hasSidebar: true, requiresEntities: ['Classes', 'Programs', 'Venues'] },
 
-  // Other
-  ATTENDEES: { component: Attendees, hasSidebar: true },
-  BOOKINGS: { component: Bookings, hasSidebar: true },
-  REVIEWS: { component: Reviews, hasSidebar: true },
-  FOLLOWERS: { component: Followers, hasSidebar: true },
-  DOCUMENTS: { component: Documents, hasSidebar: true },
-  MESSAGES: { component: Messages, hasSidebar: true },
-  PACKAGES: { component: Packages, hasSidebar: true },
-  FINANCIAL_HUB: { component: FinancialHub, hasSidebar: true },
+    // Other
+    ATTENDEES: { component: Attendees, hasSidebar: true },
+    BOOKINGS: { component: Bookings, hasSidebar: true },
+    REVIEWS: { component: Reviews, hasSidebar: true },
+    FOLLOWERS: { component: Followers, hasSidebar: true },
+    DOCUMENTS: { component: Documents, hasSidebar: true },
+    MESSAGES: { component: Messages, hasSidebar: true },
+    PACKAGES: { component: Packages, hasSidebar: true },
+    FINANCIAL_HUB: { component: FinancialHub, hasSidebar: true },
 
-  ANALYTICS: { component: Analytics, hasSidebar: true },
-  TRAFFIC_ANALYTICS: { component: TrafficAnalytics, hasSidebar: true },
-  ALL_COUPONS: { component: Coupons, hasSidebar: true },
-  CREATE_COUPON: { component: CreateCoupon, hasSidebar: true },
-  HELP_SUPPORT: { component: Support, hasSidebar: true },
-  PARTNER_NETWORK: { component: PartnerNetwork, hasSidebar: true },
+    // Coupons + analytics endpoints are approved-partner only — gated so a
+    // pending partner gets a "finish verification" notice, not a 403 error.
+    ANALYTICS: { component: Analytics, hasSidebar: true, requiresApproval: 'Analytics' },
+    TRAFFIC_ANALYTICS: { component: TrafficAnalytics, hasSidebar: true, requiresApproval: 'Analytics' },
+    ALL_COUPONS: { component: Coupons, hasSidebar: true, requiresApproval: 'Coupons' },
+    CREATE_COUPON: { component: CreateCoupon, hasSidebar: true, requiresApproval: 'Coupons' },
+    HELP_SUPPORT: { component: Support, hasSidebar: true },
+    PARTNER_NETWORK: { component: PartnerNetwork, hasSidebar: true },
 };
 
 // ---------------------------------------------------------------------------
 // Inner App (consumes PartnerContext)
 // ---------------------------------------------------------------------------
 function AppInner() {
-  const { allowedEntities, setAllowedEntities } = usePartner();
-  const [currentScreen, setCurrentScreen] = useState<Screen>('LANDING');
-  // The screen we navigated from — lets a child (e.g. PreviewProfile) return to
-  // its actual entry point (Accounts vs Brand Profile) instead of a hardcoded one.
-  const [previousScreen, setPreviousScreen] = useState<Screen | null>(null);
-  const currentScreenRef = useRef<Screen>('LANDING');
-  useEffect(() => { currentScreenRef.current = currentScreen; }, [currentScreen]);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [authData, setAuthData] = useState<{ value: string; type: 'email' | 'phone' } | null>(null);
-  const [initializing, setInitializing] = useState(true);
-  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+    const { allowedEntities, setAllowedEntities } = usePartner();
+    const [currentScreen, setCurrentScreen] = useState<Screen>('LANDING');
+    // The screen we navigated from — lets a child (e.g. PreviewProfile) return to
+    // its actual entry point (Accounts vs Brand Profile) instead of a hardcoded one.
+    const [previousScreen, setPreviousScreen] = useState<Screen | null>(null);
+    const currentScreenRef = useRef<Screen>('LANDING');
+    useEffect(() => {
+        currentScreenRef.current = currentScreen;
+    }, [currentScreen]);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [authData, setAuthData] = useState<{ value: string; type: 'email' | 'phone' } | null>(null);
+    const [initializing, setInitializing] = useState(true);
+    const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
-  useEffect(() => {
-    const handleOnline = () => setIsOffline(false);
-    const handleOffline = () => setIsOffline(true);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
+    useEffect(() => {
+        const handleOnline = () => setIsOffline(false);
+        const handleOffline = () => setIsOffline(true);
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+        return () => {
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+        };
+    }, []);
 
-  // ── Prefetch all screen chunks once the browser is idle after first paint ──
-  // so reopening / switching slides loads instantly instead of flashing a blank
-  // screen while the lazy chunk downloads.
-  useEffect(() => {
-    const ric = (window as any).requestIdleCallback as
-      | ((cb: () => void) => number)
-      | undefined;
-    if (ric) {
-      const id = ric(prefetchScreens);
-      return () => (window as any).cancelIdleCallback?.(id);
+    // ── Prefetch all screen chunks once the browser is idle after first paint ──
+    // so reopening / switching slides loads instantly instead of flashing a blank
+    // screen while the lazy chunk downloads.
+    useEffect(() => {
+        const ric = (window as any).requestIdleCallback as ((cb: () => void) => number) | undefined;
+        if (ric) {
+            const id = ric(prefetchScreens);
+            return () => (window as any).cancelIdleCallback?.(id);
+        }
+        const t = setTimeout(prefetchScreens, 2000);
+        return () => clearTimeout(t);
+    }, []);
+
+    // ── Session restore on page load / refresh ──
+    useEffect(() => {
+        const restoreSession = async () => {
+            const token = getAuthToken();
+
+            // If no access token, try refreshing with the refresh token
+            if (!token) {
+                const refreshToken = getRefreshToken();
+                if (!refreshToken) {
+                    // No tokens at all — go to LANDING
+                    setInitializing(false);
+                    return;
+                }
+
+                // Shared with apiClient's own 401-retry — never re-implement this fetch here.
+                let newAccess = await refreshAccessToken();
+                if (!newAccess && getRefreshToken()) {
+                    // Tokens survived the failed call — refresh-token 429'd (a transient
+                    // rate limit, not an invalid/expired token). Back off briefly and
+                    // retry once before giving up, rather than logging the user out.
+                    await new Promise((resolve) => setTimeout(resolve, 1500));
+                    newAccess = await refreshAccessToken();
+                }
+                if (!newAccess) {
+                    // Refresh token is invalid/expired, or the retry also failed — full logout
+                    setInitializing(false);
+                    return;
+                }
+            }
+
+            // We have a (possibly refreshed) access token — fetch partner status
+            try {
+                const res = await getCurrentPartner();
+                const partner = res.data || res;
+                const status = partner.status || '';
+
+                // Sync categories into context
+                if (partner.categories?.length > 0) {
+                    const cats = partner.categories.map((c: any) => c.name || c);
+                    setAllowedEntities(cats);
+                }
+
+                // Route based on partner status
+                switch (status) {
+                    case 'otp_verified':
+                        setCurrentScreen('PARTNER_CATEGORY');
+                        break;
+                    case 'category_selected':
+                        setCurrentScreen('REGISTRATION');
+                        break;
+                    case 'profile_created':
+                    case 'activated_limited':
+                    case 'under_review':
+                    case 'approved':
+                        setCurrentScreen('HOME');
+                        break;
+                    default:
+                        // Unknown status but valid token — go to HOME
+                        setCurrentScreen('HOME');
+                        break;
+                }
+            } catch (err) {
+                console.error('Session restore failed:', err);
+                // Token is invalid even after refresh — clear and show landing
+                clearTokens();
+                setCurrentScreen('LANDING');
+            } finally {
+                setInitializing(false);
+            }
+        };
+
+        restoreSession();
+    }, []);
+
+    // Route guard: redirect restricted screens to HOME
+    const guardedNavigate = useCallback(
+        (screen: Screen) => {
+            // Remember where we came from so children can offer an accurate "back".
+            if (screen !== currentScreenRef.current) setPreviousScreen(currentScreenRef.current);
+            const targetRoute = routes[screen];
+            if (targetRoute?.requiresEntities) {
+                const hasAccess = targetRoute.requiresEntities.some((e) => allowedEntities.includes(e));
+                if (!hasAccess) {
+                    setCurrentScreen('HOME');
+                    return;
+                }
+            }
+            // If navigating to LANDING, clear tokens (logout)
+            if (screen === 'LANDING') {
+                clearTokens();
+                sessionStorage.clear();
+                // Memoised partner data must never leak into the next account's session.
+                invalidatePortalSummary();
+            }
+            setCurrentScreen(screen);
+        },
+        [allowedEntities]
+    );
+
+    // Show loading spinner while restoring session
+    if (initializing) {
+        return <SkeletonPage />;
     }
-    const t = setTimeout(prefetchScreens, 2000);
-    return () => clearTimeout(t);
-  }, []);
 
-  // ── Session restore on page load / refresh ──
-  useEffect(() => {
-    const restoreSession = async () => {
-      let token = getAuthToken();
-
-      // If no access token, try refreshing with the refresh token
-      if (!token) {
-        const refreshToken = getRefreshToken();
-        if (!refreshToken) {
-          // No tokens at all — go to LANDING
-          setInitializing(false);
-          return;
-        }
-
-        // Shared with apiClient's own 401-retry — never re-implement this fetch here.
-        let newAccess = await refreshAccessToken();
-        if (!newAccess && getRefreshToken()) {
-          // Tokens survived the failed call — refresh-token 429'd (a transient
-          // rate limit, not an invalid/expired token). Back off briefly and
-          // retry once before giving up, rather than logging the user out.
-          await new Promise(resolve => setTimeout(resolve, 1500));
-          newAccess = await refreshAccessToken();
-        }
-        if (!newAccess) {
-          // Refresh token is invalid/expired, or the retry also failed — full logout
-          setInitializing(false);
-          return;
-        }
-        token = newAccess;
-      }
-
-      // We have a (possibly refreshed) access token — fetch partner status
-      try {
-        const res = await getCurrentPartner();
-        const partner = res.data || res;
-        const status = partner.status || '';
-
-        // Sync categories into context
-        if (partner.categories?.length > 0) {
-          const cats = partner.categories.map((c: any) => c.name || c);
-          setAllowedEntities(cats);
-        }
-
-        // Route based on partner status
-        switch (status) {
-          case 'otp_verified':
-            setCurrentScreen('PARTNER_CATEGORY');
-            break;
-          case 'category_selected':
-            setCurrentScreen('REGISTRATION');
-            break;
-          case 'profile_created':
-          case 'activated_limited':
-          case 'under_review':
-          case 'approved':
-            setCurrentScreen('HOME');
-            break;
-          default:
-            // Unknown status but valid token — go to HOME
-            setCurrentScreen('HOME');
-            break;
-        }
-      } catch (err) {
-        console.error('Session restore failed:', err);
-        // Token is invalid even after refresh — clear and show landing
-        clearTokens();
-        setCurrentScreen('LANDING');
-      } finally {
-        setInitializing(false);
-      }
-    };
-
-    restoreSession();
-  }, []);
-
-  // Route guard: redirect restricted screens to HOME
-  const guardedNavigate = useCallback((screen: Screen) => {
-    // Remember where we came from so children can offer an accurate "back".
-    if (screen !== currentScreenRef.current) setPreviousScreen(currentScreenRef.current);
-    const targetRoute = routes[screen];
-    if (targetRoute?.requiresEntities) {
-      const hasAccess = targetRoute.requiresEntities.some(e => allowedEntities.includes(e));
-      if (!hasAccess) {
-        setCurrentScreen('HOME');
-        return;
-      }
-    }
-    // If navigating to LANDING, clear tokens (logout)
-    if (screen === 'LANDING') {
-      clearTokens();
-      sessionStorage.clear();
-      // Memoised partner data must never leak into the next account's session.
-      invalidatePortalSummary();
-    }
-    setCurrentScreen(screen);
-  }, [allowedEntities]);
-
-  // Show loading spinner while restoring session
-  if (initializing) {
-    return <SkeletonPage />;
-  }
-
-  const route = routes[currentScreen] ?? routes.LANDING;
-  const Component = route.component;
-
-  return (
-    <div className="font-sans text-tlb-dark">
-      {isOffline && <NoInternetState />}
-      {route.hasSidebar && (
-        <Sidebar
-          isOpen={isSidebarOpen}
-          onClose={() => setIsSidebarOpen(false)}
-          currentScreen={currentScreen}
-          onNavigate={guardedNavigate}
-        />
-      )}
-      <div className={`flex flex-col min-h-screen ${route.hasSidebar ? 'lg:ml-[220px] bg-tlb-canvas' : ''}`}>
-        {route.hasSidebar && (
-          <TopHeader
-            onOpenSidebar={() => setIsSidebarOpen(true)}
+    const route = routes[currentScreen] ?? routes.LANDING;
+    const Component = route.component;
+    const screenElement = (
+        <Component
             onNavigate={guardedNavigate}
-          />
-        )}
-        <Suspense fallback={<SkeletonPage />}>
-          {/* Enter-only fade — no `mode="wait"` exit gap, so the new screen mounts
+            previousScreen={previousScreen}
+            authData={authData}
+            setAuthData={setAuthData}
+            {...(route.hasSidebar ? { onOpenSidebar: () => setIsSidebarOpen(true) } : {})}
+        />
+    );
+
+    return (
+        <div className="font-sans text-tlb-dark">
+            {isOffline && <NoInternetState />}
+            {route.hasSidebar && (
+                <Sidebar
+                    isOpen={isSidebarOpen}
+                    onClose={() => setIsSidebarOpen(false)}
+                    currentScreen={currentScreen}
+                    onNavigate={guardedNavigate}
+                />
+            )}
+            <div className={`flex flex-col min-h-screen ${route.hasSidebar ? 'lg:ml-[220px] bg-tlb-canvas' : ''}`}>
+                {route.hasSidebar && <TopHeader onOpenSidebar={() => setIsSidebarOpen(true)} onNavigate={guardedNavigate} />}
+                <Suspense fallback={<SkeletonPage />}>
+                    {/* Enter-only fade — no `mode="wait"` exit gap, so the new screen mounts
               immediately instead of leaving a blank window while the old one exits. */}
-          <motion.div
-            key={currentScreen}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
-          >
-            <ScreenErrorBoundary>
-              <Component
-                onNavigate={guardedNavigate}
-                previousScreen={previousScreen}
-                authData={authData}
-                setAuthData={setAuthData}
-                {...(route.hasSidebar ? { onOpenSidebar: () => setIsSidebarOpen(true) } : {})}
-              />
-            </ScreenErrorBoundary>
-          </motion.div>
-        </Suspense>
-      </div>
-    </div>
-  );
+                    <motion.div
+                        key={currentScreen}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.2, ease: 'easeOut' }}
+                    >
+                        <ScreenErrorBoundary>
+                            {/* The lazy screen only loads once it actually mounts, so a gated
+                  screen fires none of its approved-partner-only calls. */}
+                            {route.requiresApproval ? (
+                                <ApprovalGate feature={route.requiresApproval} onNavigate={guardedNavigate}>
+                                    {screenElement}
+                                </ApprovalGate>
+                            ) : (
+                                screenElement
+                            )}
+                        </ScreenErrorBoundary>
+                    </motion.div>
+                </Suspense>
+            </div>
+        </div>
+    );
 }
 
 // ---------------------------------------------------------------------------
 // App (provides context)
 // ---------------------------------------------------------------------------
 export default function App() {
-  return (
-    <PartnerProvider>
-      <AppInner />
-      <Toaster />
-    </PartnerProvider>
-  );
+    return (
+        <PartnerProvider>
+            <AppInner />
+            <Toaster />
+        </PartnerProvider>
+    );
 }

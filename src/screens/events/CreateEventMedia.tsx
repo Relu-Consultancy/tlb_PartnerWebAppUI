@@ -169,6 +169,13 @@ export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => {
         }
     };
 
+    // Media uploads/deletes persist immediately as the partner makes them —
+    // there's nothing extra to save here, so "Save as draft" is just an exit.
+    const handleSaveDraft = () => {
+        toast.success('Draft saved. Resume anytime from My Listings.');
+        onNavigate('SERVICE_LISTINGS');
+    };
+
     if (loading) {
         return (
             <WizardShell title="New event" entityType="Events" step={3} totalSteps={5} stepLabel="Media" onBack={() => onNavigate('CREATE_EVENT_SCHEDULE')}>
@@ -293,6 +300,7 @@ export const CreateEventMedia: React.FC<Props> = ({ onNavigate }) => {
                     onNext={() => onNavigate('CREATE_EVENT_POLICIES')}
                     nextText="Next: FAQs & Terms"
                     nextIcon={<ArrowRight size={14} strokeWidth={2.75} />}
+                    onSaveDraft={handleSaveDraft}
                 />
             </div>
         </WizardShell>

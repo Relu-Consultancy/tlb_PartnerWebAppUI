@@ -48,7 +48,10 @@ export const deletePartnerMedia = async (media_id: number) => {
         const err = await response.json().catch(() => null);
         throw new Error(err?.error?.message || err?.message || 'Failed to delete media');
     }
-    return response.json();
+    // DELETE commonly returns 204 No Content — .json() on an empty body throws,
+    // which would otherwise surface as a false "delete failed" error.
+    if (response.status === 204) return {};
+    return response.json().catch(() => ({}));
 };
 
 export const getBusinessProfile = async () => {

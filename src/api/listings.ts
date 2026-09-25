@@ -8,11 +8,40 @@ export class ApiError extends Error {
     }
 }
 
+// DRF validation errors often come back as { field: ["message", ...] } rather than a
+// flat string — dig into that shape (and any nesting) for the first human-readable
+// string instead of ever surfacing the raw object/JSON to the user.
+const extractMessage = (value: unknown): string | null => {
+    if (typeof value === 'string') return value || null;
+    if (Array.isArray(value)) {
+        for (const item of value) {
+            const m = extractMessage(item);
+            if (m) return m;
+        }
+        return null;
+    }
+    if (value && typeof value === 'object') {
+        for (const v of Object.values(value)) {
+            const m = extractMessage(v);
+            if (m) return m;
+        }
+    }
+    return null;
+};
+
+// A misbehaving serializer can leak DRF's internal repr, e.g.
+// "ErrorDetail(string='Registration deadline must be on or before the event start date.', code='invalid')".
+// Pull just the quoted message out of that instead of showing the wrapper.
+const cleanErrorDetail = (message: string): string => {
+    const match = message.match(/ErrorDetail\(string=(['"])(.*?)\1/);
+    return match ? match[2] : message;
+};
+
 const handleError = async (response: Response, fallback: string): Promise<never> => {
     const err = await response.json().catch(() => null);
     const code: string = err?.error?.code || err?.code || '';
-    const msg: string = err?.error?.message || err?.message || (err && JSON.stringify(err)) || fallback;
-    throw new ApiError(msg, code);
+    const msg = extractMessage(err?.error?.message) ?? extractMessage(err?.message) ?? extractMessage(err?.error) ?? fallback;
+    throw new ApiError(cleanErrorDetail(msg), code);
 };
 
 // ─── Class Metadata (public) ──────────────────────────────────────────────

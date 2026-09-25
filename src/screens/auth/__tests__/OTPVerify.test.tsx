@@ -123,6 +123,21 @@ describe('OTPVerify — verify OTP API', () => {
         expect(screen.queryByText('Invalid OTP. Please try again.')).not.toBeInTheDocument();
     });
 
+    it('shows a clear Customer-account message on USER_ROLE_MISMATCH instead of the generic invalid-OTP message', async () => {
+        server.use(http.post(`${BASE}/api/v1/auth/verify-otp/`, () =>
+            HttpResponse.json({
+                error: { code: 'USER_ROLE_MISMATCH', message: "This email is registered as 'customer', not 'partner'." },
+            }, { status: 403 })));
+        renderOTPVerify();
+        const user = userEvent.setup();
+        const inputs = screen.getAllByRole('textbox');
+        for (let i = 0; i < 6; i++) await user.type(inputs[i], '0');
+        await user.click(screen.getByRole('button', { name: /verify identity/i }));
+        await waitFor(() => expect(screen.getByText(/registered as a customer account/i)).toBeInTheDocument());
+        expect(screen.queryByText('Invalid OTP. Please try again.')).not.toBeInTheDocument();
+        expect(localStorage.getItem('access_token')).toBeNull();
+    });
+
     it('rejects login when partner status indicates onboarding is incomplete', async () => {
         // Partner exists but only at otp_verified — login should refuse the session.
         server.use(http.get(`${BASE}/api/v1/partner/me/`, () =>

@@ -50,6 +50,7 @@ export const CreateEventSchedule: React.FC<Props> = ({ onNavigate }) => {
     const [draftId, setDraftId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [savingDraft, setSavingDraft] = useState(false);
     const [loadError, setLoadError] = useState<string | null>(null);
 
     const [startDate, setStartDate] = useState('');
@@ -115,16 +116,77 @@ export const CreateEventSchedule: React.FC<Props> = ({ onNavigate }) => {
         setTickets(prev => prev.map((t, i) => i === idx ? { ...t, [field]: value, dirty: true } : t));
     };
 
+    // Shared by "Next" and "Save as draft" — persists whatever's currently
+    // filled in (schedule fields + ticket sync). Neither caller requires the
+    // step to be complete; only "Next" additionally validates before calling this.
+    const persist = async () => {
+        if (!draftId) throw new Error('No active draft.');
+
+        const startIso = toIso(startDate, startTime);
+        const endIso = toIso(endDate, endTime);
+        const deadlineIso = toIso(deadlineDate, deadlineTime);
+
+        const payload: Record<string, any> = { price_type: priceType };
+        if (startIso) payload.start_datetime = startIso;
+        if (endIso) payload.end_datetime = endIso;
+        if (deadlineIso) payload.registration_deadline = deadlineIso;
+        if (priceType === 'free' && capacity) payload.capacity = parseInt(capacity, 10);
+
+        await updateListing(draftId, payload);
+
+        // Sync tickets (only relevant for paid events)
+        if (priceType === 'paid') {
+            // Determine which originals were removed
+            const currentIds = new Set(tickets.map(t => t.id).filter((x): x is number => x !== null));
+            const toDelete: number[] = [];
+            originalTicketIds.forEach((id) => { if (!currentIds.has(id)) toDelete.push(id); });
+
+            for (const id of toDelete) {
+                await deleteTicket(draftId, id);
+            }
+
+            for (const t of tickets) {
+                const priceNum = parseFloat(t.price);
+                const qtyNum = parseInt(t.quantity, 10);
+                if (!t.name.trim() || isNaN(priceNum) || isNaN(qtyNum)) {
+                    // Skip incomplete ticket rows
+                    continue;
+                }
+                if (t.id === null) {
+                    await createTicket(draftId, {
+                        name: t.name.trim(),
+                        price: priceNum,
+                        total_quantity: qtyNum,
+                        description: t.description || undefined,
+                    });
+                } else if (t.dirty) {
+                    await updateTicket(draftId, t.id, {
+                        name: t.name.trim(),
+                        price: priceNum,
+                        total_quantity: qtyNum,
+                        description: t.description || '',
+                    });
+                }
+            }
+        }
+        // If user switched from paid → free, backend auto-clears tickets.
+        // If switched free → paid with no tickets, that's fine — they can add later.
+        setOriginalPriceType(priceType);
+    };
+
     const handleNext = async () => {
         if (!draftId) return;
 
-        // Build payload
         const startIso = toIso(startDate, startTime);
         const endIso = toIso(endDate, endTime);
         const deadlineIso = toIso(deadlineDate, deadlineTime);
 
         if (startIso && endIso && new Date(endIso) <= new Date(startIso)) {
             toast.warning('End date/time must be after start date/time.');
+            return;
+        }
+        if (startIso && deadlineIso && new Date(deadlineIso) > new Date(startIso)) {
+            toast.warning('Registration deadline must be on or before the event start date.');
             return;
         }
         if (priceType === 'free' && capacity && parseInt(capacity, 10) < 1) {
@@ -134,59 +196,28 @@ export const CreateEventSchedule: React.FC<Props> = ({ onNavigate }) => {
 
         setSaving(true);
         try {
-            const payload: Record<string, any> = { price_type: priceType };
-            if (startIso) payload.start_datetime = startIso;
-            if (endIso) payload.end_datetime = endIso;
-            if (deadlineIso) payload.registration_deadline = deadlineIso;
-            if (priceType === 'free' && capacity) payload.capacity = parseInt(capacity, 10);
-
-            await updateListing(draftId, payload);
-
-            // Sync tickets (only relevant for paid events)
-            if (priceType === 'paid') {
-                // Determine which originals were removed
-                const currentIds = new Set(tickets.map(t => t.id).filter((x): x is number => x !== null));
-                const toDelete: number[] = [];
-                originalTicketIds.forEach((id) => { if (!currentIds.has(id)) toDelete.push(id); });
-
-                for (const id of toDelete) {
-                    await deleteTicket(draftId, id);
-                }
-
-                for (const t of tickets) {
-                    const priceNum = parseFloat(t.price);
-                    const qtyNum = parseInt(t.quantity, 10);
-                    if (!t.name.trim() || isNaN(priceNum) || isNaN(qtyNum)) {
-                        // Skip incomplete ticket rows
-                        continue;
-                    }
-                    if (t.id === null) {
-                        await createTicket(draftId, {
-                            name: t.name.trim(),
-                            price: priceNum,
-                            total_quantity: qtyNum,
-                            description: t.description || undefined,
-                        });
-                    } else if (t.dirty) {
-                        await updateTicket(draftId, t.id, {
-                            name: t.name.trim(),
-                            price: priceNum,
-                            total_quantity: qtyNum,
-                            description: t.description || '',
-                        });
-                    }
-                }
-            }
-            // If user switched from paid → free, backend auto-clears tickets.
-            // If switched free → paid with no tickets, that's fine — they can add later.
-            setOriginalPriceType(priceType);
-
+            await persist();
             onNavigate('CREATE_EVENT_MEDIA');
         } catch (err: any) {
             console.error('Failed to save schedule', err);
             toast.error(err?.message || 'Failed to save schedule. Please try again.');
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleSaveDraft = async () => {
+        if (!draftId) return;
+        setSavingDraft(true);
+        try {
+            await persist();
+            toast.success('Draft saved. Resume anytime from My Listings.');
+            onNavigate('SERVICE_LISTINGS');
+        } catch (err: any) {
+            console.error('Failed to save draft', err);
+            toast.error(err?.message || 'Failed to save draft. Please try again.');
+        } finally {
+            setSavingDraft(false);
         }
     };
 
@@ -330,6 +361,8 @@ export const CreateEventSchedule: React.FC<Props> = ({ onNavigate }) => {
                     onNext={saving ? () => {} : handleNext}
                     nextText={saving ? 'Saving…' : 'Next: Media'}
                     nextIcon={saving ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} strokeWidth={2.75} />}
+                    onSaveDraft={saving ? undefined : handleSaveDraft}
+                    savingDraft={savingDraft}
                 />
             </div>
         </WizardShell>

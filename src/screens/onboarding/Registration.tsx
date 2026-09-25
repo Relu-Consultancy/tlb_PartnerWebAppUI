@@ -244,7 +244,7 @@ export const Registration: React.FC<OnboardingProps> = ({ onNavigate }) => {
                                 Email
                             </label>
                             <div className="relative">
-                                <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                                <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 block text-gray-400" />
                                 <input
                                     className="tlb-input pl-11"
                                     placeholder="sarah@grandtheater.com"
@@ -395,7 +395,6 @@ export const Registration: React.FC<OnboardingProps> = ({ onNavigate }) => {
                             <input
                                 type="file"
                                 multiple
-                                accept="image/png,image/jpeg"
                                 className="hidden"
                                 onChange={handleImageUpload}
                                 disabled={uploadingMedia}

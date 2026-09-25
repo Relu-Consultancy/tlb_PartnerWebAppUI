@@ -96,6 +96,21 @@ export const OTPVerify: React.FC<AuthProps> = ({ onNavigate, authData }) => {
             onNavigate('HOME');
         } catch (error) {
             console.error('Failed to verify OTP', error);
+            // USER_ROLE_MISMATCH: the identifier is a valid account, just not a partner
+            // one (e.g. registered as a customer). That's a distinct, actionable reason
+            // for the failure — surface it clearly instead of collapsing it into the
+            // generic "Invalid OTP" message, which would leave the user guessing.
+            if (error instanceof AuthApiError && error.code === 'USER_ROLE_MISMATCH') {
+                clearTokens();
+                sessionStorage.clear();
+                setOtp(['', '', '', '', '', '']);
+                showToast(
+                    'This email is registered as a Customer account and can\'t be used to log in to the Partner Portal.',
+                    'error',
+                    6000,
+                );
+                return;
+            }
             const message = error instanceof AuthApiError && error.status === 429 ? error.message : 'Invalid OTP. Please try again.';
             showToast(message, 'error');
         } finally {

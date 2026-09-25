@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
-import { FaqTermsEditor, FaqApi, RefundPolicyToggle } from '../../components/ui';
+import { FaqTermsEditor, FaqApi, RefundPolicyToggle, toast } from '../../components/ui';
 import { WizardShell, WizardNav } from '../../components/portal/wizard';
 import {
     getCurrentDraftId, getListingDetail, updateListing,
@@ -22,6 +22,7 @@ export const CreateEventPolicies: React.FC<Props> = ({ onNavigate }) => {
     // Backend treats an unset value as refundable.
     const [isRefundable, setIsRefundable] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [savingDraft, setSavingDraft] = useState(false);
     const [error, setError] = useState('');
 
     useEffect(() => {
@@ -53,6 +54,24 @@ export const CreateEventPolicies: React.FC<Props> = ({ onNavigate }) => {
         }
     };
 
+    // FAQs/terms save immediately as the partner edits them (via FaqTermsEditor),
+    // so the only thing left to persist here is the refund toggle.
+    const handleSaveDraft = async () => {
+        if (savingDraft) return;
+        if (!draftId) { onNavigate('SERVICE_LISTINGS'); return; }
+        setSavingDraft(true);
+        setError('');
+        try {
+            await updateListing(draftId, { is_refundable: isRefundable });
+            toast.success('Draft saved. Resume anytime from My Listings.');
+            onNavigate('SERVICE_LISTINGS');
+        } catch (e: any) {
+            setError(e?.message || 'Failed to save draft. Please try again.');
+        } finally {
+            setSavingDraft(false);
+        }
+    };
+
     return (
         <WizardShell title="New event" entityType="Events" step={4} totalSteps={5} stepLabel="FAQs & terms" onBack={() => onNavigate('CREATE_EVENT_MEDIA')}>
             <div className="pt-card p-5 sm:p-6 flex flex-col gap-6">
@@ -77,6 +96,8 @@ export const CreateEventPolicies: React.FC<Props> = ({ onNavigate }) => {
                     onNext={handleNext}
                     nextText={saving ? 'Saving…' : 'Next: Review'}
                     nextIcon={saving ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} strokeWidth={2.75} />}
+                    onSaveDraft={saving ? undefined : handleSaveDraft}
+                    savingDraft={savingDraft}
                 />
             </div>
         </WizardShell>

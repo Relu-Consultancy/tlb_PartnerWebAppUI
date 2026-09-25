@@ -206,6 +206,33 @@ describe('updateListing', () => {
         expect(err.code).toBe('VALIDATION_ERROR');
     });
 
+    it('extracts a plain message from a DRF-style field-keyed validation error instead of leaking the raw object', async () => {
+        server.use(http.patch(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, () =>
+            HttpResponse.json({
+                error: {
+                    code: 'VALIDATION_ERROR',
+                    message: { registration_deadline: ['Registration deadline must be on or before the event start date.'] },
+                },
+            }, { status: 400 })));
+        const err = await updateListing(DRAFT_ID, { registration_deadline: '2026-09-30T00:00:00Z' }).catch(e => e);
+        expect(err).toBeInstanceOf(ApiError);
+        expect(err.code).toBe('VALIDATION_ERROR');
+        expect(err.message).toBe('Registration deadline must be on or before the event start date.');
+    });
+
+    it('strips a leaked DRF ErrorDetail repr down to its quoted message', async () => {
+        server.use(http.patch(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, () =>
+            HttpResponse.json({
+                error: {
+                    code: 'VALIDATION_ERROR',
+                    message: "ErrorDetail(string='Registration deadline must be on or before the event start date.', code='invalid')",
+                },
+            }, { status: 400 })));
+        const err = await updateListing(DRAFT_ID, { registration_deadline: '2026-09-30T00:00:00Z' }).catch(e => e);
+        expect(err.message).toBe('Registration deadline must be on or before the event start date.');
+        expect(err.message).not.toContain('ErrorDetail');
+    });
+
     it('throws ApiError with LISTING_LOCKED on 400', async () => {
         server.use(http.patch(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, () =>
             HttpResponse.json({ error: { code: 'LISTING_LOCKED', message: 'Listing is pending' } }, { status: 400 })));

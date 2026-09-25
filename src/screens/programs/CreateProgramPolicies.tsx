@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
-import { FaqTermsEditor, FaqApi, RefundPolicyToggle } from '../../components/ui';
+import { toast, FaqTermsEditor, FaqApi, RefundPolicyToggle } from '../../components/ui';
 import { WizardShell, WizardNav, WizardField } from '../../components/portal/wizard';
 import {
     getCurrentProgramDraftId,
@@ -30,6 +30,7 @@ export const CreateProgramPolicies: React.FC<Props> = ({ onNavigate }) => {
     const [isRefundable, setIsRefundable] = useState(true);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [savingDraft, setSavingDraft] = useState(false);
     const [error, setError] = useState('');
 
     useEffect(() => {
@@ -51,22 +52,46 @@ export const CreateProgramPolicies: React.FC<Props> = ({ onNavigate }) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // Shared by "Next" and "Save as draft" — FAQs/terms save immediately per-edit
+    // via FaqTermsEditor; only the cancellation/refund policy fields are batched
+    // here. Neither caller requires the step to be complete.
+    const persist = async () => {
+        if (!draftId) return;
+        await updateProgramListing(draftId, {
+            ...(cancelPolicy.trim() ? { cancellation_policy: cancelPolicy.trim() } : {}),
+            ...(refundPolicy.trim() ? { refund_policy: refundPolicy.trim() } : {}),
+            is_refundable: isRefundable,
+        });
+    };
+
     const handleNext = async () => {
         if (saving) return;
         if (!draftId) { onNavigate('CREATE_PROGRAM_PREVIEW'); return; }
         setSaving(true);
         setError('');
         try {
-            await updateProgramListing(draftId, {
-                ...(cancelPolicy.trim() ? { cancellation_policy: cancelPolicy.trim() } : {}),
-                ...(refundPolicy.trim() ? { refund_policy: refundPolicy.trim() } : {}),
-                is_refundable: isRefundable,
-            });
+            await persist();
             onNavigate('CREATE_PROGRAM_PREVIEW');
         } catch (e: any) {
             setError(e?.message || 'Failed to save. Please try again.');
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleSaveDraft = async () => {
+        if (savingDraft) return;
+        setSavingDraft(true);
+        setError('');
+        try {
+            await persist();
+            toast.success('Draft saved. Resume anytime from My Listings.');
+            onNavigate('SERVICE_LISTINGS');
+        } catch (e: any) {
+            console.error('Failed to save draft', e);
+            toast.error(e?.message || 'Failed to save draft. Please try again.');
+        } finally {
+            setSavingDraft(false);
         }
     };
 
@@ -123,6 +148,8 @@ export const CreateProgramPolicies: React.FC<Props> = ({ onNavigate }) => {
                     onNext={handleNext}
                     nextText={saving ? 'Saving…' : 'Preview & finish'}
                     nextIcon={saving ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} strokeWidth={2.75} />}
+                    onSaveDraft={saving ? undefined : handleSaveDraft}
+                    savingDraft={savingDraft}
                 />
             </div>
         </WizardShell>

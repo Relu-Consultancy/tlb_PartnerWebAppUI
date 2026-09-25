@@ -216,7 +216,7 @@ export const CreateProgramPreview: React.FC<Props> = ({ onNavigate }) => {
             batches.length ? { icon: 'schedule', label: 'Batches', value: `${batches.length} batch${batches.length > 1 ? 'es' : ''}` } : null,
         ].filter(Boolean) as PreviewFact[],
         priceLabel: pgPrice != null ? (Number(pgPrice) > 0 ? `₹${Number(pgPrice).toLocaleString()}` : 'Free') : '—',
-        ctaLabel: 'Enquire Now',
+        ctaLabel: program.booking_type === 'direct_booking' ? 'Book Now' : 'Enquire Now',
     } : null;
 
     const handleSubmit = async () => {
@@ -303,6 +303,7 @@ export const CreateProgramPreview: React.FC<Props> = ({ onNavigate }) => {
                     }}
                     nextText={submitting ? 'Submitting…' : canSubmit ? 'Submit for review' : 'Back to listings'}
                     nextIcon={submitting ? <Loader2 size={14} className="animate-spin" /> : <Rocket size={14} strokeWidth={2.75} />}
+                    onSaveDraft={() => onNavigate('SERVICE_LISTINGS')}
                 />
             </div>
 

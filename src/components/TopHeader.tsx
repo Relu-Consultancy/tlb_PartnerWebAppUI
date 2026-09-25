@@ -5,7 +5,7 @@ import { NotificationCenter } from './NotificationCenter';
 import { EntityPickerSheet, createListingScreen } from './EntityPickerSheet';
 import { AccountMenu, DateRangePicker } from './portal';
 import { usePartner } from '../context/PartnerContext';
-import { getExtendedProfile } from '../api/onboarding';
+import { getBusinessProfile, getExtendedProfile } from '../api/onboarding';
 import { loadCurrentPartner, PARTNER_UPDATED_EVENT } from '../api/portalSummary';
 import { requestProfileSection } from '../constants/profileSections';
 
@@ -24,9 +24,17 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ onOpenSidebar, onNavigate 
     useEffect(() => {
         let cancelled = false;
         const loadIdentity = () => {
-            loadCurrentPartner().then(p => { if (!cancelled) setPartner(p); }).catch(() => {});
+            // /partner/me/ doesn't reliably carry business_name — /partner/profile/
+            // is the canonical source (same precedence EditProfile's form uses).
+            Promise.allSettled([loadCurrentPartner(), getBusinessProfile()]).then(([partnerRes, profileRes]) => {
+                if (cancelled) return;
+                const p = partnerRes.status === 'fulfilled' ? partnerRes.value : null;
+                const profile = profileRes.status === 'fulfilled' ? (profileRes.value?.data ?? profileRes.value) : null;
+                if (!p && !profile) return;
+                setPartner({ ...p, business_name: profile?.business_name || p?.business_name });
+            });
             getExtendedProfile()
-                .then(res => {
+                .then((res) => {
                     const ext = res?.data ?? res;
                     if (!cancelled) setLogoUrl(ext?.logo || ext?.logo_url || null);
                 })

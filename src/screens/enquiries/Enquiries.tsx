@@ -1,14 +1,27 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-    Search, Filter, Lock, Phone, MessageCircle, X, StickyNote,
-    Users, Sparkles, CheckCircle2, CalendarClock, Check,
+    Search,
+    Filter,
+    Lock,
+    Phone,
+    MessageCircle,
+    X,
+    StickyNote,
+    Users,
+    Sparkles,
+    CheckCircle2,
+    CalendarClock,
+    Check,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Screen, EnquiryStatus } from '../../types';
 import { toast, Select, LoadingState, ErrorState, EmptyState, NoSearchResultState, Pagination } from '../../components/ui';
 import { getClassEnquiries, updateClassEnquiry, unlockClassEnquiry } from '../../api/listings';
 
-interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
+interface Props {
+    onNavigate: (screen: Screen) => void;
+    onOpenSidebar: () => void;
+}
 
 interface Lead {
     id: string;
@@ -27,38 +40,49 @@ interface Lead {
 
 // ── API status values ↔ display labels ─────────────────────────────────────
 const STATUS_OPTIONS: { value: EnquiryStatus; label: string }[] = [
-    { value: 'new',           label: 'New' },
-    { value: 'contacted',     label: 'Contacted' },
-    { value: 'trial_booked',  label: 'Trial Booked' },
-    { value: 'closed',        label: 'Closed' },
+    { value: 'new', label: 'New' },
+    { value: 'contacted', label: 'Contacted' },
+    { value: 'trial_booked', label: 'Trial Booked' },
+    { value: 'closed', label: 'Closed' },
 ];
 
 // Accent metadata (hex so it survives Tailwind's JIT in dynamic styles)
 const STATUS_META: Record<EnquiryStatus, { fg: string; bg: string; dot: string }> = {
-    new:          { fg: '#2563EB', bg: '#EFF6FF', dot: '#3B82F6' },
-    contacted:    { fg: '#059669', bg: '#ECFDF5', dot: '#10B981' },
+    new: { fg: '#2563EB', bg: '#EFF6FF', dot: '#3B82F6' },
+    contacted: { fg: '#059669', bg: '#ECFDF5', dot: '#10B981' },
     trial_booked: { fg: '#7C3AED', bg: '#F5F3FF', dot: '#8B5CF6' },
-    enrolled:             { fg: '#7C3AED', bg: '#F5F3FF', dot: '#8B5CF6' },
+    enrolled: { fg: '#7C3AED', bg: '#F5F3FF', dot: '#8B5CF6' },
     site_visit_scheduled: { fg: '#B45309', bg: '#FFFBEB', dot: '#F59E0B' },
-    closed:               { fg: '#4B5563', bg: '#F3F4F6', dot: '#9CA3AF' },
+    closed: { fg: '#4B5563', bg: '#F3F4F6', dot: '#9CA3AF' },
 };
 
 const statusStyle = (s: EnquiryStatus) => {
     switch (s) {
-        case 'new':          return 'bg-blue-500 text-white border-blue-600';
-        case 'contacted':    return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-        case 'trial_booked': return 'bg-purple-100 text-purple-700 border-purple-200';
-        case 'closed':       return 'bg-gray-100 text-gray-600 border-gray-200';
-        default:             return 'bg-gray-100 text-gray-600 border-gray-200';
+        case 'new':
+            return 'bg-blue-500 text-white border-blue-600';
+        case 'contacted':
+            return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+        case 'trial_booked':
+            return 'bg-purple-100 text-purple-700 border-purple-200';
+        case 'closed':
+            return 'bg-gray-100 text-gray-600 border-gray-200';
+        default:
+            return 'bg-gray-100 text-gray-600 border-gray-200';
     }
 };
 
 const initials = (name: string) =>
-    name.trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('') || '?';
+    name
+        .trim()
+        .split(/\s+/)
+        .slice(0, 2)
+        .map((w) => w[0]?.toUpperCase() ?? '')
+        .join('') || '?';
 
 const avatarTint = (name: string) => {
     const palette = ['#3B82F6', '#8B5CF6', '#10B981', '#F59E0B', '#EC4899', '#06B6D4'];
-    let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) & 0xffff;
+    let h = 0;
+    for (const c of name) h = (h * 31 + c.charCodeAt(0)) & 0xffff;
     return palette[h % palette.length];
 };
 
@@ -75,7 +99,6 @@ export const Enquiries: React.FC<Props> = () => {
 
     useEffect(() => {
         loadEnquiries();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const loadEnquiries = async () => {
@@ -83,7 +106,7 @@ export const Enquiries: React.FC<Props> = () => {
             setIsLoading(true);
             setHasError(false);
             const res = await getClassEnquiries();
-            const raw: any[] = Array.isArray(res) ? res : (res.data || []);
+            const raw: any[] = Array.isArray(res) ? res : res.data || [];
             const formattedData: Lead[] = raw.map((item: any) => ({
                 id: String(item.id),
                 classTitle: item.class_title || '',
@@ -115,7 +138,7 @@ export const Enquiries: React.FC<Props> = () => {
                 isUnlocked: !!item.is_contact_unlocked,
                 contact: item.mobile || 'Hidden',
             };
-            setLeads(prev => prev.map(l => l.id === id ? { ...l, ...updatedLead } : l));
+            setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, ...updatedLead } : l)));
             if (selectedLead && selectedLead.id === id) {
                 setSelectedLead({ ...selectedLead, ...updatedLead });
             }
@@ -127,7 +150,7 @@ export const Enquiries: React.FC<Props> = () => {
 
     const updateStatus = async (id: string, status: EnquiryStatus) => {
         try {
-            setLeads(prev => prev.map(l => l.id === id ? { ...l, status } : l));
+            setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, status } : l)));
             await updateClassEnquiry(id, { status });
             if (selectedLead && selectedLead.id === id) {
                 setSelectedLead({ ...selectedLead, status });
@@ -140,7 +163,7 @@ export const Enquiries: React.FC<Props> = () => {
 
     const updateNotes = async (id: string, notes: string) => {
         try {
-            setLeads(prev => prev.map(l => l.id === id ? { ...l, notes } : l));
+            setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, notes } : l)));
             await updateClassEnquiry(id, { internal_notes: notes });
             if (selectedLead && selectedLead.id === id) {
                 setSelectedLead({ ...selectedLead, notes });
@@ -158,337 +181,434 @@ export const Enquiries: React.FC<Props> = () => {
         return c;
     }, [leads]);
 
-    const filtered = leads.filter(l =>
-        (statusFilter === '' || l.status === statusFilter) &&
-        (l.studentName.toLowerCase().includes(search.toLowerCase()) ||
-         l.classTitle.toLowerCase().includes(search.toLowerCase()))
+    const filtered = leads.filter(
+        (l) =>
+            (statusFilter === '' || l.status === statusFilter) &&
+            (l.studentName.toLowerCase().includes(search.toLowerCase()) || l.classTitle.toLowerCase().includes(search.toLowerCase()))
     );
 
-    useEffect(() => { setCurrentPage(1); }, [search, statusFilter]);
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [search, statusFilter]);
 
     const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
     const paginatedLeads = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
     const kpiCards: { key: EnquiryStatus | ''; label: string; icon: React.ElementType; fg: string; bg: string }[] = [
-        { key: '',            label: 'Total Leads',  icon: Users,        fg: '#CA8A04', bg: '#FEFCE8' },
-        { key: 'new',         label: 'New',          icon: Sparkles,     fg: STATUS_META.new.fg,          bg: STATUS_META.new.bg },
-        { key: 'contacted',   label: 'Contacted',    icon: Phone,        fg: STATUS_META.contacted.fg,    bg: STATUS_META.contacted.bg },
-        { key: 'trial_booked',label: 'Trial Booked', icon: CalendarClock,fg: STATUS_META.trial_booked.fg, bg: STATUS_META.trial_booked.bg },
-        { key: 'closed',      label: 'Closed',       icon: CheckCircle2, fg: STATUS_META.closed.fg,       bg: STATUS_META.closed.bg },
+        { key: '', label: 'Total Leads', icon: Users, fg: '#CA8A04', bg: '#FEFCE8' },
+        { key: 'new', label: 'New', icon: Sparkles, fg: STATUS_META.new.fg, bg: STATUS_META.new.bg },
+        { key: 'contacted', label: 'Contacted', icon: Phone, fg: STATUS_META.contacted.fg, bg: STATUS_META.contacted.bg },
+        {
+            key: 'trial_booked',
+            label: 'Trial Booked',
+            icon: CalendarClock,
+            fg: STATUS_META.trial_booked.fg,
+            bg: STATUS_META.trial_booked.bg,
+        },
+        { key: 'closed', label: 'Closed', icon: CheckCircle2, fg: STATUS_META.closed.fg, bg: STATUS_META.closed.bg },
     ];
 
     if (isLoading) return <LoadingState msg="Loading class enquiries..." />;
     if (hasError) return <ErrorState onRetry={loadEnquiries} />;
     if (!isLoading && !hasError && leads.length === 0) {
         return (
-            <EmptyState 
-                title="No Class Enquiries" 
-                desc="When students enquire about your classes, they will appear here. Keep your profile updated to attract more leads!" 
+            <EmptyState
+                title="No Class Enquiries"
+                desc="When students enquire about your classes, they will appear here. Keep your profile updated to attract more leads!"
             />
         );
     }
 
     return (
         <>
-        <main className="p-5 md:p-6">
-            <div className="max-w-6xl mx-auto space-y-6">
-                {/* KPI / quick-filter cards */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                    {kpiCards.map(card => {
-                        const active = statusFilter === card.key;
-                        return (
-                            <motion.div
-                                key={card.key || 'all'}
-                                onClick={() => setStatusFilter(card.key)}
-                                whileHover={{ y: -3 }}
-                                whileTap={{ scale: 0.97 }}
-                                className={`cursor-pointer rounded-2xl p-4 border bg-white transition-all ${active ? 'border-tlb-yellow ring-2 ring-tlb-yellow/30 shadow-md' : 'border-gray-100 shadow-sm hover:shadow-md'}`}
-                            >
-                                <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-2.5" style={{ background: card.bg, color: card.fg }}>
-                                    <card.icon size={16} />
-                                </div>
-                                <p className="text-2xl font-black leading-none text-gray-900">{counts[card.key] ?? 0}</p>
-                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1.5">{card.label}</p>
-                            </motion.div>
-                        );
-                    })}
-                </div>
-
-                {/* Search + Filter */}
-                <div className="flex gap-3">
-                    <div className="flex-1 bg-white border border-gray-100 rounded-2xl px-4 py-3 flex items-center gap-3 shadow-sm focus-within:border-tlb-yellow transition-colors">
-                        <Search size={18} className="text-gray-400" />
-                        <input className="bg-transparent flex-1 text-sm outline-none" placeholder="Search by student or class name..." value={search} onChange={(e) => setSearch(e.target.value)} />
-                        {search && <button onClick={() => setSearch('')} className="text-gray-300 hover:text-gray-500"><X size={16} /></button>}
-                    </div>
-                    <div className="relative">
-                        <button
-                            onClick={() => setShowFilter(!showFilter)}
-                            className={`bg-white border p-3 rounded-2xl shadow-sm transition-colors ${statusFilter ? 'border-tlb-yellow text-tlb-yellow' : 'border-gray-100 text-gray-400 hover:text-gray-600'}`}
-                        >
-                            <Filter size={18} />
-                        </button>
-                        <AnimatePresence>
-                        {showFilter && (
-                            <motion.div
-                                initial={{ opacity: 0, y: -6, scale: 0.97 }}
-                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                exit={{ opacity: 0, y: -6, scale: 0.97 }}
-                                transition={{ duration: 0.15 }}
-                                className="absolute right-0 top-full mt-2 bg-white border border-gray-100 rounded-2xl shadow-xl z-20 p-2 min-w-[170px]"
-                            >
-                                <button
-                                    onClick={() => { setStatusFilter(''); setShowFilter(false); }}
-                                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-colors flex items-center justify-between ${!statusFilter ? 'bg-tlb-yellow/10 text-tlb-yellow' : 'text-gray-500 hover:bg-gray-50'}`}
+            <main className="p-5 md:p-6">
+                <div className="max-w-6xl mx-auto space-y-6">
+                    {/* KPI / quick-filter cards */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                        {kpiCards.map((card) => {
+                            const active = statusFilter === card.key;
+                            return (
+                                <motion.div
+                                    key={card.key || 'all'}
+                                    onClick={() => setStatusFilter(card.key)}
+                                    whileHover={{ y: -3 }}
+                                    whileTap={{ scale: 0.97 }}
+                                    className={`cursor-pointer rounded-2xl p-4 border bg-white transition-all ${active ? 'border-tlb-yellow ring-2 ring-tlb-yellow/30 shadow-md' : 'border-gray-100 shadow-sm hover:shadow-md'}`}
                                 >
-                                    All Statuses {!statusFilter && <Check size={13} />}
-                                </button>
-                                {STATUS_OPTIONS.map(opt => (
-                                    <button
-                                        key={opt.value}
-                                        onClick={() => { setStatusFilter(opt.value); setShowFilter(false); }}
-                                        className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-colors flex items-center justify-between ${statusFilter === opt.value ? 'bg-tlb-yellow/10 text-tlb-yellow' : 'text-gray-500 hover:bg-gray-50'}`}
+                                    <div
+                                        className="w-8 h-8 rounded-xl flex items-center justify-center mb-2.5"
+                                        style={{ background: card.bg, color: card.fg }}
                                     >
-                                        {opt.label} {statusFilter === opt.value && <Check size={13} />}
-                                    </button>
-                                ))}
-                            </motion.div>
-                        )}
-                        </AnimatePresence>
-                    </div>
-                </div>
-
-                {/* Enquiries Table */}
-                <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-gray-50/70 border-b border-gray-100">
-                                    <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest">Student</th>
-                                    <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest">Class / Batch</th>
-                                    <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest text-center">Age</th>
-                                    <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest">Received</th>
-                                    <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest">Contact</th>
-                                    <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-50">
-                                {paginatedLeads.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={6} className="p-0">
-                                            <NoSearchResultState 
-                                                query={search || statusFilter || 'filters'} 
-                                                onClear={() => { setSearch(''); setStatusFilter(''); }} 
-                                            />
-                                        </td>
-                                    </tr>
-                                ) : paginatedLeads.map((lead, i) => (
-                                    <motion.tr
-                                        key={lead.id}
-                                        initial={{ opacity: 0, y: 6 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ duration: 0.25, delay: Math.min(i * 0.03, 0.3) }}
-                                        onClick={() => setSelectedLead(lead)}
-                                        className={`hover:bg-gray-50/70 transition-colors cursor-pointer ${lead.status === 'new' ? 'bg-blue-50/30' : ''}`}
-                                    >
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-black shrink-0" style={{ background: avatarTint(lead.studentName) }}>
-                                                    {initials(lead.studentName)}
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="font-bold text-sm text-gray-900 truncate">{lead.studentName}</span>
-                                                        {lead.status === 'new' && (
-                                                            <span className="flex items-center gap-1 bg-blue-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded uppercase">
-                                                                <span className="w-1 h-1 rounded-full bg-white animate-pulse" />New
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                    {lead.parentName && <p className="text-[11px] text-gray-400 truncate">Parent: {lead.parentName}</p>}
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            {lead.classTitle && <p className="text-xs font-bold text-gray-700">{lead.classTitle}</p>}
-                                            <p className="text-xs text-gray-400">{lead.batch}</p>
-                                        </td>
-                                        <td className="px-6 py-4 text-center"><span className="text-sm text-gray-500">{lead.age}</span></td>
-                                        <td className="px-6 py-4"><span className="text-[11px] font-bold text-gray-400">{lead.dateTime}</span></td>
-                                        <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                                            {!lead.isUnlocked ? (
-                                                <button
-                                                    onClick={() => unlockLead(lead.id)}
-                                                    className="bg-tlb-yellow/10 text-tlb-yellow px-4 py-2 rounded-xl flex items-center justify-center gap-2 text-xs font-black border border-tlb-yellow/20 hover:bg-tlb-yellow/20 transition-all"
-                                                >
-                                                    <Lock size={14} /> Unlock Mobile
-                                                </button>
-                                            ) : (
-                                                <div className="flex items-center gap-3">
-                                                    <span className="text-sm font-black text-gray-700 whitespace-nowrap">{lead.contact}</span>
-                                                    <div className="flex gap-1">
-                                                        <a href={`tel:${lead.contact}`} title="Call" className="bg-emerald-50 text-emerald-600 p-2 rounded-lg hover:bg-emerald-100 transition-colors border border-emerald-100">
-                                                            <Phone size={14} />
-                                                        </a>
-                                                        <a href={`https://wa.me/91${lead.contact.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" title="WhatsApp" className="bg-green-50 text-green-600 p-2 rounded-lg hover:bg-green-100 transition-colors border border-green-100">
-                                                            <MessageCircle size={14} />
-                                                        </a>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                                            <Select
-                                                value={lead.status}
-                                                onChange={(v) => updateStatus(lead.id, v as EnquiryStatus)}
-                                                options={STATUS_OPTIONS}
-                                                ariaLabel="Lead status"
-                                                align="right"
-                                                className="inline-block"
-                                                buttonClassName={`inline-flex items-center gap-1.5 text-xs font-bold rounded-xl px-3 py-2 border outline-none cursor-pointer transition-all shadow-sm ${statusStyle(lead.status)}`}
-                                            />
-                                        </td>
-                                    </motion.tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <Pagination 
-                        currentPage={currentPage}
-                        totalPages={totalPages}
-                        totalItems={filtered.length}
-                        itemsPerPage={ITEMS_PER_PAGE}
-                        onPageChange={setCurrentPage}
-                    />
-                </div>
-            </div>
-        </main>
-
-        {/* Slide-out Lead Card */}
-        <AnimatePresence>
-        {selectedLead && (
-            <>
-                <motion.div
-                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                    className="fixed inset-0 bg-black/40 z-40 backdrop-blur-sm" onClick={() => setSelectedLead(null)}
-                />
-                <motion.div
-                    initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
-                    transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-                    className="fixed top-0 right-0 bottom-0 w-full sm:w-[420px] bg-white z-50 shadow-2xl flex flex-col"
-                >
-                    {/* Gradient header */}
-                    <div className="relative p-6 pb-7 bg-gradient-to-br from-gray-900 to-gray-700 text-white">
-                        <button onClick={() => setSelectedLead(null)} className="absolute top-5 right-5 p-2 hover:bg-white/10 rounded-full transition-colors"><X size={18} /></button>
-                        <div className="flex items-center gap-4">
-                            <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-black shrink-0" style={{ background: avatarTint(selectedLead.studentName) }}>
-                                {initials(selectedLead.studentName)}
-                            </div>
-                            <div className="min-w-0">
-                                <p className="text-xl font-black truncate">{selectedLead.studentName}</p>
-                                {selectedLead.parentName && <p className="text-sm text-white/60 truncate">Parent: {selectedLead.parentName}</p>}
-                            </div>
-                        </div>
+                                        <card.icon size={16} />
+                                    </div>
+                                    <p className="text-2xl font-black leading-none text-gray-900">{counts[card.key] ?? 0}</p>
+                                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1.5">{card.label}</p>
+                                </motion.div>
+                            );
+                        })}
                     </div>
 
-                    <div className="flex-1 overflow-auto p-6 space-y-5 -mt-3 bg-white rounded-t-3xl">
-                        {/* Status segmented control */}
-                        <div>
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">Status</label>
-                            <div className="grid grid-cols-2 gap-2">
-                                {STATUS_OPTIONS.map(opt => {
-                                    const active = selectedLead.status === opt.value;
-                                    const m = STATUS_META[opt.value];
-                                    return (
-                                        <button
-                                            key={opt.value}
-                                            onClick={() => updateStatus(selectedLead.id, opt.value)}
-                                            className="px-3 py-2.5 rounded-xl text-xs font-black border transition-all flex items-center justify-center gap-1.5"
-                                            style={active
-                                                ? { background: m.bg, color: m.fg, borderColor: m.dot }
-                                                : { background: '#fff', color: '#9CA3AF', borderColor: '#F3F4F6' }}
-                                        >
-                                            {active && <Check size={13} />}{opt.label}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        {/* Detail grid */}
-                        <div className="space-y-3">
-                            {selectedLead.classTitle && (
-                                <div className="bg-gray-50 rounded-xl px-4 py-3">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Class</p>
-                                    <p className="text-sm font-bold mt-0.5">{selectedLead.classTitle}</p>
-                                </div>
-                            )}
-                            <div className="bg-gray-50 rounded-xl px-4 py-3">
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Batch Interested</p>
-                                <p className="text-sm font-bold mt-0.5">{selectedLead.batch}</p>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="bg-gray-50 rounded-xl px-4 py-3">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Age</p>
-                                    <p className="text-sm font-bold mt-0.5">{selectedLead.age}</p>
-                                </div>
-                                <div className="bg-gray-50 rounded-xl px-4 py-3">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Enquiry Date</p>
-                                    <p className="text-sm font-bold mt-0.5">{selectedLead.dateTime}</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {selectedLead.message && (
-                            <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
-                                <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-1">Message</p>
-                                <p className="text-sm text-blue-800 italic">"{selectedLead.message}"</p>
-                            </div>
-                        )}
-
-                        {/* Internal Notes */}
-                        <div>
-                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                                <StickyNote size={12} /> Internal Notes
-                            </label>
-                            <textarea
-                                className="tlb-input w-full min-h-[96px] resize-y"
-                                placeholder="Add your notes here... (e.g. Called on 12th, will come for trial next week)"
-                                defaultValue={selectedLead.notes}
-                                onBlur={(e) => updateNotes(selectedLead.id, e.target.value)}
+                    {/* Search + Filter */}
+                    <div className="flex gap-3">
+                        <div className="flex-1 bg-white border border-gray-100 rounded-2xl px-4 py-3 flex items-center gap-3 shadow-sm focus-within:border-tlb-yellow transition-colors">
+                            <Search size={18} className="text-gray-400" />
+                            <input
+                                className="bg-transparent flex-1 text-sm outline-none"
+                                placeholder="Search by student or class name..."
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
                             />
+                            {search && (
+                                <button onClick={() => setSearch('')} className="text-gray-300 hover:text-gray-500">
+                                    <X size={16} />
+                                </button>
+                            )}
+                        </div>
+                        <div className="relative">
+                            <button
+                                onClick={() => setShowFilter(!showFilter)}
+                                className={`bg-white border p-3 rounded-2xl shadow-sm transition-colors ${statusFilter ? 'border-tlb-yellow text-tlb-yellow' : 'border-gray-100 text-gray-400 hover:text-gray-600'}`}
+                            >
+                                <Filter size={18} />
+                            </button>
+                            <AnimatePresence>
+                                {showFilter && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: -6, scale: 0.97 }}
+                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        exit={{ opacity: 0, y: -6, scale: 0.97 }}
+                                        transition={{ duration: 0.15 }}
+                                        className="absolute right-0 top-full mt-2 bg-white border border-gray-100 rounded-2xl shadow-xl z-20 p-2 min-w-[170px]"
+                                    >
+                                        <button
+                                            onClick={() => {
+                                                setStatusFilter('');
+                                                setShowFilter(false);
+                                            }}
+                                            className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-colors flex items-center justify-between ${!statusFilter ? 'bg-tlb-yellow/10 text-tlb-yellow' : 'text-gray-500 hover:bg-gray-50'}`}
+                                        >
+                                            All Statuses {!statusFilter && <Check size={13} />}
+                                        </button>
+                                        {STATUS_OPTIONS.map((opt) => (
+                                            <button
+                                                key={opt.value}
+                                                onClick={() => {
+                                                    setStatusFilter(opt.value);
+                                                    setShowFilter(false);
+                                                }}
+                                                className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-colors flex items-center justify-between ${statusFilter === opt.value ? 'bg-tlb-yellow/10 text-tlb-yellow' : 'text-gray-500 hover:bg-gray-50'}`}
+                                            >
+                                                {opt.label} {statusFilter === opt.value && <Check size={13} />}
+                                            </button>
+                                        ))}
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    </div>
+
+                    {/* Enquiries Table */}
+                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-gray-50/70 border-b border-gray-100">
+                                        <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest">
+                                            Student
+                                        </th>
+                                        <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest">
+                                            Class / Batch
+                                        </th>
+                                        <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest text-center">
+                                            Age
+                                        </th>
+                                        <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest">
+                                            Received
+                                        </th>
+                                        <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest">
+                                            Contact
+                                        </th>
+                                        <th className="px-6 py-4 text-[11px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {paginatedLeads.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={6} className="p-0">
+                                                <NoSearchResultState
+                                                    query={search || statusFilter || 'filters'}
+                                                    onClear={() => {
+                                                        setSearch('');
+                                                        setStatusFilter('');
+                                                    }}
+                                                />
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        paginatedLeads.map((lead, i) => (
+                                            <motion.tr
+                                                key={lead.id}
+                                                initial={{ opacity: 0, y: 6 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ duration: 0.25, delay: Math.min(i * 0.03, 0.3) }}
+                                                onClick={() => setSelectedLead(lead)}
+                                                className={`hover:bg-gray-50/70 transition-colors cursor-pointer ${lead.status === 'new' ? 'bg-blue-50/30' : ''}`}
+                                            >
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div
+                                                            className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-black shrink-0"
+                                                            style={{ background: avatarTint(lead.studentName) }}
+                                                        >
+                                                            {initials(lead.studentName)}
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-bold text-sm text-gray-900 truncate">
+                                                                    {lead.studentName}
+                                                                </span>
+                                                                {lead.status === 'new' && (
+                                                                    <span className="flex items-center gap-1 bg-blue-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded uppercase">
+                                                                        <span className="w-1 h-1 rounded-full bg-white animate-pulse" />
+                                                                        New
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            {lead.parentName && (
+                                                                <p className="text-[11px] text-gray-400 truncate">
+                                                                    Parent: {lead.parentName}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    {lead.classTitle && (
+                                                        <p className="text-xs font-bold text-gray-700">{lead.classTitle}</p>
+                                                    )}
+                                                    <p className="text-xs text-gray-400">{lead.batch}</p>
+                                                </td>
+                                                <td className="px-6 py-4 text-center">
+                                                    <span className="text-sm text-gray-500">{lead.age}</span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className="text-[11px] font-bold text-gray-400">{lead.dateTime}</span>
+                                                </td>
+                                                <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                                                    {!lead.isUnlocked ? (
+                                                        <button
+                                                            onClick={() => unlockLead(lead.id)}
+                                                            className="bg-tlb-yellow/10 text-tlb-yellow px-4 py-2 rounded-xl flex items-center justify-center gap-2 text-xs font-black border border-tlb-yellow/20 hover:bg-tlb-yellow/20 transition-all"
+                                                        >
+                                                            <Lock size={14} /> Unlock Mobile
+                                                        </button>
+                                                    ) : (
+                                                        <div className="flex items-center gap-3">
+                                                            <span className="text-sm font-black text-gray-700 whitespace-nowrap">
+                                                                {lead.contact}
+                                                            </span>
+                                                            <div className="flex gap-1">
+                                                                <a
+                                                                    href={`tel:${lead.contact}`}
+                                                                    title="Call"
+                                                                    className="bg-emerald-50 text-emerald-600 p-2 rounded-lg hover:bg-emerald-100 transition-colors border border-emerald-100"
+                                                                >
+                                                                    <Phone size={14} />
+                                                                </a>
+                                                                <a
+                                                                    href={`https://wa.me/91${lead.contact.replace(/\D/g, '')}`}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    title="WhatsApp"
+                                                                    className="bg-green-50 text-green-600 p-2 rounded-lg hover:bg-green-100 transition-colors border border-green-100"
+                                                                >
+                                                                    <MessageCircle size={14} />
+                                                                </a>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                                                    <Select
+                                                        value={lead.status}
+                                                        onChange={(v) => updateStatus(lead.id, v as EnquiryStatus)}
+                                                        options={STATUS_OPTIONS}
+                                                        ariaLabel="Lead status"
+                                                        align="right"
+                                                        className="inline-block"
+                                                        buttonClassName={`inline-flex items-center gap-1.5 text-xs font-bold rounded-xl px-3 py-2 border outline-none cursor-pointer transition-all shadow-sm ${statusStyle(lead.status)}`}
+                                                    />
+                                                </td>
+                                            </motion.tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
 
-                        {/* Contact Actions */}
-                        {selectedLead.isUnlocked ? (
-                            <div className="space-y-3">
-                                <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center gap-2">
-                                    <Phone size={14} className="text-gray-400" />
-                                    <span className="text-sm font-black">{selectedLead.contact}</span>
-                                </div>
-                                <div className="flex gap-3">
-                                    <a href={`tel:${selectedLead.contact}`} className="flex-1 bg-emerald-500 text-white py-3 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-emerald-600 transition-colors">
-                                        <Phone size={16} /> Call
-                                    </a>
-                                    <a href={`https://wa.me/91${selectedLead.contact.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="flex-1 bg-green-500 text-white py-3 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-green-600 transition-colors">
-                                        <MessageCircle size={16} /> WhatsApp
-                                    </a>
+                        <Pagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            totalItems={filtered.length}
+                            itemsPerPage={ITEMS_PER_PAGE}
+                            onPageChange={setCurrentPage}
+                        />
+                    </div>
+                </div>
+            </main>
+
+            {/* Slide-out Lead Card */}
+            <AnimatePresence>
+                {selectedLead && (
+                    <>
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 bg-black/40 z-40 backdrop-blur-sm"
+                            onClick={() => setSelectedLead(null)}
+                        />
+                        <motion.div
+                            initial={{ x: '100%' }}
+                            animate={{ x: 0 }}
+                            exit={{ x: '100%' }}
+                            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+                            className="fixed top-0 right-0 bottom-0 w-full sm:w-[420px] bg-white z-50 shadow-2xl flex flex-col"
+                        >
+                            {/* Gradient header */}
+                            <div className="relative p-6 pb-7 bg-gradient-to-br from-gray-900 to-gray-700 text-white">
+                                <button
+                                    onClick={() => setSelectedLead(null)}
+                                    className="absolute top-5 right-5 p-2 hover:bg-white/10 rounded-full transition-colors"
+                                >
+                                    <X size={18} />
+                                </button>
+                                <div className="flex items-center gap-4">
+                                    <div
+                                        className="w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-black shrink-0"
+                                        style={{ background: avatarTint(selectedLead.studentName) }}
+                                    >
+                                        {initials(selectedLead.studentName)}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="text-xl font-black truncate">{selectedLead.studentName}</p>
+                                        {selectedLead.parentName && (
+                                            <p className="text-sm text-white/60 truncate">Parent: {selectedLead.parentName}</p>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
-                        ) : (
-                            <button
-                                onClick={() => unlockLead(selectedLead.id)}
-                                className="w-full bg-tlb-yellow text-tlb-dark py-3.5 rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:brightness-95 transition-all"
-                            >
-                                <Lock size={16} /> Unlock Contact Info
-                            </button>
-                        )}
-                    </div>
-                </motion.div>
-            </>
-        )}
-        </AnimatePresence>
+
+                            <div className="flex-1 overflow-auto p-6 space-y-5 -mt-3 bg-white rounded-t-3xl">
+                                {/* Status segmented control */}
+                                <div>
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">
+                                        Status
+                                    </label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {STATUS_OPTIONS.map((opt) => {
+                                            const active = selectedLead.status === opt.value;
+                                            const m = STATUS_META[opt.value];
+                                            return (
+                                                <button
+                                                    key={opt.value}
+                                                    onClick={() => updateStatus(selectedLead.id, opt.value)}
+                                                    className="px-3 py-2.5 rounded-xl text-xs font-black border transition-all flex items-center justify-center gap-1.5"
+                                                    style={
+                                                        active
+                                                            ? { background: m.bg, color: m.fg, borderColor: m.dot }
+                                                            : { background: '#fff', color: '#9CA3AF', borderColor: '#F3F4F6' }
+                                                    }
+                                                >
+                                                    {active && <Check size={13} />}
+                                                    {opt.label}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* Detail grid */}
+                                <div className="space-y-3">
+                                    {selectedLead.classTitle && (
+                                        <div className="bg-gray-50 rounded-xl px-4 py-3">
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Class</p>
+                                            <p className="text-sm font-bold mt-0.5">{selectedLead.classTitle}</p>
+                                        </div>
+                                    )}
+                                    <div className="bg-gray-50 rounded-xl px-4 py-3">
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Batch Interested</p>
+                                        <p className="text-sm font-bold mt-0.5">{selectedLead.batch}</p>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="bg-gray-50 rounded-xl px-4 py-3">
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Age</p>
+                                            <p className="text-sm font-bold mt-0.5">{selectedLead.age}</p>
+                                        </div>
+                                        <div className="bg-gray-50 rounded-xl px-4 py-3">
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Enquiry Date</p>
+                                            <p className="text-sm font-bold mt-0.5">{selectedLead.dateTime}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {selectedLead.message && (
+                                    <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
+                                        <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-1">Message</p>
+                                        <p className="text-sm text-blue-800 italic">"{selectedLead.message}"</p>
+                                    </div>
+                                )}
+
+                                {/* Internal Notes */}
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                                        <StickyNote size={12} /> Internal Notes
+                                    </label>
+                                    <textarea
+                                        className="tlb-input w-full min-h-[96px] resize-y"
+                                        placeholder="Add your notes here... (e.g. Called on 12th, will come for trial next week)"
+                                        defaultValue={selectedLead.notes}
+                                        onBlur={(e) => updateNotes(selectedLead.id, e.target.value)}
+                                    />
+                                </div>
+
+                                {/* Contact Actions */}
+                                {selectedLead.isUnlocked ? (
+                                    <div className="space-y-3">
+                                        <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center gap-2">
+                                            <Phone size={14} className="text-gray-400" />
+                                            <span className="text-sm font-black">{selectedLead.contact}</span>
+                                        </div>
+                                        <div className="flex gap-3">
+                                            <a
+                                                href={`tel:${selectedLead.contact}`}
+                                                className="flex-1 bg-emerald-500 text-white py-3 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-emerald-600 transition-colors"
+                                            >
+                                                <Phone size={16} /> Call
+                                            </a>
+                                            <a
+                                                href={`https://wa.me/91${selectedLead.contact.replace(/\D/g, '')}`}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="flex-1 bg-green-500 text-white py-3 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-green-600 transition-colors"
+                                            >
+                                                <MessageCircle size={16} /> WhatsApp
+                                            </a>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => unlockLead(selectedLead.id)}
+                                        className="w-full bg-tlb-yellow text-tlb-dark py-3.5 rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:brightness-95 transition-all"
+                                    >
+                                        <Lock size={16} /> Unlock Contact Info
+                                    </button>
+                                )}
+                            </div>
+                        </motion.div>
+                    </>
+                )}
+            </AnimatePresence>
         </>
     );
 };

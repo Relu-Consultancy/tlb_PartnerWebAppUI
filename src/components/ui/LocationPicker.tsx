@@ -2,7 +2,14 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Search, MapPin, Loader2, X, Navigation, CheckCircle2 } from 'lucide-react';
-import { autocompleteLocation, getPlaceDetails, reverseGeocodeLocation, LocationApiError, LocationSuggestion, ResolvedLocation } from '../../api/location';
+import {
+    autocompleteLocation,
+    getPlaceDetails,
+    reverseGeocodeLocation,
+    LocationApiError,
+    LocationSuggestion,
+    ResolvedLocation,
+} from '../../api/location';
 
 export interface PickedLocation extends ResolvedLocation {
     place_id?: string;
@@ -59,9 +66,7 @@ const debounce = <A extends any[]>(fn: (...args: A) => void, ms: number) => {
     };
 };
 
-export const LocationPicker: React.FC<LocationPickerProps> = ({
-    initialLatitude, initialLongitude, initialAddress, onSelect,
-}) => {
+export const LocationPicker: React.FC<LocationPickerProps> = ({ initialLatitude, initialLongitude, initialAddress, onSelect }) => {
     const mapElRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<L.Map | null>(null);
     const markerRef = useRef<L.Marker | null>(null);
@@ -89,24 +94,26 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
     };
 
     // ─── Drop / move the pin, then resolve its address ────────────────────
-    const resolvePin = useCallback(debounce(async (lat: number, lng: number) => {
-        setResolving(true);
-        setError(null);
-        try {
-            const loc = await reverseGeocodeLocation(lat, lng);
-            // Google may snap to the nearest addressable point — re-center the
-            // marker on the coordinates actually being saved, not the raw drop.
-            if (markerRef.current) markerRef.current.setLatLng([loc.latitude, loc.longitude]);
-            setResolvedAddress(loc.address);
-            setCoords({ lat: loc.latitude, lng: loc.longitude });
-            onSelect({ ...loc });
-        } catch (err: any) {
-            setError(err?.message || 'Could not resolve that location.');
-        } finally {
-            setResolving(false);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, 450), [onSelect]);
+    const resolvePin = useCallback(
+        debounce(async (lat: number, lng: number) => {
+            setResolving(true);
+            setError(null);
+            try {
+                const loc = await reverseGeocodeLocation(lat, lng);
+                // Google may snap to the nearest addressable point — re-center the
+                // marker on the coordinates actually being saved, not the raw drop.
+                if (markerRef.current) markerRef.current.setLatLng([loc.latitude, loc.longitude]);
+                setResolvedAddress(loc.address);
+                setCoords({ lat: loc.latitude, lng: loc.longitude });
+                onSelect({ ...loc });
+            } catch (err: any) {
+                setError(err?.message || 'Could not resolve that location.');
+            } finally {
+                setResolving(false);
+            }
+        }, 450),
+        [onSelect]
+    );
 
     const attachDragHandler = (marker: L.Marker) => {
         marker.on('dragend', () => {
@@ -122,7 +129,11 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
         if (markerRef.current) {
             markerRef.current.setLatLng([lat, lng]);
             const el = markerRef.current.getElement();
-            if (el) { el.classList.remove('tlb-map-pin'); void el.offsetWidth; el.classList.add('tlb-map-pin'); }
+            if (el) {
+                el.classList.remove('tlb-map-pin');
+                void el.offsetWidth;
+                el.classList.add('tlb-map-pin');
+            }
         } else {
             markerRef.current = L.marker([lat, lng], { icon: pinIcon, draggable: true }).addTo(map);
             attachDragHandler(markerRef.current);
@@ -135,8 +146,10 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
         if (!mapElRef.current || mapRef.current) return;
         injectMapStyles();
         const center: [number, number] = hasInitialPin ? [initialLatitude as number, initialLongitude as number] : INDIA_CENTER;
-        const map = L.map(mapElRef.current, { zoomControl: false, attributionControl: false })
-            .setView(center, hasInitialPin ? PICKED_ZOOM : INDIA_ZOOM);
+        const map = L.map(mapElRef.current, { zoomControl: false, attributionControl: false }).setView(
+            center,
+            hasInitialPin ? PICKED_ZOOM : INDIA_ZOOM
+        );
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap',
             maxZoom: 19,
@@ -152,33 +165,46 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
         map.on('click', (e: L.LeafletMouseEvent) => placePin(e.latlng.lat, e.latlng.lng));
         mapRef.current = map;
 
-        return () => { map.remove(); mapRef.current = null; };
+        return () => {
+            map.remove();
+            mapRef.current = null;
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // ─── Search box ─────────────────────────────────────────────────────────
-    const runSearch = useCallback(debounce(async (q: string) => {
-        if (q.trim().length < 3) { setSuggestions([]); setSearching(false); return; }
-        try {
-            const token = sessionTokenRef.current || newSessionToken();
-            const results = await autocompleteLocation(q, token);
-            setSuggestions(results);
-        } catch (err) {
-            setSuggestions([]);
-            // A 429 here means requests are going out faster than normal debounced
-            // typing should produce — surface it as "slow down", not a silent
-            // empty-results state (which would look like a genuine no-match).
-            setSearchNotice(err instanceof LocationApiError && err.status === 429 ? err.message : null);
-        } finally {
-            setSearching(false);
-        }
-    }, 350), []);
+    const runSearch = useCallback(
+        debounce(async (q: string) => {
+            if (q.trim().length < 3) {
+                setSuggestions([]);
+                setSearching(false);
+                return;
+            }
+            try {
+                const token = sessionTokenRef.current || newSessionToken();
+                const results = await autocompleteLocation(q, token);
+                setSuggestions(results);
+            } catch (err) {
+                setSuggestions([]);
+                // A 429 here means requests are going out faster than normal debounced
+                // typing should produce — surface it as "slow down", not a silent
+                // empty-results state (which would look like a genuine no-match).
+                setSearchNotice(err instanceof LocationApiError && err.status === 429 ? err.message : null);
+            } finally {
+                setSearching(false);
+            }
+        }, 350),
+        []
+    );
 
     const handleQueryChange = (v: string) => {
         setQuery(v);
         setDropdownOpen(true);
         setSearchNotice(null);
-        if (v.trim().length < 3) { setSuggestions([]); return; }
+        if (v.trim().length < 3) {
+            setSuggestions([]);
+            return;
+        }
         setSearching(true);
         runSearch(v);
     };
@@ -199,7 +225,11 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
                 if (markerRef.current) {
                     markerRef.current.setLatLng([loc.latitude, loc.longitude]);
                     const el = markerRef.current.getElement();
-                    if (el) { el.classList.remove('tlb-map-pin'); void el.offsetWidth; el.classList.add('tlb-map-pin'); }
+                    if (el) {
+                        el.classList.remove('tlb-map-pin');
+                        void el.offsetWidth;
+                        el.classList.add('tlb-map-pin');
+                    }
                 } else {
                     markerRef.current = L.marker([loc.latitude, loc.longitude], { icon: pinIcon, draggable: true }).addTo(map);
                     attachDragHandler(markerRef.current);
@@ -217,7 +247,10 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
 
     // ─── Use my current location ────────────────────────────────────────────
     const useMyLocation = () => {
-        if (!navigator.geolocation) { setError("Your browser doesn't support location access."); return; }
+        if (!navigator.geolocation) {
+            setError("Your browser doesn't support location access.");
+            return;
+        }
         setLocating(true);
         setError(null);
         navigator.geolocation.getCurrentPosition(
@@ -231,7 +264,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
                 setLocating(false);
                 setError('Could not access your location — check your browser permissions.');
             },
-            { enableHighAccuracy: true, timeout: 8000 },
+            { enableHighAccuracy: true, timeout: 8000 }
         );
     };
 
@@ -254,7 +287,14 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
                         />
                         {searching && <Loader2 size={15} className="text-gray-300 animate-spin shrink-0" />}
                         {query && !searching && (
-                            <button type="button" onClick={() => { setQuery(''); setSuggestions([]); }} className="text-gray-300 hover:text-gray-500 shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setQuery('');
+                                    setSuggestions([]);
+                                }}
+                                className="text-gray-300 hover:text-gray-500 shrink-0"
+                            >
                                 <X size={15} />
                             </button>
                         )}
@@ -331,10 +371,13 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
                             )}
                         </div>
                     </div>
-                ) : !resolving && (
-                    <p className="text-xs font-semibold text-gray-400 flex items-center gap-2">
-                        <MapPin size={13} className="text-gray-300" /> Search above, tap the map, or use your current location to set this listing's spot.
-                    </p>
+                ) : (
+                    !resolving && (
+                        <p className="text-xs font-semibold text-gray-400 flex items-center gap-2">
+                            <MapPin size={13} className="text-gray-300" /> Search above, tap the map, or use your current location to set
+                            this listing's spot.
+                        </p>
+                    )
                 )}
                 {error && <p className="text-xs font-semibold text-red-500 pl-11">{error}</p>}
             </div>

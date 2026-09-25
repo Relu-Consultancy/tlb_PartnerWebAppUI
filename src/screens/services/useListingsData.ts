@@ -2,9 +2,19 @@ import { useCallback, useEffect, useState } from 'react';
 import { EntityType } from '../../types';
 import { ListingState, listingStateOf, reviewMessageOf } from '../../api/portalSummary';
 import {
-    getEventListings, getVenueListings, getClassListings, getProgramListings,
-    getListingDetail, getVenueListingDetail, getClassListingDetail, getProgramListingDetail,
-    pauseListing, resumeListing, archiveListing, unarchiveListing, setClassListingLive,
+    getEventListings,
+    getVenueListings,
+    getClassListings,
+    getProgramListings,
+    getListingDetail,
+    getVenueListingDetail,
+    getClassListingDetail,
+    getProgramListingDetail,
+    pauseListing,
+    resumeListing,
+    archiveListing,
+    unarchiveListing,
+    setClassListingLive,
 } from '../../api/listings';
 import { toast } from '../../components/ui';
 import { enrichFromDetail, modelOf, synthListingCode } from './model';
@@ -52,11 +62,11 @@ export const useListingsData = (allowedEntities: EntityType[]) => {
         setState({ loading: true, rows: [], error: null });
         const now = new Date();
         try {
-            const results = await Promise.allSettled(allowedEntities.map(type => LIST_LOADERS[type]()));
+            const results = await Promise.allSettled(allowedEntities.map((type) => LIST_LOADERS[type]()));
             const rawRows: { item: any; entityType: EntityType }[] = [];
             let firstError: string | null = null;
             results.forEach((r, i) => {
-                if (r.status === 'fulfilled') asList(r.value).forEach(item => rawRows.push({ item, entityType: allowedEntities[i] }));
+                if (r.status === 'fulfilled') asList(r.value).forEach((item) => rawRows.push({ item, entityType: allowedEntities[i] }));
                 else {
                     console.error(`Listings load failed for ${allowedEntities[i]}`, r.reason);
                     firstError = firstError || (r.reason as any)?.message || 'Failed to load listings.';
@@ -91,8 +101,8 @@ export const useListingsData = (allowedEntities: EntityType[]) => {
 
             setState({ loading: false, rows: baseRows, error: null });
 
-            const detailResults = await Promise.allSettled(baseRows.map(row => DETAIL_LOADERS[row.entityType](row.id)));
-            setState(s => ({
+            const detailResults = await Promise.allSettled(baseRows.map((row) => DETAIL_LOADERS[row.entityType](row.id)));
+            setState((s) => ({
                 ...s,
                 rows: s.rows.map((row, i) => {
                     const res = detailResults[i];
@@ -112,10 +122,12 @@ export const useListingsData = (allowedEntities: EntityType[]) => {
         }
     }, [scopeKey]);
 
-    useEffect(() => { load(); }, [load]);
+    useEffect(() => {
+        load();
+    }, [load]);
 
     const patch = (id: string, changes: Partial<ListingRow>) =>
-        setState(s => ({ ...s, rows: s.rows.map(r => r.id === id ? { ...r, ...changes } : r) }));
+        setState((s) => ({ ...s, rows: s.rows.map((r) => (r.id === id ? { ...r, ...changes } : r)) }));
 
     // Pause/resume goes through the generic, entity-agnostic action routes.
     // Classes are the exception: their status is read from `is_live`, a field
@@ -126,7 +138,8 @@ export const useListingsData = (allowedEntities: EntityType[]) => {
         const prevState = row.state;
         patch(row.id, { state: wasPaused ? 'live' : 'paused' });
         try {
-            if (wasPaused) await resumeListing(row.id); else await pauseListing(row.id);
+            if (wasPaused) await resumeListing(row.id);
+            else await pauseListing(row.id);
             if (row.entityType === 'Classes') await setClassListingLive(row.id, wasPaused);
         } catch (err: any) {
             patch(row.id, { state: prevState });
@@ -140,7 +153,11 @@ export const useListingsData = (allowedEntities: EntityType[]) => {
         const nextState: ListingState = wasArchived ? 'draft' : 'archived';
         patch(row.id, { state: nextState });
         try {
-            if (wasArchived) await unarchiveListing(row.id); else await archiveListing(row.id);
+            if (wasArchived) await unarchiveListing(row.id);
+            else await archiveListing(row.id);
+            // Archiving is how a partner unlocks editing, so say so — the row's
+            // primary action changes from Archive to Edit underneath them.
+            toast.success(wasArchived ? 'Listing restored as a draft.' : 'Listing archived — you can edit it now.');
         } catch (err: any) {
             patch(row.id, { state: prevState });
             toast.error(err?.message || 'Couldn’t update the listing. Please try again.');

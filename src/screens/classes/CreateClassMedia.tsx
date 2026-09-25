@@ -167,6 +167,14 @@ export const CreateClassMedia: React.FC<Props> = ({ onNavigate }) => {
         }
     };
 
+    // Media uploads/deletes are already persisted immediately (each action
+    // above calls the API directly) — "Save as draft" has nothing left to
+    // send, it just confirms and exits.
+    const handleSaveDraft = () => {
+        toast.success('Draft saved. Resume anytime from My Listings.');
+        onNavigate('SERVICE_LISTINGS');
+    };
+
     if (loading) {
         return (
             <WizardShell title="New class" entityType="Classes" step={3} totalSteps={5} stepLabel="Media" onBack={() => onNavigate('CREATE_CLASS_BATCH')}>
@@ -291,6 +299,7 @@ export const CreateClassMedia: React.FC<Props> = ({ onNavigate }) => {
                     onNext={() => onNavigate('CREATE_CLASS_POLICIES')}
                     nextText="Next: FAQs & Terms"
                     nextIcon={<ArrowRight size={14} strokeWidth={2.75} />}
+                    onSaveDraft={handleSaveDraft}
                 />
             </div>
         </WizardShell>

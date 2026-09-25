@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { ArrowRight, Mail, Smartphone } from 'lucide-react';
 import { Screen } from '../../types';
 import { verifyOtp, requestOtp, AuthApiError } from '../../api/auth';
-import { setAuthToken, setRefreshToken } from '../../api/client';
+import { setAuthToken, setRefreshToken, clearTokens } from '../../api/client';
 import { OnboardingShell, PageHeader, ToastContainer, useToasts } from '../../components/ui';
 
 interface AuthProps {
@@ -83,8 +83,20 @@ export const PartnerAccessOTP: React.FC<AuthProps> = ({ onNavigate, authData }) 
             onNavigate('PARTNER_CATEGORY');
         } catch (err) {
             console.error('Failed to verify OTP', err);
-            const message = err instanceof AuthApiError && err.status === 429 ? err.message : 'Invalid OTP. Please try again.';
-            showToast(message, 'error');
+            // The backend can reject signup for an identifier that's already a fully
+            // registered partner (INVALID_PARTNER_STATE / "already registered" style
+            // messages). Surface that clearly instead of the generic OTP message so the
+            // user isn't left guessing — the raw error was previously only visible in
+            // the Network tab.
+            if (err instanceof AuthApiError && err.status !== 429 && /already regist|not allowed in/i.test(err.message)) {
+                clearTokens();
+                sessionStorage.clear();
+                showToast('This email is already registered. Please log in instead.', 'warning', 6000);
+                setTimeout(() => onNavigate('LOGIN'), 1800);
+            } else {
+                const message = err instanceof AuthApiError ? err.message : 'Invalid OTP. Please try again.';
+                showToast(message, 'error');
+            }
         } finally {
             setLoading(false);
         }

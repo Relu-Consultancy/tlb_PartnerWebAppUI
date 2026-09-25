@@ -382,6 +382,7 @@ export const CreateEventPreview: React.FC<Props> = ({ onNavigate }) => {
                     onNext={canSubmit && !submitting ? handleSubmit : () => {}}
                     nextText={submitting ? 'Submitting…' : event.status === 'draft' ? 'Submit for review' : 'Done'}
                     nextIcon={submitting ? <Loader2 size={14} className="animate-spin" /> : <Rocket size={14} strokeWidth={2.75} />}
+                    onSaveDraft={() => onNavigate('SERVICE_LISTINGS')}
                 />
             </div>
 

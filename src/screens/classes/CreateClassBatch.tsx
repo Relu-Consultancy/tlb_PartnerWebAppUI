@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowRight, Plus, Trash2, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
-import { SkeletonList } from '../../components/ui';
+import { SkeletonList, toast } from '../../components/ui';
 import { WizardShell, WizardNav, WizardField } from '../../components/portal/wizard';
 import {
     getCurrentClassDraftId,
@@ -49,6 +49,7 @@ export const CreateClassBatch: React.FC<Props> = ({ onNavigate }) => {
     const [batches, setBatches] = useState<LocalBatch[]>([blankBatch()]);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [savingDraft, setSavingDraft] = useState(false);
     const deletedIds = useRef<number[]>([]);
 
     useEffect(() => {
@@ -97,37 +98,61 @@ export const CreateClassBatch: React.FC<Props> = ({ onNavigate }) => {
         setBatches(prev => prev.filter(b => b.key !== key));
     };
 
+    // Shared by "Next" and "Save as draft" — flushes deletions then any
+    // dirty batches (created/updated) against the batches sub-resource.
+    // Neither caller requires the step to be complete.
+    const persistBatches = async (draftId: string) => {
+        for (const id of deletedIds.current) {
+            await deleteClassBatch(draftId, id);
+        }
+        deletedIds.current = [];
+        for (const b of batches) {
+            if (!b.isDirty) continue;
+            const payload = {
+                name: b.name,
+                days: b.days.map(toApiDay),
+                start_time: toApiTime(b.startTime),
+                end_time: toApiTime(b.endTime),
+                capacity: Number(b.capacity) || 1,
+                is_active: true,
+            };
+            if (b.apiId) {
+                await updateClassBatch(draftId, b.apiId, payload);
+            } else {
+                await createClassBatch(draftId, payload);
+            }
+        }
+    };
+
     const handleNext = async () => {
         if (saving) return;
         const draftId = getCurrentClassDraftId();
         if (!draftId) { onNavigate('CREATE_CLASS_MEDIA'); return; }
         try {
             setSaving(true);
-            for (const id of deletedIds.current) {
-                await deleteClassBatch(draftId, id);
-            }
-            deletedIds.current = [];
-            for (const b of batches) {
-                if (!b.isDirty) continue;
-                const payload = {
-                    name: b.name,
-                    days: b.days.map(toApiDay),
-                    start_time: toApiTime(b.startTime),
-                    end_time: toApiTime(b.endTime),
-                    capacity: Number(b.capacity) || 1,
-                    is_active: true,
-                };
-                if (b.apiId) {
-                    await updateClassBatch(draftId, b.apiId, payload);
-                } else {
-                    await createClassBatch(draftId, payload);
-                }
-            }
+            await persistBatches(draftId);
             onNavigate('CREATE_CLASS_MEDIA');
         } catch (e) {
             console.error('Failed to save batches', e);
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleSaveDraft = async () => {
+        if (savingDraft) return;
+        const draftId = getCurrentClassDraftId();
+        if (!draftId) { onNavigate('SERVICE_LISTINGS'); return; }
+        setSavingDraft(true);
+        try {
+            await persistBatches(draftId);
+            toast.success('Draft saved. Resume anytime from My Listings.');
+            onNavigate('SERVICE_LISTINGS');
+        } catch (e: any) {
+            console.error('Failed to save draft', e);
+            toast.error(e?.message || 'Failed to save draft. Please try again.');
+        } finally {
+            setSavingDraft(false);
         }
     };
 
@@ -229,6 +254,8 @@ export const CreateClassBatch: React.FC<Props> = ({ onNavigate }) => {
                     onNext={handleNext}
                     nextText={saving ? 'Saving…' : 'Next: Media'}
                     nextIcon={saving ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} strokeWidth={2.75} />}
+                    onSaveDraft={saving ? undefined : handleSaveDraft}
+                    savingDraft={savingDraft}
                 />
             </div>
         </WizardShell>

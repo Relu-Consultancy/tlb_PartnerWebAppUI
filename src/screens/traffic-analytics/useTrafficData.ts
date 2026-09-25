@@ -14,22 +14,24 @@ export const useTrafficData = (period: TrafficPeriodState) => {
     const ready = period.key !== 'custom' || isCustomRangeReady(period.dateFrom, period.dateTo);
 
     const load = useCallback(async () => {
-        if (!ready) { setState({ loading: false, traffic: null, error: null }); return; }
-        setState(s => ({ ...s, loading: true, error: null }));
+        if (!ready) {
+            setState({ loading: false, traffic: null, error: null });
+            return;
+        }
+        setState((s) => ({ ...s, loading: true, error: null }));
         try {
             const traffic = await getStatsTraffic(
-                period.key === 'custom'
-                    ? { period: 'custom', date_from: period.dateFrom, date_to: period.dateTo }
-                    : { period: period.key }
+                period.key === 'custom' ? { period: 'custom', date_from: period.dateFrom, date_to: period.dateTo } : { period: period.key }
             );
             setState({ loading: false, traffic, error: null });
         } catch (e: any) {
             setState({ loading: false, traffic: null, error: e?.message || 'Failed to load traffic stats' });
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [period.key, period.dateFrom, period.dateTo, ready]);
 
-    useEffect(() => { load(); }, [load]);
+    useEffect(() => {
+        load();
+    }, [load]);
 
     return { ...state, ready, reload: load };
 };

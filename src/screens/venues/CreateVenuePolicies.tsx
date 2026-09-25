@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
-import { FaqTermsEditor, FaqApi, RefundPolicyToggle } from '../../components/ui';
+import { FaqTermsEditor, FaqApi, RefundPolicyToggle, toast } from '../../components/ui';
 import { WizardShell, WizardNav } from '../../components/portal/wizard';
 import {
     getCurrentVenueDraftId, getVenueListingDetail, updateVenueListing,
@@ -22,6 +22,7 @@ export const CreateVenuePolicies: React.FC<Props> = ({ onNavigate }) => {
     // Backend treats an unset value as refundable.
     const [isRefundable, setIsRefundable] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [savingDraft, setSavingDraft] = useState(false);
     const [error, setError] = useState('');
 
     useEffect(() => {
@@ -53,6 +54,24 @@ export const CreateVenuePolicies: React.FC<Props> = ({ onNavigate }) => {
         }
     };
 
+    // FAQs/terms are already persisted immediately by FaqTermsEditor's own save
+    // actions — the only thing this step still batches is the refund toggle.
+    const handleSaveDraft = async () => {
+        if (savingDraft) return;
+        if (!draftId) { onNavigate('SERVICE_LISTINGS'); return; }
+        setSavingDraft(true);
+        setError('');
+        try {
+            await updateVenueListing(draftId, { is_refundable: isRefundable });
+            toast.success('Draft saved. Resume anytime from My Listings.');
+            onNavigate('SERVICE_LISTINGS');
+        } catch (e: any) {
+            toast.error(e?.message || 'Failed to save draft. Please try again.');
+        } finally {
+            setSavingDraft(false);
+        }
+    };
+
     return (
         <WizardShell title="New venue" entityType="Venues" step={6} totalSteps={7} stepLabel="FAQs & terms" onBack={() => onNavigate('CREATE_VENUE_AMENITIES')}>
             <div className="pt-card p-5 sm:p-6 flex flex-col gap-6">
@@ -74,9 +93,11 @@ export const CreateVenuePolicies: React.FC<Props> = ({ onNavigate }) => {
                 )}
 
                 <WizardNav
-                    onNext={handleNext}
+                    onNext={saving ? () => {} : handleNext}
                     nextText={saving ? 'Saving…' : 'Next: Review'}
                     nextIcon={saving ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} strokeWidth={2.75} />}
+                    onSaveDraft={saving ? undefined : handleSaveDraft}
+                    savingDraft={savingDraft}
                 />
             </div>
         </WizardShell>

@@ -42,6 +42,7 @@ export const CreateVenuePackages: React.FC<Props> = ({ onNavigate }) => {
     const [loadError, setLoadError] = useState<string | null>(null);
     const [packages, setPackages] = useState<PkgForm[]>([]);
     const [proceeding, setProceeding] = useState(false);
+    const [savingDraft, setSavingDraft] = useState(false);
 
     useEffect(() => {
         const id = getCurrentVenueDraftId();
@@ -91,6 +92,25 @@ export const CreateVenuePackages: React.FC<Props> = ({ onNavigate }) => {
         setPackages(prev => prev.filter(p => p.localKey !== pkg.localKey));
     };
 
+    // Shared by "Next" and "Save as draft" — creates/updates each dirty (unsaved)
+    // package row. Deletes already happen immediately in handleDelete above.
+    const persistPackage = async (pkg: PkgForm) => {
+        const payload: Record<string, any> = {
+            name: pkg.name.trim(),
+            price: pkg.price ? Number(pkg.price) : 0,
+            description: pkg.description.trim(),
+        };
+        const durMins = Number(pkg.duration_minutes);
+        const maxG = Number(pkg.max_guests);
+        if (pkg.duration_minutes && durMins >= 1) payload.duration_minutes = durMins;
+        if (pkg.max_guests && maxG >= 1) payload.max_guests = maxG;
+        if (pkg.apiId) {
+            await updateVenuePackage(draftId!, pkg.apiId, payload);
+        } else {
+            await createVenuePackage(draftId!, payload);
+        }
+    };
+
     const handleNext = async () => {
         if (!draftId) return;
         setProceeding(true);
@@ -98,26 +118,33 @@ export const CreateVenuePackages: React.FC<Props> = ({ onNavigate }) => {
             for (const pkg of packages) {
                 if (!pkg.dirty) continue;
                 if (!pkg.name.trim()) { toast.warning('Package name is required for all packages.'); setProceeding(false); return; }
-                const payload: Record<string, any> = {
-                    name: pkg.name.trim(),
-                    price: pkg.price ? Number(pkg.price) : 0,
-                    description: pkg.description.trim(),
-                };
-                const durMins = Number(pkg.duration_minutes);
-                const maxG = Number(pkg.max_guests);
-                if (pkg.duration_minutes && durMins >= 1) payload.duration_minutes = durMins;
-                if (pkg.max_guests && maxG >= 1) payload.max_guests = maxG;
-                if (pkg.apiId) {
-                    await updateVenuePackage(draftId, pkg.apiId, payload);
-                } else {
-                    await createVenuePackage(draftId, payload);
-                }
+                await persistPackage(pkg);
             }
             onNavigate('CREATE_VENUE_AMENITIES');
         } catch (err: any) {
             toast.error(err?.message || 'Failed to save packages.');
         } finally {
             setProceeding(false);
+        }
+    };
+
+    const handleSaveDraft = async () => {
+        if (!draftId) return;
+        setSavingDraft(true);
+        try {
+            // Unlike "Next", save-draft doesn't require every dirty row to be
+            // complete — persist whichever ones already have a name and leave
+            // half-filled rows for later (nothing to identify them by yet).
+            for (const pkg of packages) {
+                if (!pkg.dirty || !pkg.name.trim()) continue;
+                await persistPackage(pkg);
+            }
+            toast.success('Draft saved. Resume anytime from My Listings.');
+            onNavigate('SERVICE_LISTINGS');
+        } catch (err: any) {
+            toast.error(err?.message || 'Failed to save draft. Please try again.');
+        } finally {
+            setSavingDraft(false);
         }
     };
 
@@ -237,9 +264,11 @@ export const CreateVenuePackages: React.FC<Props> = ({ onNavigate }) => {
 
                 <WizardNav
                     onBack={() => onNavigate('CREATE_VENUE_AVAILABILITY')}
-                    onNext={handleNext}
+                    onNext={proceeding ? () => {} : handleNext}
                     nextText={proceeding ? 'Saving…' : 'Next: Amenities'}
                     nextIcon={proceeding ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} strokeWidth={2.75} />}
+                    onSaveDraft={proceeding ? undefined : handleSaveDraft}
+                    savingDraft={savingDraft}
                 />
             </div>
         </WizardShell>

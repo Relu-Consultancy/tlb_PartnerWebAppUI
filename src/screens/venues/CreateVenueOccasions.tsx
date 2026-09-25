@@ -33,6 +33,7 @@ export const CreateVenueOccasions: React.FC<Props> = ({ onNavigate }) => {
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
+    const [savingDraft, setSavingDraft] = useState(false);
 
     // Occasions (using IDs)
     const [occasions, setOccasions] = useState<OccasionItem[]>([]);
@@ -118,28 +119,48 @@ export const CreateVenueOccasions: React.FC<Props> = ({ onNavigate }) => {
         setRequiredFields(prev => prev.includes(key) ? prev.filter(f => f !== key) : [...prev, key]);
     };
 
+    // Shared by "Next" and "Save as draft" — persists whatever's currently
+    // selected. The draft itself always already exists by this step (created
+    // in step 1), so there's nothing to validate before either can save.
+    const persist = async () => {
+        // PATCH venue with occasion_ids (atomic replace)
+        await updateVenueListing(draftId!, {
+            occasion_ids: selectedOccasionIds,
+        });
+        // PUT discovery (atomic replace)
+        await updateVenueDiscovery(draftId!, {
+            outing_types: selectedOutingTypes,
+            activity_types: selectedActivityTypes,
+            format_types: selectedFormatTypes,
+        });
+        // PUT attendee fields (atomic replace)
+        await updateVenueAttendeeFields(draftId!, requiredFields);
+    };
+
     const handleNext = async () => {
         if (!draftId) return;
         setSaving(true);
         try {
-            // PATCH venue with occasion_ids (atomic replace)
-            await updateVenueListing(draftId, {
-                occasion_ids: selectedOccasionIds,
-            });
-            // PUT discovery (atomic replace)
-            await updateVenueDiscovery(draftId, {
-                outing_types: selectedOutingTypes,
-                activity_types: selectedActivityTypes,
-                format_types: selectedFormatTypes,
-            });
-            // PUT attendee fields (atomic replace)
-            await updateVenueAttendeeFields(draftId, requiredFields);
-
+            await persist();
             onNavigate('CREATE_VENUE_AVAILABILITY');
         } catch (err: any) {
             toast.error(err?.message || 'Failed to save.');
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleSaveDraft = async () => {
+        if (!draftId) return;
+        setSavingDraft(true);
+        try {
+            await persist();
+            toast.success('Draft saved. Resume anytime from My Listings.');
+            onNavigate('SERVICE_LISTINGS');
+        } catch (err: any) {
+            toast.error(err?.message || 'Failed to save draft. Please try again.');
+        } finally {
+            setSavingDraft(false);
         }
     };
 
@@ -247,6 +268,8 @@ export const CreateVenueOccasions: React.FC<Props> = ({ onNavigate }) => {
                     onNext={saving ? () => {} : handleNext}
                     nextText={saving ? 'Saving…' : 'Next: Availability'}
                     nextIcon={saving ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} strokeWidth={2.75} />}
+                    onSaveDraft={saving ? undefined : handleSaveDraft}
+                    savingDraft={savingDraft}
                 />
             </div>
         </WizardShell>

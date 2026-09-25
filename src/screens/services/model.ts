@@ -23,7 +23,7 @@ const locationOf = (...sources: any[]): string => {
         const line = [src?.area, src?.city].filter(Boolean).join(', ');
         if (line) return line;
     }
-    return sources.map(s => s?.address).find(Boolean) || '—';
+    return sources.map((s) => s?.address).find(Boolean) || '—';
 };
 
 const isActive = (batch: any): boolean => batch?.is_active !== false;
@@ -48,14 +48,17 @@ interface EnrichedFields {
 
 const earliestUpcoming = (dates: (string | null | undefined)[], now: Date): string | null => {
     const future = dates
-        .map(d => parseDate(d))
+        .map((d) => parseDate(d))
         .filter((d): d is Date => !!d && d.getTime() >= now.getTime())
         .sort((a, b) => a.getTime() - b.getTime());
     return future[0]?.toISOString() ?? null;
 };
 
 const galleryUrlsOf = (media: any[]): string[] =>
-    media.filter(m => m?.media_type !== 'cover').map(m => m?.file_url).filter(Boolean);
+    media
+        .filter((m) => m?.media_type !== 'cover')
+        .map((m) => m?.file_url)
+        .filter(Boolean);
 
 /** Parses a listing's full detail payload into the table's price/capacity/location/next-slot fields. */
 export const enrichFromDetail = (entityType: EntityType, raw: any, fallbackStartsAt: string | null, now: Date): EnrichedFields => {
@@ -66,15 +69,17 @@ export const enrichFromDetail = (entityType: EntityType, raw: any, fallbackStart
 
     if (entityType === 'Events') {
         const tickets: any[] = raw?.tickets || [];
-        const prices = tickets.map(t => toNumber(t?.price)).filter(p => p >= 0);
-        const priceLabel = raw?.price_type === 'free'
-            ? 'Free'
-            : prices.length
-                ? (prices.length > 1 ? `From ${formatRupees(Math.min(...prices))}` : formatRupees(prices[0]))
-                : '—';
-        const seats = raw?.price_type === 'free'
-            ? raw?.capacity
-            : tickets.reduce((sum, t) => sum + (toNumber(t?.total_quantity) || 0), 0) || null;
+        const prices = tickets.map((t) => toNumber(t?.price)).filter((p) => p >= 0);
+        const priceLabel =
+            raw?.price_type === 'free'
+                ? 'Free'
+                : prices.length
+                  ? prices.length > 1
+                      ? `From ${formatRupees(Math.min(...prices))}`
+                      : formatRupees(prices[0])
+                  : '—';
+        const seats =
+            raw?.price_type === 'free' ? raw?.capacity : tickets.reduce((sum, t) => sum + (toNumber(t?.total_quantity) || 0), 0) || null;
         return {
             priceLabel,
             capacityLabel: seats != null ? `${seats} seats` : '—',
@@ -88,14 +93,24 @@ export const enrichFromDetail = (entityType: EntityType, raw: any, fallbackStart
 
     if (entityType === 'Venues') {
         const packages: any[] = raw?.packages || [];
-        const prices = packages.map(p => toNumber(p?.price)).filter(p => p > 0);
+        const prices = packages.map((p) => toNumber(p?.price)).filter((p) => p > 0);
         const priceLabel = prices.length ? formatRupees(Math.min(...prices)) : 'By enquiry';
-        const minCap = raw?.min_capacity, maxCap = raw?.max_capacity;
-        const capacityLabel = minCap != null && maxCap != null
-            ? `${minCap}–${maxCap} guests`
-            : maxCap != null ? `Up to ${maxCap} guests` : minCap != null ? `${minCap}+ guests` : '—';
+        const minCap = raw?.min_capacity,
+            maxCap = raw?.max_capacity;
+        const capacityLabel =
+            minCap != null && maxCap != null
+                ? `${minCap}–${maxCap} guests`
+                : maxCap != null
+                  ? `Up to ${maxCap} guests`
+                  : minCap != null
+                    ? `${minCap}+ guests`
+                    : '—';
         const slots: any[] = raw?.availability || [];
-        const startsAt = earliestUpcoming(slots.map(s => s?.date), now) || fallbackStartsAt;
+        const startsAt =
+            earliestUpcoming(
+                slots.map((s) => s?.date),
+                now
+            ) || fallbackStartsAt;
         return { priceLabel, capacityLabel, location, startsAt, description, galleryUrls: galleryUrlsOf(raw?.media || []), isRefundable };
     }
 
@@ -104,14 +119,21 @@ export const enrichFromDetail = (entityType: EntityType, raw: any, fallbackStart
     const batches: any[] = service.batches || raw?.batches || [];
     const activeBatches = batches.filter(isActive);
     const firstBatch = activeBatches[0] || batches[0];
-    const price = entityType === 'Classes'
-        ? (raw?.price ?? service.price ?? raw?.fee ?? service.fee)
-        : (raw?.price ?? raw?.fee);
-    const priceLabel = price != null
-        ? (toNumber(price) > 0 ? formatRupees(toNumber(price)) : 'Free')
-        : (firstBatch?.fee != null ? formatRupees(toNumber(firstBatch.fee)) : '—');
+    const price = entityType === 'Classes' ? (raw?.price ?? service.price ?? raw?.fee ?? service.fee) : (raw?.price ?? raw?.fee);
+    const priceLabel =
+        price != null
+            ? toNumber(price) > 0
+                ? formatRupees(toNumber(price))
+                : 'Free'
+            : firstBatch?.fee != null
+              ? formatRupees(toNumber(firstBatch.fee))
+              : '—';
     const capacity = entityType === 'Programs' ? (raw?.max_capacity ?? firstBatch?.total_seats) : firstBatch?.total_seats;
-    const startsAt = earliestUpcoming(activeBatches.map(b => b?.start_date), now) || fallbackStartsAt;
+    const startsAt =
+        earliestUpcoming(
+            activeBatches.map((b) => b?.start_date),
+            now
+        ) || fallbackStartsAt;
     return {
         priceLabel,
         capacityLabel: capacity != null ? `${capacity} places` : '—',
@@ -123,6 +145,18 @@ export const enrichFromDetail = (entityType: EntityType, raw: any, fallbackStart
     };
 };
 
+// ── Row actions ──────────────────────────────────────────────────────────────
+// A listing that's on the marketplace (or queued for it) can't be edited in
+// place — reopening the wizard on something customers can already see is what
+// confused partners. Archiving takes it down first; editing is offered only
+// once it's off the marketplace (archived) or was never on it (draft).
+
+export const canEditListing = (state: ListingState): boolean => state === 'archived' || state === 'draft';
+
+export const canArchiveListing = (state: ListingState): boolean => !canEditListing(state);
+
+export const canPauseListing = (state: ListingState): boolean => state === 'live' || state === 'paused';
+
 // ── Filtering ────────────────────────────────────────────────────────────────
 
 export interface ListingFilters {
@@ -133,9 +167,9 @@ export interface ListingFilters {
 
 export const filterListings = (rows: ListingRow[], filters: ListingFilters): ListingRow[] =>
     rows
-        .filter(r => filters.scope === 'all' || r.entityType === filters.scope)
-        .filter(r => filters.status === 'any' || r.state === filters.status)
-        .filter(r => {
+        .filter((r) => filters.scope === 'all' || r.entityType === filters.scope)
+        .filter((r) => filters.status === 'any' || r.state === filters.status)
+        .filter((r) => {
             const q = filters.search.trim().toLowerCase();
             if (!q) return true;
             return r.title.toLowerCase().includes(q) || r.code.toLowerCase().includes(q);
@@ -156,13 +190,15 @@ export const demandOf = (
     enquiries: EnquiryEntry[],
     bookings: BookingEntry[],
     range: DateRangeKey,
-    now: Date,
+    now: Date
 ): ListingDemand => {
     if (row.model === 'enquiry') {
-        const count = enquiries.filter(e => e.listingId === row.id && isWithinRange(parseDate(e.createdAt), range, now)).length;
+        const count = enquiries.filter((e) => e.listingId === row.id && isWithinRange(parseDate(e.createdAt), range, now)).length;
         return { count, label: `${count} ${count === 1 ? 'enquiry' : 'enquiries'}` };
     }
-    const count = bookings.filter(b => b.listingId === row.id && b.status !== 'cancelled' && isWithinRange(parseDate(b.createdAt), range, now)).length;
+    const count = bookings.filter(
+        (b) => b.listingId === row.id && b.status !== 'cancelled' && isWithinRange(parseDate(b.createdAt), range, now)
+    ).length;
     return { count, label: `${count} ${count === 1 ? 'booking' : 'bookings'}` };
 };
 
@@ -180,6 +216,9 @@ export interface ListingStateCounts {
 
 export const listingStateCounts = (rows: ListingRow[]): ListingStateCounts => {
     const counts: ListingStateCounts = { live: 0, pending: 0, paused: 0, draft: 0, rejected: 0, archived: 0, total: 0 };
-    for (const row of rows) { counts[row.state] += 1; counts.total += 1; }
+    for (const row of rows) {
+        counts[row.state] += 1;
+        counts.total += 1;
+    }
     return counts;
 };

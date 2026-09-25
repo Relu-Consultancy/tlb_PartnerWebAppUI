@@ -34,8 +34,11 @@ describe('ServiceListings — loading and error states', () => {
     });
 
     it('shows an error message when every service type fails to load', async () => {
-        server.use(http.get(`${BASE}/api/v1/partner/listings/events/`, () =>
-            HttpResponse.json({ error: { code: 'SERVER_ERROR', message: 'Listings unavailable' } }, { status: 500 })));
+        server.use(
+            http.get(`${BASE}/api/v1/partner/listings/events/`, () =>
+                HttpResponse.json({ error: { code: 'SERVER_ERROR', message: 'Listings unavailable' } }, { status: 500 })
+            )
+        );
         renderWithPartner();
         await waitFor(() => expect(screen.getByText(/listings unavailable/i)).toBeInTheDocument());
     });
@@ -51,8 +54,7 @@ describe('ServiceListings — listing display', () => {
     });
 
     it('shows an empty state when no listings match the filters', async () => {
-        server.use(http.get(`${BASE}/api/v1/partner/listings/events/`, () =>
-            HttpResponse.json({ success: true, data: [] })));
+        server.use(http.get(`${BASE}/api/v1/partner/listings/events/`, () => HttpResponse.json({ success: true, data: [] })));
         renderWithPartner();
         await waitFor(() => expect(screen.getByText(/no listings match/i)).toBeInTheDocument());
     });
@@ -67,9 +69,11 @@ describe('ServiceListings — service scope', () => {
     it('filters to only the selected service type', async () => {
         server.use(
             http.get(`${BASE}/api/v1/partner/listings/events/`, () =>
-                HttpResponse.json({ success: true, data: [{ id: '1', title: 'My Event', status: 'draft', listing_type: 'event' }] })),
+                HttpResponse.json({ success: true, data: [{ id: '1', title: 'My Event', status: 'draft', listing_type: 'event' }] })
+            ),
             http.get(`${BASE}/api/v1/partner/listings/classes/`, () =>
-                HttpResponse.json({ success: true, data: [{ id: '2', title: 'My Class', status: 'draft', listing_type: 'class' }] })),
+                HttpResponse.json({ success: true, data: [{ id: '2', title: 'My Class', status: 'draft', listing_type: 'class' }] })
+            )
         );
         renderWithPartner(['Events', 'Classes']);
         const user = userEvent.setup();
@@ -84,14 +88,17 @@ describe('ServiceListings — service scope', () => {
 
 describe('ServiceListings — search', () => {
     it('filters listings by title', async () => {
-        server.use(http.get(`${BASE}/api/v1/partner/listings/events/`, () =>
-            HttpResponse.json({
-                success: true,
-                data: [
-                    { id: '1', title: 'Summer Art Festival', status: 'draft', listing_type: 'event' },
-                    { id: '2', title: 'Winter Dance Camp', status: 'draft', listing_type: 'event' },
-                ],
-            })));
+        server.use(
+            http.get(`${BASE}/api/v1/partner/listings/events/`, () =>
+                HttpResponse.json({
+                    success: true,
+                    data: [
+                        { id: '1', title: 'Summer Art Festival', status: 'draft', listing_type: 'event' },
+                        { id: '2', title: 'Winter Dance Camp', status: 'draft', listing_type: 'event' },
+                    ],
+                })
+            )
+        );
         renderWithPartner();
         const user = userEvent.setup();
         await waitFor(() => screen.getByText('Summer Art Festival'));
@@ -103,8 +110,14 @@ describe('ServiceListings — search', () => {
 
 describe('ServiceListings — refundable tag', () => {
     it('shows a Non-refundable badge once enrichment resolves a listing with is_refundable: false', async () => {
-        server.use(http.get(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, () =>
-            HttpResponse.json({ success: true, data: { id: DRAFT_ID, listing_type: 'event', title: 'Test Event', is_refundable: false } })));
+        server.use(
+            http.get(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, () =>
+                HttpResponse.json({
+                    success: true,
+                    data: { id: DRAFT_ID, listing_type: 'event', title: 'Test Event', is_refundable: false },
+                })
+            )
+        );
         renderWithPartner();
         await waitFor(() => expect(screen.getByText('Non-refundable')).toBeInTheDocument());
     });
@@ -127,14 +140,50 @@ describe('ServiceListings — edit and create navigation', () => {
         expect(mockNavigate).toHaveBeenCalledWith('CREATE_EVENT_DETAILS');
     });
 
-    it('shows a Locked button instead of Edit for a published (archived) listing', async () => {
-        server.use(http.get(`${BASE}/api/v1/partner/listings/events/`, () =>
-            HttpResponse.json({
-                success: true,
-                data: [{ id: DRAFT_ID, title: 'Archived Event', status: 'archived', listing_type: 'event' }],
-            })));
+    it('offers Edit — not Archive — for an archived listing', async () => {
+        server.use(
+            http.get(`${BASE}/api/v1/partner/listings/events/`, () =>
+                HttpResponse.json({
+                    success: true,
+                    data: [{ id: DRAFT_ID, title: 'Archived Event', status: 'archived', listing_type: 'event' }],
+                })
+            )
+        );
         renderWithPartner();
-        await waitFor(() => expect(screen.getByRole('button', { name: 'Locked' })).toBeInTheDocument());
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument());
+        expect(screen.queryByRole('button', { name: 'Archive' })).not.toBeInTheDocument();
+    });
+
+    it('offers Archive instead of Edit while a listing is live', async () => {
+        server.use(
+            http.get(`${BASE}/api/v1/partner/listings/events/`, () =>
+                HttpResponse.json({
+                    success: true,
+                    data: [{ id: DRAFT_ID, title: 'Live Event', status: 'published', is_paused: false, listing_type: 'event' }],
+                })
+            )
+        );
+        renderWithPartner();
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Archive' })).toBeInTheDocument());
+        expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
+    });
+
+    it('swaps Archive for Edit once the live listing is archived', async () => {
+        server.use(
+            http.get(`${BASE}/api/v1/partner/listings/events/`, () =>
+                HttpResponse.json({
+                    success: true,
+                    data: [{ id: DRAFT_ID, title: 'Live Event', status: 'published', is_paused: false, listing_type: 'event' }],
+                })
+            ),
+            http.post(`${BASE}/api/v1/partner/listings/${DRAFT_ID}/archive/`, () =>
+                HttpResponse.json({ success: true, data: { status: 'archived' } })
+            )
+        );
+        renderWithPartner();
+        const user = userEvent.setup();
+        await user.click(await screen.findByRole('button', { name: 'Archive' }));
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument());
     });
 
     it('navigates straight to the wizard when only one service type is allowed', async () => {

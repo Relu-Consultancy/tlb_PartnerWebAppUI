@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { MoreHorizontal } from 'lucide-react';
 import { useDismiss } from '../../../hooks/useDismiss';
+import { canArchiveListing, canEditListing, canPauseListing } from '../model';
 import { ListingRow } from '../types';
 
 interface RowActionsProps {
@@ -10,26 +11,45 @@ interface RowActionsProps {
     onToggleArchive: () => void;
 }
 
-/** Edit + "···" (Pause/Resume, Archive/Unarchive) — stops the row's own onClick from also firing. */
+/**
+ * One primary action + "···" — stops the row's own onClick from also firing.
+ *
+ * The primary action is Archive while the listing is on the marketplace (or
+ * queued for it) and Edit once it's off — see `canEditListing`. Offering Edit
+ * on a live listing is what confused partners, so it isn't shown there at all.
+ */
 export const RowActions: React.FC<RowActionsProps> = ({ row, onEdit, onTogglePause, onToggleArchive }) => {
     const [open, setOpen] = useState(false);
     const rootRef = useRef<HTMLDivElement>(null);
     useDismiss(rootRef, open, () => setOpen(false));
 
-    const canPause = row.state === 'live' || row.state === 'paused';
-    const canArchive = row.state === 'live' || row.state === 'paused' || row.state === 'archived';
-    const editable = row.state !== 'archived';
+    const editable = canEditListing(row.state);
+    const canPause = canPauseListing(row.state);
+    const archived = row.state === 'archived';
+    const hasMenu = canPause || archived;
 
     return (
         <div className="flex items-center gap-1.5 justify-end" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-            <button type="button" onClick={onEdit} disabled={!editable} className="pt-btn pt-btn-o pt-btn-sm">
-                {editable ? 'Edit' : 'Locked'}
-            </button>
-            {(canPause || canArchive) && (
+            {editable ? (
+                <button type="button" onClick={onEdit} className="pt-btn pt-btn-o pt-btn-sm">
+                    Edit
+                </button>
+            ) : (
+                <button
+                    type="button"
+                    onClick={onToggleArchive}
+                    disabled={!canArchiveListing(row.state)}
+                    title="Take this listing off the marketplace — you can edit it once archived"
+                    className="pt-btn pt-btn-o pt-btn-sm"
+                >
+                    Archive
+                </button>
+            )}
+            {hasMenu && (
                 <div ref={rootRef} className="relative">
                     <button
                         type="button"
-                        onClick={() => setOpen(o => !o)}
+                        onClick={() => setOpen((o) => !o)}
                         aria-haspopup="menu"
                         aria-expanded={open}
                         aria-label="More actions"
@@ -40,13 +60,29 @@ export const RowActions: React.FC<RowActionsProps> = ({ row, onEdit, onTogglePau
                     {open && (
                         <div role="menu" className="pt-popover absolute right-0 top-9 z-30 w-[170px] p-[7px]">
                             {canPause && (
-                                <button type="button" role="menuitem" className="pt-opt" onClick={() => { onTogglePause(); setOpen(false); }}>
+                                <button
+                                    type="button"
+                                    role="menuitem"
+                                    className="pt-opt"
+                                    onClick={() => {
+                                        onTogglePause();
+                                        setOpen(false);
+                                    }}
+                                >
                                     {row.state === 'paused' ? 'Resume' : 'Pause'}
                                 </button>
                             )}
-                            {canArchive && (
-                                <button type="button" role="menuitem" className="pt-opt" onClick={() => { onToggleArchive(); setOpen(false); }}>
-                                    {row.state === 'archived' ? 'Unarchive' : 'Archive'}
+                            {archived && (
+                                <button
+                                    type="button"
+                                    role="menuitem"
+                                    className="pt-opt"
+                                    onClick={() => {
+                                        onToggleArchive();
+                                        setOpen(false);
+                                    }}
+                                >
+                                    Unarchive
                                 </button>
                             )}
                         </div>

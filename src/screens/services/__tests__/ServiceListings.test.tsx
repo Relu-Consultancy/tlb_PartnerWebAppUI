@@ -8,6 +8,7 @@ import { DRAFT_ID } from '../../../test/msw/handlers';
 import { ServiceListings } from '../ServiceListings';
 import { PartnerProvider } from '../../../context/PartnerContext';
 import { getCurrentDraftId } from '../../../api/listings';
+import { toast } from '../../../components/ui';
 
 const BASE = 'https://tlb-api.reluconsultancy.in';
 
@@ -138,6 +139,49 @@ describe('ServiceListings — edit and create navigation', () => {
         await user.click(screen.getByRole('button', { name: 'Edit' }));
         expect(getCurrentDraftId()).toBe(DRAFT_ID);
         expect(mockNavigate).toHaveBeenCalledWith('CREATE_EVENT_DETAILS');
+    });
+
+    it('lifts the archive before opening the wizard, since archived listings are locked server-side', async () => {
+        let unarchived = false;
+        server.use(
+            http.get(`${BASE}/api/v1/partner/listings/events/`, () =>
+                HttpResponse.json({
+                    success: true,
+                    data: [{ id: DRAFT_ID, title: 'Archived Event', status: 'archived', listing_type: 'event' }],
+                })
+            ),
+            http.post(`${BASE}/api/v1/partner/listings/${DRAFT_ID}/unarchive/`, () => {
+                unarchived = true;
+                return HttpResponse.json({ success: true, data: { id: DRAFT_ID, status: 'draft' } });
+            })
+        );
+        renderWithPartner();
+        const user = userEvent.setup();
+        await user.click(await screen.findByRole('button', { name: 'Edit' }));
+        await waitFor(() => expect(unarchived).toBe(true));
+        expect(getCurrentDraftId()).toBe(DRAFT_ID);
+        expect(mockNavigate).toHaveBeenCalledWith('CREATE_EVENT_DETAILS');
+    });
+
+    it('stays put when the unarchive fails, instead of opening a wizard that cannot save', async () => {
+        server.use(
+            http.get(`${BASE}/api/v1/partner/listings/events/`, () =>
+                HttpResponse.json({
+                    success: true,
+                    data: [{ id: DRAFT_ID, title: 'Archived Event', status: 'archived', listing_type: 'event' }],
+                })
+            ),
+            http.post(`${BASE}/api/v1/partner/listings/${DRAFT_ID}/unarchive/`, () =>
+                HttpResponse.json({ error: { code: 'LISTING_LOCKED', message: 'Not editable' } }, { status: 400 })
+            )
+        );
+        const toastError = vi.spyOn(toast, 'error');
+        renderWithPartner();
+        const user = userEvent.setup();
+        await user.click(await screen.findByRole('button', { name: 'Edit' }));
+        await waitFor(() => expect(toastError).toHaveBeenCalled());
+        expect(mockNavigate).not.toHaveBeenCalledWith('CREATE_EVENT_DETAILS');
+        toastError.mockRestore();
     });
 
     it('offers Edit — not Archive — for an archived listing', async () => {

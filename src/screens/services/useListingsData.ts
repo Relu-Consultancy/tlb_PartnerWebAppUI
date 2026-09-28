@@ -147,22 +147,63 @@ export const useListingsData = (allowedEntities: EntityType[]) => {
         }
     };
 
-    const toggleArchive = async (row: ListingRow) => {
-        const wasArchived = row.state === 'archived';
+    /**
+     * Archives / unarchives: optimistic first, then corrected from the server's
+     * own status — an unarchive doesn't always land in `draft`. Returns the
+     * resulting state, or null when the call failed.
+     */
+    const setArchived = async (row: ListingRow, archived: boolean): Promise<ListingState | null> => {
         const prevState = row.state;
-        const nextState: ListingState = wasArchived ? 'draft' : 'archived';
-        patch(row.id, { state: nextState });
+        patch(row.id, { state: archived ? 'archived' : 'draft' });
         try {
-            if (wasArchived) await unarchiveListing(row.id);
-            else await archiveListing(row.id);
-            // Archiving is how a partner unlocks editing, so say so — the row's
-            // primary action changes from Archive to Edit underneath them.
-            toast.success(wasArchived ? 'Listing restored as a draft.' : 'Listing archived — you can edit it now.');
+            const res = archived ? await archiveListing(row.id) : await unarchiveListing(row.id);
+            const raw = (res as any)?.data ?? res;
+            const nextState: ListingState = raw?.status ? listingStateOf(raw, row.entityType) : archived ? 'archived' : 'draft';
+            patch(row.id, { state: nextState });
+            return nextState;
         } catch (err: any) {
             patch(row.id, { state: prevState });
             toast.error(err?.message || 'Couldn’t update the listing. Please try again.');
+            return null;
         }
     };
 
-    return { loading: state.loading, rows: state.rows, error: state.error, reload: load, togglePause, toggleArchive };
+    const toggleArchive = async (row: ListingRow): Promise<boolean> => {
+        const nextState = await setArchived(row, row.state !== 'archived');
+        if (!nextState) return false;
+        // Archiving is how a partner unlocks editing, so say so — the row's
+        // primary action changes from Archive to Edit underneath them.
+        toast.success(
+            nextState === 'archived'
+                ? 'Listing archived — you can edit it now.'
+                : `Listing unarchived${nextState === 'draft' ? ' as a draft' : ''}.`
+        );
+        return true;
+    };
+
+    /**
+     * The backend rejects every write on an archived listing ("locked in
+     * 'archived' status"), so Edit has to lift the archive before opening the
+     * wizard — otherwise the partner lands on a form that can't be saved.
+     */
+    const unarchiveForEdit = async (row: ListingRow): Promise<boolean> => {
+        const nextState = await setArchived(row, false);
+        if (!nextState) return false;
+        toast.success(
+            nextState === 'draft'
+                ? 'Unarchived as a draft so you can edit it — republish when you’re done.'
+                : 'Unarchived so you can edit it.'
+        );
+        return true;
+    };
+
+    return {
+        loading: state.loading,
+        rows: state.rows,
+        error: state.error,
+        reload: load,
+        togglePause,
+        toggleArchive,
+        unarchiveForEdit,
+    };
 };

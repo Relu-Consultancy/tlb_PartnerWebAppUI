@@ -2,9 +2,14 @@ import { useCallback, useEffect, useState } from 'react';
 import { EntityType, EnquiryStatus } from '../../types';
 import { loadPartnerListings, PartnerListing } from '../../api/portalSummary';
 import {
-    getClassEnquiries, getVenueEnquiries, getProgramEnquiries,
-    updateClassEnquiry, updateVenueEnquiry, updateProgramEnquiry,
-    unlockClassEnquiry, unlockVenueEnquiry,
+    getClassEnquiries,
+    getVenueEnquiries,
+    getProgramEnquiries,
+    updateClassEnquiry,
+    updateVenueEnquiry,
+    updateProgramEnquiry,
+    unlockClassEnquiry,
+    unlockVenueEnquiry,
 } from '../../api/listings';
 import { toast } from '../../components/ui';
 import { EnquiryEntity, EnquiryEntry } from './types';
@@ -21,37 +26,62 @@ const unwrapList = (res: any): any[] => {
 };
 
 const pick = (...values: unknown[]): string => {
-    const found = values.find(v => v !== undefined && v !== null && String(v).trim() !== '');
+    const found = values.find((v) => v !== undefined && v !== null && String(v).trim() !== '');
     return found === undefined ? '' : String(found);
 };
 
+// Enquiry payloads name their listing inconsistently across the three
+// endpoints — and the per-listing Program endpoint often omits it entirely,
+// since the caller already knows which program it asked about. Read every
+// spelling we've seen, then fall back to the partner's own listings by id.
 const TITLE_KEYS: Record<EnquiryEntity, string[]> = {
-    Classes: ['class_title'],
-    Programs: ['program_title'],
-    Venues: ['venue_title', 'listing_title'],
+    Classes: ['class_title', 'class_name', 'listing_title', 'title'],
+    Programs: ['program_title', 'program_name', 'listing_title', 'title'],
+    Venues: ['venue_title', 'venue_name', 'listing_title', 'title'],
 };
+const NESTED_TITLE_KEYS: Record<EnquiryEntity, string[]> = {
+    Classes: ['class', 'class_listing', 'listing'],
+    Programs: ['program', 'program_listing', 'listing'],
+    Venues: ['venue', 'venue_listing', 'listing'],
+};
+
+const titleOf = (entity: EnquiryEntity, raw: any): string =>
+    pick(
+        ...TITLE_KEYS[entity].map((k) => raw?.[k]),
+        // `class`/`venue` can be a bare id or an expanded object — only the latter has a title.
+        ...NESTED_TITLE_KEYS[entity].map((k) => (raw?.[k] as any)?.title ?? (raw?.[k] as any)?.name)
+    );
 const LISTING_ID_KEYS: Record<EnquiryEntity, string[]> = {
     Classes: ['class_id', 'class'],
     Programs: [],
     Venues: ['venue_id', 'venue', 'listing_id'],
 };
 
-const normalize = (entity: EnquiryEntity, raw: any, listingId?: string): EnquiryEntry => ({
+const normalize = (entity: EnquiryEntity, raw: any, listing?: { id: string; title: string }): EnquiryEntry => ({
     id: String(raw?.id ?? ''),
     entity,
-    listingId: listingId ?? pick(...LISTING_ID_KEYS[entity].map(k => raw?.[k])),
-    listingTitle: pick(...TITLE_KEYS[entity].map(k => raw?.[k])) || 'Untitled listing',
+    listingId: listing?.id ?? pick(...LISTING_ID_KEYS[entity].map((k) => raw?.[k])),
+    // Left empty when the payload doesn't name the listing — `resolveTitles`
+    // fills it from the partner's listings before anything renders.
+    listingTitle: titleOf(entity, raw) || listing?.title || '',
     name: pick(raw?.attendee_name, raw?.student_name, raw?.parent_name, raw?.contact_name, raw?.customer_name, raw?.name) || 'Unknown',
     detail: pick(raw?.batch_name, raw?.student_age != null ? `Age ${raw.student_age}` : '', raw?.occasion),
-    contact: entity === 'Programs'
-        ? pick(raw?.contact_number, raw?.mobile) || 'Hidden'
-        : (raw?.is_contact_unlocked ? pick(raw?.mobile, raw?.contact_number) || 'Hidden' : 'Hidden'),
+    contact:
+        entity === 'Programs'
+            ? pick(raw?.contact_number, raw?.mobile) || 'Hidden'
+            : raw?.is_contact_unlocked
+              ? pick(raw?.mobile, raw?.contact_number) || 'Hidden'
+              : 'Hidden',
     isUnlocked: entity === 'Programs' ? true : !!raw?.is_contact_unlocked,
     status: (pick(raw?.status) || 'new') as EnquiryStatus,
     message: pick(raw?.message),
     notes: pick(raw?.internal_notes, raw?.partner_note),
     createdAt: pick(raw?.created_at) || null,
 });
+
+/** Names any enquiry whose payload didn't, using the partner's own listings. */
+const resolveTitles = (entries: EnquiryEntry[], listingsById: Map<string, PartnerListing>): EnquiryEntry[] =>
+    entries.map((e) => (e.listingTitle ? e : { ...e, listingTitle: listingsById.get(e.listingId)?.title || 'Untitled listing' }));
 
 interface State {
     loading: boolean;
@@ -61,39 +91,56 @@ interface State {
 
 export const useEnquiriesData = (allowedEntities: EntityType[]) => {
     const [state, setState] = useState<State>({ loading: true, entries: [], listingsById: new Map() });
-    const scope: EnquiryEntity[] = (['Classes', 'Programs', 'Venues'] as EnquiryEntity[])
-        .filter(e => allowedEntities.length === 0 || allowedEntities.includes(e));
+    const scope: EnquiryEntity[] = (['Classes', 'Programs', 'Venues'] as EnquiryEntity[]).filter(
+        (e) => allowedEntities.length === 0 || allowedEntities.includes(e)
+    );
     const scopeKey = scope.join(',');
 
     const load = useCallback(async () => {
-        setState(s => ({ ...s, loading: true }));
+        setState((s) => ({ ...s, loading: true }));
         const programListings = scope.includes('Programs') ? loadPartnerListings(['Programs']) : Promise.resolve([]);
         const jobs: Promise<EnquiryEntry[]>[] = [];
         if (scope.includes('Classes')) {
-            jobs.push(getClassEnquiries().then(res => unwrapList(res).map(r => normalize('Classes', r))).catch(() => []));
+            jobs.push(
+                getClassEnquiries()
+                    .then((res) => unwrapList(res).map((r) => normalize('Classes', r)))
+                    .catch(() => [])
+            );
         }
         if (scope.includes('Venues')) {
-            jobs.push(getVenueEnquiries().then(res => unwrapList(res).map(r => normalize('Venues', r))).catch(() => []));
+            jobs.push(
+                getVenueEnquiries()
+                    .then((res) => unwrapList(res).map((r) => normalize('Venues', r)))
+                    .catch(() => [])
+            );
         }
         if (scope.includes('Programs')) {
             jobs.push(
-                programListings.then(listings =>
-                    Promise.all(listings.map(l =>
-                        getProgramEnquiries(l.id).then(res => unwrapList(res).map(r => normalize('Programs', r, l.id))).catch(() => [])))
-                ).then(lists => lists.flat()).catch(() => []),
+                programListings
+                    .then((listings) =>
+                        Promise.all(
+                            listings.map((l) =>
+                                getProgramEnquiries(l.id)
+                                    .then((res) => unwrapList(res).map((r) => normalize('Programs', r, l)))
+                                    .catch(() => [])
+                            )
+                        )
+                    )
+                    .then((lists) => lists.flat())
+                    .catch(() => [])
             );
         }
-        const [results, allListings] = await Promise.all([
-            Promise.all(jobs),
-            loadPartnerListings(scope as EntityType[]),
-        ]);
-        setState({ loading: false, entries: results.flat(), listingsById: new Map(allListings.map(l => [l.id, l])) });
+        const [results, allListings] = await Promise.all([Promise.all(jobs), loadPartnerListings(scope as EntityType[])]);
+        const listingsById = new Map(allListings.map((l) => [l.id, l]));
+        setState({ loading: false, entries: resolveTitles(results.flat(), listingsById), listingsById });
     }, [scopeKey]);
 
-    useEffect(() => { load(); }, [load]);
+    useEffect(() => {
+        load();
+    }, [load]);
 
     const patch = (id: string, entity: EnquiryEntity, changes: Partial<EnquiryEntry>) =>
-        setState(s => ({ ...s, entries: s.entries.map(e => (e.id === id && e.entity === entity) ? { ...e, ...changes } : e) }));
+        setState((s) => ({ ...s, entries: s.entries.map((e) => (e.id === id && e.entity === entity ? { ...e, ...changes } : e)) }));
 
     const updateStatus = async (entry: EnquiryEntry, status: EnquiryStatus) => {
         const prev = entry.status;
@@ -125,11 +172,22 @@ export const useEnquiriesData = (allowedEntities: EntityType[]) => {
         try {
             const res = entry.entity === 'Classes' ? await unlockClassEnquiry(entry.id) : await unlockVenueEnquiry(entry.id);
             const data = res?.data ?? res;
-            patch(entry.id, entry.entity, { isUnlocked: !!data?.is_contact_unlocked, contact: pick(data?.mobile, data?.contact_number) || 'Hidden' });
+            patch(entry.id, entry.entity, {
+                isUnlocked: !!data?.is_contact_unlocked,
+                contact: pick(data?.mobile, data?.contact_number) || 'Hidden',
+            });
         } catch (err: any) {
             toast.error(err?.message || 'Couldn’t unlock the contact. Please try again.');
         }
     };
 
-    return { loading: state.loading, entries: state.entries, listingsById: state.listingsById, reload: load, updateStatus, updateNotes, unlock };
+    return {
+        loading: state.loading,
+        entries: state.entries,
+        listingsById: state.listingsById,
+        reload: load,
+        updateStatus,
+        updateNotes,
+        unlock,
+    };
 };

@@ -22,18 +22,19 @@ interface State {
 
 export const useBookingsData = (allowedEntities: EntityType[]) => {
     const [state, setState] = useState<State>({ loading: true, entries: [] });
-    const scope: BookingEntity[] = (['Events', 'Venues'] as BookingEntity[])
-        .filter(e => allowedEntities.length === 0 || allowedEntities.includes(e));
+    const scope: BookingEntity[] = (['Events', 'Venues'] as BookingEntity[]).filter(
+        (e) => allowedEntities.length === 0 || allowedEntities.includes(e)
+    );
     const scopeKey = scope.join(',');
 
     const load = useCallback(async () => {
-        setState(s => ({ ...s, loading: true }));
+        setState((s) => ({ ...s, loading: true }));
         try {
-            const [bookings, listings] = await Promise.all([
-                getAllBookings().catch(() => []),
-                loadPartnerListings(scope),
-            ]);
-            const startsById = new Map(listings.map(l => [l.id, l.startsAt]));
+            const [bookings, listings] = await Promise.all([getAllBookings().catch(() => []), loadPartnerListings(scope)]);
+            const startsById = new Map(listings.map((l) => [l.id, l.startsAt]));
+            // Bookings don't always carry `listing_title` — the partner's own
+            // listings name it when the payload doesn't.
+            const titleById = new Map(listings.map((l) => [l.id, l.title]));
             const entries: BookingEntry[] = (bookings as any[])
                 .map((b): BookingEntry | null => {
                     const entity = BOOKING_TYPE_TO_ENTITY[b?.booking_type];
@@ -43,7 +44,7 @@ export const useBookingsData = (allowedEntities: EntityType[]) => {
                         id: String(b?.id ?? ''),
                         entity,
                         listingId,
-                        listingTitle: b?.listing_title || 'Untitled listing',
+                        listingTitle: b?.listing_title || titleById.get(listingId) || 'Untitled listing',
                         bookingReference: b?.booking_reference || '',
                         customerName: b?.customer_name || 'Unknown',
                         amount: toNumber(b?.total_amount),
@@ -62,12 +63,14 @@ export const useBookingsData = (allowedEntities: EntityType[]) => {
         }
     }, [scopeKey]);
 
-    useEffect(() => { load(); }, [load]);
+    useEffect(() => {
+        load();
+    }, [load]);
 
     const markAttended = async (id: string): Promise<boolean> => {
         try {
             await markBookingAttended(id);
-            setState(s => ({ ...s, entries: s.entries.map(e => (e.id === id ? { ...e, status: 'attended' } : e)) }));
+            setState((s) => ({ ...s, entries: s.entries.map((e) => (e.id === id ? { ...e, status: 'attended' } : e)) }));
             return true;
         } catch (err: any) {
             toast.error(err?.message || 'Couldn’t mark this booking as attended. Please try again.');
@@ -80,7 +83,7 @@ export const useBookingsData = (allowedEntities: EntityType[]) => {
     const cancel = async (id: string, reason: string): Promise<{ success: true } | { success: false; code: string; message: string }> => {
         try {
             await cancelBooking(id, reason);
-            setState(s => ({ ...s, entries: s.entries.map(e => (e.id === id ? { ...e, status: 'cancelled' } : e)) }));
+            setState((s) => ({ ...s, entries: s.entries.map((e) => (e.id === id ? { ...e, status: 'cancelled' } : e)) }));
             return { success: true };
         } catch (err: any) {
             const code = err instanceof ApiError ? err.code : '';

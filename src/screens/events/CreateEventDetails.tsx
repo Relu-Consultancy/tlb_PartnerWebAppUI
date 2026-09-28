@@ -3,7 +3,7 @@ import { ArrowRight, MapPin, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
 import { toast, LocationPicker, LanguagePicker, validateLanguages } from '../../components/ui';
 import { PickedLocation } from '../../components/ui/LocationPicker';
-import { WizardShell, WizardNav, WizardField, OptionTileGrid } from '../../components/portal/wizard';
+import { WizardShell, WizardNav, WizardField, OptionTileGrid, scrollToFirstMissingField } from '../../components/portal/wizard';
 import {
     getEventMetaCategories,
     getEventMetaFormats,
@@ -15,17 +15,43 @@ import {
     setCurrentDraftId,
 } from '../../api/listings';
 
-interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
+interface Props {
+    onNavigate: (screen: Screen) => void;
+    onOpenSidebar: () => void;
+}
 
-interface ApiCategory { id: number; name: string; slug: string; subcategories: { id: number; name: string; slug: string }[] }
-interface ApiFormat { value: string; label: string }
-interface StaticRange { min_age: number; max_age: number }
+interface ApiCategory {
+    id: number;
+    name: string;
+    slug: string;
+    subcategories: { id: number; name: string; slug: string }[];
+}
+interface ApiFormat {
+    value: string;
+    label: string;
+}
+interface StaticRange {
+    min_age: number;
+    max_age: number;
+}
 interface AgeGroupsMeta {
     static_ranges: StaticRange[];
     custom_range: { enabled: boolean; min_allowed_age: number; max_allowed_age: number };
 }
 
 type Mode = 'online' | 'offline' | 'hybrid';
+
+type RequiredField = 'description' | 'category' | 'subcategory' | 'format' | 'ageGroup' | 'location' | 'meetingLink';
+
+const MISSING_LABEL: Record<RequiredField, string> = {
+    description: 'Description',
+    category: 'Category',
+    subcategory: 'Sub-category',
+    format: 'Event format',
+    ageGroup: 'Age group',
+    location: 'Venue location (pick on the map)',
+    meetingLink: 'Meeting link',
+};
 
 const MODE_META: { value: Mode; label: string; icon: string }[] = [
     { value: 'online', label: 'Online', icon: '💻' },
@@ -80,7 +106,11 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
 
     // A manual edit after a pick invalidates the place_id (and the map's
     // resolved area) — fall back to sending the raw lat/lng + address instead.
-    const editAddressManually = (v: string) => { setAddress(v); setPlaceId(undefined); setArea(''); };
+    const editAddressManually = (v: string) => {
+        setAddress(v);
+        setPlaceId(undefined);
+        setArea('');
+    };
 
     const [saving, setSaving] = useState(false);
     const [savingDraft, setSavingDraft] = useState(false);
@@ -145,10 +175,12 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
             }
         };
         load();
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+        };
     }, []);
 
-    const selectedCategory = categories.find(c => c.id === selectedCategoryId);
+    const selectedCategory = categories.find((c) => c.id === selectedCategoryId);
     const subcategories = selectedCategory?.subcategories || [];
 
     const buildAgeGroup = () => {
@@ -162,6 +194,17 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
         if (isNaN(min) || isNaN(max)) return null;
         return { type: 'custom', min_age: min, max_age: max };
     };
+
+    // Required fields still empty — each flags its WizardField so Next can scroll to the first.
+    const missingFields: RequiredField[] = [];
+    if (!description.trim()) missingFields.push('description');
+    if (categories.length > 0 && selectedCategoryId == null) missingFields.push('category');
+    if (subcategories.length > 0 && selectedSubcategoryId == null) missingFields.push('subcategory');
+    if (formats.length > 0 && !selectedFormat) missingFields.push('format');
+    if (ageMeta && !buildAgeGroup()) missingFields.push('ageGroup');
+    if ((mode === 'offline' || mode === 'hybrid') && (!address.trim() || !city.trim())) missingFields.push('location');
+    if ((mode === 'online' || mode === 'hybrid') && !meetingLink.trim()) missingFields.push('meetingLink');
+    const isMissing = (field: RequiredField) => missingFields.includes(field);
 
     // Shared by "Next" and "Save as draft" — creates the draft if needed and
     // persists whatever's currently filled in. Neither caller requires the step
@@ -222,11 +265,25 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
 
     const handleNext = async () => {
         if (!title.trim()) {
+            scrollToFirstMissingField();
             toast.warning('Please enter an event title.');
             return;
         }
+
+        // Surface every gap at once — toast + scroll to the first — so the partner
+        // isn't surprised by them only at Preview. "Save as draft" skips this.
+        if (missingFields.length > 0) {
+            scrollToFirstMissingField();
+            toast.warning(`Please complete before continuing: ${missingFields.map((f) => MISSING_LABEL[f]).join(', ')}.`);
+            return;
+        }
+
         const langErr = validateLanguages(languages, otherLanguage);
-        if (langErr) { setLangError(langErr); toast.warning(langErr); return; }
+        if (langErr) {
+            setLangError(langErr);
+            toast.warning(langErr);
+            return;
+        }
         setLangError('');
         setSaving(true);
         try {
@@ -241,7 +298,10 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
     };
 
     const handleSaveDraft = async () => {
-        if (!title.trim()) { toast.warning('Please enter an event title before saving.'); return; }
+        if (!title.trim()) {
+            toast.warning('Please enter an event title before saving.');
+            return;
+        }
         setSavingDraft(true);
         try {
             await persist();
@@ -258,7 +318,14 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
     const overlayLoading = metaLoading || draftLoading;
 
     return (
-        <WizardShell title="New event" entityType="Events" step={1} totalSteps={5} stepLabel="Details" onBack={() => onNavigate('SERVICE_LISTINGS')}>
+        <WizardShell
+            title="New event"
+            entityType="Events"
+            step={1}
+            totalSteps={5}
+            stepLabel="Details"
+            onBack={() => onNavigate('SERVICE_LISTINGS')}
+        >
             <div className="pt-card p-5 sm:p-6 flex flex-col gap-5">
                 {overlayLoading && (
                     <div className="flex items-center justify-center gap-2 text-tlb-muted text-xs font-bold">
@@ -272,7 +339,7 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
                     <p className="text-[13px] text-tlb-sub mt-0.5">Define what your event is about.</p>
                 </div>
 
-                <WizardField label="Event title">
+                <WizardField label="Event title" missing={!title.trim()}>
                     <input
                         className="pt-input"
                         placeholder="e.g. Summer Art Festival"
@@ -282,7 +349,7 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
                     />
                 </WizardField>
 
-                <WizardField label="Description">
+                <WizardField label="Description" missing={isMissing('description')}>
                     <textarea
                         className="pt-input min-h-[140px]"
                         placeholder="Tell parents & attendees what this event is about, what to expect, what to bring..."
@@ -291,22 +358,25 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
                     />
                 </WizardField>
 
-                <WizardField label="Category">
+                <WizardField label="Category" missing={isMissing('category')}>
                     {categories.length === 0 && !metaLoading ? (
                         <p className="text-xs text-tlb-muted">No categories available.</p>
                     ) : (
                         <div className="max-h-[300px] overflow-y-auto">
                             <OptionTileGrid
-                                options={categories.map(c => ({ id: String(c.id), label: c.name }))}
+                                options={categories.map((c) => ({ id: String(c.id), label: c.name }))}
                                 isSelected={(id) => selectedCategoryId === Number(id)}
-                                onToggle={(id) => { setSelectedCategoryId(Number(id)); setSelectedSubcategoryId(null); }}
+                                onToggle={(id) => {
+                                    setSelectedCategoryId(Number(id));
+                                    setSelectedSubcategoryId(null);
+                                }}
                             />
                         </div>
                     )}
                 </WizardField>
 
                 {selectedCategory && subcategories.length > 0 && (
-                    <WizardField label="Sub-category">
+                    <WizardField label="Sub-category" missing={isMissing('subcategory')}>
                         <div className="flex gap-2 overflow-x-auto pb-1">
                             {subcategories.map((s) => (
                                 <button
@@ -322,7 +392,7 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
                     </WizardField>
                 )}
 
-                <WizardField label="Event format">
+                <WizardField label="Event format" missing={isMissing('format')}>
                     <div className="flex flex-wrap gap-2">
                         {formats.map((f) => (
                             <button
@@ -338,13 +408,21 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
                 </WizardField>
 
                 {ageMeta && (
-                    <WizardField label="Age group">
+                    <WizardField label="Age group" missing={isMissing('ageGroup')}>
                         <div className="flex gap-2 mb-1">
-                            <button type="button" onClick={() => setAgeGroupType('static')} className={`pt-scope ${ageGroupType === 'static' ? 'is-active' : ''}`}>
+                            <button
+                                type="button"
+                                onClick={() => setAgeGroupType('static')}
+                                className={`pt-scope ${ageGroupType === 'static' ? 'is-active' : ''}`}
+                            >
                                 Preset
                             </button>
                             {ageMeta.custom_range.enabled && (
-                                <button type="button" onClick={() => setAgeGroupType('custom')} className={`pt-scope ${ageGroupType === 'custom' ? 'is-active' : ''}`}>
+                                <button
+                                    type="button"
+                                    onClick={() => setAgeGroupType('custom')}
+                                    className={`pt-scope ${ageGroupType === 'custom' ? 'is-active' : ''}`}
+                                >
                                     Custom
                                 </button>
                             )}
@@ -413,8 +491,10 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
                 </WizardField>
 
                 {(mode === 'offline' || mode === 'hybrid') && (
-                    <WizardField label="Venue location" className="gap-3">
-                        <span className="sr-only"><MapPin size={12} /></span>
+                    <WizardField label="Venue location" className="gap-3" missing={isMissing('location')}>
+                        <span className="sr-only">
+                            <MapPin size={12} />
+                        </span>
                         <LocationPicker
                             initialLatitude={latitude}
                             initialLongitude={longitude}
@@ -433,12 +513,16 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
                 <LanguagePicker
                     languages={languages}
                     otherLanguage={otherLanguage}
-                    onChange={(l, o) => { setLanguages(l); setOtherLanguage(o); setLangError(''); }}
+                    onChange={(l, o) => {
+                        setLanguages(l);
+                        setOtherLanguage(o);
+                        setLangError('');
+                    }}
                     error={langError}
                 />
 
                 {(mode === 'online' || mode === 'hybrid') && (
-                    <WizardField label="Meeting link">
+                    <WizardField label="Meeting link" missing={isMissing('meetingLink')}>
                         <input
                             className="pt-input"
                             placeholder="https://meet.google.com/..."

@@ -21,9 +21,7 @@ beforeEach(() => {
 describe('CreateEventSchedule — loading and error states', () => {
     it('shows error when no draft id in sessionStorage', async () => {
         render(<CreateEventSchedule {...props} />);
-        await waitFor(() =>
-            expect(screen.getByText(/no active draft/i)).toBeInTheDocument()
-        );
+        await waitFor(() => expect(screen.getByText(/no active draft/i)).toBeInTheDocument());
     });
 
     it('shows loading spinner initially when draft exists', () => {
@@ -34,12 +32,13 @@ describe('CreateEventSchedule — loading and error states', () => {
 
     it('shows error message on API failure', async () => {
         setCurrentDraftId(DRAFT_ID);
-        server.use(http.get(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, () =>
-            HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Listing not found' } }, { status: 404 })));
-        render(<CreateEventSchedule {...props} />);
-        await waitFor(() =>
-            expect(screen.getByText(/listing not found/i)).toBeInTheDocument()
+        server.use(
+            http.get(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, () =>
+                HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Listing not found' } }, { status: 404 })
+            )
         );
+        render(<CreateEventSchedule {...props} />);
+        await waitFor(() => expect(screen.getByText(/listing not found/i)).toBeInTheDocument());
     });
 });
 
@@ -153,10 +152,12 @@ describe('CreateEventSchedule — date validation', () => {
         const user = userEvent.setup();
         const toastSpy = vi.spyOn(toast, 'warning').mockImplementation(() => 0);
         let updateCalled = false;
-        server.use(http.patch(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, () => {
-            updateCalled = true;
-            return HttpResponse.json({ success: true, data: {} });
-        }));
+        server.use(
+            http.patch(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, () => {
+                updateCalled = true;
+                return HttpResponse.json({ success: true, data: {} });
+            })
+        );
         render(<CreateEventSchedule {...props} />);
         await waitFor(() => document.querySelectorAll('input[type="date"]').length > 0);
 
@@ -173,14 +174,59 @@ describe('CreateEventSchedule — date validation', () => {
     });
 });
 
+describe('CreateEventSchedule — required fields', () => {
+    it('lists missing start/end/capacity on Next and never calls the backend', async () => {
+        setCurrentDraftId(DRAFT_ID);
+        const user = userEvent.setup();
+        const toastSpy = vi.spyOn(toast, 'warning').mockImplementation(() => 0);
+        let updateCalled = false;
+        server.use(
+            http.patch(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, () => {
+                updateCalled = true;
+                return HttpResponse.json({ success: true, data: {} });
+            })
+        );
+        render(<CreateEventSchedule {...props} />);
+        await waitFor(() => document.querySelectorAll('input[type="date"]').length > 0);
+
+        const dateInputs = document.querySelectorAll('input[type="date"]');
+        fireEvent.change(dateInputs[0], { target: { value: '' } });
+        fireEvent.change(dateInputs[1], { target: { value: '' } });
+        fireEvent.change(screen.getByPlaceholderText(/e\.g\. 100/i), { target: { value: '' } });
+        await user.click(screen.getByText(/next: media/i));
+
+        expect(toastSpy).toHaveBeenCalledWith('Please complete before continuing: Event start date, Event end date, Capacity.');
+        expect(updateCalled).toBe(false);
+        expect(mockNavigate).not.toHaveBeenCalled();
+        toastSpy.mockRestore();
+    });
+
+    it('requires at least one complete ticket for a paid event', async () => {
+        setCurrentDraftId(DRAFT_ID);
+        const user = userEvent.setup();
+        const toastSpy = vi.spyOn(toast, 'warning').mockImplementation(() => 0);
+        render(<CreateEventSchedule {...props} />);
+        await waitFor(() => screen.getByText('Paid event'));
+        await user.click(screen.getByText('Paid event'));
+        // The draft's existing Free Entry ticket loads with it — drop it so no tier is complete.
+        await user.click(document.querySelector('button[aria-label="Remove ticket"]') as HTMLButtonElement);
+        await user.click(screen.getByText(/next: media/i));
+        expect(toastSpy).toHaveBeenCalledWith(expect.stringMatching(/At least 1 ticket/));
+        expect(mockNavigate).not.toHaveBeenCalled();
+        toastSpy.mockRestore();
+    });
+});
+
 describe('CreateEventSchedule — Next navigation', () => {
     it('calls updateListing and navigates to CREATE_EVENT_MEDIA', async () => {
         setCurrentDraftId(DRAFT_ID);
         let updateCalled = false;
-        server.use(http.patch(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, () => {
-            updateCalled = true;
-            return HttpResponse.json({ success: true, data: {} });
-        }));
+        server.use(
+            http.patch(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, () => {
+                updateCalled = true;
+                return HttpResponse.json({ success: true, data: {} });
+            })
+        );
         const user = userEvent.setup();
         render(<CreateEventSchedule {...props} />);
         await waitFor(() => screen.getByText(/next: media/i));
@@ -192,8 +238,11 @@ describe('CreateEventSchedule — Next navigation', () => {
     it('shows error alert on API failure', async () => {
         setCurrentDraftId(DRAFT_ID);
         const toastSpy = vi.spyOn(toast, 'error').mockImplementation(() => 0);
-        server.use(http.patch(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, () =>
-            HttpResponse.json({ error: { code: 'LISTING_LOCKED', message: 'Listing is locked' } }, { status: 400 })));
+        server.use(
+            http.patch(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, () =>
+                HttpResponse.json({ error: { code: 'LISTING_LOCKED', message: 'Listing is locked' } }, { status: 400 })
+            )
+        );
         const user = userEvent.setup();
         render(<CreateEventSchedule {...props} />);
         await waitFor(() => screen.getByText(/next: media/i));
@@ -202,4 +251,3 @@ describe('CreateEventSchedule — Next navigation', () => {
         toastSpy.mockRestore();
     });
 });
-

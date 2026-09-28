@@ -238,7 +238,9 @@ export const ListingDetailModal: React.FC<ListingDetailModalProps> = ({
                     </button>
                 ) : (
                     <span className="text-[11.5px] text-tlb-muted max-w-[220px]">
-                        Archive this listing to edit it — it comes back as a draft you can republish.
+                        {row.state === 'pending'
+                            ? 'In review with TLB — changes can be made once it’s approved.'
+                            : 'Archive this listing to edit it — it comes back as a draft you can republish.'}
                     </span>
                 )}
                 <button type="button" onClick={() => onNavigate('BOOKINGS_ENQUIRIES')} className="pt-btn pt-btn-o">

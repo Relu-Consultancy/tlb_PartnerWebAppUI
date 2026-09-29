@@ -1,8 +1,21 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-    getStatsOverview, getStatsEvents, getStatsVenues, getStatsEnquiries, getStatsRevenue, getStatsReviews, getStatsTraffic,
+    getStatsOverview,
+    getStatsEvents,
+    getStatsVenues,
+    getStatsEnquiries,
+    getStatsRevenue,
+    getStatsReviews,
+    getStatsTraffic,
     getStatsOverviewAll,
-    StatsOverview, StatsEvents, StatsVenues, StatsEnquiries, StatsRevenue, StatsReviews, StatsTraffic, StatsOverviewAll,
+    StatsOverview,
+    StatsEvents,
+    StatsVenues,
+    StatsEnquiries,
+    StatsRevenue,
+    StatsReviews,
+    StatsTraffic,
+    StatsOverviewAll,
 } from '../../api/stats';
 import { DateRangeKey } from '../../constants/dateRange';
 
@@ -26,21 +39,40 @@ interface State {
      * the Demand-funnel tab's "Where customers come from" card. */
     overviewAll: StatsOverviewAll | null;
     error: boolean;
+    /** First rejection's message — tells an approval refusal apart from a real outage. */
+    errorMessage: string | null;
 }
 
-const settled = <T,>(r: PromiseSettledResult<T>): T | null => (r.status === 'fulfilled' ? r.value : null);
+const settled = <T>(r: PromiseSettledResult<T>): T | null => (r.status === 'fulfilled' ? r.value : null);
 
 export const useAnalyticsData = (range: DateRangeKey) => {
     const [state, setState] = useState<State>({
-        loading: true, overview: null, events: null, venues: null, enquiries: null, revenue: null, reviews: null, traffic: null, overviewAll: null, error: false,
+        loading: true,
+        overview: null,
+        events: null,
+        venues: null,
+        enquiries: null,
+        revenue: null,
+        reviews: null,
+        traffic: null,
+        overviewAll: null,
+        error: false,
+        errorMessage: null,
     });
 
     const load = useCallback(async () => {
-        setState(s => ({ ...s, loading: true }));
-        const [oRes, eRes, vRes, enqRes, revRes, rwRes, trRes, oaRes] = await Promise.allSettled([
-            getStatsOverview(), getStatsEvents(), getStatsVenues(), getStatsEnquiries(), getStatsRevenue(range), getStatsReviews(), getStatsTraffic(),
+        setState((s) => ({ ...s, loading: true }));
+        const results = await Promise.allSettled([
+            getStatsOverview(),
+            getStatsEvents(),
+            getStatsVenues(),
+            getStatsEnquiries(),
+            getStatsRevenue(range),
+            getStatsReviews(),
+            getStatsTraffic(),
             getStatsOverviewAll(range),
         ]);
+        const [oRes, eRes, vRes, enqRes, revRes, rwRes, trRes, oaRes] = results;
         setState({
             loading: false,
             overview: settled(oRes),
@@ -51,11 +83,14 @@ export const useAnalyticsData = (range: DateRangeKey) => {
             reviews: settled(rwRes),
             traffic: settled(trRes),
             overviewAll: settled(oaRes),
-            error: [oRes, eRes, vRes, enqRes, revRes, rwRes, trRes, oaRes].every(r => r.status === 'rejected'),
+            error: results.every((r) => r.status === 'rejected'),
+            errorMessage: (results.find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined)?.reason?.message ?? null,
         });
     }, [range]);
 
-    useEffect(() => { load(); }, [load]);
+    useEffect(() => {
+        load();
+    }, [load]);
 
     return { ...state, reload: load };
 };

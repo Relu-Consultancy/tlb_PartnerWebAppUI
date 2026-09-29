@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/msw/server';
 import { invalidatePortalSummary } from '../../api/portalSummary';
-import { ApprovalGate } from '../ApprovalGate';
+import { ApprovalGate, isApprovalError } from '../ApprovalGate';
 
 const BASE = 'https://tlb-api.reluconsultancy.in';
 const mockNavigate = vi.fn();
@@ -60,5 +60,20 @@ describe('ApprovalGate', () => {
         server.use(http.get(`${BASE}/api/v1/partner/me/`, () => HttpResponse.error()));
         renderGate();
         await waitFor(() => expect(screen.getByText('Coupons screen')).toBeInTheDocument());
+    });
+});
+
+describe('isApprovalError', () => {
+    it('recognises the backend’s approved-partner refusals', () => {
+        expect(isApprovalError('This feature requires a fully approved partner account.')).toBe(true);
+        expect(isApprovalError(new Error('Partner is not approved'))).toBe(true);
+        expect(isApprovalError({ message: 'Forbidden (HTTP 403)' })).toBe(true);
+    });
+
+    it('leaves real outages alone, so they still read as errors', () => {
+        expect(isApprovalError('Failed to load coupons.')).toBe(false);
+        expect(isApprovalError(new Error('Network request failed'))).toBe(false);
+        expect(isApprovalError(null)).toBe(false);
+        expect(isApprovalError(undefined)).toBe(false);
     });
 });

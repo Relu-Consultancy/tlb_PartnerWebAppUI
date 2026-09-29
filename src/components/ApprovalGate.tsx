@@ -65,11 +65,12 @@ const GateSkeleton: React.FC = () => (
 
 interface NoticeProps {
     feature: string;
-    inReview: boolean;
+    /** Documents already submitted — nothing for the partner to re-upload. */
+    inReview?: boolean;
     onNavigate: (screen: Screen) => void;
 }
 
-const ApprovalRequiredNotice: React.FC<NoticeProps> = ({ feature, inReview, onNavigate }) => (
+export const ApprovalRequiredNotice: React.FC<NoticeProps> = ({ feature, inReview, onNavigate }) => (
     <div className="px-4 sm:px-[26px] pt-5 pb-9">
         <section
             role="alert"
@@ -135,4 +136,18 @@ export const ApprovalGate: React.FC<ApprovalGateProps> = ({ feature, onNavigate,
     if (state === 'verified' || state === null) return <>{children}</>;
 
     return <ApprovalRequiredNotice feature={feature} inReview={state === 'in_review'} onNavigate={onNavigate} />;
+};
+
+/**
+ * True for the backend's "approved partners only" refusal (IsApprovedPartner —
+ * 403 on the coupons and stats endpoints). The gate can't always pre-empt it:
+ * a partner can read as verified client-side (`is_verified`) while the backend
+ * still wants `status === 'approved'`, so screens that hit those endpoints
+ * check their load error against this and show the notice instead of a raw
+ * server string.
+ */
+export const isApprovalError = (error: unknown): boolean => {
+    const message = typeof error === 'string' ? error : (error as any)?.message;
+    if (!message) return false;
+    return /fully approved|not approved|approved partner|PARTNER_NOT_APPROVED|IsApprovedPartner|HTTP 403/i.test(String(message));
 };

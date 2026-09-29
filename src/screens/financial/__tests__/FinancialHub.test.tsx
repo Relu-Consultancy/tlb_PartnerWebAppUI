@@ -57,11 +57,68 @@ describe('FinancialHub — bank details modal', () => {
         await waitFor(() => expect(screen.getByRole('heading', { name: 'Update bank account' })).toBeInTheDocument());
         expect(screen.getByDisplayValue('Aviraj Studio')).toBeInTheDocument();
     });
+});
 
-    it('shows an add-account prompt when no bank is on file', async () => {
+describe('FinancialHub — bank account gate', () => {
+    it('hides every revenue/payout section behind a connect-bank prompt when no bank is on file', async () => {
         server.use(http.get(`${BASE}/api/v1/partner/bank-details/`, () => new HttpResponse(null, { status: 404 })));
         renderScreen();
-        await waitFor(() => expect(screen.getByText('No bank account linked yet.')).toBeInTheDocument());
-        expect(screen.getByText('Add payout account →')).toBeInTheDocument();
+        await waitFor(() => expect(screen.getByRole('heading', { name: 'Connect your bank account' })).toBeInTheDocument());
+        expect(screen.queryByText('Rs 1,05,910')).not.toBeInTheDocument();
+        expect(screen.queryByText('Revenue by vertical')).not.toBeInTheDocument();
+        expect(screen.queryByText('Payout account')).not.toBeInTheDocument();
+    });
+
+    it('unlocks the sections as soon as the bank form is saved', async () => {
+        server.use(
+            http.get(`${BASE}/api/v1/partner/bank-details/`, () => new HttpResponse(null, { status: 404 })),
+            http.put(`${BASE}/api/v1/partner/bank-details/`, () =>
+                HttpResponse.json({
+                    success: true,
+                    data: {
+                        account_holder_name: 'Aviraj Studio',
+                        bank_name: 'HDFC Bank',
+                        branch_name: '',
+                        account_number_masked: '••9012',
+                        ifsc_code: 'HDFC0001234',
+                        cancelled_cheque_url: '',
+                        consent_given: true,
+                        verification_status: 'pending',
+                        verification_note: '',
+                        updated_at: '2026-09-28T10:00:00Z',
+                    },
+                })
+            )
+        );
+        renderScreen();
+        const user = userEvent.setup();
+        await user.click(await screen.findByRole('button', { name: /add bank account/i }));
+        await waitFor(() => screen.getByRole('heading', { name: 'Add bank account' }));
+
+        await user.type(screen.getByPlaceholderText('As per bank records'), 'Aviraj Studio');
+        await user.type(screen.getByPlaceholderText('9-18 digit account number'), '123456789012');
+        await user.type(screen.getByPlaceholderText('Confirm account number'), '123456789012');
+        await user.type(screen.getByPlaceholderText('e.g. HDFC0001234'), 'HDFC0001234');
+        await user.click(screen.getByRole('checkbox'));
+        await user.click(screen.getByRole('button', { name: 'Save bank details' }));
+
+        await waitFor(() => expect(screen.getByText('Rs 1,05,910')).toBeInTheDocument());
+        expect(screen.queryByRole('heading', { name: 'Connect your bank account' })).not.toBeInTheDocument();
+        expect(screen.getByText('Payout account')).toBeInTheDocument();
+    });
+
+    it('offers a retry — not the connect prompt — when the bank details fail to load', async () => {
+        server.use(
+            http.get(`${BASE}/api/v1/partner/bank-details/`, () =>
+                HttpResponse.json({ error: { message: 'Server error' } }, { status: 500 })
+            )
+        );
+        renderScreen();
+        await waitFor(() => expect(screen.getByRole('heading', { name: /couldn.t load your payout account/i })).toBeInTheDocument());
+        expect(screen.queryByRole('heading', { name: 'Connect your bank account' })).not.toBeInTheDocument();
+
+        server.resetHandlers();
+        await userEvent.setup().click(screen.getByRole('button', { name: /try again/i }));
+        await waitFor(() => expect(screen.getByText(/HDFC Bank ••4412/)).toBeInTheDocument());
     });
 });

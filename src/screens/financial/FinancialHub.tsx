@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { AlertCircle, ArrowRight, Landmark, RotateCw } from 'lucide-react';
 import { Screen } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
 import { getDateRangeOption } from '../../constants/dateRange';
@@ -42,16 +43,74 @@ const FinancialHub: React.FC<Props> = ({ onNavigate }) => {
         return ok;
     };
 
+    const header = (
+        <div>
+            <nav aria-label="Breadcrumb" className="text-xs text-tlb-muted mb-[5px]">
+                <button type="button" onClick={() => onNavigate('HOME')} className="text-tlb-link hover:text-tlb-gold transition-colors">
+                    Dashboard
+                </button>
+                {' · '}Revenue &amp; payouts
+            </nav>
+            <h1 className="pt-h1 text-[24px]">Revenue &amp; payouts</h1>
+            <p className="text-[13.5px] text-tlb-sub mt-[3px]">What you've earned, what's on the way, and where it lands</p>
+        </div>
+    );
+
+    // No payout account yet (or it couldn't be checked) — earnings, ledger and payouts
+    // stay hidden until there's somewhere for the money to land. Saving the bank form
+    // lifts this straight away (verification can still be pending).
+    if (data.bankStatus !== 'linked') {
+        const loadFailed = data.bankStatus === 'error';
+        return (
+            <div className="px-4 sm:px-[26px] pt-5 pb-9 flex flex-col gap-4">
+                {header}
+                <section
+                    role="alert"
+                    aria-live="polite"
+                    className="pt-card max-w-[620px] w-full mx-auto px-5 py-7 sm:px-9 sm:py-9 flex flex-col items-center text-center"
+                >
+                    <span
+                        className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
+                            loadFailed ? 'bg-tlb-red-soft text-tlb-red-deep' : 'bg-tlb-amber-soft text-tlb-gold'
+                        }`}
+                        aria-hidden="true"
+                    >
+                        {loadFailed ? <AlertCircle size={26} strokeWidth={2.25} /> : <Landmark size={26} strokeWidth={2.25} />}
+                    </span>
+                    <h2 className="pt-h1 text-[20px] sm:text-[22px] mt-4 sm:mt-5">
+                        {loadFailed ? 'Couldn’t load your payout account' : 'Connect your bank account'}
+                    </h2>
+                    <p className="text-[13.5px] text-tlb-sub mt-2.5 max-w-[46ch]">
+                        {loadFailed
+                            ? 'We need to check your bank details before showing revenue and payouts. Please try again.'
+                            : 'Add the account your payouts should settle into. Your revenue, ledger and payout history open up as soon as it’s saved.'}
+                    </p>
+                    {loadFailed ? (
+                        <button
+                            type="button"
+                            onClick={data.reload}
+                            className="pt-btn pt-btn-y justify-center w-full sm:w-auto py-3 sm:py-2 mt-6 sm:mt-7"
+                        >
+                            <RotateCw size={15} strokeWidth={2.5} /> Try again
+                        </button>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => setModalOpen(true)}
+                            className="pt-btn pt-btn-y justify-center w-full sm:w-auto py-3 sm:py-2 mt-6 sm:mt-7"
+                        >
+                            Add bank account <ArrowRight size={15} strokeWidth={2.5} />
+                        </button>
+                    )}
+                </section>
+                <BankDetailsModal open={modalOpen} bank={null} onClose={() => setModalOpen(false)} onSave={handleSave} />
+            </div>
+        );
+    }
+
     return (
         <div className="px-4 sm:px-[26px] pt-5 pb-9 flex flex-col gap-4">
-            <div>
-                <nav aria-label="Breadcrumb" className="text-xs text-tlb-muted mb-[5px]">
-                    <button type="button" onClick={() => onNavigate('HOME')} className="text-tlb-link hover:text-tlb-gold transition-colors">Dashboard</button>
-                    {' · '}Revenue &amp; payouts
-                </nav>
-                <h1 className="pt-h1 text-[24px]">Revenue &amp; payouts</h1>
-                <p className="text-[13.5px] text-tlb-sub mt-[3px]">What you've earned, what's on the way, and where it lands</p>
-            </div>
+            {header}
 
             <StatsStrip revenue={data.revenue} periodPhrase={periodPhrase} />
 

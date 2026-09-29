@@ -1,14 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import {
-    motion,
-    useInView,
-    useMotionTemplate,
-    useMotionValue,
-    useScroll,
-    useSpring,
-    useTransform,
-    MotionValue,
-} from 'motion/react';
+import { motion, useInView, useMotionTemplate, useMotionValue, useScroll, useSpring, useTransform, MotionValue } from 'motion/react';
 import {
     ArrowRight,
     BarChart3,
@@ -64,11 +55,7 @@ const Counter: React.FC<{ to: number; suffix?: string; className?: string }> = (
 };
 
 // ── Reusable scroll-into-view wrapper ──
-const Reveal: React.FC<{ children: React.ReactNode; delay?: number; className?: string }> = ({
-    children,
-    delay = 0,
-    className,
-}) => (
+const Reveal: React.FC<{ children: React.ReactNode; delay?: number; className?: string }> = ({ children, delay = 0, className }) => (
     <motion.div
         className={className}
         initial={{ opacity: 0, y: 24 }}
@@ -82,9 +69,12 @@ const Reveal: React.FC<{ children: React.ReactNode; delay?: number; className?: 
 
 // ── Floating entity cards in the hero (right column on desktop) ──
 // Accepts tilt motion values from parent so the whole group reacts to cursor position.
-const HeroCards: React.FC<{ rotateX?: MotionValue<number>; rotateY?: MotionValue<number> }> = ({
+// `compact` is the phone/tablet layout: narrower cards, stacked in a container tall
+// enough to hold all four, so none spill into the stats strip below.
+const HeroCards: React.FC<{ rotateX?: MotionValue<number>; rotateY?: MotionValue<number>; compact?: boolean }> = ({
     rotateX,
     rotateY,
+    compact = false,
 }) => {
     const cards = [
         { icon: CalendarDays, title: 'Events', meta: '127 active', tint: 'bg-blue-50 text-blue-600', delay: 0 },
@@ -94,7 +84,7 @@ const HeroCards: React.FC<{ rotateX?: MotionValue<number>; rotateY?: MotionValue
     ];
     return (
         <motion.div
-            className="relative w-full h-[420px] sm:h-[460px] overflow-hidden"
+            className={`relative w-full overflow-hidden ${compact ? 'h-[380px]' : 'h-[420px] sm:h-[460px]'}`}
             style={{ rotateX, rotateY, transformStyle: 'preserve-3d', perspective: 1000 }}
         >
             {/* Backdrop gradient blob — deeper gold wash */}
@@ -103,16 +93,24 @@ const HeroCards: React.FC<{ rotateX?: MotionValue<number>; rotateY?: MotionValue
             </div>
 
             {cards.map((card, i) => {
-                const positions = [
-                    'top-4 left-2 sm:left-6',
-                    'top-24 right-2 sm:right-4',
-                    'bottom-28 left-6 sm:left-10',
-                    'bottom-4 right-4 sm:right-12',
-                ];
+                const positions = compact
+                    ? [
+                          // ~90px-tall cards, zig-zagging down 380px: each row clears the one above
+                          'top-2 left-1 sm:left-[8%]',
+                          'top-[98px] right-1 sm:right-[8%]',
+                          'top-[194px] left-1 sm:left-[12%]',
+                          'bottom-2 right-1 sm:right-[12%]',
+                      ]
+                    : [
+                          'top-4 left-2 sm:left-6',
+                          'top-24 right-2 sm:right-4',
+                          'bottom-28 left-6 sm:left-10',
+                          'bottom-4 right-4 sm:right-12',
+                      ];
                 return (
                     <motion.div
                         key={card.title}
-                        className={`absolute ${positions[i]} w-52 bg-white rounded-2xl shadow-xl border border-gray-100 p-4`}
+                        className={`absolute ${positions[i]} ${compact ? 'w-44 sm:w-52' : 'w-52'} bg-white rounded-2xl shadow-xl border border-gray-100 p-4`}
                         initial={{ opacity: 0, y: 24, rotate: i % 2 === 0 ? -3 : 3 }}
                         animate={{
                             opacity: 1,
@@ -236,7 +234,10 @@ export const Landing: React.FC<AuthProps> = ({ onNavigate }) => {
     const winX = useMotionValue(-9999);
     const winY = useMotionValue(-9999);
     useEffect(() => {
-        const onMove = (e: MouseEvent) => { winX.set(e.clientX); winY.set(e.clientY); };
+        const onMove = (e: MouseEvent) => {
+            winX.set(e.clientX);
+            winY.set(e.clientY);
+        };
         window.addEventListener('mousemove', onMove);
         return () => window.removeEventListener('mousemove', onMove);
     }, [winX, winY]);
@@ -308,17 +309,10 @@ export const Landing: React.FC<AuthProps> = ({ onNavigate }) => {
     return (
         <div className="min-h-screen bg-[#FDFCF8] text-tlb-dark">
             {/* ── Full-screen cursor spotlight (behind all content) ── */}
-            <motion.div
-                aria-hidden
-                className="pointer-events-none fixed inset-0 -z-10 hidden sm:block"
-                style={{ background: spotlight }}
-            />
+            <motion.div aria-hidden className="pointer-events-none fixed inset-0 -z-10 hidden sm:block" style={{ background: spotlight }} />
 
             {/* ── Scroll progress bar (thin yellow line, very top) ── */}
-            <motion.div
-                className="fixed top-0 left-0 right-0 h-[3px] bg-tlb-yellow origin-left z-[60]"
-                style={{ scaleX }}
-            />
+            <motion.div className="fixed top-0 left-0 right-0 h-[3px] bg-tlb-yellow origin-left z-[60]" style={{ scaleX }} />
 
             {/* ── Sticky Header ── */}
             <header
@@ -326,14 +320,15 @@ export const Landing: React.FC<AuthProps> = ({ onNavigate }) => {
                     scrolled ? 'bg-white/80 backdrop-blur-lg border-b border-gray-100 shadow-sm' : 'bg-transparent'
                 }`}
             >
-                <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                        <div className="w-9 h-9 bg-tlb-dark rounded-xl flex items-center justify-center text-tlb-yellow font-black text-xs shadow-sm">
+                <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex justify-between items-center gap-2 sm:gap-3">
+                    {/* Sized so the full name fits beside "Get Started" on a 360px phone; truncate is only a safety net for narrower screens */}
+                    <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                        <div className="w-8 h-8 sm:w-9 sm:h-9 bg-tlb-dark rounded-xl flex items-center justify-center text-tlb-yellow font-black text-[11px] sm:text-xs shadow-sm shrink-0">
                             TLB
                         </div>
-                        <span className="font-black text-lg tracking-tight">The Little Broadway</span>
+                        <span className="font-black text-[15px] sm:text-lg tracking-tight truncate">The Little Broadway</span>
                     </div>
-                    <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                         <button
                             onClick={() => onNavigate('LOGIN')}
                             className="hidden sm:block font-bold text-gray-600 hover:text-tlb-dark transition-colors text-sm px-3 py-2"
@@ -344,7 +339,7 @@ export const Landing: React.FC<AuthProps> = ({ onNavigate }) => {
                             whileHover={{ scale: 1.03 }}
                             whileTap={{ scale: 0.97 }}
                             onClick={() => onNavigate('PARTNER_ACCESS')}
-                            className="bg-tlb-yellow text-tlb-dark font-bold px-4 sm:px-5 py-2.5 rounded-xl text-sm flex items-center gap-1.5 shadow-md shadow-tlb-yellow/30"
+                            className="bg-tlb-yellow text-tlb-dark font-bold px-3 sm:px-5 py-2.5 rounded-xl text-[13px] sm:text-sm flex items-center gap-1 sm:gap-1.5 whitespace-nowrap shadow-md shadow-tlb-yellow/30"
                         >
                             Get Started <ArrowRight size={14} />
                         </motion.button>
@@ -388,8 +383,8 @@ export const Landing: React.FC<AuthProps> = ({ onNavigate }) => {
                             transition={{ duration: 0.6, delay: 0.2 }}
                             className="text-gray-500 mt-5 text-base sm:text-lg leading-relaxed max-w-xl"
                         >
-                            The ultimate partner portal for Broadway events, classes, programs, and venues. Manage listings,
-                            bookings, and payouts from one beautifully designed dashboard.
+                            The ultimate partner portal for Broadway events, classes, programs, and venues. Manage listings, bookings, and
+                            payouts from one beautifully designed dashboard.
                         </motion.p>
 
                         <motion.div
@@ -402,7 +397,7 @@ export const Landing: React.FC<AuthProps> = ({ onNavigate }) => {
                                 whileHover={{ scale: 1.02 }}
                                 whileTap={{ scale: 0.98 }}
                                 onClick={() => onNavigate('PARTNER_ACCESS')}
-                                className="bg-tlb-yellow text-tlb-dark font-bold py-4 px-7 rounded-xl inline-flex items-center justify-center gap-2 shadow-lg shadow-tlb-yellow/30 text-base"
+                                className="w-full sm:w-auto bg-tlb-yellow text-tlb-dark font-bold py-4 px-7 rounded-xl inline-flex items-center justify-center gap-2 shadow-lg shadow-tlb-yellow/30 text-base"
                             >
                                 Become a Partner <ArrowRight size={18} />
                             </motion.button>
@@ -445,11 +440,9 @@ export const Landing: React.FC<AuthProps> = ({ onNavigate }) => {
                         <HeroCards rotateX={rotateX} rotateY={rotateY} />
                     </div>
 
-                    {/* Mobile: simpler illustration (no tilt — no cursor) */}
+                    {/* Mobile/tablet: compact illustration (no tilt — no cursor). Its own height holds all four cards. */}
                     <div className="lg:hidden">
-                        <div className="relative h-72">
-                            <HeroCards />
-                        </div>
+                        <HeroCards compact />
                     </div>
                 </div>
             </section>
@@ -487,8 +480,8 @@ export const Landing: React.FC<AuthProps> = ({ onNavigate }) => {
                             One platform. Every tool. <span className="text-tlb-yellow">Zero hassle.</span>
                         </h2>
                         <p className="text-gray-500 mt-3 leading-relaxed">
-                            From the first listing to your hundredth booking, TLB gives you a single, polished workspace built around
-                            the way Broadway partners actually work.
+                            From the first listing to your hundredth booking, TLB gives you a single, polished workspace built around the
+                            way Broadway partners actually work.
                         </p>
                     </div>
                 </Reveal>
@@ -553,8 +546,8 @@ export const Landing: React.FC<AuthProps> = ({ onNavigate }) => {
                                     Ready for the <span className="text-tlb-yellow">spotlight?</span>
                                 </h2>
                                 <p className="text-gray-400 mt-4 text-base max-w-xl leading-relaxed">
-                                    Join the network powering the next generation of Broadway excellence. Setup takes minutes — your
-                                    first listing can go live the same day.
+                                    Join the network powering the next generation of Broadway excellence. Setup takes minutes — your first
+                                    listing can go live the same day.
                                 </p>
                             </div>
 
@@ -583,9 +576,14 @@ export const Landing: React.FC<AuthProps> = ({ onNavigate }) => {
 
             {/* ── Footer ── */}
             <footer>
-                <img src="/tlbAppIcon.png" alt="The Little Broadway" className="block mx-auto w-24 h-24" />
                 <div className="bg-tlb-dark px-6 sm:px-10 py-10">
                     <div className="max-w-6xl mx-auto">
+                        {/* Logo sits inside the dark footer (it used to float on the cream page, butted against the footer's edge) */}
+                        <img
+                            src="/tlbAppIcon.png"
+                            alt="The Little Broadway"
+                            className="block mx-auto w-16 h-16 sm:w-20 sm:h-20 rounded-2xl mb-8 sm:mb-10"
+                        />
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 mb-10">
                             <div>
                                 <h4 className="text-[10px] font-black text-tlb-yellow uppercase tracking-widest mb-3">Platform</h4>

@@ -6,6 +6,7 @@ import { server } from '../../../test/msw/server';
 import { DRAFT_ID, mockDraft } from '../../../test/msw/handlers';
 import { CreateEventPreview } from '../CreateEventPreview';
 import { setCurrentDraftId, getCurrentDraftId } from '../../../api/listings';
+import { toast } from '../../../components/ui';
 
 const BASE = 'https://tlb-api.reluconsultancy.in';
 
@@ -20,9 +21,7 @@ beforeEach(() => {
 describe('CreateEventPreview — loading and error states', () => {
     it('shows error when no draft id in sessionStorage', async () => {
         render(<CreateEventPreview {...props} />);
-        await waitFor(() =>
-            expect(screen.getByText(/no active draft/i)).toBeInTheDocument()
-        );
+        await waitFor(() => expect(screen.getByText(/no active draft/i)).toBeInTheDocument());
     });
 
     it('shows loading spinner initially when draft exists', () => {
@@ -33,12 +32,13 @@ describe('CreateEventPreview — loading and error states', () => {
 
     it('shows error message on API failure', async () => {
         setCurrentDraftId(DRAFT_ID);
-        server.use(http.get(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, () =>
-            HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Listing not found' } }, { status: 404 })));
-        render(<CreateEventPreview {...props} />);
-        await waitFor(() =>
-            expect(screen.getByText(/listing not found/i)).toBeInTheDocument()
+        server.use(
+            http.get(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, () =>
+                HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Listing not found' } }, { status: 404 })
+            )
         );
+        render(<CreateEventPreview {...props} />);
+        await waitFor(() => expect(screen.getByText(/listing not found/i)).toBeInTheDocument());
     });
 });
 
@@ -46,33 +46,25 @@ describe('CreateEventPreview — event details display', () => {
     it('shows event title', async () => {
         setCurrentDraftId(DRAFT_ID);
         render(<CreateEventPreview {...props} />);
-        await waitFor(() =>
-            expect(screen.getByText('Test Event')).toBeInTheDocument()
-        );
+        await waitFor(() => expect(screen.getByText('Test Event')).toBeInTheDocument());
     });
 
     it('shows category breadcrumb', async () => {
         setCurrentDraftId(DRAFT_ID);
         render(<CreateEventPreview {...props} />);
-        await waitFor(() =>
-            expect(screen.getByText(/dance/i)).toBeInTheDocument()
-        );
+        await waitFor(() => expect(screen.getByText(/dance/i)).toBeInTheDocument());
     });
 
     it('shows event description', async () => {
         setCurrentDraftId(DRAFT_ID);
         render(<CreateEventPreview {...props} />);
-        await waitFor(() =>
-            expect(screen.getByText(/a test event description/i)).toBeInTheDocument()
-        );
+        await waitFor(() => expect(screen.getByText(/a test event description/i)).toBeInTheDocument());
     });
 
     it('shows free ticket when price_type is free', async () => {
         setCurrentDraftId(DRAFT_ID);
         render(<CreateEventPreview {...props} />);
-        await waitFor(() =>
-            expect(screen.getByText('Free')).toBeInTheDocument()
-        );
+        await waitFor(() => expect(screen.getByText('Free')).toBeInTheDocument());
     });
 
     it('shows cover image', async () => {
@@ -89,32 +81,55 @@ describe('CreateEventPreview — submission readiness', () => {
     it('shows Ready to submit when all required fields present', async () => {
         setCurrentDraftId(DRAFT_ID);
         render(<CreateEventPreview {...props} />);
-        await waitFor(() =>
-            expect(screen.getByText(/ready to submit/i)).toBeInTheDocument()
-        );
+        await waitFor(() => expect(screen.getByText(/ready to submit/i)).toBeInTheDocument());
     });
 
     it('shows Submit for Review button', async () => {
         setCurrentDraftId(DRAFT_ID);
         render(<CreateEventPreview {...props} />);
-        await waitFor(() =>
-            expect(screen.getByRole('button', { name: /submit for review/i })).toBeInTheDocument()
-        );
+        await waitFor(() => expect(screen.getByRole('button', { name: /submit for review/i })).toBeInTheDocument());
     });
 
     it('shows missing fields list when required fields absent', async () => {
         setCurrentDraftId(DRAFT_ID);
-        server.use(http.get(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, () =>
-            HttpResponse.json({
-                success: true,
-                data: { ...mockDraft, title: '', media: [] },
-            })));
-        render(<CreateEventPreview {...props} />);
-        await waitFor(() =>
-            expect(screen.getByText(/missing for submission/i)).toBeInTheDocument()
+        server.use(
+            http.get(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, () =>
+                HttpResponse.json({
+                    success: true,
+                    data: { ...mockDraft, title: '', media: [] },
+                })
+            )
         );
+        render(<CreateEventPreview {...props} />);
+        await waitFor(() => expect(screen.getByText(/missing for submission/i)).toBeInTheDocument());
         expect(screen.getByText('Title')).toBeInTheDocument();
         expect(screen.getByText('Cover image')).toBeInTheDocument();
+    });
+
+    it('warns with the missing fields — instead of silently doing nothing — when Submit is pressed early', async () => {
+        setCurrentDraftId(DRAFT_ID);
+        let submitCalled = false;
+        server.use(
+            http.get(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, () =>
+                HttpResponse.json({
+                    success: true,
+                    data: { ...mockDraft, age_group: null, mode: 'online', meeting_link: null },
+                })
+            ),
+            http.post(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/submit/`, () => {
+                submitCalled = true;
+                return HttpResponse.json({ success: true, data: {} });
+            })
+        );
+        const toastSpy = vi.spyOn(toast, 'warning').mockImplementation(() => 0);
+        const user = userEvent.setup();
+        render(<CreateEventPreview {...props} />);
+        await waitFor(() => screen.getByText(/missing for submission/i));
+        await user.click(screen.getByRole('button', { name: /submit for review/i }));
+        expect(toastSpy).toHaveBeenCalledWith('Please complete before submitting: Age group, Meeting link.');
+        expect(screen.getByText(/missing for submission/i).closest('[data-field-missing]')).toBeInTheDocument();
+        expect(submitCalled).toBe(false);
+        toastSpy.mockRestore();
     });
 });
 
@@ -125,58 +140,68 @@ describe('CreateEventPreview — submit modals', () => {
         render(<CreateEventPreview {...props} />);
         await waitFor(() => screen.getByRole('button', { name: /submit for review/i }));
         await user.click(screen.getByRole('button', { name: /submit for review/i }));
-        await waitFor(() =>
-            expect(screen.getByText('Event Under Review')).toBeInTheDocument()
-        );
+        await waitFor(() => expect(screen.getByText('Event Under Review')).toBeInTheDocument());
         expect(screen.getByText(/pending admin approval/i)).toBeInTheDocument();
         expect(screen.getByText(/won't be able to create new events/i)).toBeInTheDocument();
     });
 
     it('shows Profile Under Review modal when PARTNER_UNDER_REVIEW error code', async () => {
         setCurrentDraftId(DRAFT_ID);
-        server.use(http.post(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/submit/`, () =>
-            HttpResponse.json({
-                error: { code: 'PARTNER_UNDER_REVIEW', message: 'Partner under review' },
-            }, { status: 403 })));
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/submit/`, () =>
+                HttpResponse.json(
+                    {
+                        error: { code: 'PARTNER_UNDER_REVIEW', message: 'Partner under review' },
+                    },
+                    { status: 403 }
+                )
+            )
+        );
         const user = userEvent.setup();
         render(<CreateEventPreview {...props} />);
         await waitFor(() => screen.getByRole('button', { name: /submit for review/i }));
         await user.click(screen.getByRole('button', { name: /submit for review/i }));
-        await waitFor(() =>
-            expect(screen.getByText('Profile Under Review')).toBeInTheDocument()
-        );
+        await waitFor(() => expect(screen.getByText('Profile Under Review')).toBeInTheDocument());
         expect(screen.queryByText('Event Under Review')).not.toBeInTheDocument();
     });
 
     it('does NOT show Profile Under Review for non-PARTNER_UNDER_REVIEW errors', async () => {
         setCurrentDraftId(DRAFT_ID);
-        server.use(http.post(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/submit/`, () =>
-            HttpResponse.json({
-                error: { code: 'LISTING_INCOMPLETE', message: 'Listing is incomplete' },
-            }, { status: 400 })));
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/submit/`, () =>
+                HttpResponse.json(
+                    {
+                        error: { code: 'LISTING_INCOMPLETE', message: 'Listing is incomplete' },
+                    },
+                    { status: 400 }
+                )
+            )
+        );
         const user = userEvent.setup();
         render(<CreateEventPreview {...props} />);
         await waitFor(() => screen.getByRole('button', { name: /submit for review/i }));
         await user.click(screen.getByRole('button', { name: /submit for review/i }));
-        await waitFor(() =>
-            expect(screen.getByText('Submission Failed')).toBeInTheDocument()
-        );
+        await waitFor(() => expect(screen.getByText('Submission Failed')).toBeInTheDocument());
         expect(screen.queryByText('Profile Under Review')).not.toBeInTheDocument();
     });
 
     it('shows error message in Submission Failed modal', async () => {
         setCurrentDraftId(DRAFT_ID);
-        server.use(http.post(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/submit/`, () =>
-            HttpResponse.json({
-                error: { code: 'SERVER_ERROR', message: 'Internal server error' },
-            }, { status: 500 })));
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/submit/`, () =>
+                HttpResponse.json(
+                    {
+                        error: { code: 'SERVER_ERROR', message: 'Internal server error' },
+                    },
+                    { status: 500 }
+                )
+            )
+        );
         const user = userEvent.setup();
         render(<CreateEventPreview {...props} />);
         await waitFor(() => screen.getByRole('button', { name: /submit for review/i }));
         await user.click(screen.getByRole('button', { name: /submit for review/i }));
-        await waitFor(() =>
-            expect(screen.getByText(/internal server error/i)).toBeInTheDocument()
-        );
+        await waitFor(() => expect(screen.getByText(/internal server error/i)).toBeInTheDocument());
     });
 
     it('navigates to SERVICE_LISTINGS when success modal is closed', async () => {
@@ -203,10 +228,16 @@ describe('CreateEventPreview — submit modals', () => {
 
     it('navigates to SERVICE_LISTINGS when Profile Under Review modal is closed', async () => {
         setCurrentDraftId(DRAFT_ID);
-        server.use(http.post(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/submit/`, () =>
-            HttpResponse.json({
-                error: { code: 'PARTNER_UNDER_REVIEW', message: 'Partner under review' },
-            }, { status: 403 })));
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/submit/`, () =>
+                HttpResponse.json(
+                    {
+                        error: { code: 'PARTNER_UNDER_REVIEW', message: 'Partner under review' },
+                    },
+                    { status: 403 }
+                )
+            )
+        );
         const user = userEvent.setup();
         render(<CreateEventPreview {...props} />);
         await waitFor(() => screen.getByRole('button', { name: /submit for review/i }));

@@ -46,7 +46,9 @@ export const BookingsEnquiries: React.FC<Props> = ({ onNavigate }) => {
     const eStats = enquiryStats(enquiries.entries);
     const bStats = bookingStats(bookings.entries);
     const soon = soonBookings(bookings.entries, now);
-    const bookingScope: BookingEntity[] = (['Events', 'Venues'] as BookingEntity[]).filter(e => allowedEntities.length === 0 || allowedEntities.includes(e));
+    const bookingScope: BookingEntity[] = (['Events', 'Venues'] as BookingEntity[]).filter(
+        (e) => allowedEntities.length === 0 || allowedEntities.includes(e)
+    );
 
     const exportCurrentTab = () => {
         if (tab === 'enquiries') {
@@ -59,18 +61,22 @@ export const BookingsEnquiries: React.FC<Props> = ({ onNavigate }) => {
     // Keep the open modal's data fresh after a status/notes/unlock update.
     const openEnquiry = (entry: EnquiryEntry) => setSelectedEnquiry(entry);
     const liveSelectedEnquiry = selectedEnquiry
-        ? enquiries.entries.find(e => e.id === selectedEnquiry.id && e.entity === selectedEnquiry.entity) ?? selectedEnquiry
+        ? (enquiries.entries.find((e) => e.id === selectedEnquiry.id && e.entity === selectedEnquiry.entity) ?? selectedEnquiry)
         : null;
-    const liveSelectedBooking = selectedBooking
-        ? bookings.entries.find(b => b.id === selectedBooking.id) ?? selectedBooking
-        : null;
+    const liveSelectedBooking = selectedBooking ? (bookings.entries.find((b) => b.id === selectedBooking.id) ?? selectedBooking) : null;
 
     return (
         <div className="px-4 sm:px-[26px] pt-5 pb-9 flex flex-col gap-4">
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                 <div>
                     <nav aria-label="Breadcrumb" className="text-xs text-tlb-muted mb-[5px]">
-                        <button type="button" onClick={() => onNavigate('HOME')} className="text-tlb-link hover:text-tlb-gold transition-colors">Dashboard</button>
+                        <button
+                            type="button"
+                            onClick={() => onNavigate('HOME')}
+                            className="text-tlb-link hover:text-tlb-gold transition-colors"
+                        >
+                            Dashboard
+                        </button>
                         {' · '}Bookings/Enquiries
                     </nav>
                     <h1 className="pt-h1 text-[24px]">Bookings/Enquiries</h1>
@@ -80,17 +86,24 @@ export const BookingsEnquiries: React.FC<Props> = ({ onNavigate }) => {
                             : 'Ticketed bookings — Events and Venue slots, confirmed and paid.'}
                     </p>
                 </div>
-                <div className="flex items-center gap-4 flex-none">
-                    <div className="text-right">
-                        <p className="pt-eyebrow">{tab === 'enquiries' ? 'To respond' : 'Confirmed'}</p>
-                        <p className="pt-num text-[19px] text-tlb-ink">{tab === 'enquiries' ? formatCount(eStats.toRespond) : formatCount(bStats.confirmedCount)}</p>
+                {/* Mobile: stats on one row, Export full-width below. sm+: all inline. */}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 flex-none">
+                    <div className="flex items-center gap-4">
+                        <div className="sm:text-right">
+                            <p className="pt-eyebrow whitespace-nowrap">{tab === 'enquiries' ? 'To respond' : 'Confirmed'}</p>
+                            <p className="pt-num text-[19px] text-tlb-ink">
+                                {tab === 'enquiries' ? formatCount(eStats.toRespond) : formatCount(bStats.confirmedCount)}
+                            </p>
+                        </div>
+                        <div className="w-px h-[34px] bg-tlb-line" aria-hidden="true" />
+                        <div className="sm:text-right">
+                            <p className="pt-eyebrow whitespace-nowrap">{tab === 'enquiries' ? 'Responded' : 'Booking value'}</p>
+                            <p className="pt-num text-[19px] text-tlb-ink">
+                                {tab === 'enquiries' ? formatCount(eStats.responded) : formatRupees(bStats.bookingValue)}
+                            </p>
+                        </div>
                     </div>
-                    <div className="w-px h-[34px] bg-tlb-line" aria-hidden="true" />
-                    <div className="text-right">
-                        <p className="pt-eyebrow">{tab === 'enquiries' ? 'Responded' : 'Booking value'}</p>
-                        <p className="pt-num text-[19px] text-tlb-ink">{tab === 'enquiries' ? formatCount(eStats.responded) : formatRupees(bStats.bookingValue)}</p>
-                    </div>
-                    <button type="button" onClick={exportCurrentTab} className="pt-btn pt-btn-d">
+                    <button type="button" onClick={exportCurrentTab} className="pt-btn pt-btn-d justify-center w-full sm:w-auto">
                         <Download size={14} strokeWidth={2.75} /> {tab === 'enquiries' ? 'Export enquiries' : 'Export CSV'}
                     </button>
                 </div>
@@ -99,19 +112,11 @@ export const BookingsEnquiries: React.FC<Props> = ({ onNavigate }) => {
             {tab === 'bookings' && soon.rows.length > 0 && <SoonBookingsBanner soon={soon} />}
 
             <div className="flex items-center gap-7 border-b border-tlb-line overflow-x-auto">
-                <button
-                    type="button"
-                    className={`pt-vtab ${tab === 'enquiries' ? 'is-active' : ''}`}
-                    onClick={() => setTab('enquiries')}
-                >
+                <button type="button" className={`pt-vtab ${tab === 'enquiries' ? 'is-active' : ''}`} onClick={() => setTab('enquiries')}>
                     Enquiries
                     <span className={`pt-vtab-count ${eStats.toRespond > 0 ? 'is-alert' : ''}`}>{eStats.total}</span>
                 </button>
-                <button
-                    type="button"
-                    className={`pt-vtab ${tab === 'bookings' ? 'is-active' : ''}`}
-                    onClick={() => setTab('bookings')}
-                >
+                <button type="button" className={`pt-vtab ${tab === 'bookings' ? 'is-active' : ''}`} onClick={() => setTab('bookings')}>
                     Bookings
                     <span className="pt-vtab-count">{bStats.total}</span>
                 </button>
@@ -129,12 +134,7 @@ export const BookingsEnquiries: React.FC<Props> = ({ onNavigate }) => {
                     onOpen={openEnquiry}
                 />
             ) : (
-                <BookingsPanel
-                    entries={bookings.entries}
-                    availableEntities={bookingScope}
-                    now={now}
-                    onOpen={setSelectedBooking}
-                />
+                <BookingsPanel entries={bookings.entries} availableEntities={bookingScope} now={now} onOpen={setSelectedBooking} />
             )}
 
             <EnquiryDetailModal

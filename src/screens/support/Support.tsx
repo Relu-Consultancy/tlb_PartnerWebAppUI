@@ -1,22 +1,50 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import {
-    ArrowLeft, Plus, LifeBuoy, Search, RefreshCw, AlertCircle,
-    Send, CheckCircle2, MessageSquare, Clock, Lock, Ticket as TicketIcon,
-    Share2, ChevronRight,
+    ArrowLeft,
+    Plus,
+    LifeBuoy,
+    Search,
+    RefreshCw,
+    AlertCircle,
+    Send,
+    CheckCircle2,
+    MessageSquare,
+    Clock,
+    Lock,
+    Ticket as TicketIcon,
+    Share2,
+    ChevronRight,
 } from 'lucide-react';
 import { Screen } from '../../types';
 import { Select, SelectOption, toast } from '../../components/ui';
 import {
-    listTickets, getTicket, createTicket, closeTicket,
-    getTicketMessages, sendTicketMessage, getTicketCategories, ticketCategoryLabel,
-    listSharedTickets, getSharedTicket, getSharedTicketMessages, sendSharedTicketMessage,
-    TicketListItem, Ticket, TicketMessage, TicketCategory,
-    SharedTicketListItem, SharedTicketDetail,
+    listTickets,
+    getTicket,
+    createTicket,
+    closeTicket,
+    getTicketMessages,
+    sendTicketMessage,
+    getTicketCategories,
+    ticketCategoryLabel,
+    isBookingCategory,
+    listSharedTickets,
+    getSharedTicket,
+    getSharedTicketMessages,
+    sendSharedTicketMessage,
+    TicketListItem,
+    Ticket,
+    TicketMessage,
+    TicketCategory,
+    SharedTicketListItem,
+    SharedTicketDetail,
 } from '../../api/help';
 import { getBookings } from '../../api/listings';
 
-interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
+interface Props {
+    onNavigate: (screen: Screen) => void;
+    onOpenSidebar: () => void;
+}
 
 type Tab = 'my' | 'shared';
 
@@ -24,21 +52,20 @@ type Tab = 'my' | 'shared';
 // Status styling
 // ---------------------------------------------------------------------------
 const STATUS_STYLE: Record<string, { label: string; cls: string; dot: string }> = {
-    open:        { label: 'Open',        cls: 'bg-blue-50 text-blue-700 border-blue-200',       dot: 'bg-blue-500' },
-    pending:     { label: 'Pending',     cls: 'bg-amber-50 text-amber-700 border-amber-200',    dot: 'bg-amber-500' },
-    in_progress: { label: 'In Progress', cls: 'bg-amber-50 text-amber-700 border-amber-200',    dot: 'bg-amber-500' },
-    resolved:    { label: 'Resolved',    cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
-    closed:      { label: 'Closed',      cls: 'bg-gray-100 text-gray-500 border-gray-200',      dot: 'bg-gray-400' },
+    open: { label: 'Open', cls: 'bg-blue-50 text-blue-700 border-blue-200', dot: 'bg-blue-500' },
+    pending: { label: 'Pending', cls: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500' },
+    in_progress: { label: 'In Progress', cls: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500' },
+    resolved: { label: 'Resolved', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
+    closed: { label: 'Closed', cls: 'bg-gray-100 text-gray-500 border-gray-200', dot: 'bg-gray-400' },
 };
-const statusStyle = (s: string) => STATUS_STYLE[s] || { label: s.replace(/_/g, ' '), cls: 'bg-gray-100 text-gray-600 border-gray-200', dot: 'bg-gray-400' };
+const statusStyle = (s: string) =>
+    STATUS_STYLE[s] || { label: s.replace(/_/g, ' '), cls: 'bg-gray-100 text-gray-600 border-gray-200', dot: 'bg-gray-400' };
 
 const isStaff = (role: string) => ['admin', 'support', 'staff'].includes(role);
 const isClosed = (s?: string) => s === 'closed' || s === 'resolved';
 
-const fmtDate = (iso: string) =>
-    new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-const fmtTime = (iso: string) =>
-    new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
 const toCount = (v: number | string | undefined) => {
     const n = typeof v === 'string' ? Number(v) : v;
@@ -127,7 +154,9 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
     useEffect(() => {
         loadList();
         loadSharedList();
-        getTicketCategories().then(setCategories).catch(() => {});
+        getTicketCategories()
+            .then(setCategories)
+            .catch(() => {});
         getBookings()
             .then((res: any) => {
                 const d = res?.data || res;
@@ -151,17 +180,19 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
             try {
                 const { messages: msgs, ticket_status } = await getTicketMessages(selectedId, lastTsRef.current);
                 if (msgs.length) {
-                    setMessages(prev => {
-                        const seen = new Set(prev.map(m => m.id));
-                        const fresh = msgs.filter(m => !seen.has(m.id));
+                    setMessages((prev) => {
+                        const seen = new Set(prev.map((m) => m.id));
+                        const fresh = msgs.filter((m) => !seen.has(m.id));
                         return fresh.length ? [...prev, ...fresh] : prev;
                     });
                     lastTsRef.current = msgs[msgs.length - 1].created_at;
                 }
                 if (ticket_status && ticket_status !== detail?.status) {
-                    setDetail(prev => prev ? { ...prev, status: ticket_status } : prev);
+                    setDetail((prev) => (prev ? { ...prev, status: ticket_status } : prev));
                 }
-            } catch { /* silent during polling */ }
+            } catch {
+                /* silent during polling */
+            }
         };
         const iv = setInterval(poll, intervalMs);
         return () => clearInterval(iv);
@@ -177,17 +208,19 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
             try {
                 const { messages: msgs, ticket_status } = await getSharedTicketMessages(sharedSelectedId, sharedLastTsRef.current);
                 if (msgs.length) {
-                    setSharedMessages(prev => {
-                        const seen = new Set(prev.map(m => m.id));
-                        const fresh = msgs.filter(m => !seen.has(m.id));
+                    setSharedMessages((prev) => {
+                        const seen = new Set(prev.map((m) => m.id));
+                        const fresh = msgs.filter((m) => !seen.has(m.id));
                         return fresh.length ? [...prev, ...fresh] : prev;
                     });
                     sharedLastTsRef.current = msgs[msgs.length - 1].created_at;
                 }
                 if (ticket_status && sharedDetail) {
-                    setSharedDetail(prev => prev ? { ...prev, ticket_status } : prev);
+                    setSharedDetail((prev) => (prev ? { ...prev, ticket_status } : prev));
                 }
-            } catch { /* silent during polling */ }
+            } catch {
+                /* silent during polling */
+            }
         };
         const iv = setInterval(poll, intervalMs);
         return () => clearInterval(iv);
@@ -214,7 +247,7 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
             setDetail(msgsRes.ticket_status ? { ...t, status: msgsRes.ticket_status } : t);
             setMessages(msgsRes.messages);
             lastTsRef.current = msgsRes.messages.length ? msgsRes.messages[msgsRes.messages.length - 1].created_at : undefined;
-            setTickets(prev => prev.map(tk => tk.id === id ? { ...tk, unread_count: 0 } : tk));
+            setTickets((prev) => prev.map((tk) => (tk.id === id ? { ...tk, unread_count: 0 } : tk)));
         } catch (e: any) {
             toast.error(e?.message || 'Failed to load ticket');
             setSelectedId(null);
@@ -229,15 +262,15 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
         try {
             const { messages: msgs, ticket_status } = await getTicketMessages(selectedId, lastTsRef.current);
             if (msgs.length) {
-                setMessages(prev => {
-                    const seen = new Set(prev.map(m => m.id));
-                    const fresh = msgs.filter(m => !seen.has(m.id));
+                setMessages((prev) => {
+                    const seen = new Set(prev.map((m) => m.id));
+                    const fresh = msgs.filter((m) => !seen.has(m.id));
                     return fresh.length ? [...prev, ...fresh] : prev;
                 });
                 lastTsRef.current = msgs[msgs.length - 1].created_at;
             }
             if (ticket_status && ticket_status !== detail?.status) {
-                setDetail(prev => prev ? { ...prev, status: ticket_status } : prev);
+                setDetail((prev) => (prev ? { ...prev, status: ticket_status } : prev));
             }
         } catch (e: any) {
             toast.error(e?.message || 'Failed to refresh messages');
@@ -273,7 +306,7 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                 subject: form.subject.trim(),
                 category: form.category,
                 body: form.body.trim(),
-                booking_id: form.bookingId || undefined,
+                booking_id: (isBookingCategory(form.category) && form.bookingId) || undefined,
             });
             toast.success('Support ticket raised.');
             setCreating(false);
@@ -293,7 +326,7 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
         setSending(true);
         try {
             const msg = await sendTicketMessage(selectedId, body);
-            setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
+            setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
             lastTsRef.current = msg.created_at;
             setReply('');
         } catch (e: any) {
@@ -309,7 +342,7 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
         try {
             const t = await closeTicket(selectedId);
             setDetail(t);
-            setTickets(prev => prev.map(tk => tk.id === selectedId ? { ...tk, status: t.status } : tk));
+            setTickets((prev) => prev.map((tk) => (tk.id === selectedId ? { ...tk, status: t.status } : tk)));
             toast.success('Ticket closed.');
         } catch (e: any) {
             toast.error(e?.message || 'Failed to close ticket');
@@ -333,7 +366,7 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
             if (data.messages?.length) {
                 sharedLastTsRef.current = data.messages[data.messages.length - 1].created_at;
             }
-            setSharedTickets(prev => prev.map(tk => tk.id === id ? { ...tk, unread_count: 0 } : tk));
+            setSharedTickets((prev) => prev.map((tk) => (tk.id === id ? { ...tk, unread_count: 0 } : tk)));
         } catch (e: any) {
             toast.error(e?.message || 'Failed to load shared query');
             setSharedSelectedId(null);
@@ -348,15 +381,15 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
         try {
             const { messages: msgs, ticket_status } = await getSharedTicketMessages(sharedSelectedId, sharedLastTsRef.current);
             if (msgs.length) {
-                setSharedMessages(prev => {
-                    const seen = new Set(prev.map(m => m.id));
-                    const fresh = msgs.filter(m => !seen.has(m.id));
+                setSharedMessages((prev) => {
+                    const seen = new Set(prev.map((m) => m.id));
+                    const fresh = msgs.filter((m) => !seen.has(m.id));
                     return fresh.length ? [...prev, ...fresh] : prev;
                 });
                 sharedLastTsRef.current = msgs[msgs.length - 1].created_at;
             }
             if (ticket_status && sharedDetail) {
-                setSharedDetail(prev => prev ? { ...prev, ticket_status } : prev);
+                setSharedDetail((prev) => (prev ? { ...prev, ticket_status } : prev));
             }
         } catch (e: any) {
             toast.error(e?.message || 'Failed to refresh messages');
@@ -372,7 +405,7 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
         setSendingShared(true);
         try {
             const msg = await sendSharedTicketMessage(sharedSelectedId, body);
-            setSharedMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
+            setSharedMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
             sharedLastTsRef.current = msg.created_at;
             setSharedReply('');
         } catch (e: any) {
@@ -395,7 +428,7 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
         if (statusFilter === 'open') return s === 'open' || s === 'pending';
         return s === statusFilter;
     };
-    const filtered = tickets.filter(t => {
+    const filtered = tickets.filter((t) => {
         if (!matchesStatus(t.status)) return false;
         const q = query.trim().toLowerCase();
         if (!q) return true;
@@ -403,16 +436,18 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
     });
 
     // KPI counts across all my tickets
-    const activeCount = tickets.filter(t => !isClosed(t.status)).length;
-    const resolvedCount = tickets.filter(t => t.status === 'resolved').length;
-    const closedCount = tickets.filter(t => t.status === 'closed').length;
+    const activeCount = tickets.filter((t) => !isClosed(t.status)).length;
+    const resolvedCount = tickets.filter((t) => t.status === 'resolved').length;
+    const closedCount = tickets.filter((t) => t.status === 'closed').length;
 
-    const filteredShared = sharedTickets.filter(t => {
+    const filteredShared = sharedTickets.filter((t) => {
         const q = sharedQuery.trim().toLowerCase();
         if (!q) return true;
-        return t.subject.toLowerCase().includes(q)
-            || ticketCategoryLabel(t.category).toLowerCase().includes(q)
-            || (t.booking_reference || '').toLowerCase().includes(q);
+        return (
+            t.subject.toLowerCase().includes(q) ||
+            ticketCategoryLabel(t.category).toLowerCase().includes(q) ||
+            (t.booking_reference || '').toLowerCase().includes(q)
+        );
     });
 
     const sharedUnread = sharedTickets.reduce((s, t) => s + toCount(t.unread_count), 0);
@@ -474,10 +509,10 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
     const tabBar = !creating && !isInDetail && (
         <div className="bg-white border-b border-gray-100 px-5 md:px-8">
             <div className="max-w-5xl mx-auto flex gap-1">
-                {([
+                {[
                     { key: 'my' as Tab, label: 'My Tickets', icon: <TicketIcon size={14} />, badge: 0 },
                     { key: 'shared' as Tab, label: 'Shared Queries', icon: <Share2 size={14} />, badge: sharedUnread },
-                ]).map(tab => (
+                ].map((tab) => (
                     <button
                         key={tab.key}
                         onClick={() => setActiveTab(tab.key)}
@@ -489,7 +524,9 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                     >
                         {tab.icon} {tab.label}
                         {tab.badge > 0 && (
-                            <span className="text-[10px] font-black text-white bg-red-500 rounded-full px-1.5 py-0.5 leading-none">{tab.badge}</span>
+                            <span className="text-[10px] font-black text-white bg-red-500 rounded-full px-1.5 py-0.5 leading-none">
+                                {tab.badge}
+                            </span>
                         )}
                     </button>
                 ))}
@@ -511,8 +548,9 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                             <div>
                                 <label className={labelCls}>Subject *</label>
                                 <input
-                                    type="text" value={form.subject}
-                                    onChange={e => setForm(f => ({ ...f, subject: e.target.value }))}
+                                    type="text"
+                                    value={form.subject}
+                                    onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))}
                                     placeholder="Brief summary of your issue"
                                     className={`tlb-input ${formErrors.subject ? 'border-red-300 ring-1 ring-red-200' : ''}`}
                                 />
@@ -524,7 +562,15 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                     <label className={labelCls}>Category *</label>
                                     <Select
                                         value={form.category}
-                                        onChange={v => setForm(f => ({ ...f, category: v }))}
+                                        onChange={(v) =>
+                                            setForm((f) => ({
+                                                ...f,
+                                                category: v,
+                                                // The picker is hidden for other categories, so never
+                                                // submit a booking the partner can no longer see.
+                                                bookingId: isBookingCategory(v) ? f.bookingId : '',
+                                            }))
+                                        }
                                         options={categories}
                                         placeholder="Select a category"
                                         ariaLabel="Ticket category"
@@ -532,23 +578,29 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                     />
                                     {formErrors.category && <p className="text-xs text-red-500 mt-1.5">{formErrors.category}</p>}
                                 </div>
-                                <div>
-                                    <label className={labelCls}>Related Booking (optional)</label>
-                                    <Select
-                                        value={form.bookingId}
-                                        onChange={v => setForm(f => ({ ...f, bookingId: v }))}
-                                        options={bookingOptions.length ? bookingOptions : [{ value: '', label: 'No booking' }]}
-                                        placeholder="Link a booking"
-                                        ariaLabel="Related booking"
-                                    />
-                                </div>
+                                {isBookingCategory(form.category) && (
+                                    <div>
+                                        <label className={labelCls}>Related Booking (optional)</label>
+                                        <Select
+                                            value={form.bookingId}
+                                            onChange={(v) => setForm((f) => ({ ...f, bookingId: v }))}
+                                            options={bookingOptions.length ? bookingOptions : [{ value: '', label: 'No booking' }]}
+                                            placeholder="Link a booking"
+                                            ariaLabel="Related booking"
+                                        />
+                                        <p className="text-[11px] text-gray-400 mt-1.5">
+                                            Pick the booking this is about so support can look it up straight away.
+                                        </p>
+                                    </div>
+                                )}
                             </div>
 
                             <div>
                                 <label className={labelCls}>Description *</label>
                                 <textarea
-                                    rows={6} value={form.body}
-                                    onChange={e => setForm(f => ({ ...f, body: e.target.value }))}
+                                    rows={6}
+                                    value={form.body}
+                                    onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))}
                                     placeholder="Describe the issue in detail…"
                                     className={`tlb-input resize-none ${formErrors.body ? 'border-red-300 ring-1 ring-red-200' : ''}`}
                                 />
@@ -557,14 +609,24 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                         </div>
 
                         <div className="flex gap-3">
-                            <button type="button" onClick={() => setCreating(false)}
-                                className="flex-1 py-3 rounded-2xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
+                            <button
+                                type="button"
+                                onClick={() => setCreating(false)}
+                                className="flex-1 py-3 rounded-2xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors"
+                            >
                                 Cancel
                             </button>
                             <button type="submit" disabled={submitting} className="tlb-button flex-1 py-3.5 disabled:opacity-60">
-                                {submitting
-                                    ? <><span className="w-4 h-4 border-2 border-tlb-dark/30 border-t-tlb-dark rounded-full animate-spin" /> Submitting…</>
-                                    : <><LifeBuoy size={18} /> Submit Ticket</>}
+                                {submitting ? (
+                                    <>
+                                        <span className="w-4 h-4 border-2 border-tlb-dark/30 border-t-tlb-dark rounded-full animate-spin" />{' '}
+                                        Submitting…
+                                    </>
+                                ) : (
+                                    <>
+                                        <LifeBuoy size={18} /> Submit Ticket
+                                    </>
+                                )}
                             </button>
                         </div>
                     </form>
@@ -590,22 +652,31 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                     <>
                         {detail && st && (
                             <div className="bg-white border-b border-gray-100 px-5 md:px-8 py-3 flex items-center gap-3 flex-wrap">
-                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${st.cls}`}>
+                                <span
+                                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${st.cls}`}
+                                >
                                     <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} /> {st.label}
                                 </span>
                                 <span className="text-xs font-bold text-gray-400 flex items-center gap-1.5">
                                     <Clock size={12} /> Opened {fmtDate(detail.created_at)}
                                 </span>
                                 <div className="ml-auto flex items-center gap-2">
-                                    <button onClick={refreshMessages} disabled={refreshing}
+                                    <button
+                                        onClick={refreshMessages}
+                                        disabled={refreshing}
                                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-50"
-                                        title="Refresh messages">
+                                        title="Refresh messages"
+                                    >
                                         <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} /> Refresh
                                     </button>
                                     {!closed ? (
-                                        <button onClick={handleClose} disabled={closing}
-                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-50">
-                                            {closing ? <RefreshCw size={12} className="animate-spin" /> : <CheckCircle2 size={12} />} Close Ticket
+                                        <button
+                                            onClick={handleClose}
+                                            disabled={closing}
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                                        >
+                                            {closing ? <RefreshCw size={12} className="animate-spin" /> : <CheckCircle2 size={12} />} Close
+                                            Ticket
                                         </button>
                                     ) : (
                                         <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-gray-400">
@@ -623,20 +694,28 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                         <MessageSquare size={30} className="text-gray-200" />
                                         <p className="text-sm font-bold text-gray-400">No messages yet — start the conversation below.</p>
                                     </div>
-                                ) : messages.map(m => {
-                                    const mine = !isStaff(m.sender_role);
-                                    return (
-                                        <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
-                                            <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${mine ? 'bg-tlb-yellow text-tlb-dark rounded-br-md' : 'bg-white border border-gray-100 text-gray-800 rounded-bl-md shadow-sm'}`}>
-                                                {!mine && (
-                                                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">TLB Support</p>
-                                                )}
-                                                <p className="text-sm leading-snug whitespace-pre-wrap break-words">{m.body}</p>
-                                                <p className={`text-[10px] mt-1 ${mine ? 'text-tlb-dark/50' : 'text-gray-400'}`}>{fmtTime(m.created_at)}</p>
+                                ) : (
+                                    messages.map((m) => {
+                                        const mine = !isStaff(m.sender_role);
+                                        return (
+                                            <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+                                                <div
+                                                    className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${mine ? 'bg-tlb-yellow text-tlb-dark rounded-br-md' : 'bg-white border border-gray-100 text-gray-800 rounded-bl-md shadow-sm'}`}
+                                                >
+                                                    {!mine && (
+                                                        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">
+                                                            TLB Support
+                                                        </p>
+                                                    )}
+                                                    <p className="text-sm leading-snug whitespace-pre-wrap break-words">{m.body}</p>
+                                                    <p className={`text-[10px] mt-1 ${mine ? 'text-tlb-dark/50' : 'text-gray-400'}`}>
+                                                        {fmtTime(m.created_at)}
+                                                    </p>
+                                                </div>
                                             </div>
-                                        </div>
-                                    );
-                                })}
+                                        );
+                                    })
+                                )}
                                 <div ref={bottomRef} />
                             </div>
                         </div>
@@ -649,14 +728,23 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                             ) : (
                                 <form onSubmit={sendReply} className="max-w-3xl mx-auto flex items-end gap-3">
                                     <textarea
-                                        rows={1} value={reply}
-                                        onChange={e => setReply(e.target.value)}
-                                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply(e); } }}
+                                        rows={1}
+                                        value={reply}
+                                        onChange={(e) => setReply(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                e.preventDefault();
+                                                sendReply(e);
+                                            }
+                                        }}
                                         placeholder="Type your message…"
                                         className="flex-1 tlb-input resize-none max-h-32 py-3"
                                     />
-                                    <button type="submit" disabled={sending || !reply.trim()}
-                                        className="tlb-button !px-4 py-3 shrink-0 disabled:opacity-50">
+                                    <button
+                                        type="submit"
+                                        disabled={sending || !reply.trim()}
+                                        className="tlb-button !px-4 py-3 shrink-0 disabled:opacity-50"
+                                    >
                                         {sending ? <RefreshCw size={18} className="animate-spin" /> : <Send size={18} />}
                                     </button>
                                 </form>
@@ -687,7 +775,9 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                     <>
                         {ticket && (
                             <div className="bg-white border-b border-gray-100 px-5 md:px-8 py-3 flex items-center gap-3 flex-wrap">
-                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${st.cls}`}>
+                                <span
+                                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${st.cls}`}
+                                >
                                     <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} /> {st.label}
                                 </span>
                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border bg-purple-50 text-purple-700 border-purple-200">
@@ -700,9 +790,12 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                     <Clock size={12} /> Opened {fmtDate(ticket.created_at)}
                                 </span>
                                 <div className="ml-auto flex items-center gap-2">
-                                    <button onClick={refreshSharedMessages} disabled={refreshingShared}
+                                    <button
+                                        onClick={refreshSharedMessages}
+                                        disabled={refreshingShared}
                                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-50"
-                                        title="Refresh messages">
+                                        title="Refresh messages"
+                                    >
                                         <RefreshCw size={12} className={refreshingShared ? 'animate-spin' : ''} /> Refresh
                                     </button>
                                     {closed && (
@@ -721,30 +814,38 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                         <MessageSquare size={30} className="text-gray-200" />
                                         <p className="text-sm font-bold text-gray-400">No messages in this thread yet.</p>
                                     </div>
-                                ) : sharedMessages.map(m => {
-                                    const mine = m.sender_role === 'partner';
-                                    const roleLabel = ROLE_LABEL[m.sender_role] || m.sender_role;
-                                    const isCustomer = m.sender_role === 'customer';
-                                    return (
-                                        <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
-                                            <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
-                                                mine
-                                                    ? 'bg-tlb-yellow text-tlb-dark rounded-br-md'
-                                                    : isCustomer
-                                                        ? 'bg-blue-50 border border-blue-100 text-gray-800 rounded-bl-md'
-                                                        : 'bg-white border border-gray-100 text-gray-800 rounded-bl-md shadow-sm'
-                                            }`}>
-                                                {!mine && (
-                                                    <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isCustomer ? 'text-blue-400' : 'text-gray-400'}`}>
-                                                        {roleLabel}
+                                ) : (
+                                    sharedMessages.map((m) => {
+                                        const mine = m.sender_role === 'partner';
+                                        const roleLabel = ROLE_LABEL[m.sender_role] || m.sender_role;
+                                        const isCustomer = m.sender_role === 'customer';
+                                        return (
+                                            <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+                                                <div
+                                                    className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
+                                                        mine
+                                                            ? 'bg-tlb-yellow text-tlb-dark rounded-br-md'
+                                                            : isCustomer
+                                                              ? 'bg-blue-50 border border-blue-100 text-gray-800 rounded-bl-md'
+                                                              : 'bg-white border border-gray-100 text-gray-800 rounded-bl-md shadow-sm'
+                                                    }`}
+                                                >
+                                                    {!mine && (
+                                                        <p
+                                                            className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isCustomer ? 'text-blue-400' : 'text-gray-400'}`}
+                                                        >
+                                                            {roleLabel}
+                                                        </p>
+                                                    )}
+                                                    <p className="text-sm leading-snug whitespace-pre-wrap break-words">{m.body}</p>
+                                                    <p className={`text-[10px] mt-1 ${mine ? 'text-tlb-dark/50' : 'text-gray-400'}`}>
+                                                        {fmtTime(m.created_at)}
                                                     </p>
-                                                )}
-                                                <p className="text-sm leading-snug whitespace-pre-wrap break-words">{m.body}</p>
-                                                <p className={`text-[10px] mt-1 ${mine ? 'text-tlb-dark/50' : 'text-gray-400'}`}>{fmtTime(m.created_at)}</p>
+                                                </div>
                                             </div>
-                                        </div>
-                                    );
-                                })}
+                                        );
+                                    })
+                                )}
                                 <div ref={sharedBottomRef} />
                             </div>
                         </div>
@@ -757,14 +858,23 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                             ) : (
                                 <form onSubmit={sendSharedReply} className="max-w-3xl mx-auto flex items-end gap-3">
                                     <textarea
-                                        rows={1} value={sharedReply}
-                                        onChange={e => setSharedReply(e.target.value)}
-                                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendSharedReply(e); } }}
+                                        rows={1}
+                                        value={sharedReply}
+                                        onChange={(e) => setSharedReply(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                e.preventDefault();
+                                                sendSharedReply(e);
+                                            }
+                                        }}
                                         placeholder="Reply to this query…"
                                         className="flex-1 tlb-input resize-none max-h-32 py-3"
                                     />
-                                    <button type="submit" disabled={sendingShared || !sharedReply.trim()}
-                                        className="tlb-button !px-4 py-3 shrink-0 disabled:opacity-50">
+                                    <button
+                                        type="submit"
+                                        disabled={sendingShared || !sharedReply.trim()}
+                                        className="tlb-button !px-4 py-3 shrink-0 disabled:opacity-50"
+                                    >
                                         {sendingShared ? <RefreshCw size={18} className="animate-spin" /> : <Send size={18} />}
                                     </button>
                                 </form>
@@ -789,7 +899,9 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                         <>
                             {/* Support hero */}
                             <motion.section
-                                initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}
+                                initial={{ opacity: 0, y: 12 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.35 }}
                                 className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 sm:p-8"
                             >
                                 <div className="flex items-center gap-3">
@@ -797,16 +909,22 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                         <LifeBuoy size={20} />
                                     </div>
                                     <div>
-                                        <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400">We're here to help</p>
+                                        <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400">
+                                            We're here to help
+                                        </p>
                                         <h2 className="text-xl font-black text-gray-900 mt-0.5">How can we help you today?</h2>
                                     </div>
                                 </div>
-                                <p className="text-sm text-gray-500 mt-3 max-w-md">Raise a ticket and the TLB team will get back to you — usually within a few hours.</p>
+                                <p className="text-sm text-gray-500 mt-3 max-w-md">
+                                    Raise a ticket and the TLB team will get back to you — usually within a few hours.
+                                </p>
                                 <div className="mt-5 flex flex-col sm:flex-row gap-3 max-w-2xl">
                                     <div className="flex-1 flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-xl px-4 py-3">
                                         <Search size={18} className="text-gray-400 shrink-0" />
                                         <input
-                                            type="text" value={query} onChange={e => setQuery(e.target.value)}
+                                            type="text"
+                                            value={query}
+                                            onChange={(e) => setQuery(e.target.value)}
                                             placeholder="Search your tickets…"
                                             className="flex-1 bg-transparent text-sm font-bold text-gray-800 placeholder:text-gray-300 outline-none"
                                         />
@@ -816,21 +934,35 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                     </button>
                                 </div>
                                 <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-[11px] text-gray-400 font-medium">
-                                    <span className="inline-flex items-center gap-1.5"><Clock size={12} /> Avg response in a few hours</span>
-                                    <span className="inline-flex items-center gap-1.5"><MessageSquare size={12} /> Chat-based support</span>
+                                    <span className="inline-flex items-center gap-1.5">
+                                        <Clock size={12} /> Avg response in a few hours
+                                    </span>
+                                    <span className="inline-flex items-center gap-1.5">
+                                        <MessageSquare size={12} /> Chat-based support
+                                    </span>
                                 </div>
                             </motion.section>
 
                             {/* KPI cards */}
                             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                                {([
-                                    { label: 'Total Tickets', value: tickets.length, icon: TicketIcon, tint: 'bg-tlb-yellow/15 text-tlb-dark' },
+                                {[
+                                    {
+                                        label: 'Total Tickets',
+                                        value: tickets.length,
+                                        icon: TicketIcon,
+                                        tint: 'bg-tlb-yellow/15 text-tlb-dark',
+                                    },
                                     { label: 'Open', value: activeCount, icon: MessageSquare, tint: 'bg-blue-50 text-blue-600' },
                                     { label: 'Resolved', value: resolvedCount, icon: CheckCircle2, tint: 'bg-emerald-50 text-emerald-600' },
                                     { label: 'Closed', value: closedCount, icon: Lock, tint: 'bg-gray-100 text-gray-500' },
-                                ]).map(s => (
-                                    <div key={s.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
-                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${s.tint}`}><s.icon size={18} /></div>
+                                ].map((s) => (
+                                    <div
+                                        key={s.label}
+                                        className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3"
+                                    >
+                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${s.tint}`}>
+                                            <s.icon size={18} />
+                                        </div>
                                         <div>
                                             <p className="text-2xl font-black text-gray-900 leading-none">{s.value}</p>
                                             <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-1">{s.label}</p>
@@ -841,18 +973,20 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
 
                             {/* Status filter chips */}
                             <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-                                {([
+                                {[
                                     { key: 'all' as const, label: 'All' },
                                     { key: 'open' as const, label: 'Open' },
                                     { key: 'in_progress' as const, label: 'In Progress' },
                                     { key: 'resolved' as const, label: 'Resolved' },
                                     { key: 'closed' as const, label: 'Closed' },
-                                ]).map(c => (
+                                ].map((c) => (
                                     <button
                                         key={c.key}
                                         onClick={() => setStatusFilter(c.key)}
                                         className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold transition-colors ${
-                                            statusFilter === c.key ? 'bg-tlb-dark text-white' : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-300'
+                                            statusFilter === c.key
+                                                ? 'bg-tlb-dark text-white'
+                                                : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-300'
                                         }`}
                                     >
                                         {c.label}
@@ -864,9 +998,15 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                             {loadingList ? (
                                 <div className="space-y-3">
                                     {Array.from({ length: 4 }).map((_, i) => (
-                                        <div key={i} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-4 animate-pulse">
+                                        <div
+                                            key={i}
+                                            className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-4 animate-pulse"
+                                        >
                                             <div className="w-11 h-11 rounded-xl bg-gray-100 shrink-0" />
-                                            <div className="flex-1 space-y-2.5"><div className="h-3.5 w-1/3 bg-gray-100 rounded-full" /><div className="h-2.5 w-1/2 bg-gray-50 rounded-full" /></div>
+                                            <div className="flex-1 space-y-2.5">
+                                                <div className="h-3.5 w-1/3 bg-gray-100 rounded-full" />
+                                                <div className="h-2.5 w-1/2 bg-gray-50 rounded-full" />
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
@@ -874,50 +1014,76 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                 <div className="tlb-card flex flex-col items-center justify-center text-center py-16">
                                     <AlertCircle size={32} className="text-red-300 mb-3" />
                                     <p className="text-sm font-bold text-gray-500">{listError}</p>
-                                    <button onClick={loadList} className="text-xs font-black text-blue-500 hover:underline mt-3">Try again</button>
+                                    <button onClick={loadList} className="text-xs font-black text-blue-500 hover:underline mt-3">
+                                        Try again
+                                    </button>
                                 </div>
                             ) : filtered.length === 0 ? (
                                 <div className="tlb-card flex flex-col items-center justify-center text-center py-16">
                                     <div className="w-16 h-16 rounded-2xl bg-tlb-yellow/10 flex items-center justify-center mb-4">
                                         <LifeBuoy size={28} className="text-tlb-yellow" />
                                     </div>
-                                    <h3 className="tlb-h3">{query || statusFilter !== 'all' ? 'No tickets match your filters' : 'No support tickets yet'}</h3>
+                                    <h3 className="tlb-h3">
+                                        {query || statusFilter !== 'all' ? 'No tickets match your filters' : 'No support tickets yet'}
+                                    </h3>
                                     <p className="text-sm text-gray-500 mt-1 max-w-xs">
-                                        {query || statusFilter !== 'all' ? 'Try a different search or status.' : 'Raise a ticket and our team will get back to you here.'}
+                                        {query || statusFilter !== 'all'
+                                            ? 'Try a different search or status.'
+                                            : 'Raise a ticket and our team will get back to you here.'}
                                     </p>
                                     {!query && statusFilter === 'all' && (
-                                        <button onClick={openNew} className="tlb-button mt-5"><Plus size={18} /> Raise your first ticket</button>
+                                        <button onClick={openNew} className="tlb-button mt-5">
+                                            <Plus size={18} /> Raise your first ticket
+                                        </button>
                                     )}
                                 </div>
                             ) : (
                                 <div className="space-y-3">
-                                    <p className="text-xs font-bold text-gray-400 px-1">{filtered.length} ticket{filtered.length === 1 ? '' : 's'}</p>
+                                    <p className="text-xs font-bold text-gray-400 px-1">
+                                        {filtered.length} ticket{filtered.length === 1 ? '' : 's'}
+                                    </p>
                                     {filtered.map((t, i) => {
                                         const st = statusStyle(t.status);
                                         const unread = toCount(t.unread_count);
                                         return (
                                             <motion.button
                                                 key={t.id}
-                                                initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                                                initial={{ opacity: 0, y: 8 }}
+                                                animate={{ opacity: 1, y: 0 }}
                                                 transition={{ duration: 0.2, delay: Math.min(i * 0.03, 0.2) }}
                                                 onClick={() => openTicket(t.id)}
                                                 className="group w-full text-left bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-5 flex items-center gap-4 hover:shadow-md hover:border-gray-200 transition-all"
                                             >
-                                                <div className="w-11 h-11 rounded-xl bg-tlb-yellow/15 flex items-center justify-center shrink-0 text-tlb-dark"><TicketIcon size={20} /></div>
+                                                <div className="w-11 h-11 rounded-xl bg-tlb-yellow/15 flex items-center justify-center shrink-0 text-tlb-dark">
+                                                    <TicketIcon size={20} />
+                                                </div>
                                                 <div className="min-w-0 flex-1">
                                                     <div className="flex items-center gap-2">
                                                         <p className="font-bold text-[15px] text-gray-900 truncate">{t.subject}</p>
-                                                        {unread > 0 && <span className="shrink-0 text-[10px] font-black text-white bg-red-500 rounded-full px-1.5 py-0.5">{unread}</span>}
+                                                        {unread > 0 && (
+                                                            <span className="shrink-0 text-[10px] font-black text-white bg-red-500 rounded-full px-1.5 py-0.5">
+                                                                {unread}
+                                                            </span>
+                                                        )}
                                                     </div>
                                                     <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-500 bg-gray-50 rounded-full px-2 py-0.5">{ticketCategoryLabel(t.category)}</span>
-                                                        <span className="text-[11px] text-gray-400 font-medium">Updated {fmtDate(t.updated_at)}</span>
+                                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-500 bg-gray-50 rounded-full px-2 py-0.5">
+                                                            {ticketCategoryLabel(t.category)}
+                                                        </span>
+                                                        <span className="text-[11px] text-gray-400 font-medium">
+                                                            Updated {fmtDate(t.updated_at)}
+                                                        </span>
                                                     </div>
                                                 </div>
-                                                <span className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${st.cls}`}>
+                                                <span
+                                                    className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${st.cls}`}
+                                                >
                                                     <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} /> {st.label}
                                                 </span>
-                                                <ChevronRight size={16} className="hidden sm:block text-gray-300 shrink-0 group-hover:text-gray-600 group-hover:translate-x-0.5 transition-all" />
+                                                <ChevronRight
+                                                    size={16}
+                                                    className="hidden sm:block text-gray-300 shrink-0 group-hover:text-gray-600 group-hover:translate-x-0.5 transition-all"
+                                                />
                                             </motion.button>
                                         );
                                     })}
@@ -934,7 +1100,9 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                 <div className="relative md:w-72">
                                     <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                                     <input
-                                        type="text" value={sharedQuery} onChange={e => setSharedQuery(e.target.value)}
+                                        type="text"
+                                        value={sharedQuery}
+                                        onChange={(e) => setSharedQuery(e.target.value)}
                                         placeholder="Search shared queries"
                                         className="tlb-input !pl-9 !py-2.5"
                                     />
@@ -949,7 +1117,9 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                 <div className="tlb-card flex flex-col items-center justify-center text-center py-16">
                                     <AlertCircle size={32} className="text-red-300 mb-3" />
                                     <p className="text-sm font-bold text-gray-500">{sharedError}</p>
-                                    <button onClick={loadSharedList} className="text-xs font-black text-blue-500 hover:underline mt-3">Try again</button>
+                                    <button onClick={loadSharedList} className="text-xs font-black text-blue-500 hover:underline mt-3">
+                                        Try again
+                                    </button>
                                 </div>
                             ) : filteredShared.length === 0 ? (
                                 <div className="tlb-card flex flex-col items-center justify-center text-center py-16">
@@ -958,7 +1128,9 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                     </div>
                                     <h3 className="tlb-h3">{sharedQuery ? 'No queries match your search' : 'No shared queries'}</h3>
                                     <p className="text-sm text-gray-500 mt-1 max-w-xs">
-                                        {sharedQuery ? 'Try a different search term.' : 'When admin shares a customer query with you, it will appear here.'}
+                                        {sharedQuery
+                                            ? 'Try a different search term.'
+                                            : 'When admin shares a customer query with you, it will appear here.'}
                                     </p>
                                 </div>
                             ) : (
@@ -982,7 +1154,9 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                                     <div className="flex items-center gap-2">
                                                         <p className="font-bold text-gray-900 truncate">{t.subject}</p>
                                                         {unread > 0 && (
-                                                            <span className="shrink-0 text-[10px] font-black text-white bg-red-500 rounded-full px-1.5 py-0.5">{unread}</span>
+                                                            <span className="shrink-0 text-[10px] font-black text-white bg-red-500 rounded-full px-1.5 py-0.5">
+                                                                {unread}
+                                                            </span>
                                                         )}
                                                     </div>
                                                     <p className="text-xs text-gray-400 font-medium mt-0.5 truncate">
@@ -992,10 +1166,15 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                                         {t.shared_at && <> · Shared {fmtDate(t.shared_at)}</>}
                                                     </p>
                                                 </div>
-                                                <span className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${st.cls}`}>
+                                                <span
+                                                    className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${st.cls}`}
+                                                >
                                                     <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} /> {st.label}
                                                 </span>
-                                                <ChevronRight size={16} className="hidden sm:block text-gray-300 shrink-0 group-hover:text-gray-600 group-hover:translate-x-0.5 transition-all" />
+                                                <ChevronRight
+                                                    size={16}
+                                                    className="hidden sm:block text-gray-300 shrink-0 group-hover:text-gray-600 group-hover:translate-x-0.5 transition-all"
+                                                />
                                             </motion.button>
                                         );
                                     })}
@@ -1007,9 +1186,11 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
             </main>
 
             {activeTab === 'my' && (
-                <button onClick={openNew}
+                <button
+                    onClick={openNew}
                     className="sm:hidden fixed bottom-6 right-6 z-40 w-14 h-14 rounded-2xl bg-tlb-yellow text-tlb-dark shadow-xl flex items-center justify-center"
-                    aria-label="New ticket">
+                    aria-label="New ticket"
+                >
                     <Plus size={26} />
                 </button>
             )}

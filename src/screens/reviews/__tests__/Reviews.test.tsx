@@ -35,10 +35,12 @@ describe('Reviews — loading and display', () => {
         expect(screen.getByText('4.6')).toBeInTheDocument();
     });
 
-    it('shows Coming soon for the Business rating and Awaiting a reply tiles', async () => {
+    it('hides the Business rating and Awaiting a reply tiles (commented out until the API backs them)', async () => {
         renderScreen();
         await waitFor(() => screen.getByText('Meera K.'));
-        expect(screen.getAllByText('Coming soon').length).toBeGreaterThanOrEqual(2);
+        expect(screen.queryByText('Business rating')).not.toBeInTheDocument();
+        expect(screen.queryByText('Awaiting a reply')).not.toBeInTheDocument();
+        expect(screen.getByText('Listing rating')).toBeInTheDocument();
     });
 });
 
@@ -60,8 +62,11 @@ describe('Reviews — tabs', () => {
     });
 
     it('shows an error message when the review feed fails to load', async () => {
-        server.use(http.get(`${BASE}/api/v1/partner/reviews/`, () =>
-            HttpResponse.json({ error: { message: 'Reviews unavailable' } }, { status: 500 })));
+        server.use(
+            http.get(`${BASE}/api/v1/partner/reviews/`, () =>
+                HttpResponse.json({ error: { message: 'Reviews unavailable' } }, { status: 500 })
+            )
+        );
         renderScreen();
         await waitFor(() => expect(screen.getByText(/reviews unavailable/i)).toBeInTheDocument());
     });

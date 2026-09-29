@@ -4,6 +4,7 @@ import { usePartner } from '../../context/PartnerContext';
 import { SegBar } from '../../components/portal';
 import { Skeleton } from '../../components/ui';
 import { useReviewsData } from './useReviewsData';
+import { reviewSummary } from './model';
 import { ReviewTab } from './types';
 import { StatsStrip } from './components/StatsStrip';
 import { ReviewsList } from './components/ReviewsList';
@@ -36,18 +37,34 @@ export const Reviews: React.FC<Props> = ({ onNavigate }) => {
 
     if (data.loading && data.reviews.length === 0 && !data.stats) return <SkeletonBody />;
 
+    // The aggregate endpoint can fail or lag the feed — never let the tile
+    // contradict the reviews visible right below it.
+    const summary = reviewSummary(data.stats, {
+        reviews: data.reviews,
+        total: data.total,
+        unfiltered: listingId === 'all' && tab !== 'business' && tab !== 'unanswered',
+    });
+
     return (
         <div className="px-4 sm:px-[26px] pt-5 pb-9 flex flex-col gap-4">
             <div>
                 <nav aria-label="Breadcrumb" className="text-xs text-tlb-muted mb-[5px]">
-                    <button type="button" onClick={() => onNavigate('HOME')} className="text-tlb-link hover:text-tlb-gold transition-colors">Dashboard</button>
+                    <button
+                        type="button"
+                        onClick={() => onNavigate('HOME')}
+                        className="text-tlb-link hover:text-tlb-gold transition-colors"
+                    >
+                        Dashboard
+                    </button>
                     {' · '}Reviews
                 </nav>
                 <h1 className="pt-h1 text-[24px]">Reviews</h1>
-                <p className="text-[13.5px] text-tlb-sub mt-[3px]">Your overall business rating, plus reviews left on individual listings</p>
+                <p className="text-[13.5px] text-tlb-sub mt-[3px]">
+                    Your overall business rating, plus reviews left on individual listings
+                </p>
             </div>
 
-            <StatsStrip stats={data.stats} />
+            <StatsStrip summary={summary} />
 
             <div className="flex items-center gap-2.5 flex-wrap">
                 <SegBar options={tabOptions} value={tab} onChange={setTab} />
@@ -58,7 +75,11 @@ export const Reviews: React.FC<Props> = ({ onNavigate }) => {
                         className="pt-input py-2 text-[12.5px] w-auto"
                     >
                         <option value="all">All listings</option>
-                        {data.listings.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
+                        {data.listings.map((l) => (
+                            <option key={l.id} value={l.id}>
+                                {l.title}
+                            </option>
+                        ))}
                     </select>
                 )}
             </div>

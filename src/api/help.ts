@@ -66,8 +66,7 @@ const unwrapList = async <T>(response: Response, fallbackErr: string): Promise<T
     return (data?.results as T[]) ?? [];
 };
 
-const humanize = (v: string) =>
-    v.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+const humanize = (v: string) => v.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
 /** GET /help/tickets/list/ — list this user's tickets. */
 export const listTickets = async (): Promise<TicketListItem[]> => {
@@ -130,10 +129,63 @@ export const sendTicketMessage = async (ticketId: string, body: string): Promise
     return unwrap<TicketMessage>(res, 'Failed to send message');
 };
 
+/** `Event Review` / `event-review` / `event_review` all collapse to one key. */
+const categoryKey = (value: string) =>
+    value
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_|_$/g, '');
+
+/**
+ * Display-only renames — the `value` posted to the API is never touched, so
+ * these are safe regardless of what the backend calls the category. Keyed by
+ * the category's value *or* its server label, since some deployments return a
+ * numeric id with the label carrying the wording.
+ */
+const CATEGORY_LABEL_OVERRIDES: Record<string, string> = {
+    event_review: 'Listing Review',
+    listing_review: 'Listing Review',
+    listing_issue: 'Listings Issue',
+    booking_issue: 'Bookings Issue',
+};
+
+/**
+ * Categories the portal offers even when the role-scoped endpoint omits them.
+ * Both are part of the help taxonomy (see DEFAULT_CATEGORIES); `listing_issue`
+ * is distinct from `listing_bug` — a bug is broken software, an issue is
+ * anything else wrong with a listing.
+ */
+const EXTRA_CATEGORIES: TicketCategory[] = [
+    { value: 'listing_issue', label: 'Listings Issue' },
+    { value: 'booking_issue', label: 'Bookings Issue' },
+];
+
+/**
+ * True for the category that a ticket can be pinned to a booking with — the
+ * only one where the "Related booking" picker is worth showing. Matches any
+ * booking-scoped category, not just the `booking_issue` the portal adds.
+ */
+export const isBookingCategory = (value: string): boolean => categoryKey(value || '').startsWith('booking');
+
+const applyOverride = (value: string, label: string): string =>
+    CATEGORY_LABEL_OVERRIDES[categoryKey(value)] ?? CATEGORY_LABEL_OVERRIDES[categoryKey(label)] ?? label;
+
+/** Used when the endpoint is empty or unreachable — same wording as the live list. */
 const DEFAULT_CATEGORIES: TicketCategory[] = [
-    'refund_status', 'payment_issue', 'booking_issue', 'listing_issue',
-    'account', 'technical', 'other',
-].map((v) => ({ value: v, label: humanize(v) }));
+    'refund_status',
+    'payment_issue',
+    'booking_issue',
+    'listing_issue',
+    'account',
+    'technical',
+    'other',
+].map((v) => ({ value: v, label: applyOverride(v, humanize(v)) }));
+
+/** Appends any EXTRA_CATEGORIES the server didn't already offer (matched on key). */
+const withExtras = (categories: TicketCategory[]): TicketCategory[] => {
+    const keys = new Set(categories.map((c) => categoryKey(c.value)));
+    return [...categories, ...EXTRA_CATEGORIES.filter((c) => !keys.has(categoryKey(c.value)))];
+};
 
 /**
  * GET /help/tickets/categories/ — categories valid for the current role.
@@ -145,20 +197,24 @@ export const getTicketCategories = async (): Promise<TicketCategory[]> => {
         const res = await apiClient('/api/v1/help/tickets/categories/');
         const data = await unwrap<any>(res, 'Failed to load categories');
         const arr: any[] = Array.isArray(data) ? data : (data?.results ?? data?.categories ?? []);
-        const mapped: TicketCategory[] = arr.map((c) => {
-            if (typeof c === 'string') return { value: c, label: humanize(c) };
-            const value = c.value ?? c.id ?? c.slug ?? c.key ?? '';
-            const label = c.label ?? c.name ?? c.display ?? humanize(String(value));
-            return { value: String(value), label: String(label) };
-        }).filter((c) => c.value);
-        return mapped.length > 0 ? mapped : DEFAULT_CATEGORIES;
+        const mapped: TicketCategory[] = arr
+            .map((c) => {
+                if (typeof c === 'string') return { value: c, label: applyOverride(c, humanize(c)) };
+                const value = String(c.value ?? c.id ?? c.slug ?? c.key ?? '');
+                const label = String(c.label ?? c.name ?? c.display ?? humanize(value));
+                return { value, label: applyOverride(value, label) };
+            })
+            .filter((c) => c.value);
+        return withExtras(mapped.length > 0 ? mapped : DEFAULT_CATEGORIES);
     } catch {
-        return DEFAULT_CATEGORIES;
+        return withExtras(DEFAULT_CATEGORIES);
     }
 };
 
-export const ticketCategoryLabel = (value: string) =>
-    DEFAULT_CATEGORIES.find((c) => c.value === value)?.label || humanize(value || '');
+export const ticketCategoryLabel = (value: string) => {
+    const fallback = DEFAULT_CATEGORIES.find((c) => c.value === value)?.label || humanize(value || '');
+    return applyOverride(value || '', fallback);
+};
 
 // ---------------------------------------------------------------------------
 // Shared queries — tickets admin shared with this partner

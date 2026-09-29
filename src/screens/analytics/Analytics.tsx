@@ -5,6 +5,7 @@ import { usePartner } from '../../context/PartnerContext';
 import { getDateRangeOption } from '../../constants/dateRange';
 import { Pill, SegBar } from '../../components/portal';
 import { Skeleton, toast } from '../../components/ui';
+import { ApprovalRequiredNotice, isApprovalError } from '../../components/ApprovalGate';
 import { downloadTextFile } from '../../utils/download';
 import { getEarningsStatementReport } from '../../api/reports';
 import { useAnalyticsData } from './useAnalyticsData';
@@ -12,8 +13,13 @@ import { useOverviewAllData } from './useOverviewAllData';
 import { useListingPerformanceData } from './useListingPerformanceData';
 import { ListingPerformanceTab, OverviewAllListingType } from '../../api/stats';
 import {
-    funnelStages, overviewFunnelStages, revenueByListingSlices,
-    revenueTypeSlices, trendPoints, uncontactedLeadValue, weeklyTrendPoints,
+    funnelStages,
+    overviewFunnelStages,
+    revenueByListingSlices,
+    revenueTypeSlices,
+    trendPoints,
+    uncontactedLeadValue,
+    weeklyTrendPoints,
 } from './model';
 import { AnalyticsTab } from './types';
 import { OverviewAllMetrics } from './components/OverviewAllMetrics';
@@ -75,6 +81,9 @@ export const Analytics: React.FC<Props> = ({ onNavigate }) => {
     if (stats.loading) return <SkeletonBody />;
 
     if (stats.error) {
+        // Stats are approved-partner only. The route gate can't always pre-empt
+        // that refusal, so turn it into the same notice rather than a dead end.
+        if (isApprovalError(stats.errorMessage)) return <ApprovalRequiredNotice feature="Analytics" onNavigate={onNavigate} />;
         return (
             <div className="px-4 sm:px-[26px] pt-5 pb-9">
                 <div className="pt-note bg-tlb-red-soft text-tlb-red-deep">Could not load analytics data.</div>
@@ -91,13 +100,13 @@ export const Analytics: React.FC<Props> = ({ onNavigate }) => {
     // but the current Overview scope is deliberately All services/Events/Classes/Venues only.
     const overviewScopeOptions = [
         { key: 'all' as const, label: 'All services' },
-        ...allowedEntities.filter(e => e !== 'Programs').map(e => ({ key: e, label: e })),
+        ...allowedEntities.filter((e) => e !== 'Programs').map((e) => ({ key: e, label: e })),
     ];
     const overviewSlices = overviewAll.overview?.revenue_by_type
         ? revenueTypeSlices(overviewAll.overview.revenue_by_type)
         : overviewAll.overview?.revenue_by_listing
-            ? revenueByListingSlices(overviewAll.overview.revenue_by_listing)
-            : [];
+          ? revenueByListingSlices(overviewAll.overview.revenue_by_listing)
+          : [];
     const overviewTrend = weeklyTrendPoints(overviewAll.overview?.weekly_trend || []);
     const overviewFunnel = overviewAll.overview ? overviewFunnelStages(overviewAll.overview.demand_funnel) : [];
     const revenueByListingCard = overviewAll.overview?.revenue_by_listing != null;
@@ -119,7 +128,13 @@ export const Analytics: React.FC<Props> = ({ onNavigate }) => {
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                 <div>
                     <nav aria-label="Breadcrumb" className="text-xs text-tlb-muted mb-[5px]">
-                        <button type="button" onClick={() => onNavigate('HOME')} className="text-tlb-link hover:text-tlb-gold transition-colors">Dashboard</button>
+                        <button
+                            type="button"
+                            onClick={() => onNavigate('HOME')}
+                            className="text-tlb-link hover:text-tlb-gold transition-colors"
+                        >
+                            Dashboard
+                        </button>
                         {' · '}Analytics
                     </nav>
                     <h1 className="pt-h1 text-[24px]">Analytics &amp; reports</h1>
@@ -152,14 +167,24 @@ export const Analytics: React.FC<Props> = ({ onNavigate }) => {
                                             <p className="text-[12.5px] text-tlb-muted mt-0.5">Weekly · last 8 weeks</p>
                                         </div>
                                         <div className="flex gap-3.5 text-[12px] text-tlb-body">
-                                            <span className="flex items-center gap-1.5"><span className="w-[9px] h-[9px] rounded-[3px] bg-tlb-amber" />Revenue</span>
-                                            <span className="flex items-center gap-1.5"><span className="w-[9px] h-[9px] rounded-[3px] bg-tlb-ink" />Bookings</span>
+                                            <span className="flex items-center gap-1.5">
+                                                <span className="w-[9px] h-[9px] rounded-[3px] bg-tlb-amber" />
+                                                Revenue
+                                            </span>
+                                            <span className="flex items-center gap-1.5">
+                                                <span className="w-[9px] h-[9px] rounded-[3px] bg-tlb-ink" />
+                                                Bookings
+                                            </span>
                                         </div>
                                     </div>
                                     <RevenueChart points={overviewTrend} />
                                 </div>
                                 <div className="pt-card p-5">
-                                    <p className="pt-h-sec mb-1">{revenueByListingCard ? `Revenue by ${overviewScope === 'all' ? 'listing' : overviewScope.slice(0, -1).toLowerCase()}` : 'Revenue by service'}</p>
+                                    <p className="pt-h-sec mb-1">
+                                        {revenueByListingCard
+                                            ? `Revenue by ${overviewScope === 'all' ? 'listing' : overviewScope.slice(0, -1).toLowerCase()}`
+                                            : 'Revenue by service'}
+                                    </p>
                                     <RevenueByService
                                         slices={overviewSlices}
                                         grossLabel={overviewAll.overview ? formatRupees(toNumber(overviewAll.overview.gross_revenue)) : '—'}
@@ -169,7 +194,9 @@ export const Analytics: React.FC<Props> = ({ onNavigate }) => {
                             </div>
                             <div className="pt-card p-5">
                                 <p className="pt-h-sec">Demand funnel</p>
-                                <p className="text-[12.5px] text-tlb-muted mb-5">Listing views → enquiries → confirmed bookings · {getDateRangeOption(dateRange).phrase}</p>
+                                <p className="text-[12.5px] text-tlb-muted mb-5">
+                                    Listing views → enquiries → confirmed bookings · {getDateRangeOption(dateRange).phrase}
+                                </p>
                                 <DemandFunnel stages={overviewFunnel} uncontacted={0} uncontactedValue={0} avgResponseHours={null} />
                             </div>
                         </>
@@ -180,10 +207,28 @@ export const Analytics: React.FC<Props> = ({ onNavigate }) => {
             {tab === 'revenue' && (
                 <div className="flex flex-col gap-4">
                     <div className="pt-card grid grid-cols-2 sm:grid-cols-4 overflow-hidden">
-                        <div className="pt-stat"><p className="pt-eyebrow">Gross revenue</p><p className="pt-stat-n">{stats.revenue ? formatRupees(toNumber(stats.revenue.gross_revenue)) : '—'}</p></div>
-                        <div className="pt-stat"><p className="pt-eyebrow">Platform fees</p><p className="pt-stat-n text-tlb-red-deep">{stats.revenue ? formatRupees(toNumber(stats.revenue.platform_fees)) : '—'}</p></div>
-                        <div className="pt-stat"><p className="pt-eyebrow">Refunds</p><p className="pt-stat-n text-tlb-red-deep">{stats.revenue ? formatRupees(toNumber(stats.revenue.refunds)) : '—'}</p></div>
-                        <div className="pt-stat"><p className="pt-eyebrow">Net earnings</p><p className="pt-stat-n text-tlb-gold">{stats.revenue ? formatRupees(toNumber(stats.revenue.net_earnings)) : '—'}</p></div>
+                        <div className="pt-stat">
+                            <p className="pt-eyebrow">Gross revenue</p>
+                            <p className="pt-stat-n">{stats.revenue ? formatRupees(toNumber(stats.revenue.gross_revenue)) : '—'}</p>
+                        </div>
+                        <div className="pt-stat">
+                            <p className="pt-eyebrow">Platform fees</p>
+                            <p className="pt-stat-n text-tlb-red-deep">
+                                {stats.revenue ? formatRupees(toNumber(stats.revenue.platform_fees)) : '—'}
+                            </p>
+                        </div>
+                        <div className="pt-stat">
+                            <p className="pt-eyebrow">Refunds</p>
+                            <p className="pt-stat-n text-tlb-red-deep">
+                                {stats.revenue ? formatRupees(toNumber(stats.revenue.refunds)) : '—'}
+                            </p>
+                        </div>
+                        <div className="pt-stat">
+                            <p className="pt-eyebrow">Net earnings</p>
+                            <p className="pt-stat-n text-tlb-gold">
+                                {stats.revenue ? formatRupees(toNumber(stats.revenue.net_earnings)) : '—'}
+                            </p>
+                        </div>
                     </div>
                     <div className="pt-card p-5">
                         <p className="pt-h-sec mb-1">Revenue trend</p>
@@ -192,7 +237,10 @@ export const Analytics: React.FC<Props> = ({ onNavigate }) => {
                     </div>
                     <div className="pt-card p-5">
                         <p className="pt-h-sec mb-1">Revenue by service</p>
-                        <RevenueByService slices={slices} grossLabel={stats.revenue ? formatRupees(toNumber(stats.revenue.gross_revenue)) : '—'} />
+                        <RevenueByService
+                            slices={slices}
+                            grossLabel={stats.revenue ? formatRupees(toNumber(stats.revenue.gross_revenue)) : '—'}
+                        />
                     </div>
                 </div>
             )}
@@ -201,10 +249,21 @@ export const Analytics: React.FC<Props> = ({ onNavigate }) => {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-[18px] items-start">
                     <div className="pt-card p-5">
                         <p className="pt-h-sec">Demand funnel</p>
-                        <p className="text-[12.5px] text-tlb-muted mb-5">Where customers drop off · {getDateRangeOption(dateRange).phrase}</p>
-                        <DemandFunnel stages={stages} uncontacted={uncontacted} uncontactedValue={uncontactedValue} avgResponseHours={stats.enquiries?.avg_response_hours ?? null} />
+                        <p className="text-[12.5px] text-tlb-muted mb-5">
+                            Where customers drop off · {getDateRangeOption(dateRange).phrase}
+                        </p>
+                        <DemandFunnel
+                            stages={stages}
+                            uncontacted={uncontacted}
+                            uncontactedValue={uncontactedValue}
+                            avgResponseHours={stats.enquiries?.avg_response_hours ?? null}
+                        />
                     </div>
-                    <TrafficSourcesCard traffic={stats.traffic} topCity={stats.overviewAll?.top_city ?? null} onViewDetail={() => onNavigate('TRAFFIC_ANALYTICS')} />
+                    <TrafficSourcesCard
+                        traffic={stats.traffic}
+                        topCity={stats.overviewAll?.top_city ?? null}
+                        onViewDetail={() => onNavigate('TRAFFIC_ANALYTICS')}
+                    />
                 </div>
             )}
 
@@ -215,7 +274,11 @@ export const Analytics: React.FC<Props> = ({ onNavigate }) => {
                             <p className="pt-h-sec">Listing performance</p>
                             <p className="text-[12.5px] text-tlb-muted mt-0.5">
                                 {listingPerf.total} listing{listingPerf.total === 1 ? '' : 's'}
-                                {perfTab === 'top' ? ' · sorted by revenue' : perfTab === 'underperforming' ? ' · sorted by enquiry rate' : ''}
+                                {perfTab === 'top'
+                                    ? ' · sorted by revenue'
+                                    : perfTab === 'underperforming'
+                                      ? ' · sorted by enquiry rate'
+                                      : ''}
                             </p>
                         </div>
                         <SegBar options={PERF_TAB_OPTIONS} value={perfTab} onChange={setPerfTab} />
@@ -233,7 +296,13 @@ export const Analytics: React.FC<Props> = ({ onNavigate }) => {
             {tab === 'customers' && (
                 <div className="pt-card p-5">
                     <p className="pt-h-sec mb-4">Customers</p>
-                    <CustomersPanel allowedEntities={allowedEntities} overview={stats.overview} events={stats.events} venues={stats.venues} enquiries={stats.enquiries} />
+                    <CustomersPanel
+                        allowedEntities={allowedEntities}
+                        overview={stats.overview}
+                        events={stats.events}
+                        venues={stats.venues}
+                        enquiries={stats.enquiries}
+                    />
                 </div>
             )}
 

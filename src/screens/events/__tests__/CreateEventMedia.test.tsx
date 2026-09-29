@@ -21,9 +21,7 @@ beforeEach(() => {
 describe('CreateEventMedia — loading and error states', () => {
     it('shows error when no draft id in sessionStorage', async () => {
         render(<CreateEventMedia {...props} />);
-        await waitFor(() =>
-            expect(screen.getByText(/no active draft/i)).toBeInTheDocument()
-        );
+        await waitFor(() => expect(screen.getByText(/no active draft/i)).toBeInTheDocument());
     });
 
     it('shows loading spinner initially when draft exists', () => {
@@ -34,12 +32,13 @@ describe('CreateEventMedia — loading and error states', () => {
 
     it('shows error message on media API failure', async () => {
         setCurrentDraftId(DRAFT_ID);
-        server.use(http.get(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/media/`, () =>
-            HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Media not found' } }, { status: 404 })));
-        render(<CreateEventMedia {...props} />);
-        await waitFor(() =>
-            expect(screen.getByText(/media not found/i)).toBeInTheDocument()
+        server.use(
+            http.get(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/media/`, () =>
+                HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Media not found' } }, { status: 404 })
+            )
         );
+        render(<CreateEventMedia {...props} />);
+        await waitFor(() => expect(screen.getByText(/media not found/i)).toBeInTheDocument());
     });
 });
 
@@ -56,22 +55,20 @@ describe('CreateEventMedia — media display', () => {
 
     it('shows upload cover button when no cover exists', async () => {
         setCurrentDraftId(DRAFT_ID);
-        server.use(http.get(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/media/`, () =>
-            HttpResponse.json({ success: true, data: [] })));
-        render(<CreateEventMedia {...props} />);
-        await waitFor(() =>
-            expect(screen.getByText(/upload cover/i)).toBeInTheDocument()
+        server.use(
+            http.get(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/media/`, () => HttpResponse.json({ success: true, data: [] }))
         );
+        render(<CreateEventMedia {...props} />);
+        await waitFor(() => expect(screen.getByText(/upload cover/i)).toBeInTheDocument());
     });
 
     it('shows cover required warning when no cover', async () => {
         setCurrentDraftId(DRAFT_ID);
-        server.use(http.get(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/media/`, () =>
-            HttpResponse.json({ success: true, data: [] })));
-        render(<CreateEventMedia {...props} />);
-        await waitFor(() =>
-            expect(screen.getByText(/cover image is required/i)).toBeInTheDocument()
+        server.use(
+            http.get(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/media/`, () => HttpResponse.json({ success: true, data: [] }))
         );
+        render(<CreateEventMedia {...props} />);
+        await waitFor(() => expect(screen.getByText(/cover banner is required/i)).toBeInTheDocument());
     });
 
     it('hides cover warning when cover exists', async () => {
@@ -84,25 +81,19 @@ describe('CreateEventMedia — media display', () => {
     it('shows gallery Add button', async () => {
         setCurrentDraftId(DRAFT_ID);
         render(<CreateEventMedia {...props} />);
-        await waitFor(() =>
-            expect(screen.getByText('Add')).toBeInTheDocument()
-        );
+        await waitFor(() => expect(screen.getByText('Add')).toBeInTheDocument());
     });
 
     it('shows gallery count label', async () => {
         setCurrentDraftId(DRAFT_ID);
         render(<CreateEventMedia {...props} />);
-        await waitFor(() =>
-            expect(screen.getByText(/gallery photos/i)).toBeInTheDocument()
-        );
+        await waitFor(() => expect(screen.getByText(/gallery photos/i)).toBeInTheDocument());
     });
 
     it('shows Upload Video button', async () => {
         setCurrentDraftId(DRAFT_ID);
         render(<CreateEventMedia {...props} />);
-        await waitFor(() =>
-            expect(screen.getByText(/upload video/i)).toBeInTheDocument()
-        );
+        await waitFor(() => expect(screen.getByText(/upload video/i)).toBeInTheDocument());
     });
 });
 
@@ -110,9 +101,7 @@ describe('CreateEventMedia — cover deletion', () => {
     it('shows Remove cover button when cover exists', async () => {
         setCurrentDraftId(DRAFT_ID);
         render(<CreateEventMedia {...props} />);
-        await waitFor(() =>
-            expect(document.querySelector('button[aria-label="Remove cover"]')).toBeInTheDocument()
-        );
+        await waitFor(() => expect(document.querySelector('button[aria-label="Remove cover"]')).toBeInTheDocument());
     });
 
     it('can delete cover and shows upload button after', async () => {
@@ -122,16 +111,17 @@ describe('CreateEventMedia — cover deletion', () => {
         await waitFor(() => document.querySelector('button[aria-label="Remove cover"]'));
         const deleteBtn = document.querySelector('button[aria-label="Remove cover"]') as HTMLButtonElement;
         await user.click(deleteBtn);
-        await waitFor(() =>
-            expect(screen.getByText(/upload cover/i)).toBeInTheDocument()
-        );
+        await waitFor(() => expect(screen.getByText(/upload cover/i)).toBeInTheDocument());
     });
 
     it('shows alert when cover delete fails', async () => {
         setCurrentDraftId(DRAFT_ID);
         const toastSpy = vi.spyOn(toast, 'error').mockImplementation(() => 0);
-        server.use(http.delete(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/media/:mediaId`, () =>
-            HttpResponse.json({ error: { code: 'SERVER_ERROR', message: 'Delete failed' } }, { status: 500 })));
+        server.use(
+            http.delete(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/media/:mediaId`, () =>
+                HttpResponse.json({ error: { code: 'SERVER_ERROR', message: 'Delete failed' } }, { status: 500 })
+            )
+        );
         const user = userEvent.setup();
         render(<CreateEventMedia {...props} />);
         await waitFor(() => document.querySelector('button[aria-label="Remove cover"]'));
@@ -149,6 +139,20 @@ describe('CreateEventMedia — navigation', () => {
         await waitFor(() => screen.getByText(/faqs & terms/i));
         await user.click(screen.getByText(/faqs & terms/i));
         expect(mockNavigate).toHaveBeenCalledWith('CREATE_EVENT_POLICIES');
+    });
+
+    it('warns and stays on the step when Next is pressed without a cover', async () => {
+        setCurrentDraftId(DRAFT_ID);
+        const user = userEvent.setup();
+        const toastSpy = vi.spyOn(toast, 'warning').mockImplementation(() => 0);
+        render(<CreateEventMedia {...props} />);
+        await waitFor(() => document.querySelector('button[aria-label="Remove cover"]'));
+        await user.click(document.querySelector('button[aria-label="Remove cover"]') as HTMLButtonElement);
+        await waitFor(() => screen.getByText(/upload cover/i));
+        await user.click(screen.getByText(/faqs & terms/i));
+        expect(toastSpy).toHaveBeenCalledWith('Please complete before continuing: Cover banner.');
+        expect(mockNavigate).not.toHaveBeenCalled();
+        toastSpy.mockRestore();
     });
 
     it('navigates back to CREATE_EVENT_SCHEDULE on Back click', async () => {

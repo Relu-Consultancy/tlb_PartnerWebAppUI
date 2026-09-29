@@ -1,18 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Rocket, Clock, Loader2, AlertCircle, CheckCircle2, ShieldCheck, LockKeyhole } from 'lucide-react';
 import { Screen } from '../../types';
-import { AppListingPreview, formatLanguages } from '../../components/ui';
+import { AppListingPreview, formatLanguages, toast } from '../../components/ui';
 import type { AppListingPreviewModel, PreviewFact } from '../../components/ui';
-import { WizardShell, WizardNav } from '../../components/portal/wizard';
-import {
-    getListingDetail,
-    submitListing,
-    getCurrentDraftId,
-    clearCurrentDraftId,
-    ApiError,
-} from '../../api/listings';
+import { WizardShell, WizardNav, scrollToFirstMissingField } from '../../components/portal/wizard';
+import { getListingDetail, submitListing, getCurrentDraftId, clearCurrentDraftId, ApiError } from '../../api/listings';
 
-interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
+interface Props {
+    onNavigate: (screen: Screen) => void;
+    onOpenSidebar: () => void;
+}
 
 interface EventDetail {
     id: string;
@@ -34,7 +31,15 @@ interface EventDetail {
     price_type?: string;
     capacity?: number;
     available_seats?: number;
-    tickets?: { id: number; name: string; price: number; total_quantity: number; available_quantity: number; description?: string; is_default?: boolean }[];
+    tickets?: {
+        id: number;
+        name: string;
+        price: number;
+        total_quantity: number;
+        available_quantity: number;
+        description?: string;
+        is_default?: boolean;
+    }[];
     media?: { id: number; media_type: string; file_url: string }[];
 }
 
@@ -52,8 +57,10 @@ const ResultModal: React.FC<ResultModalProps> = ({ variant, message, onClose }) 
     // ── success: partner isVerified=true, event submitted → under admin review ──
     if (variant === 'success') {
         return (
-            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-6"
-                style={{ backdropFilter: 'blur(6px)', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+            <div
+                className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-6"
+                style={{ backdropFilter: 'blur(6px)', backgroundColor: 'rgba(0,0,0,0.5)' }}
+            >
                 <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden border-2 border-amber-400">
                     {/* Amber header band */}
                     <div className="bg-amber-50 px-6 pt-8 pb-6 flex flex-col items-center text-center gap-4">
@@ -66,9 +73,7 @@ const ResultModal: React.FC<ResultModalProps> = ({ variant, message, onClose }) 
                         </div>
                         <div>
                             <h2 className="text-2xl font-black text-tlb-dark">Event Under Review</h2>
-                            <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest mt-1">
-                                Pending Admin Approval
-                            </p>
+                            <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest mt-1">Pending Admin Approval</p>
                         </div>
                     </div>
 
@@ -93,17 +98,23 @@ const ResultModal: React.FC<ResultModalProps> = ({ variant, message, onClose }) 
                     <div className="px-6 pb-4">
                         <div className="bg-gray-50 rounded-2xl p-4 space-y-2.5">
                             {[
-                                { done: true,  label: 'Draft created & saved' },
-                                { done: true,  label: 'Submitted for admin review' },
+                                { done: true, label: 'Draft created & saved' },
+                                { done: true, label: 'Submitted for admin review' },
                                 { done: false, label: 'Admin approves → event goes live' },
                             ].map((step, i) => (
                                 <div key={i} className="flex items-center gap-3 text-xs">
-                                    <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${step.done ? 'bg-emerald-500' : 'bg-amber-100 border-2 border-amber-300'}`}>
-                                        {step.done
-                                            ? <CheckCircle2 size={12} className="text-white" />
-                                            : <Clock size={9} className="text-amber-500" />}
+                                    <div
+                                        className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${step.done ? 'bg-emerald-500' : 'bg-amber-100 border-2 border-amber-300'}`}
+                                    >
+                                        {step.done ? (
+                                            <CheckCircle2 size={12} className="text-white" />
+                                        ) : (
+                                            <Clock size={9} className="text-amber-500" />
+                                        )}
                                     </div>
-                                    <span className={step.done ? 'text-gray-700 font-semibold' : 'text-amber-600 font-semibold'}>{step.label}</span>
+                                    <span className={step.done ? 'text-gray-700 font-semibold' : 'text-amber-600 font-semibold'}>
+                                        {step.label}
+                                    </span>
                                 </div>
                             ))}
                         </div>
@@ -126,8 +137,10 @@ const ResultModal: React.FC<ResultModalProps> = ({ variant, message, onClose }) 
     // ── under_review: partner isVerified=false, profile under review → can't submit ──
     if (variant === 'under_review') {
         return (
-            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-6"
-                style={{ backdropFilter: 'blur(6px)', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+            <div
+                className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-6"
+                style={{ backdropFilter: 'blur(6px)', backgroundColor: 'rgba(0,0,0,0.5)' }}
+            >
                 <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden border-2 border-purple-400">
                     <div className="bg-blue-50 px-6 pt-8 pb-6 flex flex-col items-center text-center gap-4">
                         <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center border-4 border-purple-400 shadow-lg">
@@ -135,14 +148,13 @@ const ResultModal: React.FC<ResultModalProps> = ({ variant, message, onClose }) 
                         </div>
                         <div>
                             <h2 className="text-2xl font-black text-tlb-dark">Profile Under Review</h2>
-                            <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mt-1">
-                                Draft Saved
-                            </p>
+                            <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mt-1">Draft Saved</p>
                         </div>
                     </div>
                     <div className="px-6 py-5">
                         <p className="text-sm text-gray-500 leading-relaxed text-center">
-                            {message || 'Your partner profile is currently under review. You can prepare and save drafts, but cannot submit events until the review is complete.'}
+                            {message ||
+                                'Your partner profile is currently under review. You can prepare and save drafts, but cannot submit events until the review is complete.'}
                         </p>
                     </div>
                     <div className="px-6 pb-6">
@@ -160,8 +172,10 @@ const ResultModal: React.FC<ResultModalProps> = ({ variant, message, onClose }) 
 
     // ── error: generic submit failure ──
     return (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-6"
-            style={{ backdropFilter: 'blur(6px)', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <div
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-6"
+            style={{ backdropFilter: 'blur(6px)', backgroundColor: 'rgba(0,0,0,0.5)' }}
+        >
             <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden border-2 border-red-400">
                 <div className="bg-red-50 px-6 pt-8 pb-6 flex flex-col items-center text-center gap-4">
                     <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center border-4 border-red-400 shadow-lg">
@@ -199,7 +213,7 @@ const resolveUrl = (url: string) => {
     return `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
 };
 
-const titleCase = (s?: string) => s ? s.charAt(0).toUpperCase() + s.slice(1) : '—';
+const titleCase = (s?: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : '—');
 
 // "Saturday, 21 Mar · 3:00 PM – 6:00 PM"
 const fmtRange = (s?: string, e?: string): string | undefined => {
@@ -248,8 +262,8 @@ export const CreateEventPreview: React.FC<Props> = ({ onNavigate }) => {
         loadDraft(id);
     }, []);
 
-    const cover = event?.media?.find(m => m.media_type === 'cover');
-    const gallery = event?.media?.filter(m => m.media_type === 'gallery') || [];
+    const cover = event?.media?.find((m) => m.media_type === 'cover');
+    const gallery = event?.media?.filter((m) => m.media_type === 'gallery') || [];
 
     // Submission readiness check (mirrors backend requirements)
     const missing: string[] = [];
@@ -273,32 +287,39 @@ export const CreateEventPreview: React.FC<Props> = ({ onNavigate }) => {
     const canSubmit = !!event && missing.length === 0 && event.status === 'draft';
 
     const isOnline = event?.mode === 'online';
-    const minTicket = event?.tickets && event.tickets.length
-        ? Math.min(...event.tickets.map(t => Number(t.price) || 0)) : undefined;
+    const minTicket = event?.tickets && event.tickets.length ? Math.min(...event.tickets.map((t) => Number(t.price) || 0)) : undefined;
     const langLine = event ? formatLanguages(event.languages, event.other_language) : '';
-    const previewModel: AppListingPreviewModel | null = event ? {
-        typeLabel: 'Event',
-        title: event.title || '',
-        coverUrl: cover ? resolveUrl(cover.file_url) : undefined,
-        gallery: gallery.map(g => resolveUrl(g.file_url)),
-        tags: [event.category?.name, event.subcategory?.name, event.format ? titleCase(event.format) : undefined].filter(Boolean) as string[],
-        locationLine: isOnline ? 'Online event' : ([event.area, event.city].filter(Boolean).join(', ') || event.address || undefined),
-        address: isOnline ? undefined : (event.address || [event.area, event.city].filter(Boolean).join(', ') || undefined),
-        dateLine: fmtRange(event.start_datetime, event.end_datetime),
-        description: event.description || '',
-        aboutTitle: 'About Event',
-        facts: [
-            langLine ? { icon: 'language', label: 'Language', value: langLine } : null,
-            event.age_group ? { icon: 'age', label: 'Age Group', value: `${event.age_group.min_age}–${event.age_group.max_age} yrs` } : null,
-            event.format ? { icon: 'format', label: 'Format', value: titleCase(event.format) } : null,
-            event.mode ? { icon: 'mode', label: 'Mode', value: titleCase(event.mode) } : null,
-            event.available_seats != null
-                ? { icon: 'spots', label: 'Spots available', value: String(event.available_seats) }
-                : event.capacity != null ? { icon: 'spots', label: 'Capacity', value: String(event.capacity) } : null,
-        ].filter(Boolean) as PreviewFact[],
-        priceLabel: event.price_type === 'free' ? 'Free' : (minTicket != null ? (minTicket > 0 ? `₹${minTicket}` : 'Free') : '—'),
-        ctaLabel: 'Book Now',
-    } : null;
+    const previewModel: AppListingPreviewModel | null = event
+        ? {
+              typeLabel: 'Event',
+              title: event.title || '',
+              coverUrl: cover ? resolveUrl(cover.file_url) : undefined,
+              gallery: gallery.map((g) => resolveUrl(g.file_url)),
+              tags: [event.category?.name, event.subcategory?.name, event.format ? titleCase(event.format) : undefined].filter(
+                  Boolean
+              ) as string[],
+              locationLine: isOnline ? 'Online event' : [event.area, event.city].filter(Boolean).join(', ') || event.address || undefined,
+              address: isOnline ? undefined : event.address || [event.area, event.city].filter(Boolean).join(', ') || undefined,
+              dateLine: fmtRange(event.start_datetime, event.end_datetime),
+              description: event.description || '',
+              aboutTitle: 'About Event',
+              facts: [
+                  langLine ? { icon: 'language', label: 'Language', value: langLine } : null,
+                  event.age_group
+                      ? { icon: 'age', label: 'Age Group', value: `${event.age_group.min_age}–${event.age_group.max_age} yrs` }
+                      : null,
+                  event.format ? { icon: 'format', label: 'Format', value: titleCase(event.format) } : null,
+                  event.mode ? { icon: 'mode', label: 'Mode', value: titleCase(event.mode) } : null,
+                  event.available_seats != null
+                      ? { icon: 'spots', label: 'Spots available', value: String(event.available_seats) }
+                      : event.capacity != null
+                        ? { icon: 'spots', label: 'Capacity', value: String(event.capacity) }
+                        : null,
+              ].filter(Boolean) as PreviewFact[],
+              priceLabel: event.price_type === 'free' ? 'Free' : minTicket != null ? (minTicket > 0 ? `₹${minTicket}` : 'Free') : '—',
+              ctaLabel: 'Book Now',
+          }
+        : null;
 
     const handleSubmit = async () => {
         if (!draftId || !canSubmit) return;
@@ -313,7 +334,7 @@ export const CreateEventPreview: React.FC<Props> = ({ onNavigate }) => {
             const msg: string = err?.message || '';
             setModal({
                 variant: code === 'PARTNER_UNDER_REVIEW' ? 'under_review' : 'error',
-                message: code === 'PARTNER_UNDER_REVIEW' ? undefined : (msg || undefined),
+                message: code === 'PARTNER_UNDER_REVIEW' ? undefined : msg || undefined,
             });
         } finally {
             setSubmitting(false);
@@ -328,7 +349,14 @@ export const CreateEventPreview: React.FC<Props> = ({ onNavigate }) => {
 
     if (loading) {
         return (
-            <WizardShell title="New event" entityType="Events" step={5} totalSteps={5} stepLabel="Preview & publish" onBack={() => onNavigate('CREATE_EVENT_POLICIES')}>
+            <WizardShell
+                title="New event"
+                entityType="Events"
+                step={5}
+                totalSteps={5}
+                stepLabel="Preview & publish"
+                onBack={() => onNavigate('CREATE_EVENT_POLICIES')}
+            >
                 <div className="pt-card p-5 sm:p-6 flex items-center justify-center gap-2 text-tlb-muted text-xs font-bold py-12">
                     <Loader2 size={16} className="animate-spin" /> Loading preview…
                 </div>
@@ -338,14 +366,28 @@ export const CreateEventPreview: React.FC<Props> = ({ onNavigate }) => {
 
     if (loadError || !event) {
         return (
-            <WizardShell title="New event" entityType="Events" step={5} totalSteps={5} stepLabel="Preview & publish" onBack={() => onNavigate('CREATE_EVENT_POLICIES')}>
+            <WizardShell
+                title="New event"
+                entityType="Events"
+                step={5}
+                totalSteps={5}
+                stepLabel="Preview & publish"
+                onBack={() => onNavigate('CREATE_EVENT_POLICIES')}
+            >
                 <div className="pt-note bg-tlb-red-soft text-tlb-red-deep">{loadError || 'Could not load event.'}</div>
             </WizardShell>
         );
     }
 
     return (
-        <WizardShell title="New event" entityType="Events" step={5} totalSteps={5} stepLabel="Preview & publish" onBack={() => onNavigate('CREATE_EVENT_MEDIA')}>
+        <WizardShell
+            title="New event"
+            entityType="Events"
+            step={5}
+            totalSteps={5}
+            stepLabel="Preview & publish"
+            onBack={() => onNavigate('CREATE_EVENT_MEDIA')}
+        >
             <div className="pt-card p-5 sm:p-6 flex flex-col gap-5">
                 <div className="text-center">
                     <h2 className="pt-h-sec">Preview your event</h2>
@@ -356,13 +398,15 @@ export const CreateEventPreview: React.FC<Props> = ({ onNavigate }) => {
 
                 {/* Submission readiness */}
                 {missing.length > 0 ? (
-                    <div className="pt-note bg-tlb-amber-soft text-tlb-gold flex-col items-start gap-2">
+                    <div className="pt-note bg-tlb-amber-soft text-tlb-gold flex-col items-start gap-2" data-field-missing>
                         <div className="flex items-center gap-2">
                             <AlertCircle size={15} strokeWidth={2.75} />
                             <p className="pt-eyebrow !text-tlb-gold">Missing for submission</p>
                         </div>
                         <ul className="text-xs list-disc pl-5 space-y-0.5">
-                            {missing.map(m => <li key={m}>{m}</li>)}
+                            {missing.map((m) => (
+                                <li key={m}>{m}</li>
+                            ))}
                         </ul>
                     </div>
                 ) : event.status === 'draft' ? (
@@ -379,20 +423,25 @@ export const CreateEventPreview: React.FC<Props> = ({ onNavigate }) => {
 
                 <WizardNav
                     onBack={() => onNavigate('CREATE_EVENT_POLICIES')}
-                    onNext={canSubmit && !submitting ? handleSubmit : () => {}}
+                    onNext={
+                        submitting
+                            ? () => {}
+                            : canSubmit
+                              ? handleSubmit
+                              : missing.length > 0
+                                ? () => {
+                                      scrollToFirstMissingField();
+                                      toast.warning(`Please complete before submitting: ${missing.join(', ')}.`);
+                                  }
+                                : () => onNavigate('SERVICE_LISTINGS')
+                    }
                     nextText={submitting ? 'Submitting…' : event.status === 'draft' ? 'Submit for review' : 'Done'}
                     nextIcon={submitting ? <Loader2 size={14} className="animate-spin" /> : <Rocket size={14} strokeWidth={2.75} />}
                     onSaveDraft={() => onNavigate('SERVICE_LISTINGS')}
                 />
             </div>
 
-            {modal && (
-                <ResultModal
-                    variant={modal.variant}
-                    message={modal.message}
-                    onClose={handleModalClose}
-                />
-            )}
+            {modal && <ResultModal variant={modal.variant} message={modal.message} onClose={handleModalClose} />}
         </WizardShell>
     );
 };

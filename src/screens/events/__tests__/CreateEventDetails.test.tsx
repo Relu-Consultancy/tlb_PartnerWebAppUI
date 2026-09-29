@@ -49,7 +49,8 @@ describe('CreateEventDetails — metadata loading', () => {
     it('shows error message when metadata fails', async () => {
         server.use(
             http.get(`${BASE}/api/v1/listings/events/metadata/categories/`, () =>
-                HttpResponse.json({ error: { code: 'SERVER_ERROR', message: 'Server down' } }, { status: 500 }))
+                HttpResponse.json({ error: { code: 'SERVER_ERROR', message: 'Server down' } }, { status: 500 })
+            )
         );
         render(<CreateEventDetails {...defaultProps} />);
         await waitFor(() => expect(screen.getByText(/server down/i)).toBeInTheDocument());
@@ -150,23 +151,59 @@ describe('CreateEventDetails — Next button', () => {
         toastSpy.mockRestore();
     });
 
-    it('creates a new draft and navigates to schedule on Next', async () => {
+    it('lists every missing required field on Next and does not advance', async () => {
+        const user = userEvent.setup();
+        const toastSpy = vi.spyOn(toast, 'warning').mockImplementation(() => 0);
+        render(<CreateEventDetails {...defaultProps} />);
+        await waitFor(() => screen.getByText('Workshop'));
+        await user.type(screen.getByPlaceholderText(/summer art festival/i), 'My Festival');
+        await user.click(screen.getByText(/next: schedule/i));
+        expect(toastSpy).toHaveBeenCalledWith(expect.stringMatching(/Description.*Category.*Event format.*Age group.*Venue location/));
+        expect(mockNavigate).not.toHaveBeenCalled();
+        toastSpy.mockRestore();
+    });
+
+    it('scrolls to the first missing field on Next, and to the next one once that is filled', async () => {
+        const user = userEvent.setup();
+        vi.spyOn(toast, 'warning').mockImplementation(() => 0);
+        const scrollSpy = vi.fn();
+        Element.prototype.scrollIntoView = scrollSpy;
+        render(<CreateEventDetails {...defaultProps} />);
+        await waitFor(() => screen.getByText('Workshop'));
+        await user.type(screen.getByPlaceholderText(/summer art festival/i), 'My Festival');
+
+        // Other widgets on the page may scroll too — assert on *which* field we scrolled to, not the call count.
+        await user.click(screen.getByText(/next: schedule/i));
+        await waitFor(() => expect(scrollSpy.mock.contexts).toContain(screen.getByText('Description').closest('.pt-field')));
+
+        scrollSpy.mockClear();
+        await user.type(screen.getByPlaceholderText(/tell parents/i), 'Fun day out');
+        await user.click(screen.getByText(/next: schedule/i));
+        await waitFor(() => expect(scrollSpy.mock.contexts).toContain(screen.getByText('Category').closest('.pt-field')));
+        expect(scrollSpy.mock.contexts).not.toContain(screen.getByText('Description').closest('.pt-field'));
+        vi.restoreAllMocks();
+        delete (Element.prototype as any).scrollIntoView; // jsdom doesn't implement it — put it back as it was
+    });
+
+    it('still creates a new draft from just a title via Save as draft', async () => {
         const user = userEvent.setup();
         render(<CreateEventDetails {...defaultProps} />);
         await waitFor(() => screen.getByPlaceholderText(/summer art festival/i));
         await user.type(screen.getByPlaceholderText(/summer art festival/i), 'My Festival');
-        await user.click(screen.getByText(/next: schedule/i));
-        await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('CREATE_EVENT_SCHEDULE'));
+        await user.click(screen.getByText(/save as draft/i));
+        await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('SERVICE_LISTINGS'));
         expect(listingsApi.getCurrentDraftId()).toBe(DRAFT_ID);
     });
 
     it('updates existing draft instead of creating new one when draft id already set', async () => {
         listingsApi.setCurrentDraftId(DRAFT_ID);
         let createCalled = false;
-        server.use(http.post(`${BASE}/api/v1/partner/listings/events/`, () => {
-            createCalled = true;
-            return HttpResponse.json({ success: true, data: mockDraft }, { status: 201 });
-        }));
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/events/`, () => {
+                createCalled = true;
+                return HttpResponse.json({ success: true, data: mockDraft }, { status: 201 });
+            })
+        );
         const user = userEvent.setup();
         render(<CreateEventDetails {...defaultProps} />);
         await waitFor(() => screen.getByPlaceholderText(/summer art festival/i));

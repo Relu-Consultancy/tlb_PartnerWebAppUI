@@ -153,7 +153,9 @@ export const enrichFromDetail = (entityType: EntityType, raw: any, fallbackStart
 
 export const canEditListing = (state: ListingState): boolean => state === 'archived' || state === 'draft';
 
-export const canArchiveListing = (state: ListingState): boolean => !canEditListing(state);
+// The backend only archives published listings, so a pending one (still in
+// admin review) gets neither Edit nor Archive.
+export const canArchiveListing = (state: ListingState): boolean => !canEditListing(state) && state !== 'pending';
 
 export const canPauseListing = (state: ListingState): boolean => state === 'live' || state === 'paused';
 

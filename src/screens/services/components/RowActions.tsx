@@ -34,17 +34,16 @@ export const RowActions: React.FC<RowActionsProps> = ({ row, onEdit, onTogglePau
                 <button type="button" onClick={onEdit} className="pt-btn pt-btn-o pt-btn-sm">
                     Edit
                 </button>
-            ) : (
+            ) : canArchiveListing(row.state) ? (
                 <button
                     type="button"
                     onClick={onToggleArchive}
-                    disabled={!canArchiveListing(row.state)}
                     title="Take this listing off the marketplace — you can edit it once archived"
                     className="pt-btn pt-btn-o pt-btn-sm"
                 >
                     Archive
                 </button>
-            )}
+            ) : null}
             {hasMenu && (
                 <div ref={rootRef} className="relative">
                     <button

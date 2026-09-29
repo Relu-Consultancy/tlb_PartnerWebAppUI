@@ -212,6 +212,21 @@ describe('ServiceListings — edit and create navigation', () => {
         expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
     });
 
+    it('offers neither Edit nor Archive while a listing is pending review', async () => {
+        server.use(
+            http.get(`${BASE}/api/v1/partner/listings/events/`, () =>
+                HttpResponse.json({
+                    success: true,
+                    data: [{ id: DRAFT_ID, title: 'Pending Event', status: 'pending', listing_type: 'event' }],
+                })
+            )
+        );
+        renderWithPartner();
+        await waitFor(() => screen.getByText('Pending Event'));
+        expect(screen.queryByRole('button', { name: 'Archive' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
+    });
+
     it('swaps Archive for Edit once the live listing is archived', async () => {
         server.use(
             http.get(`${BASE}/api/v1/partner/listings/events/`, () =>

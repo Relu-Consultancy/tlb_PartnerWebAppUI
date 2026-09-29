@@ -2,17 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { ArrowRight, Plus, Trash2, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
 import { toast } from '../../components/ui';
-import { WizardShell, WizardNav, WizardField } from '../../components/portal/wizard';
-import {
-    getListingDetail,
-    updateListing,
-    createTicket,
-    updateTicket,
-    deleteTicket,
-    getCurrentDraftId,
-} from '../../api/listings';
+import { WizardShell, WizardNav, WizardField, scrollToFirstMissingField } from '../../components/portal/wizard';
+import { getListingDetail, updateListing, createTicket, updateTicket, deleteTicket, getCurrentDraftId } from '../../api/listings';
 
-interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
+interface Props {
+    onNavigate: (screen: Screen) => void;
+    onOpenSidebar: () => void;
+}
 
 interface TicketDraft {
     id: number | null; // null = new (not yet created on server)
@@ -24,6 +20,15 @@ interface TicketDraft {
 }
 
 type PriceType = 'free' | 'paid';
+
+type RequiredField = 'start' | 'end' | 'capacity' | 'tickets';
+
+const MISSING_LABEL: Record<RequiredField, string> = {
+    start: 'Event start date',
+    end: 'Event end date',
+    capacity: 'Capacity',
+    tickets: 'At least 1 ticket (name, price and quantity)',
+};
 
 // Convert local "YYYY-MM-DD" + "HH:MM" → ISO 8601 UTC string
 const toIso = (date: string, time: string): string | null => {
@@ -81,9 +86,12 @@ export const CreateEventSchedule: React.FC<Props> = ({ onNavigate }) => {
                 const start = fromIso(d.start_datetime);
                 const end = fromIso(d.end_datetime);
                 const deadline = fromIso(d.registration_deadline);
-                setStartDate(start.date); setStartTime(start.time);
-                setEndDate(end.date); setEndTime(end.time);
-                setDeadlineDate(deadline.date); setDeadlineTime(deadline.time);
+                setStartDate(start.date);
+                setStartTime(start.time);
+                setEndDate(end.date);
+                setEndTime(end.time);
+                setDeadlineDate(deadline.date);
+                setDeadlineTime(deadline.time);
                 const pt: PriceType = d.price_type === 'paid' ? 'paid' : 'free';
                 setPriceType(pt);
                 setOriginalPriceType(pt);
@@ -98,7 +106,7 @@ export const CreateEventSchedule: React.FC<Props> = ({ onNavigate }) => {
                     dirty: false,
                 }));
                 setTickets(ticketDrafts);
-                setOriginalTicketIds(new Set(ticketDrafts.map(t => t.id!).filter(Boolean)));
+                setOriginalTicketIds(new Set(ticketDrafts.map((t) => t.id!).filter(Boolean)));
             } catch (err: any) {
                 setLoadError(err?.message || 'Failed to load draft.');
             } finally {
@@ -108,13 +116,32 @@ export const CreateEventSchedule: React.FC<Props> = ({ onNavigate }) => {
         load();
     }, []);
 
-    const addTicket = () => setTickets(prev => [...prev, {
-        id: null, name: '', price: '', quantity: '', description: '', dirty: true,
-    }]);
-    const removeTicket = (idx: number) => setTickets(prev => prev.filter((_, i) => i !== idx));
+    const addTicket = () =>
+        setTickets((prev) => [
+            ...prev,
+            {
+                id: null,
+                name: '',
+                price: '',
+                quantity: '',
+                description: '',
+                dirty: true,
+            },
+        ]);
+    const removeTicket = (idx: number) => setTickets((prev) => prev.filter((_, i) => i !== idx));
     const updateTicketField = (idx: number, field: keyof TicketDraft, value: string) => {
-        setTickets(prev => prev.map((t, i) => i === idx ? { ...t, [field]: value, dirty: true } : t));
+        setTickets((prev) => prev.map((t, i) => (i === idx ? { ...t, [field]: value, dirty: true } : t)));
     };
+
+    // Required fields still empty — each flags its WizardField so Next can scroll to the first.
+    const missingFields: RequiredField[] = [];
+    if (!startDate) missingFields.push('start');
+    if (!endDate) missingFields.push('end');
+    if (priceType === 'free' && !capacity.trim()) missingFields.push('capacity');
+    if (priceType === 'paid' && !tickets.some((t) => t.name.trim() && !isNaN(parseFloat(t.price)) && !isNaN(parseInt(t.quantity, 10)))) {
+        missingFields.push('tickets');
+    }
+    const isMissing = (field: RequiredField) => missingFields.includes(field);
 
     // Shared by "Next" and "Save as draft" — persists whatever's currently
     // filled in (schedule fields + ticket sync). Neither caller requires the
@@ -137,9 +164,11 @@ export const CreateEventSchedule: React.FC<Props> = ({ onNavigate }) => {
         // Sync tickets (only relevant for paid events)
         if (priceType === 'paid') {
             // Determine which originals were removed
-            const currentIds = new Set(tickets.map(t => t.id).filter((x): x is number => x !== null));
+            const currentIds = new Set(tickets.map((t) => t.id).filter((x): x is number => x !== null));
             const toDelete: number[] = [];
-            originalTicketIds.forEach((id) => { if (!currentIds.has(id)) toDelete.push(id); });
+            originalTicketIds.forEach((id) => {
+                if (!currentIds.has(id)) toDelete.push(id);
+            });
 
             for (const id of toDelete) {
                 await deleteTicket(draftId, id);
@@ -181,10 +210,19 @@ export const CreateEventSchedule: React.FC<Props> = ({ onNavigate }) => {
         const endIso = toIso(endDate, endTime);
         const deadlineIso = toIso(deadlineDate, deadlineTime);
 
+        // Required-field check (all gaps at once — toast + scroll to the first);
+        // "Save as draft" deliberately skips this.
+        if (missingFields.length > 0) {
+            scrollToFirstMissingField();
+            toast.warning(`Please complete before continuing: ${missingFields.map((f) => MISSING_LABEL[f]).join(', ')}.`);
+            return;
+        }
+
         if (startIso && endIso && new Date(endIso) <= new Date(startIso)) {
             toast.warning('End date/time must be after start date/time.');
             return;
         }
+
         if (startIso && deadlineIso && new Date(deadlineIso) > new Date(startIso)) {
             toast.warning('Registration deadline must be on or before the event start date.');
             return;
@@ -223,7 +261,14 @@ export const CreateEventSchedule: React.FC<Props> = ({ onNavigate }) => {
 
     if (loading) {
         return (
-            <WizardShell title="New event" entityType="Events" step={2} totalSteps={5} stepLabel="Schedule & pricing" onBack={() => onNavigate('CREATE_EVENT_DETAILS')}>
+            <WizardShell
+                title="New event"
+                entityType="Events"
+                step={2}
+                totalSteps={5}
+                stepLabel="Schedule & pricing"
+                onBack={() => onNavigate('CREATE_EVENT_DETAILS')}
+            >
                 <div className="pt-card p-5 sm:p-6 flex items-center justify-center gap-2 text-tlb-muted text-xs font-bold py-12">
                     <Loader2 size={16} className="animate-spin" /> Loading draft…
                 </div>
@@ -233,28 +278,42 @@ export const CreateEventSchedule: React.FC<Props> = ({ onNavigate }) => {
 
     if (loadError) {
         return (
-            <WizardShell title="New event" entityType="Events" step={2} totalSteps={5} stepLabel="Schedule & pricing" onBack={() => onNavigate('CREATE_EVENT_DETAILS')}>
+            <WizardShell
+                title="New event"
+                entityType="Events"
+                step={2}
+                totalSteps={5}
+                stepLabel="Schedule & pricing"
+                onBack={() => onNavigate('CREATE_EVENT_DETAILS')}
+            >
                 <div className="pt-note bg-tlb-red-soft text-tlb-red-deep">{loadError}</div>
             </WizardShell>
         );
     }
 
     return (
-        <WizardShell title="New event" entityType="Events" step={2} totalSteps={5} stepLabel="Schedule & pricing" onBack={() => onNavigate('CREATE_EVENT_DETAILS')}>
+        <WizardShell
+            title="New event"
+            entityType="Events"
+            step={2}
+            totalSteps={5}
+            stepLabel="Schedule & pricing"
+            onBack={() => onNavigate('CREATE_EVENT_DETAILS')}
+        >
             <div className="pt-card p-5 sm:p-6 flex flex-col gap-5">
                 <div>
                     <h2 className="pt-h-sec">Schedule &amp; pricing</h2>
                     <p className="text-[13px] text-tlb-sub mt-0.5">When does your event happen and how much does it cost?</p>
                 </div>
 
-                <WizardField label="Event start">
+                <WizardField label="Event start" missing={isMissing('start')}>
                     <div className="grid grid-cols-2 gap-3">
                         <input type="date" className="pt-input" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
                         <input type="time" className="pt-input" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
                     </div>
                 </WizardField>
 
-                <WizardField label="Event end">
+                <WizardField label="Event end" missing={isMissing('end')}>
                     <div className="grid grid-cols-2 gap-3">
                         <input type="date" className="pt-input" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
                         <input type="time" className="pt-input" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
@@ -263,22 +322,36 @@ export const CreateEventSchedule: React.FC<Props> = ({ onNavigate }) => {
 
                 <WizardField label="Pricing">
                     <div className="grid grid-cols-2 gap-3">
-                        <button type="button" onClick={() => setPriceType('free')} className={`pt-tile ${priceType === 'free' ? 'is-on' : ''}`}>
+                        <button
+                            type="button"
+                            onClick={() => setPriceType('free')}
+                            className={`pt-tile ${priceType === 'free' ? 'is-on' : ''}`}
+                        >
                             <span className="text-lg">🎉</span>
                             <span>Free event</span>
                         </button>
-                        <button type="button" onClick={() => setPriceType('paid')} className={`pt-tile ${priceType === 'paid' ? 'is-on' : ''}`}>
+                        <button
+                            type="button"
+                            onClick={() => setPriceType('paid')}
+                            className={`pt-tile ${priceType === 'paid' ? 'is-on' : ''}`}
+                        >
                             <span className="text-lg">🎟️</span>
                             <span>Paid event</span>
                         </button>
                     </div>
                     {priceType !== originalPriceType && (
-                        <p className="pt-note bg-tlb-amber-soft text-tlb-gold mt-1">Switching pricing type will clear all existing tickets when saved.</p>
+                        <p className="pt-note bg-tlb-amber-soft text-tlb-gold mt-1">
+                            Switching pricing type will clear all existing tickets when saved.
+                        </p>
                     )}
                 </WizardField>
 
                 {priceType === 'free' && (
-                    <WizardField label="Capacity" hint='Backend auto-creates a "Free Entry" ticket on submit.'>
+                    <WizardField
+                        label="Capacity"
+                        hint='Backend auto-creates a "Free Entry" ticket on submit.'
+                        missing={isMissing('capacity')}
+                    >
                         <input
                             type="number"
                             min={1}
@@ -291,7 +364,7 @@ export const CreateEventSchedule: React.FC<Props> = ({ onNavigate }) => {
                 )}
 
                 {priceType === 'paid' && (
-                    <WizardField label="Ticket tiers">
+                    <WizardField label="Ticket tiers" missing={isMissing('tickets')}>
                         <div className="flex flex-col gap-3">
                             {tickets.length === 0 && (
                                 <p className="text-xs text-tlb-muted">No tickets yet. Add at least one before submitting.</p>
@@ -299,8 +372,15 @@ export const CreateEventSchedule: React.FC<Props> = ({ onNavigate }) => {
                             {tickets.map((ticket, idx) => (
                                 <div key={ticket.id ?? `new-${idx}`} className="pt-card p-4 flex flex-col gap-3">
                                     <div className="flex items-center justify-between">
-                                        <p className="pt-eyebrow">Tier {idx + 1} {ticket.id === null && '(new)'}</p>
-                                        <button type="button" onClick={() => removeTicket(idx)} className="text-tlb-red hover:text-tlb-red-deep p-1" aria-label="Remove ticket">
+                                        <p className="pt-eyebrow">
+                                            Tier {idx + 1} {ticket.id === null && '(new)'}
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={() => removeTicket(idx)}
+                                            className="text-tlb-red hover:text-tlb-red-deep p-1"
+                                            aria-label="Remove ticket"
+                                        >
                                             <Trash2 size={15} />
                                         </button>
                                     </div>

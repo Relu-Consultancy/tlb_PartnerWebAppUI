@@ -544,6 +544,18 @@ export const mockFollowers = [
 // Flat shape the current `getFollowers()` (src/api/followers.ts) actually returns —
 // distinct from the nested `mockFollowers` shape above, which backs the older
 // id-scoped `/partner/:id/followers/` endpoint used elsewhere (e.g. profile previews).
+export const mockFollowerDetail = {
+    user_id: 'u1',
+    full_name: 'Aarav Mehta',
+    email: 'aarav@example.com',
+    phone: '9876500011',
+    city: 'Mumbai',
+    gender: 'male',
+    age: 29,
+    followed_at: '2026-06-20T10:00:00Z',
+    engagement: { bookings_with_you: 3, last_booking_at: '2026-08-14T10:00:00Z' },
+};
+
 export const mockFollowersList = [
     { user_id: 'u1', full_name: 'Aarav Mehta', city: 'Mumbai', gender: 'male', followed_at: '2026-06-20T10:00:00Z' },
     { user_id: 'u2', full_name: 'Diya Kapoor', city: 'Pune', gender: 'female', followed_at: '2026-06-25T10:00:00Z' },
@@ -1007,6 +1019,10 @@ export const handlers = [
         const results = search ? mockFollowersList.filter((f) => f.full_name.toLowerCase().includes(search)) : mockFollowersList;
         return HttpResponse.json({ success: true, data: { count: 87, page: 1, page_size: 20, next: null, previous: null, results } });
     }),
+
+    http.get(`${BASE}/api/v1/partner/followers/:followerId/`, ({ params }) =>
+        HttpResponse.json({ success: true, data: { ...mockFollowerDetail, user_id: String(params.followerId) } })
+    ),
 
     // ─── Coupons ───
     http.get(`${BASE}/api/v1/partner/coupons/`, () => HttpResponse.json({ success: true, data: [] })),

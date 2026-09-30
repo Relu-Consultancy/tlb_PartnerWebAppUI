@@ -169,6 +169,14 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate }) => {
                 {scope === 'all' ? 'Events sell tickets · Classes and Programs take enquiries · Venues can do either.' : SCOPE_HINT[scope]}
             </div>
 
+            {/* The top-bar period is a reporting window, not a filter on inventory —
+                a live listing must never vanish from the screen you manage it on.
+                Say so, since the picker sits right above this page. */}
+            <p className="text-xs text-tlb-muted px-1 -mt-1">
+                Every listing you have is shown here. Settled and Demand follow the selected period ({getDateRangeOption(dateRange).phrase}
+                ); the listing counts don’t.
+            </p>
+
             <div className="flex items-center gap-2.5 flex-wrap">
                 <ListingStatusFilter value={status} onChange={setStatus} countOf={statusCountOf} />
                 <SearchField value={search} onChange={setSearch} placeholder="Search listings" />

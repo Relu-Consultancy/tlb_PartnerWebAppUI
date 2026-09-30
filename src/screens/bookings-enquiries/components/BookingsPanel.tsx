@@ -8,7 +8,7 @@ import { BOOKING_ENTITY_LABEL, BOOKING_ENTITY_TONE, bookingStatusMeta } from '..
 import { GroupedList } from './GroupedList';
 
 const PAGE_SIZE = 20;
-const SERVICE_LABEL: Record<BookingEntity, string> = { Events: 'Events', Venues: 'Venues' };
+const SERVICE_LABEL: Record<BookingEntity, string> = { Events: 'Events', Venues: 'Venues', Classes: 'Classes', Programs: 'Programs' };
 
 const WHEN_OPTIONS: { key: BookingWhen; label: string }[] = [
     { key: 'today', label: 'Today' },
@@ -18,12 +18,19 @@ const WHEN_OPTIONS: { key: BookingWhen; label: string }[] = [
 ];
 
 const CONTEXT_NOTE: Record<'all' | BookingEntity, string> = {
-    all: 'Paid at checkout, nothing to confirm — Event tickets and ticketed Venue slots. Classes and Programs never appear here; they are enquiry-led.',
+    all: 'Paid at checkout, nothing to confirm. Events always sell tickets; Venues, Classes and Programs appear here too when the listing is set to direct booking — the enquiry-led ones are on the Enquiries tab.',
     Events: 'Event tickets — fixed price per seat, paid at checkout.',
     Venues: 'Venue slots — hybrid model: hourly and day slots are paid upfront here; custom or large hires arrive as enquiries.',
+    Classes: 'Class bookings — only classes set to direct booking are paid upfront; the rest arrive as enquiries.',
+    Programs: 'Program bookings — only programs set to direct booking are paid upfront; the rest arrive as enquiries.',
 };
 
-interface StatCardProps { label: string; value: string; valueClassName?: string; sub?: string }
+interface StatCardProps {
+    label: string;
+    value: string;
+    valueClassName?: string;
+    sub?: string;
+}
 const StatCard: React.FC<StatCardProps> = ({ label, value, valueClassName = '', sub }) => (
     <div className="pt-stat">
         <span className="pt-eyebrow">{label}</span>
@@ -47,18 +54,9 @@ export const BookingsPanel: React.FC<BookingsPanelProps> = ({ entries, available
     const [visible, setVisible] = useState(PAGE_SIZE);
 
     const stats = useMemo(() => bookingStats(entries), [entries]);
-    const whenScoped = useMemo(
-        () => filterBookings(entries, { when, scope: 'all', search: '' }, now),
-        [entries, when, now],
-    );
-    const filtered = useMemo(
-        () => filterBookings(entries, { when, scope, search }, now),
-        [entries, when, scope, search, now],
-    );
-    const sorted = useMemo(
-        () => [...filtered].sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? '')),
-        [filtered],
-    );
+    const whenScoped = useMemo(() => filterBookings(entries, { when, scope: 'all', search: '' }, now), [entries, when, now]);
+    const filtered = useMemo(() => filterBookings(entries, { when, scope, search }, now), [entries, when, scope, search, now]);
+    const sorted = useMemo(() => [...filtered].sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? '')), [filtered]);
     const visibleRows = sorted.slice(0, visible);
     const groups = useMemo(() => groupByListing(visibleRows), [visibleRows]);
 
@@ -70,17 +68,33 @@ export const BookingsPanel: React.FC<BookingsPanelProps> = ({ entries, available
             <div className="pt-card grid grid-cols-2 sm:grid-cols-4 p-0 overflow-hidden">
                 <StatCard label="Total bookings" value={String(stats.total)} />
                 <StatCard label="Average value" value={formatRupees(stats.averageValue)} sub="per confirmed booking" />
-                <StatCard label="Cancellations" value={String(stats.cancelledCount)} valueClassName="text-tlb-red-deep" sub={`${stats.cancelledPct.toFixed(1)}% of bookings`} />
-                <StatCard label="Refunded" value={formatRupees(stats.refundedAmount)} sub={`${stats.refundedCount} refund${stats.refundedCount === 1 ? '' : 's'}`} />
+                <StatCard
+                    label="Cancellations"
+                    value={String(stats.cancelledCount)}
+                    valueClassName="text-tlb-red-deep"
+                    sub={`${stats.cancelledPct.toFixed(1)}% of bookings`}
+                />
+                <StatCard
+                    label="Refunded"
+                    value={formatRupees(stats.refundedAmount)}
+                    sub={`${stats.refundedCount} refund${stats.refundedCount === 1 ? '' : 's'}`}
+                />
             </div>
 
             <SegBar
                 options={[
                     { key: 'all' as const, label: 'All bookings', count: whenScoped.length },
-                    ...availableEntities.map(e => ({ key: e, label: SERVICE_LABEL[e], count: whenScoped.filter(b => b.entity === e).length })),
+                    ...availableEntities.map((e) => ({
+                        key: e,
+                        label: SERVICE_LABEL[e],
+                        count: whenScoped.filter((b) => b.entity === e).length,
+                    })),
                 ]}
                 value={scope}
-                onChange={v => { setScope(v); resetPaging(); }}
+                onChange={(v) => {
+                    setScope(v);
+                    resetPaging();
+                }}
             />
 
             <div className="pt-note">
@@ -90,9 +104,23 @@ export const BookingsPanel: React.FC<BookingsPanelProps> = ({ entries, available
 
             <div className="flex flex-wrap items-center gap-2">
                 <span className="pt-eyebrow mr-0.5">When</span>
-                <ScopePills options={WHEN_OPTIONS.map(o => ({ ...o, count: whenCount(o.key) }))} value={when} onChange={v => { setWhen(v); resetPaging(); }} />
+                <ScopePills
+                    options={WHEN_OPTIONS.map((o) => ({ ...o, count: whenCount(o.key) }))}
+                    value={when}
+                    onChange={(v) => {
+                        setWhen(v);
+                        resetPaging();
+                    }}
+                />
                 <div className="flex-1" />
-                <SearchField value={search} onChange={v => { setSearch(v); resetPaging(); }} placeholder="Search customer, listing or reference" />
+                <SearchField
+                    value={search}
+                    onChange={(v) => {
+                        setSearch(v);
+                        resetPaging();
+                    }}
+                    placeholder="Search customer, listing or reference"
+                />
             </div>
 
             <div className="pt-card overflow-x-auto">
@@ -107,10 +135,10 @@ export const BookingsPanel: React.FC<BookingsPanelProps> = ({ entries, available
                     <GroupedList<BookingEntry>
                         groups={groups}
                         expandedId={expandedListingId}
-                        onToggle={id => setExpandedListingId(cur => cur === id ? null : id)}
-                        entityLabel={e => BOOKING_ENTITY_LABEL[e as BookingEntity]}
-                        entityTone={e => BOOKING_ENTITY_TONE[e as BookingEntity]}
-                        countLabel={n => `${n} ${n === 1 ? 'booking' : 'bookings'}`}
+                        onToggle={(id) => setExpandedListingId((cur) => (cur === id ? null : id))}
+                        entityLabel={(e) => BOOKING_ENTITY_LABEL[e as BookingEntity]}
+                        entityTone={(e) => BOOKING_ENTITY_TONE[e as BookingEntity]}
+                        countLabel={(n) => `${n} ${n === 1 ? 'booking' : 'bookings'}`}
                         minWidth={620}
                         columnHeader={
                             <div className="grid grid-cols-[1.1fr_1.4fr_0.9fr_0.7fr] gap-3.5 px-[17px] py-2.5 border-b border-tlb-line bg-tlb-chrome">
@@ -120,7 +148,7 @@ export const BookingsPanel: React.FC<BookingsPanelProps> = ({ entries, available
                                 <span className="pt-lbl text-right">Status</span>
                             </div>
                         }
-                        renderRow={row => {
+                        renderRow={(row) => {
                             const meta = bookingStatusMeta(row);
                             return (
                                 <button
@@ -134,16 +162,25 @@ export const BookingsPanel: React.FC<BookingsPanelProps> = ({ entries, available
                                     </span>
                                     <span className="min-w-0">
                                         <span className="block font-semibold text-tlb-ink truncate">{row.customerName}</span>
-                                        <span className="block text-[11px] text-tlb-muted mt-px">{slotLabelOf(row.listingStartsAt, now)}</span>
+                                        <span className="block text-[11px] text-tlb-muted mt-px">
+                                            {slotLabelOf(row.listingStartsAt, now)}
+                                        </span>
                                     </span>
                                     <span className="pt-num text-tlb-ink">{formatRupees(row.amount)}</span>
-                                    <span className="flex justify-end"><Pill tone={meta.tone}>{meta.label}</Pill></span>
+                                    <span className="flex justify-end">
+                                        <Pill tone={meta.tone}>{meta.label}</Pill>
+                                    </span>
                                 </button>
                             );
                         }}
                     />
                 )}
-                <LoadMoreRow shown={Math.min(visible, filtered.length)} total={filtered.length} noun="bookings" onLoadMore={() => setVisible(v => v + PAGE_SIZE)} />
+                <LoadMoreRow
+                    shown={Math.min(visible, filtered.length)}
+                    total={filtered.length}
+                    noun="bookings"
+                    onLoadMore={() => setVisible((v) => v + PAGE_SIZE)}
+                />
             </div>
         </div>
     );

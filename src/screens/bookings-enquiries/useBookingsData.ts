@@ -12,7 +12,15 @@ import { BookingEntity, BookingEntry, BookingStatus, PaymentStatus } from './typ
 // dates behind them, not just the booking's own creation time.
 // ---------------------------------------------------------------------------
 
-const BOOKING_TYPE_TO_ENTITY: Record<string, BookingEntity | undefined> = { event: 'Events', venue: 'Venues' };
+// The API's booking_type is event | class | program | venue. Classes and
+// Programs were missing here, so a paid booking on a direct-booking class or
+// program was dropped on the floor — it showed up nowhere in the portal.
+const BOOKING_TYPE_TO_ENTITY: Record<string, BookingEntity | undefined> = {
+    event: 'Events',
+    venue: 'Venues',
+    class: 'Classes',
+    program: 'Programs',
+};
 const UNLINKED = '__unlinked__';
 
 interface State {
@@ -22,7 +30,7 @@ interface State {
 
 export const useBookingsData = (allowedEntities: EntityType[]) => {
     const [state, setState] = useState<State>({ loading: true, entries: [] });
-    const scope: BookingEntity[] = (['Events', 'Venues'] as BookingEntity[]).filter(
+    const scope: BookingEntity[] = (['Events', 'Venues', 'Classes', 'Programs'] as BookingEntity[]).filter(
         (e) => allowedEntities.length === 0 || allowedEntities.includes(e)
     );
     const scopeKey = scope.join(',');
@@ -32,14 +40,17 @@ export const useBookingsData = (allowedEntities: EntityType[]) => {
         try {
             const [bookings, listings] = await Promise.all([getAllBookings().catch(() => []), loadPartnerListings(scope)]);
             const startsById = new Map(listings.map((l) => [l.id, l.startsAt]));
+            const entityById = new Map<string, BookingEntity>(listings.map((l) => [l.id, l.entityType as BookingEntity]));
             // Bookings don't always carry `listing_title` — the partner's own
             // listings name it when the payload doesn't.
             const titleById = new Map(listings.map((l) => [l.id, l.title]));
             const entries: BookingEntry[] = (bookings as any[])
                 .map((b): BookingEntry | null => {
-                    const entity = BOOKING_TYPE_TO_ENTITY[b?.booking_type];
-                    if (!entity || !scope.includes(entity)) return null;
                     const listingId = b?.listing_id ? String(b.listing_id) : UNLINKED;
+                    // Fall back to the listing's own type: a booking must never
+                    // vanish just because booking_type was missing or unfamiliar.
+                    const entity = BOOKING_TYPE_TO_ENTITY[b?.booking_type] ?? entityById.get(listingId);
+                    if (!entity || !scope.includes(entity)) return null;
                     return {
                         id: String(b?.id ?? ''),
                         entity,

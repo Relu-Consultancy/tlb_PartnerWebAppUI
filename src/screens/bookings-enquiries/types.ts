@@ -13,7 +13,13 @@ import { EnquiryStatus } from '../../types';
 // ---------------------------------------------------------------------------
 
 export type EnquiryEntity = 'Classes' | 'Programs' | 'Venues';
-export type BookingEntity = 'Events' | 'Venues';
+/**
+ * Every service type can produce a paid booking: Events always do, and Classes,
+ * Programs and Venues do whenever the partner set `booking_type: direct_booking`
+ * in the wizard. The API's own `booking_type` on a booking is
+ * event | class | program | venue.
+ */
+export type BookingEntity = 'Events' | 'Venues' | 'Classes' | 'Programs';
 
 export interface EnquiryEntry {
     id: string;

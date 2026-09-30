@@ -25,11 +25,15 @@ export const ENQUIRY_ENTITY_TONE: Record<EnquiryEntity, Tone> = {
 export const BOOKING_ENTITY_LABEL: Record<BookingEntity, string> = {
     Events: 'Event',
     Venues: 'Venue hire',
+    Classes: 'Class',
+    Programs: 'Program',
 };
 
 export const BOOKING_ENTITY_TONE: Record<BookingEntity, Tone> = {
     Events: 'amber',
     Venues: 'blue',
+    Classes: 'green',
+    Programs: 'purple',
 };
 
 // Real statuses map onto the mock's five-state palette (red = needs you,

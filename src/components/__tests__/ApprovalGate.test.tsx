@@ -70,10 +70,39 @@ describe('isApprovalError', () => {
         expect(isApprovalError({ message: 'Forbidden (HTTP 403)' })).toBe(true);
     });
 
+    it('recognises a 403 whatever the wording — the status is what counts', () => {
+        // DRF's default refusal used to slip through prose-only matching, which
+        // is why the notice appeared on some screens and not others.
+        expect(isApprovalError({ status: 403, message: 'You do not have permission to perform this action.' })).toBe(true);
+        expect(isApprovalError({ status: 403, message: 'Something entirely different' })).toBe(true);
+        expect(isApprovalError({ status: 500, message: 'Server error' })).toBe(false);
+    });
+
     it('leaves real outages alone, so they still read as errors', () => {
         expect(isApprovalError('Failed to load coupons.')).toBe(false);
         expect(isApprovalError(new Error('Network request failed'))).toBe(false);
         expect(isApprovalError(null)).toBe(false);
         expect(isApprovalError(undefined)).toBe(false);
+    });
+});
+
+describe('ApprovalGate — transient read failures', () => {
+    it('retries once before falling back to letting the screen through', async () => {
+        let calls = 0;
+        server.use(
+            http.get(`${BASE}/api/v1/partner/me/`, () => {
+                calls += 1;
+                // First read fails the way a 429 / mid-refresh read does.
+                if (calls === 1) return HttpResponse.error();
+                return HttpResponse.json({ success: true, data: { id: 1, status: 'activated_limited', is_verified: false } });
+            })
+        );
+        renderGate();
+
+        // Without the retry this rendered the screen and left the partner on a raw 403.
+        await waitFor(() => expect(screen.getByText(/Coupons unlock once TLB approves your profile/i)).toBeInTheDocument(), {
+            timeout: 3000,
+        });
+        expect(calls).toBeGreaterThan(1);
     });
 });

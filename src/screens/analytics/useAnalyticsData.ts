@@ -18,6 +18,7 @@ import {
     StatsOverviewAll,
 } from '../../api/stats';
 import { DateRangeKey } from '../../constants/dateRange';
+import { isApprovalError } from '../../api/client';
 
 // ---------------------------------------------------------------------------
 // Loads every partner-stats endpoint in parallel for the selected reporting
@@ -41,6 +42,12 @@ interface State {
     error: boolean;
     /** First rejection's message — tells an approval refusal apart from a real outage. */
     errorMessage: string | null;
+    /**
+     * True when the backend refused *any* of these calls for lack of approval.
+     * `error` alone needed all eight to fail, so a single endpoint staying open
+     * left an unapproved partner on an empty screen with no explanation.
+     */
+    approvalRefused: boolean;
 }
 
 const settled = <T>(r: PromiseSettledResult<T>): T | null => (r.status === 'fulfilled' ? r.value : null);
@@ -58,6 +65,7 @@ export const useAnalyticsData = (range: DateRangeKey) => {
         overviewAll: null,
         error: false,
         errorMessage: null,
+        approvalRefused: false,
     });
 
     const load = useCallback(async () => {
@@ -85,6 +93,7 @@ export const useAnalyticsData = (range: DateRangeKey) => {
             overviewAll: settled(oaRes),
             error: results.every((r) => r.status === 'rejected'),
             errorMessage: (results.find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined)?.reason?.message ?? null,
+            approvalRefused: results.some((r) => r.status === 'rejected' && isApprovalError(r.reason)),
         });
     }, [range]);
 

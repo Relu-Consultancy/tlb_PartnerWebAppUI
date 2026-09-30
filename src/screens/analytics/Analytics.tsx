@@ -5,7 +5,7 @@ import { usePartner } from '../../context/PartnerContext';
 import { getDateRangeOption } from '../../constants/dateRange';
 import { Pill, SegBar } from '../../components/portal';
 import { Skeleton, toast } from '../../components/ui';
-import { ApprovalRequiredNotice, isApprovalError } from '../../components/ApprovalGate';
+import { ApprovalRequiredNotice } from '../../components/ApprovalGate';
 import { downloadTextFile } from '../../utils/download';
 import { getEarningsStatementReport } from '../../api/reports';
 import { useAnalyticsData } from './useAnalyticsData';
@@ -80,10 +80,12 @@ export const Analytics: React.FC<Props> = ({ onNavigate }) => {
 
     if (stats.loading) return <SkeletonBody />;
 
+    // Stats are approved-partner only. The route gate can't always pre-empt that
+    // refusal, and a single endpoint staying open used to leave the partner on an
+    // empty screen — so any refusal shows the notice, not just a total failure.
+    if (stats.approvalRefused) return <ApprovalRequiredNotice feature="Analytics" onNavigate={onNavigate} />;
+
     if (stats.error) {
-        // Stats are approved-partner only. The route gate can't always pre-empt
-        // that refusal, so turn it into the same notice rather than a dead end.
-        if (isApprovalError(stats.errorMessage)) return <ApprovalRequiredNotice feature="Analytics" onNavigate={onNavigate} />;
         return (
             <div className="px-4 sm:px-[26px] pt-5 pb-9">
                 <div className="pt-note bg-tlb-red-soft text-tlb-red-deep">Could not load analytics data.</div>

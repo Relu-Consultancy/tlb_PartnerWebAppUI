@@ -79,3 +79,35 @@ export const apiClient = async (endpoint: string, options: RequestInit = {}) => 
 
     return response;
 };
+
+// ---------------------------------------------------------------------------
+// Approved-partner refusals
+//
+// Coupons and stats/* sit behind the backend's IsApprovedPartner permission.
+// Callers throw plain Errors, so `status` is attached by `rejection()` below
+// and read back here — prose matching alone missed DRF's default 403 wording
+// and made the "finish your verification" notice appear only sometimes.
+// ---------------------------------------------------------------------------
+
+/** Error carrying the HTTP status that produced it. */
+export interface HttpError extends Error {
+    status?: number;
+}
+
+/** Builds the Error an API helper throws, tagged with the response status. */
+export const rejection = (message: string, status?: number): HttpError => {
+    const error = new Error(message) as HttpError;
+    if (status != null) error.status = status;
+    return error;
+};
+
+const APPROVAL_TEXT =
+    /fully approved|not approved|approved partner|do not have permission|don’t have permission|PARTNER_NOT_APPROVED|IsApprovedPartner|HTTP 403/i;
+
+/** True when a failure is the backend refusing an unapproved partner, not an outage. */
+export const isApprovalError = (error: unknown): boolean => {
+    if (!error) return false;
+    if ((error as HttpError).status === 403) return true;
+    const message = typeof error === 'string' ? error : (error as any)?.message;
+    return !!message && APPROVAL_TEXT.test(String(message));
+};

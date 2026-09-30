@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { ArrowRight, Clock, FileText, Landmark, ShieldCheck, UploadCloud } from 'lucide-react';
 import { Screen } from '../types';
 import { loadCurrentPartner, PARTNER_UPDATED_EVENT } from '../api/portalSummary';
+// Re-exported so screens can keep importing the notice and its trigger together.
+export { isApprovalError } from '../api/client';
 import { verificationOf, VerificationState } from './portal';
 import { Skeleton } from './ui';
 
@@ -17,31 +19,44 @@ import { Skeleton } from './ui';
  * Verification state for gating. `null` means "unknown" — the read failed, so
  * we fail open rather than lock an approved partner out over a transient error.
  */
+const RETRY_DELAY_MS = 800;
+
 const usePartnerApproval = (): { loading: boolean; state: VerificationState | null } => {
     const [loading, setLoading] = useState(true);
     const [state, setState] = useState<VerificationState | null>(null);
 
     useEffect(() => {
         let cancelled = false;
-        const load = () => {
+        // One retry: /partner/me/ can 429 or land mid token-refresh on a cold
+        // load, and failing open there is what made the notice intermittent.
+        const load = (attempt = 0) => {
             loadCurrentPartner()
                 .then((partner) => {
-                    if (!cancelled) setState(verificationOf(partner));
+                    if (!cancelled) {
+                        setState(verificationOf(partner));
+                        setLoading(false);
+                    }
                 })
                 .catch((err) => {
+                    if (cancelled) return;
+                    if (attempt === 0) {
+                        setTimeout(() => {
+                            if (!cancelled) load(1);
+                        }, RETRY_DELAY_MS);
+                        return;
+                    }
                     console.error('Approval gate: partner status load failed', err);
-                    if (!cancelled) setState(null);
-                })
-                .finally(() => {
-                    if (!cancelled) setLoading(false);
+                    setState(null);
+                    setLoading(false);
                 });
         };
         load();
         // Submitting documents flips the status — re-read so the gate lifts itself.
-        window.addEventListener(PARTNER_UPDATED_EVENT, load);
+        const reload = () => load();
+        window.addEventListener(PARTNER_UPDATED_EVENT, reload);
         return () => {
             cancelled = true;
-            window.removeEventListener(PARTNER_UPDATED_EVENT, load);
+            window.removeEventListener(PARTNER_UPDATED_EVENT, reload);
         };
     }, []);
 
@@ -136,18 +151,4 @@ export const ApprovalGate: React.FC<ApprovalGateProps> = ({ feature, onNavigate,
     if (state === 'verified' || state === null) return <>{children}</>;
 
     return <ApprovalRequiredNotice feature={feature} inReview={state === 'in_review'} onNavigate={onNavigate} />;
-};
-
-/**
- * True for the backend's "approved partners only" refusal (IsApprovedPartner —
- * 403 on the coupons and stats endpoints). The gate can't always pre-empt it:
- * a partner can read as verified client-side (`is_verified`) while the backend
- * still wants `status === 'approved'`, so screens that hit those endpoints
- * check their load error against this and show the notice instead of a raw
- * server string.
- */
-export const isApprovalError = (error: unknown): boolean => {
-    const message = typeof error === 'string' ? error : (error as any)?.message;
-    if (!message) return false;
-    return /fully approved|not approved|approved partner|PARTNER_NOT_APPROVED|IsApprovedPartner|HTTP 403/i.test(String(message));
 };

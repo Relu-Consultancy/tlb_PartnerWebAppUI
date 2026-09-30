@@ -1,4 +1,4 @@
-import { apiClient } from './client';
+import { apiClient, rejection } from './client';
 
 // ---------------------------------------------------------------------------
 // Partner Statistics endpoints
@@ -14,13 +14,13 @@ export interface StatsOverview {
 }
 
 export interface WeeklyTicketDay {
-    day: string;       // "Mon" .. "Sun"
-    date: string;      // ISO date
+    day: string; // "Mon" .. "Sun"
+    date: string; // ISO date
     count: number;
 }
 
 export interface MonthlyBucket {
-    month: string;     // "Dec 2025"
+    month: string; // "Dec 2025"
     year?: number;
     count: number;
     earnings?: string; // stringified decimal — present on enquiry/event trends
@@ -30,13 +30,13 @@ export interface RevenueBucket {
     month: string;
     year?: number;
     count?: number;
-    earnings: string;  // stringified decimal — "24500.00"
+    earnings: string; // stringified decimal — "24500.00"
 }
 
 export interface CategoryBucket {
     category: string;
     count: number;
-    amount?: string;   // stringified decimal — revenue attributed to the category
+    amount?: string; // stringified decimal — revenue attributed to the category
 }
 
 export interface StatsEvents {
@@ -44,7 +44,7 @@ export interface StatsEvents {
     tickets_sold: number;
     registrations: number;
     event_reach: number;
-    engagement_rate: number | null;  // always null until likes/comments tracked
+    engagement_rate: number | null; // always null until likes/comments tracked
     booking_conv_rate: number;
     this_month_tickets: number;
     prev_month_tickets: number;
@@ -57,7 +57,7 @@ export interface StatsEvents {
 export interface StatsVenues {
     total_bookings: number;
     upcoming: number;
-    monthly_earnings: string;        // decimal as string
+    monthly_earnings: string; // decimal as string
     occupancy_rate: number;
     avg_duration_minutes: number | null;
     repeat_clients: number;
@@ -74,7 +74,7 @@ export interface ConversionFunnel {
 export interface StatsEnquiries {
     conversion_funnel: ConversionFunnel;
     trial_requests: number;
-    avg_response_hours: number | null;  // null until first responded enquiry exists
+    avg_response_hours: number | null; // null until first responded enquiry exists
     student_retention_pct: number | null;
     monthly_enrolments: number;
     monthly_trend: MonthlyBucket[];
@@ -85,7 +85,7 @@ export type RevenuePeriod = '7d' | '30d' | '90d' | '1y' | 'all';
 
 export interface RevenueByType {
     type: string;
-    amount: string;   // decimal as string
+    amount: string; // decimal as string
     count: number;
 }
 
@@ -124,7 +124,7 @@ export interface OverviewDemandFunnel {
 
 export interface OverviewWeeklyTrendPoint {
     week_start: string; // ISO date, Monday-start
-    revenue: string;    // decimal as string
+    revenue: string; // decimal as string
     bookings: number;
 }
 
@@ -163,7 +163,10 @@ export interface TopCity {
     pct: number;
 }
 
-export const getStatsOverviewAll = async (period: RevenuePeriod = '30d', listingType?: OverviewAllListingType): Promise<StatsOverviewAll> => {
+export const getStatsOverviewAll = async (
+    period: RevenuePeriod = '30d',
+    listingType?: OverviewAllListingType
+): Promise<StatsOverviewAll> => {
     const params = new URLSearchParams({ period });
     if (listingType) params.set('listing_type', listingType);
     const res = await apiClient(`/api/v1/partner/stats/overview-all/?${params.toString()}`);
@@ -257,7 +260,8 @@ export interface StatsReviews {
 const unwrap = async <T>(response: Response, fallbackErr: string): Promise<T> => {
     if (!response.ok) {
         const err = await response.json().catch(() => null);
-        throw new Error(err?.error?.message || err?.message || fallbackErr);
+        // Status is kept so callers can tell an approval refusal from an outage.
+        throw rejection(err?.error?.message || err?.message || fallbackErr, response.status);
     }
     const json = await response.json();
     return (json?.data ?? json) as T;
@@ -376,7 +380,9 @@ interface TrafficDetailParams extends TrafficPeriodParams {
     page_size?: number;
 }
 
-export async function getStatsTrafficDetail(params: TrafficDetailParams & { group_by: 'listing' }): Promise<PaginatedTrafficDetail<TrafficDetailByListingRow>>;
+export async function getStatsTrafficDetail(
+    params: TrafficDetailParams & { group_by: 'listing' }
+): Promise<PaginatedTrafficDetail<TrafficDetailByListingRow>>;
 export async function getStatsTrafficDetail(params?: TrafficDetailParams): Promise<PaginatedTrafficDetail<TrafficDetailByDayRow>>;
 export async function getStatsTrafficDetail(params: TrafficDetailParams = {}): Promise<PaginatedTrafficDetail<any>> {
     const query = trafficQuery(params);

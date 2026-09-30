@@ -46,7 +46,9 @@ export const BookingsEnquiries: React.FC<Props> = ({ onNavigate }) => {
     const eStats = enquiryStats(enquiries.entries);
     const bStats = bookingStats(bookings.entries);
     const soon = soonBookings(bookings.entries, now);
-    const bookingScope: BookingEntity[] = (['Events', 'Venues'] as BookingEntity[]).filter(
+    // Any service type can be sold upfront (booking_type: direct_booking), so the
+    // scope follows what the partner offers rather than Events/Venues alone.
+    const bookingScope: BookingEntity[] = (['Events', 'Venues', 'Classes', 'Programs'] as BookingEntity[]).filter(
         (e) => allowedEntities.length === 0 || allowedEntities.includes(e)
     );
 

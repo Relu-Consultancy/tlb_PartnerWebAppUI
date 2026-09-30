@@ -2,9 +2,7 @@ import React from 'react';
 import { Check, ImageIcon } from 'lucide-react';
 import { EntityType } from '../../../types';
 import { countListings, PartnerListing } from '../../../api/portalSummary';
-import {
-    ENTITY_TONE, PartnerIdentity, Pill, serviceMixLabel, VERIFICATION_TONE,
-} from '../../../components/portal';
+import { ENTITY_TONE, PartnerIdentity, Pill, serviceMixLabel, VERIFICATION_TONE } from '../../../components/portal';
 
 interface ProfileSummaryCardProps {
     identity: PartnerIdentity;
@@ -25,17 +23,25 @@ const Stat: React.FC<{ label: string; value: string }> = ({ label, value }) => (
 );
 
 export const ProfileSummaryCard: React.FC<ProfileSummaryCardProps> = ({
-    identity, entities, listings, completion, rating, logoUrl, onLogoSelected, onManageServices,
+    identity,
+    entities,
+    listings,
+    completion,
+    rating,
+    logoUrl,
+    onLogoSelected,
+    onManageServices,
 }) => {
     const serviceMix = serviceMixLabel(entities);
-    const meta = [
-        identity.city,
-        identity.memberSince && `partner since ${identity.memberSince}`,
-        identity.code,
-    ].filter(Boolean).join(' · ');
+    const meta = [identity.city, identity.memberSince && `partner since ${identity.memberSince}`, identity.code]
+        .filter(Boolean)
+        .join(' · ');
 
     return (
-        <section className="pt-card px-5 sm:px-6 py-5 flex flex-col lg:flex-row lg:items-center gap-5 lg:gap-[22px]" aria-label="Profile summary">
+        <section
+            className="pt-card px-5 sm:px-6 py-5 flex flex-col lg:flex-row lg:items-center gap-5 lg:gap-[22px]"
+            aria-label="Profile summary"
+        >
             <div className="flex items-center gap-4 sm:gap-[22px] flex-1 min-w-0">
                 <label className="relative flex-none cursor-pointer group rounded-full focus-within:ring-2 focus-within:ring-tlb-amber focus-within:ring-offset-2">
                     <span className="sr-only">Upload logo</span>
@@ -50,7 +56,10 @@ export const ProfileSummaryCard: React.FC<ProfileSummaryCardProps> = ({
                         )}
                     </span>
                     {identity.verification === 'verified' && (
-                        <span className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-tlb-green border-[3px] border-white flex items-center justify-center" aria-hidden="true">
+                        <span
+                            className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-tlb-green border-[3px] border-white flex items-center justify-center"
+                            aria-hidden="true"
+                        >
                             <Check size={11} strokeWidth={4} className="text-white" />
                         </span>
                     )}
@@ -69,12 +78,18 @@ export const ProfileSummaryCard: React.FC<ProfileSummaryCardProps> = ({
                 <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-[9px]">
                         <h2 className="pt-h2 break-words">{identity.name}</h2>
-                        <Pill tone={VERIFICATION_TONE[identity.verification]} className="text-[11px] py-[3px]">{identity.verificationLabel}</Pill>
-                        {serviceMix && <Pill tone="amber" className="text-[11px] py-[3px]">{serviceMix}</Pill>}
+                        <Pill tone={VERIFICATION_TONE[identity.verification]} className="text-[11px] py-[3px]">
+                            {identity.verificationLabel}
+                        </Pill>
+                        {serviceMix && (
+                            <Pill tone="amber" className="text-[11px] py-[3px]">
+                                {serviceMix}
+                            </Pill>
+                        )}
                     </div>
                     {meta && <p className="text-[12.5px] text-tlb-sub mt-[5px]">{meta}</p>}
                     <div className="flex flex-wrap items-center gap-[7px] mt-2.5">
-                        {entities.map(entity => (
+                        {entities.map((entity) => (
                             <Pill key={entity} tone={ENTITY_TONE[entity]} className="text-[11px] py-[3px]">
                                 {entity} · {countListings(listings, entity).total}
                             </Pill>
@@ -88,7 +103,7 @@ export const ProfileSummaryCard: React.FC<ProfileSummaryCardProps> = ({
 
             <div className="flex gap-[26px] flex-none border-t lg:border-t-0 lg:border-l border-tlb-divider pt-4 lg:pt-0 lg:pl-[26px]">
                 <Stat label="Profile complete" value={`${completion}%`} />
-                <Stat label="Rating" value={rating != null ? `${rating.toFixed(1)} ★` : '—'} />
+                <Stat label="Rating" value={rating != null ? `${rating.toFixed(1)} ★` : '0.0 ★'} />
             </div>
         </section>
     );

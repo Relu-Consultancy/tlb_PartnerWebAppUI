@@ -1,18 +1,29 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import {
-    ShieldCheck, Clock, AlertCircle, Loader2, CheckCircle2, RefreshCw,
-    Image as ImageIcon, UploadCloud, Trash2, FileText, Landmark, BadgeCheck, ArrowLeft,
+    ShieldCheck,
+    Clock,
+    AlertCircle,
+    Loader2,
+    CheckCircle2,
+    RefreshCw,
+    Image as ImageIcon,
+    UploadCloud,
+    Trash2,
+    FileText,
+    Landmark,
+    BadgeCheck,
+    ArrowLeft,
 } from 'lucide-react';
 import { Screen } from '../../types';
 import { toast } from '../../components/ui';
 import { requestProfileSection } from '../../constants/profileSections';
-import {
-    getCurrentPartner,
-    getPartnerMedia, uploadPartnerMedia, deletePartnerMedia, submitVerification,
-} from '../../api/onboarding';
+import { getCurrentPartner, getPartnerMedia, uploadPartnerMedia, deletePartnerMedia, submitVerification } from '../../api/onboarding';
 
-interface Props { onNavigate: (s: Screen) => void; onOpenSidebar: () => void; }
+interface Props {
+    onNavigate: (s: Screen) => void;
+    onOpenSidebar: () => void;
+}
 
 const API_BASE = 'https://tlb-api.reluconsultancy.in';
 const resolveUrl = (url?: string) => {
@@ -50,11 +61,9 @@ const Documents: React.FC<Props> = ({ onNavigate }) => {
     const loadAll = async () => {
         setLoading(true);
         try {
-            const [pRes, mRes] = await Promise.allSettled([
-                getCurrentPartner(), getPartnerMedia(),
-            ]);
-            const p = pRes.status === 'fulfilled' ? (pRes.value?.data || pRes.value) : null;
-            const m = mRes.status === 'fulfilled' ? (mRes.value?.data || mRes.value) : [];
+            const [pRes, mRes] = await Promise.allSettled([getCurrentPartner(), getPartnerMedia()]);
+            const p = pRes.status === 'fulfilled' ? pRes.value?.data || pRes.value : null;
+            const m = mRes.status === 'fulfilled' ? mRes.value?.data || mRes.value : [];
             setPartner(p);
             setMedia(Array.isArray(m) ? m : []);
 
@@ -69,7 +78,9 @@ const Documents: React.FC<Props> = ({ onNavigate }) => {
         }
     };
 
-    useEffect(() => { loadAll(); }, []);
+    useEffect(() => {
+        loadAll();
+    }, []);
 
     const status = partner?.status || '';
     const isVerified = partner?.is_verified === true || status === 'approved';
@@ -77,11 +88,14 @@ const Documents: React.FC<Props> = ({ onNavigate }) => {
 
     const panValid = !pan || PAN_REGEX.test(pan.toUpperCase());
     const ifscValid = !ifsc || IFSC_REGEX.test(ifsc.toUpperCase());
-    const canSaveKyc = !!pan && !!holder && !!account && !!ifsc && panValid && ifscValid && !savingKyc;
+
+    const hasBank = !!holder && !!account && !!ifsc;
+    const hasPan = !!pan;
+    const canSaveKyc = (hasPan || hasBank) && panValid && ifscValid && !savingKyc;
 
     const saveKyc = async () => {
         if (!canSaveKyc) {
-            toast.warning('Please fill PAN, bank details with valid formats.');
+            toast.warning('Please fill valid PAN or bank details.');
             return;
         }
         setSavingKyc(true);
@@ -120,7 +134,7 @@ const Documents: React.FC<Props> = ({ onNavigate }) => {
     const removeMedia = async (id: number) => {
         try {
             await deletePartnerMedia(id);
-            setMedia(prev => prev.filter(m => m.id !== id));
+            setMedia((prev) => prev.filter((m) => m.id !== id));
             toast.success('Removed.');
         } catch (e: any) {
             toast.error(e?.message || 'Failed to remove.');
@@ -140,9 +154,17 @@ const Documents: React.FC<Props> = ({ onNavigate }) => {
                 </button>
                 <div>
                     <nav aria-label="Breadcrumb" className="text-xs text-tlb-muted mb-1">
-                        <button type="button" onClick={() => onNavigate('HOME')} className="text-tlb-link hover:text-tlb-gold transition-colors">Dashboard</button>
+                        <button
+                            type="button"
+                            onClick={() => onNavigate('HOME')}
+                            className="text-tlb-link hover:text-tlb-gold transition-colors"
+                        >
+                            Dashboard
+                        </button>
                         {' · '}
-                        <button type="button" onClick={backToProfile} className="text-tlb-link hover:text-tlb-gold transition-colors">My Profile</button>
+                        <button type="button" onClick={backToProfile} className="text-tlb-link hover:text-tlb-gold transition-colors">
+                            My Profile
+                        </button>
                         {' · '}Documents
                     </nav>
                     <h1 className="tlb-page-title">Documents</h1>
@@ -152,32 +174,44 @@ const Documents: React.FC<Props> = ({ onNavigate }) => {
 
             <main className="p-5 md:p-8 max-w-4xl mx-auto space-y-6">
                 {loading ? (
-                    <div className="flex items-center justify-center py-24"><RefreshCw size={26} className="text-gray-300 animate-spin" /></div>
+                    <div className="flex items-center justify-center py-24">
+                        <RefreshCw size={26} className="text-gray-300 animate-spin" />
+                    </div>
                 ) : (
                     <>
                         {/* Verification status banner */}
-                        <div className={`rounded-2xl border p-5 flex items-center gap-4 ${
-                            isVerified ? 'bg-emerald-50 border-emerald-200' :
-                            inReview ? 'bg-blue-50 border-blue-200' :
-                            'bg-amber-50 border-amber-200'
-                        }`}>
-                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
-                                isVerified ? 'bg-emerald-100 text-emerald-600' :
-                                inReview ? 'bg-blue-100 text-blue-600' :
-                                'bg-amber-100 text-amber-600'
-                            }`}>
+                        <div
+                            className={`rounded-2xl border p-5 flex items-center gap-4 ${
+                                isVerified
+                                    ? 'bg-emerald-50 border-emerald-200'
+                                    : inReview
+                                      ? 'bg-blue-50 border-blue-200'
+                                      : 'bg-amber-50 border-amber-200'
+                            }`}
+                        >
+                            <div
+                                className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
+                                    isVerified
+                                        ? 'bg-emerald-100 text-emerald-600'
+                                        : inReview
+                                          ? 'bg-blue-100 text-blue-600'
+                                          : 'bg-amber-100 text-amber-600'
+                                }`}
+                            >
                                 {isVerified ? <BadgeCheck size={24} /> : inReview ? <Clock size={24} /> : <AlertCircle size={24} />}
                             </div>
                             <div className="flex-1 min-w-0">
-                                <p className={`font-black ${isVerified ? 'text-emerald-700' : inReview ? 'text-blue-700' : 'text-amber-700'}`}>
+                                <p
+                                    className={`font-black ${isVerified ? 'text-emerald-700' : inReview ? 'text-blue-700' : 'text-amber-700'}`}
+                                >
                                     {isVerified ? 'Verified Partner' : inReview ? 'Documents Under Review' : 'Verification Pending'}
                                 </p>
                                 <p className="text-xs text-gray-500 mt-0.5">
                                     {isVerified
                                         ? 'Your documents have been verified by the TLB team.'
                                         : inReview
-                                            ? 'Your submitted documents are being reviewed.'
-                                            : 'Add your KYC & bank details below to get verified.'}
+                                          ? 'Your submitted documents are being reviewed.'
+                                          : 'Add your KYC & bank details below to get verified.'}
                                 </p>
                             </div>
                         </div>
@@ -185,7 +219,9 @@ const Documents: React.FC<Props> = ({ onNavigate }) => {
                         {/* KYC / Identity & Tax */}
                         <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6 space-y-4">
                             <div className="flex items-center gap-2.5">
-                                <div className="w-9 h-9 rounded-xl bg-tlb-yellow/10 text-tlb-yellow flex items-center justify-center"><FileText size={18} /></div>
+                                <div className="w-9 h-9 rounded-xl bg-tlb-yellow/10 text-tlb-yellow flex items-center justify-center">
+                                    <FileText size={18} />
+                                </div>
                                 <div>
                                     <h2 className="font-black text-sm text-gray-900 leading-none">Identity &amp; Tax</h2>
                                     <p className="text-[11px] text-gray-400 mt-1">PAN is required · GST optional</p>
@@ -194,22 +230,42 @@ const Documents: React.FC<Props> = ({ onNavigate }) => {
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                     <label className="tlb-label">PAN Number</label>
-                                    <input value={pan} onChange={e => setPan(e.target.value.toUpperCase())} maxLength={10}
-                                        placeholder="ABCDE1234F" className="tlb-input w-full uppercase" />
+                                    <input
+                                        value={pan}
+                                        onChange={(e) => setPan(e.target.value.toUpperCase())}
+                                        maxLength={10}
+                                        placeholder="ABCDE1234F"
+                                        className="tlb-input w-full uppercase"
+                                    />
                                     {!panValid && <p className="text-[11px] text-red-500 font-bold mt-1">Invalid PAN format</p>}
                                 </div>
                                 <div>
-                                    <label className="tlb-label">GST Number <span className="text-gray-300">(optional)</span></label>
-                                    <input value={gst} onChange={e => setGst(e.target.value.toUpperCase())} maxLength={15}
-                                        placeholder="22ABCDE1234F1Z5" className="tlb-input w-full uppercase" />
+                                    <label className="tlb-label">
+                                        GST Number <span className="text-gray-300">(optional)</span>
+                                    </label>
+                                    <input
+                                        value={gst}
+                                        onChange={(e) => setGst(e.target.value.toUpperCase())}
+                                        maxLength={15}
+                                        placeholder="22ABCDE1234F1Z5"
+                                        className="tlb-input w-full uppercase"
+                                    />
                                 </div>
+                            </div>
+                            <div className="flex items-center justify-end pt-1">
+                                <button onClick={saveKyc} disabled={!canSaveKyc} className="tlb-button px-6 py-3 disabled:opacity-50">
+                                    {savingKyc ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
+                                    Save Documents
+                                </button>
                             </div>
                         </section>
 
                         {/* Bank account */}
                         <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6 space-y-4">
                             <div className="flex items-center gap-2.5">
-                                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center"><Landmark size={18} /></div>
+                                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                                    <Landmark size={18} />
+                                </div>
                                 <div>
                                     <h2 className="font-black text-sm text-gray-900 leading-none">Bank Account</h2>
                                     <p className="text-[11px] text-gray-400 mt-1">Where your payouts are settled</p>
@@ -218,15 +274,31 @@ const Documents: React.FC<Props> = ({ onNavigate }) => {
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="sm:col-span-2">
                                     <label className="tlb-label">Account Holder Name</label>
-                                    <input value={holder} onChange={e => setHolder(e.target.value)} placeholder="As per bank records" className="tlb-input w-full" />
+                                    <input
+                                        value={holder}
+                                        onChange={(e) => setHolder(e.target.value)}
+                                        placeholder="As per bank records"
+                                        className="tlb-input w-full"
+                                    />
                                 </div>
                                 <div>
                                     <label className="tlb-label">Account Number</label>
-                                    <input value={account} onChange={e => setAccount(e.target.value.replace(/\D/g, ''))} placeholder="Account number" className="tlb-input w-full" />
+                                    <input
+                                        value={account}
+                                        onChange={(e) => setAccount(e.target.value.replace(/\D/g, ''))}
+                                        placeholder="Account number"
+                                        className="tlb-input w-full"
+                                    />
                                 </div>
                                 <div>
                                     <label className="tlb-label">IFSC Code</label>
-                                    <input value={ifsc} onChange={e => setIfsc(e.target.value.toUpperCase())} maxLength={11} placeholder="HDFC0001234" className="tlb-input w-full uppercase" />
+                                    <input
+                                        value={ifsc}
+                                        onChange={(e) => setIfsc(e.target.value.toUpperCase())}
+                                        maxLength={11}
+                                        placeholder="HDFC0001234"
+                                        className="tlb-input w-full uppercase"
+                                    />
                                     {!ifscValid && <p className="text-[11px] text-red-500 font-bold mt-1">Invalid IFSC format</p>}
                                 </div>
                             </div>
@@ -242,19 +314,33 @@ const Documents: React.FC<Props> = ({ onNavigate }) => {
                         <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6 space-y-4">
                             <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-2.5">
-                                    <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center"><UploadCloud size={18} /></div>
+                                    <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                                        <UploadCloud size={18} />
+                                    </div>
                                     <div>
                                         <h2 className="font-black text-sm text-gray-900 leading-none">Uploaded Documents &amp; Media</h2>
                                         <p className="text-[11px] text-gray-400 mt-1">Certificates, brochures, gallery &amp; more</p>
                                     </div>
                                 </div>
-                                <button onClick={() => docRef.current?.click()} disabled={uploadingDoc}
-                                    className="tlb-button px-4 py-2.5 text-sm disabled:opacity-50">
+                                <button
+                                    onClick={() => docRef.current?.click()}
+                                    disabled={uploadingDoc}
+                                    className="tlb-button px-4 py-2.5 text-sm disabled:opacity-50"
+                                >
                                     {uploadingDoc ? <Loader2 size={16} className="animate-spin" /> : <UploadCloud size={16} />}
                                     Add
                                 </button>
-                                <input ref={docRef} type="file" accept="image/*,video/*" hidden
-                                    onChange={e => { const f = e.target.files?.[0]; if (f) addDocument(f); e.target.value = ''; }} />
+                                <input
+                                    ref={docRef}
+                                    type="file"
+                                    accept="image/*,video/*"
+                                    hidden
+                                    onChange={(e) => {
+                                        const f = e.target.files?.[0];
+                                        if (f) addDocument(f);
+                                        e.target.value = '';
+                                    }}
+                                />
                             </div>
 
                             {media.length === 0 ? (
@@ -269,15 +355,22 @@ const Documents: React.FC<Props> = ({ onNavigate }) => {
                                         const url = resolveUrl(m.file_url || m.url);
                                         const isVideo = (m.media_type || '').includes('video');
                                         return (
-                                            <motion.div key={m.id ?? i}
-                                                initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
+                                            <motion.div
+                                                key={m.id ?? i}
+                                                initial={{ opacity: 0, scale: 0.96 }}
+                                                animate={{ opacity: 1, scale: 1 }}
                                                 transition={{ duration: 0.18, delay: Math.min(i * 0.02, 0.2) }}
-                                                className="group relative aspect-square rounded-xl overflow-hidden bg-gray-100 border border-gray-100">
-                                                {isVideo
-                                                    ? <video src={url} className="w-full h-full object-cover" />
-                                                    : <img src={url} alt="" className="w-full h-full object-cover" />}
-                                                <button onClick={() => removeMedia(m.id)}
-                                                    className="absolute top-1.5 right-1.5 w-7 h-7 rounded-lg bg-white/90 text-red-500 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow">
+                                                className="group relative aspect-square rounded-xl overflow-hidden bg-gray-100 border border-gray-100"
+                                            >
+                                                {isVideo ? (
+                                                    <video src={url} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <img src={url} alt="" className="w-full h-full object-cover" />
+                                                )}
+                                                <button
+                                                    onClick={() => removeMedia(m.id)}
+                                                    className="absolute top-1.5 right-1.5 w-7 h-7 rounded-lg bg-white/90 text-red-500 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow"
+                                                >
                                                     <Trash2 size={14} />
                                                 </button>
                                             </motion.div>

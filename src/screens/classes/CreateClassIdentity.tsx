@@ -3,7 +3,14 @@ import { ArrowRight, MapPin, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
 import { toast, LocationPicker, LanguagePicker, validateLanguages } from '../../components/ui';
 import { PickedLocation } from '../../components/ui/LocationPicker';
-import { WizardShell, WizardNav, WizardField, OptionTileGrid, BookingTypeCards } from '../../components/portal/wizard';
+import {
+    WizardShell,
+    WizardNav,
+    WizardField,
+    OptionTileGrid,
+    BookingTypeCards,
+    scrollToFirstMissingField,
+} from '../../components/portal/wizard';
 import {
     getCurrentClassDraftId,
     setCurrentClassDraftId,
@@ -14,10 +21,21 @@ import {
     getClassMetaFormats,
 } from '../../api/listings';
 
-interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
+interface Props {
+    onNavigate: (screen: Screen) => void;
+    onOpenSidebar: () => void;
+}
 
-interface ApiCategory { id: number; name: string; slug?: string; subcategories: { id: number; name: string; slug?: string }[] }
-interface ApiMode { value: string; label: string }
+interface ApiCategory {
+    id: number;
+    name: string;
+    slug?: string;
+    subcategories: { id: number; name: string; slug?: string }[];
+}
+interface ApiMode {
+    value: string;
+    label: string;
+}
 
 const tagOptions = ['Beginner Friendly', 'Advanced', 'Certification', 'Weekend Only', 'Trial Available', 'Group Class', 'One-on-One'];
 
@@ -69,10 +87,7 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
             setMetaLoading(true);
             let catsData: ApiCategory[] = [];
             try {
-                const [catsRes, fmtsRes] = await Promise.all([
-                    getClassMetaCategories(),
-                    getClassMetaFormats(),
-                ]);
+                const [catsRes, fmtsRes] = await Promise.all([getClassMetaCategories(), getClassMetaFormats()]);
                 if (!cancelled) {
                     catsData = catsRes.data || catsRes || [];
                     setCategories(catsData);
@@ -125,18 +140,20 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
                 if (subId) {
                     // Validate the stored subcategory still belongs to the stored category.
                     // A previous save bug could have left them mismatched — reset if so.
-                    const cat = catsData.find(c => c.id === catId);
-                    const isValid = cat?.subcategories.some(s => s.id === subId) ?? false;
+                    const cat = catsData.find((c) => c.id === catId);
+                    const isValid = cat?.subcategories.some((s) => s.id === subId) ?? false;
                     setSelectedSubcategoryId(isValid ? subId : null);
                 }
             } catch (e) {
                 console.warn('Failed to load class draft', e);
             }
         })();
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+        };
     }, []);
 
-    const selectedCategory = categories.find(c => c.id === selectedCategoryId);
+    const selectedCategory = categories.find((c) => c.id === selectedCategoryId);
     const needsAddress = mode === 'offline' || mode === 'hybrid';
 
     // Shared by "Next" and "Save as draft" — creates the draft if needed and
@@ -198,13 +215,28 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
     };
 
     const handleNext = async () => {
-        if (!title.trim()) { setSaveError('Class title is required.'); return; }
+        const missing: string[] = [];
+        if (!title.trim()) missing.push('Class title');
+        if (!description.trim()) missing.push('Description');
+        if (missing.length > 0) {
+            const message = `Please complete before continuing: ${missing.join(', ')}.`;
+            setSaveError(message);
+            toast.warning(message);
+            scrollToFirstMissingField();
+            return;
+        }
         if (selectedCategoryId != null && selectedSubcategoryId == null) {
             setSaveError('Please select a subcategory for the chosen category.');
             return;
         }
-        const langErr = validateLanguages(languages, otherLanguage);
-        if (langErr) { setLangError(langErr); setSaveError(langErr); return; }
+        const langErr = validateLanguages(languages, otherLanguage, true);
+        if (langErr) {
+            setLangError(langErr);
+            setSaveError(langErr);
+            toast.warning(langErr);
+            scrollToFirstMissingField();
+            return;
+        }
         setLangError('');
         if (saving) return;
         setSaveError('');
@@ -220,7 +252,10 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
     };
 
     const handleSaveDraft = async () => {
-        if (!title.trim()) { toast.warning('Please enter a class title before saving.'); return; }
+        if (!title.trim()) {
+            toast.warning('Please enter a class title before saving.');
+            return;
+        }
         setSavingDraft(true);
         try {
             await persist();
@@ -235,7 +270,14 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
     };
 
     return (
-        <WizardShell title="New class" entityType="Classes" step={1} totalSteps={5} stepLabel="Identity" onBack={() => onNavigate('SERVICE_LISTINGS')}>
+        <WizardShell
+            title="New class"
+            entityType="Classes"
+            step={1}
+            totalSteps={5}
+            stepLabel="Identity"
+            onBack={() => onNavigate('SERVICE_LISTINGS')}
+        >
             <div className="pt-card p-5 sm:p-6 flex flex-col gap-5">
                 <div>
                     <h2 className="pt-h-sec">Identity &amp; story</h2>
@@ -274,9 +316,23 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
 
                 <WizardField label="Target age group">
                     <div className="flex items-center gap-3">
-                        <input className="pt-input w-24 text-center" type="number" placeholder="Min" min={0} value={minAge} onChange={(e) => setMinAge(e.target.value)} />
+                        <input
+                            className="pt-input w-24 text-center"
+                            type="number"
+                            placeholder="Min"
+                            min={0}
+                            value={minAge}
+                            onChange={(e) => setMinAge(e.target.value)}
+                        />
                         <span className="text-tlb-muted font-bold text-sm">to</span>
-                        <input className="pt-input w-24 text-center" type="number" placeholder="Max" min={0} value={maxAge} onChange={(e) => setMaxAge(e.target.value)} />
+                        <input
+                            className="pt-input w-24 text-center"
+                            type="number"
+                            placeholder="Max"
+                            min={0}
+                            value={maxAge}
+                            onChange={(e) => setMaxAge(e.target.value)}
+                        />
                         <span className="text-tlb-muted font-bold text-sm">yrs</span>
                     </div>
                 </WizardField>
@@ -328,7 +384,9 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
 
                 {needsAddress && (
                     <WizardField label="Location" className="gap-3">
-                        <span className="sr-only"><MapPin size={12} /></span>
+                        <span className="sr-only">
+                            <MapPin size={12} />
+                        </span>
                         <LocationPicker
                             initialLatitude={latitude}
                             initialLongitude={longitude}
@@ -346,8 +404,13 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
 
                 <LanguagePicker
                     languages={languages}
+                    required
                     otherLanguage={otherLanguage}
-                    onChange={(l, o) => { setLanguages(l); setOtherLanguage(o); setLangError(''); }}
+                    onChange={(l, o) => {
+                        setLanguages(l);
+                        setOtherLanguage(o);
+                        setLangError('');
+                    }}
                     error={langError}
                 />
 
@@ -372,9 +435,12 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
                     ) : (
                         <div className="max-h-[280px] overflow-y-auto">
                             <OptionTileGrid
-                                options={categories.map(c => ({ id: String(c.id), label: c.name }))}
+                                options={categories.map((c) => ({ id: String(c.id), label: c.name }))}
                                 isSelected={(id) => selectedCategoryId === Number(id)}
-                                onToggle={(id) => { setSelectedCategoryId(Number(id)); setSelectedSubcategoryId(null); }}
+                                onToggle={(id) => {
+                                    setSelectedCategoryId(Number(id));
+                                    setSelectedSubcategoryId(null);
+                                }}
                             />
                         </div>
                     )}
@@ -403,7 +469,7 @@ export const CreateClassIdentity: React.FC<Props> = ({ onNavigate }) => {
                             <button
                                 key={t}
                                 type="button"
-                                onClick={() => setTag(prev => prev === t ? '' : t)}
+                                onClick={() => setTag((prev) => (prev === t ? '' : t))}
                                 className={`pt-scope ${tag === t ? 'is-active' : ''}`}
                             >
                                 {t}

@@ -8,6 +8,15 @@ import { CreateEventDetails } from '../CreateEventDetails';
 import * as listingsApi from '../../../api/listings';
 import { toast } from '../../../components/ui';
 
+/**
+ * Fills the step's other required fields. These cases are about the request
+ * payload / navigation, not validation, so they shouldn't trip over it.
+ */
+const fillOtherRequired = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.type(screen.getByPlaceholderText(/tell parents & attendees/i), 'Desc');
+    await user.click(screen.getByRole('checkbox', { name: 'English' }));
+};
+
 const BASE = 'https://tlb-api.reluconsultancy.in';
 
 const mockNavigate = vi.fn();
@@ -146,6 +155,7 @@ describe('CreateEventDetails — Next button', () => {
         const toastSpy = vi.spyOn(toast, 'warning').mockImplementation(() => 0);
         render(<CreateEventDetails {...defaultProps} />);
         await waitFor(() => screen.getByText('Workshop'));
+        await fillOtherRequired(user);
         await user.click(screen.getByText(/next: schedule/i));
         expect(toastSpy).toHaveBeenCalledWith(expect.stringMatching(/title/i));
         toastSpy.mockRestore();
@@ -208,6 +218,7 @@ describe('CreateEventDetails — Next button', () => {
         render(<CreateEventDetails {...defaultProps} />);
         await waitFor(() => screen.getByPlaceholderText(/summer art festival/i));
         await user.type(screen.getByPlaceholderText(/summer art festival/i), 'Updated Title');
+        await fillOtherRequired(user);
         await user.click(screen.getByText(/next: schedule/i));
         await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('CREATE_EVENT_SCHEDULE'));
         expect(createCalled).toBe(false); // should not create, only update

@@ -1,4 +1,4 @@
-import { apiClient } from './client';
+import { apiClient, rejection } from './client';
 
 // ---------------------------------------------------------------------------
 // Partner coupons / discount codes
@@ -85,7 +85,7 @@ const unwrap = async <T>(response: Response, fallbackErr: string): Promise<T> =>
     if (!response.ok) {
         const err = await response.json().catch(() => null);
         const serverMsg = err?.error?.message || err?.message || err?.detail;
-        throw new Error(serverMsg || `${fallbackErr} (HTTP ${response.status})`);
+        throw rejection(serverMsg || `${fallbackErr} (HTTP ${response.status})`, response.status);
     }
     const json = await response.json();
     return (json?.data ?? json) as T;
@@ -122,10 +122,7 @@ export const createCoupon = async (input: CreateCouponInput): Promise<Coupon> =>
 };
 
 /** PATCH /partner/coupons/{id}/ — partial update (any subset of create fields). */
-export const updateCoupon = async (
-    couponId: string,
-    input: Partial<CreateCouponInput> & { is_active?: boolean },
-): Promise<Coupon> => {
+export const updateCoupon = async (couponId: string, input: Partial<CreateCouponInput> & { is_active?: boolean }): Promise<Coupon> => {
     const res = await apiClient(`/api/v1/partner/coupons/${couponId}/`, {
         method: 'PATCH',
         body: JSON.stringify(input),

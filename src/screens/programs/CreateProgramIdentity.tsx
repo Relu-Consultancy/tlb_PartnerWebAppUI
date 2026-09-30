@@ -3,7 +3,14 @@ import { ArrowRight, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
 import { toast, Select, LocationPicker, LanguagePicker, validateLanguages } from '../../components/ui';
 import { PickedLocation } from '../../components/ui/LocationPicker';
-import { WizardShell, WizardNav, WizardField, OptionTileGrid, BookingTypeCards } from '../../components/portal/wizard';
+import {
+    WizardShell,
+    WizardNav,
+    WizardField,
+    OptionTileGrid,
+    BookingTypeCards,
+    scrollToFirstMissingField,
+} from '../../components/portal/wizard';
 import {
     getCurrentProgramDraftId,
     setCurrentProgramDraftId,
@@ -15,11 +22,26 @@ import {
     getProgramMetaTags,
 } from '../../api/listings';
 
-interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
+interface Props {
+    onNavigate: (screen: Screen) => void;
+    onOpenSidebar: () => void;
+}
 
-interface ApiCategory { id: number; name: string; slug?: string; subcategories: { id: number; name: string; slug?: string }[] }
-interface ApiOption { value: string; label: string }
-interface ApiTag { id: number; name: string; slug?: string }
+interface ApiCategory {
+    id: number;
+    name: string;
+    slug?: string;
+    subcategories: { id: number; name: string; slug?: string }[];
+}
+interface ApiOption {
+    value: string;
+    label: string;
+}
+interface ApiTag {
+    id: number;
+    name: string;
+    slug?: string;
+}
 
 export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
     const [title, setTitle] = useState('');
@@ -130,8 +152,8 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                 if (subId) {
                     // Validate the stored subcategory still belongs to the stored category.
                     // A previous save bug could have left them mismatched — reset if so.
-                    const cat = catsData.find(c => c.id === catId);
-                    const isValid = cat?.subcategories.some(s => s.id === subId) ?? false;
+                    const cat = catsData.find((c) => c.id === catId);
+                    const isValid = cat?.subcategories.some((s) => s.id === subId) ?? false;
                     setSelectedSubcategoryId(isValid ? subId : null);
                 }
                 const loadedTags = d.tags || [];
@@ -143,10 +165,12 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                 console.error('Failed to load program detail', e);
             }
         })();
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+        };
     }, []);
 
-    const selectedCategory = categories.find(c => c.id === selectedCategoryId);
+    const selectedCategory = categories.find((c) => c.id === selectedCategoryId);
     const needsAddress = deliveryMode === 'offline' || deliveryMode === 'hybrid';
 
     // Shared by "Next" and "Save as draft" — creates the draft if needed and
@@ -213,13 +237,28 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
     };
 
     const handleNext = async () => {
-        if (!title.trim()) { setError('Program title is required.'); return; }
+        const missing: string[] = [];
+        if (!title.trim()) missing.push('Program title');
+        if (!description.trim()) missing.push('Description');
+        if (missing.length > 0) {
+            const message = `Please complete before continuing: ${missing.join(', ')}.`;
+            setError(message);
+            toast.warning(message);
+            scrollToFirstMissingField();
+            return;
+        }
         if (selectedCategoryId != null && selectedSubcategoryId == null) {
             setError('Please select a subcategory for the chosen category.');
             return;
         }
-        const langErr = validateLanguages(languages, otherLanguage);
-        if (langErr) { setLangError(langErr); setError(langErr); return; }
+        const langErr = validateLanguages(languages, otherLanguage, true);
+        if (langErr) {
+            setLangError(langErr);
+            setError(langErr);
+            toast.warning(langErr);
+            scrollToFirstMissingField();
+            return;
+        }
         setLangError('');
         if (saving) return;
         setError('');
@@ -235,7 +274,10 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
     };
 
     const handleSaveDraft = async () => {
-        if (!title.trim()) { setError('Program title is required before saving.'); return; }
+        if (!title.trim()) {
+            setError('Program title is required before saving.');
+            return;
+        }
         if (savingDraft) return;
         setError('');
         setSavingDraft(true);
@@ -252,11 +294,18 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
     };
 
     const toggleTag = (id: number) => {
-        setSelectedTagId(prev => prev === id ? null : id);
+        setSelectedTagId((prev) => (prev === id ? null : id));
     };
 
     return (
-        <WizardShell title="New program" entityType="Programs" step={1} totalSteps={5} stepLabel="Identity" onBack={() => onNavigate('SERVICE_LISTINGS')}>
+        <WizardShell
+            title="New program"
+            entityType="Programs"
+            step={1}
+            totalSteps={5}
+            stepLabel="Identity"
+            onBack={() => onNavigate('SERVICE_LISTINGS')}
+        >
             <div className="pt-card p-5 sm:p-6 flex flex-col gap-5">
                 <div>
                     <h2 className="pt-h-sec">Identity &amp; story</h2>
@@ -336,9 +385,23 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
 
                 <WizardField label="Target age group">
                     <div className="flex items-center gap-3">
-                        <input className="pt-input" type="number" placeholder="Min (e.g. 8)" min={0} value={minAge} onChange={(e) => setMinAge(e.target.value)} />
+                        <input
+                            className="pt-input"
+                            type="number"
+                            placeholder="Min (e.g. 8)"
+                            min={0}
+                            value={minAge}
+                            onChange={(e) => setMinAge(e.target.value)}
+                        />
                         <span className="text-tlb-muted font-bold text-sm">to</span>
-                        <input className="pt-input" type="number" placeholder="Max (e.g. 14)" min={0} value={maxAge} onChange={(e) => setMaxAge(e.target.value)} />
+                        <input
+                            className="pt-input"
+                            type="number"
+                            placeholder="Max (e.g. 14)"
+                            min={0}
+                            value={maxAge}
+                            onChange={(e) => setMaxAge(e.target.value)}
+                        />
                         <span className="text-tlb-muted font-bold text-sm">yrs</span>
                     </div>
                 </WizardField>
@@ -358,13 +421,34 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <WizardField label="Max capacity">
-                        <input className="pt-input" type="number" placeholder="e.g. 30" min={1} value={maxCapacity} onChange={(e) => setMaxCapacity(e.target.value)} />
+                        <input
+                            className="pt-input"
+                            type="number"
+                            placeholder="e.g. 30"
+                            min={1}
+                            value={maxCapacity}
+                            onChange={(e) => setMaxCapacity(e.target.value)}
+                        />
                     </WizardField>
                     <WizardField label="Total hours">
-                        <input className="pt-input" type="number" placeholder="e.g. 40" min={1} value={totalHours} onChange={(e) => setTotalHours(e.target.value)} />
+                        <input
+                            className="pt-input"
+                            type="number"
+                            placeholder="e.g. 40"
+                            min={1}
+                            value={totalHours}
+                            onChange={(e) => setTotalHours(e.target.value)}
+                        />
                     </WizardField>
                     <WizardField label="Modules">
-                        <input className="pt-input" type="number" placeholder="e.g. 8" min={1} value={moduleCount} onChange={(e) => setModuleCount(e.target.value)} />
+                        <input
+                            className="pt-input"
+                            type="number"
+                            placeholder="e.g. 8"
+                            min={1}
+                            value={moduleCount}
+                            onChange={(e) => setModuleCount(e.target.value)}
+                        />
                     </WizardField>
                 </div>
 
@@ -376,20 +460,35 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                             initialAddress={address}
                             onSelect={handleLocationPicked}
                         />
-                        <textarea className="pt-input min-h-[70px]" placeholder="Street, building, landmark" value={address} onChange={(e) => setAddress(e.target.value)} />
+                        <textarea
+                            className="pt-input min-h-[70px]"
+                            placeholder="Street, building, landmark"
+                            value={address}
+                            onChange={(e) => setAddress(e.target.value)}
+                        />
                     </WizardField>
                 )}
 
                 <LanguagePicker
                     languages={languages}
+                    required
                     otherLanguage={otherLanguage}
-                    onChange={(l, o) => { setLanguages(l); setOtherLanguage(o); setLangError(''); }}
+                    onChange={(l, o) => {
+                        setLanguages(l);
+                        setOtherLanguage(o);
+                        setLangError('');
+                    }}
                     error={langError}
                 />
 
                 {(deliveryMode === 'online' || deliveryMode === 'hybrid') && (
                     <WizardField label="Meeting link">
-                        <input className="pt-input" placeholder="https://meet.google.com/..." value={meetingLink} onChange={(e) => setMeetingLink(e.target.value)} />
+                        <input
+                            className="pt-input"
+                            placeholder="https://meet.google.com/..."
+                            value={meetingLink}
+                            onChange={(e) => setMeetingLink(e.target.value)}
+                        />
                     </WizardField>
                 )}
 
@@ -403,9 +502,12 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                     ) : (
                         <div className="max-h-[280px] overflow-y-auto">
                             <OptionTileGrid
-                                options={categories.map(c => ({ id: String(c.id), label: c.name }))}
+                                options={categories.map((c) => ({ id: String(c.id), label: c.name }))}
                                 isSelected={(id) => selectedCategoryId === Number(id)}
-                                onToggle={(id) => { setSelectedCategoryId(Number(id)); setSelectedSubcategoryId(null); }}
+                                onToggle={(id) => {
+                                    setSelectedCategoryId(Number(id));
+                                    setSelectedSubcategoryId(null);
+                                }}
                             />
                         </div>
                     )}

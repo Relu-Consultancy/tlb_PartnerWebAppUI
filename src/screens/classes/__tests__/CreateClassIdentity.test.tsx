@@ -8,6 +8,15 @@ import { CLASS_DRAFT_ID, mockClassDraft } from '../../../test/msw/handlers';
 import { CreateClassIdentity } from '../CreateClassIdentity';
 import { getCurrentClassDraftId } from '../../../api/listings';
 
+/**
+ * Fills the step's other required fields. These cases are about the request
+ * payload / navigation, not validation, so they shouldn't trip over it.
+ */
+const fillOtherRequired = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.type(screen.getByPlaceholderText(/describe your class/i), 'Desc');
+    await user.click(screen.getByRole('checkbox', { name: 'English' }));
+};
+
 const BASE = 'https://tlb-api.reluconsultancy.in';
 const mockNavigate = vi.fn();
 
@@ -28,9 +37,7 @@ describe('CreateClassIdentity — render', () => {
 
     it('shows Service Title input', async () => {
         renderComponent();
-        await waitFor(() =>
-            expect(screen.getByPlaceholderText(/advanced robotics workshop/i)).toBeInTheDocument()
-        );
+        await waitFor(() => expect(screen.getByPlaceholderText(/advanced robotics workshop/i)).toBeInTheDocument());
     });
 
     it('shows loading state while fetching metadata', () => {
@@ -57,12 +64,11 @@ describe('CreateClassIdentity — metadata loading', () => {
     it('shows meta error when API fails', async () => {
         server.use(
             http.get(`${BASE}/api/v1/listings/classes/metadata/categories/`, () =>
-                HttpResponse.json({ error: { code: 'SERVER_ERROR', message: 'Metadata unavailable' } }, { status: 500 }))
+                HttpResponse.json({ error: { code: 'SERVER_ERROR', message: 'Metadata unavailable' } }, { status: 500 })
+            )
         );
         renderComponent();
-        await waitFor(() =>
-            expect(screen.getByText(/metadata unavailable|failed to load/i)).toBeInTheDocument()
-        );
+        await waitFor(() => expect(screen.getByText(/metadata unavailable|failed to load/i)).toBeInTheDocument());
     });
 });
 
@@ -79,9 +85,7 @@ describe('CreateClassIdentity — mode selection', () => {
         await waitFor(() => screen.getByText(/identity & story/i));
         const onlineBtn = screen.queryByRole('button', { name: 'Online' });
         if (onlineBtn) await user.click(onlineBtn);
-        await waitFor(() =>
-            expect(screen.queryByPlaceholderText(/meet\.google\.com/i)).toBeInTheDocument()
-        );
+        await waitFor(() => expect(screen.queryByPlaceholderText(/meet\.google\.com/i)).toBeInTheDocument());
     });
 });
 
@@ -91,10 +95,9 @@ describe('CreateClassIdentity — Next button (validation)', () => {
         const user = userEvent.setup();
         await waitFor(() => screen.getByText(/identity & story/i));
         const nextBtn = screen.getByRole('button', { name: /next|continue/i });
+        await fillOtherRequired(user);
         await user.click(nextBtn);
-        await waitFor(() =>
-            expect(screen.getByText(/title is required|class title/i)).toBeInTheDocument()
-        );
+        await waitFor(() => expect(screen.getByText(/title is required|class title/i)).toBeInTheDocument());
     });
 
     it('creates draft and navigates to CREATE_CLASS_BATCH on success', async () => {
@@ -103,10 +106,9 @@ describe('CreateClassIdentity — Next button (validation)', () => {
         await waitFor(() => screen.getByPlaceholderText(/advanced robotics workshop/i));
         await user.type(screen.getByPlaceholderText(/advanced robotics workshop/i), 'Test Class');
         const nextBtn = screen.getByRole('button', { name: /next|continue/i });
+        await fillOtherRequired(user);
         await user.click(nextBtn);
-        await waitFor(() =>
-            expect(mockNavigate).toHaveBeenCalledWith('CREATE_CLASS_BATCH')
-        );
+        await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('CREATE_CLASS_BATCH'));
     });
 
     it('stores class draft id in sessionStorage after creation', async () => {
@@ -114,6 +116,7 @@ describe('CreateClassIdentity — Next button (validation)', () => {
         const user = userEvent.setup();
         await waitFor(() => screen.getByPlaceholderText(/advanced robotics workshop/i));
         await user.type(screen.getByPlaceholderText(/advanced robotics workshop/i), 'My New Class');
+        await fillOtherRequired(user);
         await user.click(screen.getByRole('button', { name: /next|continue/i }));
         await waitFor(() => expect(getCurrentClassDraftId()).toBe(CLASS_DRAFT_ID));
     });
@@ -122,12 +125,13 @@ describe('CreateClassIdentity — Next button (validation)', () => {
 describe('CreateClassIdentity — pre-fill from existing draft', () => {
     it('pre-fills title from existing draft', async () => {
         sessionStorage.setItem('current_class_draft_id', CLASS_DRAFT_ID);
-        server.use(http.get(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/`, () =>
-            HttpResponse.json({ success: true, data: { ...mockClassDraft, title: 'Existing Class', mode: 'offline' } })));
-        renderComponent();
-        await waitFor(() =>
-            expect(screen.getByDisplayValue('Existing Class')).toBeInTheDocument(), { timeout: 3000 }
+        server.use(
+            http.get(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/`, () =>
+                HttpResponse.json({ success: true, data: { ...mockClassDraft, title: 'Existing Class', mode: 'offline' } })
+            )
         );
+        renderComponent();
+        await waitFor(() => expect(screen.getByDisplayValue('Existing Class')).toBeInTheDocument(), { timeout: 3000 });
     });
 });
 
@@ -141,31 +145,37 @@ describe('CreateClassIdentity — booking type', () => {
 
     it('sends booking_type "direct_booking" when that option is chosen', async () => {
         let patchBody: any = null;
-        server.use(http.patch(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/`, async ({ request }) => {
-            patchBody = await request.json();
-            return HttpResponse.json({ success: true, data: mockClassDraft });
-        }));
+        server.use(
+            http.patch(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/`, async ({ request }) => {
+                patchBody = await request.json();
+                return HttpResponse.json({ success: true, data: mockClassDraft });
+            })
+        );
         sessionStorage.setItem('current_class_draft_id', CLASS_DRAFT_ID);
         renderComponent();
         const user = userEvent.setup();
         await waitFor(() => screen.getByPlaceholderText(/advanced robotics workshop/i));
         await user.type(screen.getByPlaceholderText(/advanced robotics workshop/i), 'My Class');
         await user.click(screen.getByText('Direct booking'));
+        await fillOtherRequired(user);
         await user.click(screen.getByRole('button', { name: /next|continue/i }));
         await waitFor(() => expect(patchBody?.booking_type).toBe('direct_booking'));
     });
 
     it('defaults booking_type to "enquiry" in the PATCH payload', async () => {
         let patchBody: any = null;
-        server.use(http.patch(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/`, async ({ request }) => {
-            patchBody = await request.json();
-            return HttpResponse.json({ success: true, data: mockClassDraft });
-        }));
+        server.use(
+            http.patch(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/`, async ({ request }) => {
+                patchBody = await request.json();
+                return HttpResponse.json({ success: true, data: mockClassDraft });
+            })
+        );
         sessionStorage.setItem('current_class_draft_id', CLASS_DRAFT_ID);
         renderComponent();
         const user = userEvent.setup();
         await waitFor(() => screen.getByPlaceholderText(/advanced robotics workshop/i));
         await user.type(screen.getByPlaceholderText(/advanced robotics workshop/i), 'My Class');
+        await fillOtherRequired(user);
         await user.click(screen.getByRole('button', { name: /next|continue/i }));
         await waitFor(() => expect(patchBody?.booking_type).toBe('enquiry'));
     });

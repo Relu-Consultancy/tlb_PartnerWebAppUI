@@ -8,11 +8,17 @@ export const LANGUAGE_OPTIONS: { value: string; label: string }[] = [
 ];
 
 /**
- * Mirrors the server rule: `other_language` is required whenever "other" is
- * one of the selected languages. An empty selection is "not specified yet",
- * not an error — the backend defaults `languages` to [] on a new listing.
+ * Two rules:
+ *  - `other_language` is required whenever "other" is selected (the server's
+ *    own rule);
+ *  - at least one language must be picked when `required`. The backend accepts
+ *    an empty list, but customers see this on the listing, so every creation
+ *    wizard asks for it before letting the partner continue.
  */
-export const validateLanguages = (languages: string[], otherLanguage: string): string | null => {
+export const validateLanguages = (languages: string[], otherLanguage: string, required = false): string | null => {
+    if (required && languages.length === 0) {
+        return 'Please pick the language(s) this is conducted in.';
+    }
     if (languages.includes('other') && !otherLanguage.trim()) {
         return 'Please name the other language this listing is conducted in.';
     }
@@ -22,36 +28,33 @@ export const validateLanguages = (languages: string[], otherLanguage: string): s
 interface Props {
     languages: string[];
     otherLanguage: string;
+    /** Marks the field required and flags it for `scrollToFirstMissingField` while empty. */
+    required?: boolean;
     /** Emits both values together so de-selecting "Other" can clear the free text. */
     onChange: (languages: string[], otherLanguage: string) => void;
     error?: string;
     disabled?: boolean;
 }
 
-export const LanguagePicker: React.FC<Props> = ({
-    languages, otherLanguage, onChange, error, disabled = false,
-}) => {
+export const LanguagePicker: React.FC<Props> = ({ languages, otherLanguage, onChange, error, disabled = false, required = false }) => {
     const hasOther = languages.includes('other');
 
     const toggle = (value: string) => {
-        const next = languages.includes(value)
-            ? languages.filter(l => l !== value)
-            : [...languages, value];
+        const next = languages.includes(value) ? languages.filter((l) => l !== value) : [...languages, value];
         // Dropping "Other" also drops the free text it was describing.
         onChange(next, next.includes('other') ? otherLanguage : '');
     };
 
     return (
-        <div className="pt-field">
+        <div className="pt-field" data-field-missing={required && languages.length === 0 ? true : undefined}>
             <label className="pt-field-k flex items-center gap-1.5">
                 <Languages size={12} strokeWidth={2.75} /> Language(s)
+                {required && <span className="text-tlb-red ml-0.5">*</span>}
             </label>
-            <p className="text-[11px] text-tlb-muted -mt-0.5">
-                Which language is this conducted in? Customers see this on your listing.
-            </p>
+            <p className="text-[11px] text-tlb-muted -mt-0.5">Which language is this conducted in? Customers see this on your listing.</p>
 
             <div className="flex flex-wrap gap-2 mt-1">
-                {LANGUAGE_OPTIONS.map(opt => {
+                {LANGUAGE_OPTIONS.map((opt) => {
                     const selected = languages.includes(opt.value);
                     return (
                         <button
@@ -95,9 +98,9 @@ export default LanguagePicker;
 export const formatLanguages = (languages?: string[] | null, otherLanguage?: string | null): string => {
     if (!Array.isArray(languages) || languages.length === 0) return '';
     return languages
-        .map(l => {
+        .map((l) => {
             if (l === 'other') return (otherLanguage || '').trim();
-            return LANGUAGE_OPTIONS.find(o => o.value === l)?.label || l;
+            return LANGUAGE_OPTIONS.find((o) => o.value === l)?.label || l;
         })
         .filter(Boolean)
         .join(', ');

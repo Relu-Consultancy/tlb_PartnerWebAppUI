@@ -41,7 +41,7 @@ describe('Analytics — loading and error states', () => {
             http.get(`${BASE}/api/v1/partner/stats/revenue/`, () => HttpResponse.json({}, { status: 500 })),
             http.get(`${BASE}/api/v1/partner/stats/reviews/`, () => HttpResponse.json({}, { status: 500 })),
             http.get(`${BASE}/api/v1/partner/stats/traffic/`, () => HttpResponse.json({}, { status: 500 })),
-            http.get(`${BASE}/api/v1/partner/stats/overview-all/`, () => HttpResponse.json({}, { status: 500 })),
+            http.get(`${BASE}/api/v1/partner/stats/overview-all/`, () => HttpResponse.json({}, { status: 500 }))
         );
         renderScreen();
         await waitFor(() => expect(screen.getByText(/could not load analytics/i)).toBeInTheDocument());
@@ -121,11 +121,31 @@ describe('Analytics — tab switching', () => {
     });
 
     it('hides the Top city tile entirely when no booking has a resolved city yet', async () => {
-        server.use(http.get(`${BASE}/api/v1/partner/stats/overview-all/`, ({ request }) => {
-            const listingType = new URL(request.url).searchParams.get('listing_type');
-            if (listingType) return HttpResponse.json({ success: true, data: { listing_type: listingType, top_city: null } });
-            return HttpResponse.json({ success: true, data: { period: '30d', listing_type: null, gross_revenue: '0', revenue_growth_pct: 0, confirmed_bookings: 0, bookings_growth_pct: 0, avg_order_value: '0', conversion_rate: 0, repeat_customers_pct: 0, revenue_by_type: [], revenue_by_listing: null, demand_funnel: { listing_views: 0, enquiries: 0, confirmed_bookings: 0 }, weekly_trend: [], top_city: null } });
-        }));
+        server.use(
+            http.get(`${BASE}/api/v1/partner/stats/overview-all/`, ({ request }) => {
+                const listingType = new URL(request.url).searchParams.get('listing_type');
+                if (listingType) return HttpResponse.json({ success: true, data: { listing_type: listingType, top_city: null } });
+                return HttpResponse.json({
+                    success: true,
+                    data: {
+                        period: '30d',
+                        listing_type: null,
+                        gross_revenue: '0',
+                        revenue_growth_pct: 0,
+                        confirmed_bookings: 0,
+                        bookings_growth_pct: 0,
+                        avg_order_value: '0',
+                        conversion_rate: 0,
+                        repeat_customers_pct: 0,
+                        revenue_by_type: [],
+                        revenue_by_listing: null,
+                        demand_funnel: { listing_views: 0, enquiries: 0, confirmed_bookings: 0 },
+                        weekly_trend: [],
+                        top_city: null,
+                    },
+                });
+            })
+        );
         renderScreen();
         const user = userEvent.setup();
         await waitFor(() => screen.getByText('Revenue by service'));
@@ -149,10 +169,12 @@ describe('Analytics — tab switching', () => {
 
     it('re-sorts the listings tab via the Top/Underperforming/All control', async () => {
         let capturedTab: string | null = null;
-        server.use(http.get(`${BASE}/api/v1/partner/stats/listing-performance/`, ({ request }) => {
-            capturedTab = new URL(request.url).searchParams.get('tab');
-            return HttpResponse.json({ success: true, data: mockListingPerformance });
-        }));
+        server.use(
+            http.get(`${BASE}/api/v1/partner/stats/listing-performance/`, ({ request }) => {
+                capturedTab = new URL(request.url).searchParams.get('tab');
+                return HttpResponse.json({ success: true, data: mockListingPerformance });
+            })
+        );
         renderScreen();
         const user = userEvent.setup();
         await waitFor(() => screen.getByText('Revenue by service'));
@@ -184,5 +206,19 @@ describe('Analytics — tab switching', () => {
         await waitFor(() => screen.getByText('Revenue by service'));
         await user.click(screen.getByRole('tab', { name: 'Customers' }));
         expect(screen.getByText('Student retention')).toBeInTheDocument();
+    });
+});
+
+describe('Analytics — approval refusals', () => {
+    it('shows the verification notice when a single stats endpoint refuses, not just when all of them fail', async () => {
+        // The old rule needed every call to reject; one endpoint staying open
+        // left an unapproved partner on an empty screen with no explanation.
+        server.use(
+            http.get(`${BASE}/api/v1/partner/stats/revenue/`, () =>
+                HttpResponse.json({ error: { message: 'You do not have permission to perform this action.' } }, { status: 403 })
+            )
+        );
+        renderScreen();
+        await waitFor(() => expect(screen.getByText(/Analytics unlock once TLB approves your profile/i)).toBeInTheDocument());
     });
 });

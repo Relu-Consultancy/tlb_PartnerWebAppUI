@@ -26,10 +26,12 @@ afterEach(() => {
 describe('CreateVenueDetails — mandatory field validation', () => {
     it('shows a clear, field-specific message (not a raw backend error) when only the name is filled', async () => {
         let draftCreated = false;
-        server.use(http.post(`${BASE}/api/v1/partner/listings/venues/`, () => {
-            draftCreated = true;
-            return HttpResponse.json({ success: true, data: { id: 'new-draft' } }, { status: 201 });
-        }));
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/venues/`, () => {
+                draftCreated = true;
+                return HttpResponse.json({ success: true, data: { id: 'new-draft' } }, { status: 201 });
+            })
+        );
         const warnSpy = vi.spyOn(toast, 'warning').mockImplementation(() => 0);
         const errorSpy = vi.spyOn(toast, 'error').mockImplementation(() => 0);
         const user = userEvent.setup();
@@ -50,5 +52,32 @@ describe('CreateVenueDetails — mandatory field validation', () => {
         // The request should never reach the backend once client-side validation fails.
         expect(draftCreated).toBe(false);
         expect(errorSpy).not.toHaveBeenCalled();
+    });
+});
+
+describe('CreateVenueDetails — language is required', () => {
+    it('blocks Continue until a language is picked, and never reaches the backend', async () => {
+        // Reported by QA: every other field could be filled and Continue still
+        // went through with no language selected.
+        let saved = false;
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/venues/`, () => {
+                saved = true;
+                return HttpResponse.json({ success: true, data: { id: 'new-draft' } }, { status: 201 });
+            })
+        );
+        const warnSpy = vi.spyOn(toast, 'warning').mockImplementation(() => 0);
+        const user = userEvent.setup();
+
+        renderComponent();
+        await waitFor(() => screen.getByPlaceholderText(/the wonder zone/i));
+        await user.type(screen.getByPlaceholderText(/the wonder zone/i), 'My Test Venue');
+        await user.click(screen.getByText(/next: occasions/i));
+
+        await waitFor(() => expect(warnSpy).toHaveBeenCalled());
+        expect(saved).toBe(false);
+
+        // Once the other fields are filled, the language message is what remains.
+        expect(screen.getByRole('checkbox', { name: 'English' })).toBeInTheDocument();
     });
 });

@@ -3,15 +3,12 @@ import { CheckCircle2, Plus, Trash2, Loader2, Star } from 'lucide-react';
 import { Screen } from '../../types';
 import { toast } from '../../components/ui';
 import { WizardShell, WizardNav, WizardField } from '../../components/portal/wizard';
-import {
-    getVenuePackages,
-    createVenuePackage,
-    updateVenuePackage,
-    deleteVenuePackage,
-    getCurrentVenueDraftId,
-} from '../../api/listings';
+import { getVenuePackages, createVenuePackage, updateVenuePackage, deleteVenuePackage, getCurrentVenueDraftId } from '../../api/listings';
 
-interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar?: () => void; }
+interface Props {
+    onNavigate: (screen: Screen) => void;
+    onOpenSidebar?: () => void;
+}
 
 interface PkgForm {
     localKey: string;
@@ -46,24 +43,30 @@ export const CreateVenuePackages: React.FC<Props> = ({ onNavigate }) => {
 
     useEffect(() => {
         const id = getCurrentVenueDraftId();
-        if (!id) { setLoadError('No active draft. Start from "Venue Details".'); setLoading(false); return; }
+        if (!id) {
+            setLoadError('No active draft. Start from "Venue Details".');
+            setLoading(false);
+            return;
+        }
         setDraftId(id);
 
         const load = async () => {
             try {
                 const res = await getVenuePackages(id);
                 const data: any[] = res.data || res || [];
-                setPackages(data.map(p => ({
-                    localKey: String(p.id),
-                    apiId: p.id,
-                    name: p.name || '',
-                    price: p.price != null ? String(p.price) : '',
-                    description: p.description || '',
-                    duration_minutes: p.duration_minutes != null ? String(p.duration_minutes) : '',
-                    max_guests: p.max_guests != null ? String(p.max_guests) : '',
-                    dirty: false,
-                    saving: false,
-                })));
+                setPackages(
+                    data.map((p) => ({
+                        localKey: String(p.id),
+                        apiId: p.id,
+                        name: p.name || '',
+                        price: p.price != null ? String(p.price) : '',
+                        description: p.description || '',
+                        duration_minutes: p.duration_minutes != null ? String(p.duration_minutes) : '',
+                        max_guests: p.max_guests != null ? String(p.max_guests) : '',
+                        dirty: false,
+                        saving: false,
+                    }))
+                );
             } catch (err: any) {
                 setLoadError(err?.message || 'Failed to load packages.');
             } finally {
@@ -74,7 +77,7 @@ export const CreateVenuePackages: React.FC<Props> = ({ onNavigate }) => {
     }, []);
 
     const updateField = (localKey: string, field: keyof PkgForm, value: any) => {
-        setPackages(prev => prev.map(p => p.localKey === localKey ? { ...p, [field]: value, dirty: true } : p));
+        setPackages((prev) => prev.map((p) => (p.localKey === localKey ? { ...p, [field]: value, dirty: true } : p)));
     };
 
     const handleDelete = async (pkg: PkgForm) => {
@@ -89,7 +92,7 @@ export const CreateVenuePackages: React.FC<Props> = ({ onNavigate }) => {
                 return;
             }
         }
-        setPackages(prev => prev.filter(p => p.localKey !== pkg.localKey));
+        setPackages((prev) => prev.filter((p) => p.localKey !== pkg.localKey));
     };
 
     // Shared by "Next" and "Save as draft" — creates/updates each dirty (unsaved)
@@ -113,11 +116,20 @@ export const CreateVenuePackages: React.FC<Props> = ({ onNavigate }) => {
 
     const handleNext = async () => {
         if (!draftId) return;
+        // A venue can't be submitted without a package, so block here too.
+        if (packages.length === 0) {
+            toast.warning('Add at least one package before continuing.');
+            return;
+        }
         setProceeding(true);
         try {
             for (const pkg of packages) {
                 if (!pkg.dirty) continue;
-                if (!pkg.name.trim()) { toast.warning('Package name is required for all packages.'); setProceeding(false); return; }
+                if (!pkg.name.trim()) {
+                    toast.warning('Package name is required for all packages.');
+                    setProceeding(false);
+                    return;
+                }
                 await persistPackage(pkg);
             }
             onNavigate('CREATE_VENUE_AMENITIES');
@@ -150,7 +162,14 @@ export const CreateVenuePackages: React.FC<Props> = ({ onNavigate }) => {
 
     if (loading) {
         return (
-            <WizardShell title="New venue" entityType="Venues" step={4} totalSteps={7} stepLabel="Packages" onBack={() => onNavigate('CREATE_VENUE_AVAILABILITY')}>
+            <WizardShell
+                title="New venue"
+                entityType="Venues"
+                step={4}
+                totalSteps={7}
+                stepLabel="Packages"
+                onBack={() => onNavigate('CREATE_VENUE_AVAILABILITY')}
+            >
                 <div className="pt-card p-5 sm:p-6 flex items-center justify-center gap-2 text-tlb-muted text-xs font-bold py-12">
                     <Loader2 size={16} className="animate-spin" /> Loading packages…
                 </div>
@@ -160,14 +179,28 @@ export const CreateVenuePackages: React.FC<Props> = ({ onNavigate }) => {
 
     if (loadError) {
         return (
-            <WizardShell title="New venue" entityType="Venues" step={4} totalSteps={7} stepLabel="Packages" onBack={() => onNavigate('CREATE_VENUE_AVAILABILITY')}>
+            <WizardShell
+                title="New venue"
+                entityType="Venues"
+                step={4}
+                totalSteps={7}
+                stepLabel="Packages"
+                onBack={() => onNavigate('CREATE_VENUE_AVAILABILITY')}
+            >
                 <div className="pt-note bg-tlb-red-soft text-tlb-red-deep">{loadError}</div>
             </WizardShell>
         );
     }
 
     return (
-        <WizardShell title="New venue" entityType="Venues" step={4} totalSteps={7} stepLabel="Packages" onBack={() => onNavigate('CREATE_VENUE_AVAILABILITY')}>
+        <WizardShell
+            title="New venue"
+            entityType="Venues"
+            step={4}
+            totalSteps={7}
+            stepLabel="Packages"
+            onBack={() => onNavigate('CREATE_VENUE_AVAILABILITY')}
+        >
             <div className="pt-card p-5 sm:p-6 flex flex-col gap-5">
                 <div>
                     <h2 className="pt-h-sec">Build your packages</h2>
@@ -208,7 +241,7 @@ export const CreateVenuePackages: React.FC<Props> = ({ onNavigate }) => {
                                     className="pt-input"
                                     placeholder="e.g. Premium Party"
                                     value={pkg.name}
-                                    onChange={e => updateField(pkg.localKey, 'name', e.target.value)}
+                                    onChange={(e) => updateField(pkg.localKey, 'name', e.target.value)}
                                 />
                             </WizardField>
 
@@ -219,7 +252,7 @@ export const CreateVenuePackages: React.FC<Props> = ({ onNavigate }) => {
                                         className="pt-input font-black text-lg text-tlb-gold"
                                         placeholder="0"
                                         value={pkg.price}
-                                        onChange={e => updateField(pkg.localKey, 'price', e.target.value)}
+                                        onChange={(e) => updateField(pkg.localKey, 'price', e.target.value)}
                                     />
                                 </WizardField>
                                 <WizardField label="Duration (min)">
@@ -228,7 +261,7 @@ export const CreateVenuePackages: React.FC<Props> = ({ onNavigate }) => {
                                         className="pt-input"
                                         placeholder="e.g. 180"
                                         value={pkg.duration_minutes}
-                                        onChange={e => updateField(pkg.localKey, 'duration_minutes', e.target.value)}
+                                        onChange={(e) => updateField(pkg.localKey, 'duration_minutes', e.target.value)}
                                     />
                                 </WizardField>
                             </div>
@@ -239,7 +272,7 @@ export const CreateVenuePackages: React.FC<Props> = ({ onNavigate }) => {
                                     className="pt-input"
                                     placeholder="e.g. 50"
                                     value={pkg.max_guests}
-                                    onChange={e => updateField(pkg.localKey, 'max_guests', e.target.value)}
+                                    onChange={(e) => updateField(pkg.localKey, 'max_guests', e.target.value)}
                                 />
                             </WizardField>
 
@@ -248,7 +281,7 @@ export const CreateVenuePackages: React.FC<Props> = ({ onNavigate }) => {
                                     className="pt-input min-h-[80px]"
                                     placeholder="List the features, decorations, food, etc."
                                     value={pkg.description}
-                                    onChange={e => updateField(pkg.localKey, 'description', e.target.value)}
+                                    onChange={(e) => updateField(pkg.localKey, 'description', e.target.value)}
                                 />
                             </WizardField>
                         </div>
@@ -256,7 +289,7 @@ export const CreateVenuePackages: React.FC<Props> = ({ onNavigate }) => {
                 </div>
 
                 <button
-                    onClick={() => setPackages(prev => [...prev, newPkgForm()])}
+                    onClick={() => setPackages((prev) => [...prev, newPkgForm()])}
                     className="pt-btn pt-btn-o w-full justify-center border-dashed py-3.5"
                 >
                     <Plus size={18} /> Add another package

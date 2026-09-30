@@ -278,10 +278,11 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
             return;
         }
 
-        const langErr = validateLanguages(languages, otherLanguage);
+        const langErr = validateLanguages(languages, otherLanguage, true);
         if (langErr) {
             setLangError(langErr);
             toast.warning(langErr);
+            scrollToFirstMissingField();
             return;
         }
         setLangError('');
@@ -512,6 +513,7 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
 
                 <LanguagePicker
                     languages={languages}
+                    required
                     otherLanguage={otherLanguage}
                     onChange={(l, o) => {
                         setLanguages(l);

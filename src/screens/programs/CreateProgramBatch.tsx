@@ -11,7 +11,10 @@ import {
     deleteProgramBatch,
 } from '../../api/listings';
 
-interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
+interface Props {
+    onNavigate: (screen: Screen) => void;
+    onOpenSidebar: () => void;
+}
 
 // API expects full lowercase day names (11.10)
 const DAY_OPTIONS: { label: string; value: string }[] = [
@@ -25,8 +28,8 @@ const DAY_OPTIONS: { label: string; value: string }[] = [
 ];
 
 // Time helpers: API expects HH:MM:SS, UI uses HH:MM
-const toApiTime = (t: string) => t.length === 5 ? `${t}:00` : t;
-const toUiTime  = (t: string) => (t || '').slice(0, 5);
+const toApiTime = (t: string) => (t.length === 5 ? `${t}:00` : t);
+const toUiTime = (t: string) => (t || '').slice(0, 5);
 
 interface LocalBatch {
     apiId?: number;
@@ -72,22 +75,24 @@ export const CreateProgramBatch: React.FC<Props> = ({ onNavigate }) => {
             try {
                 setLoading(true);
                 const res = await getProgramBatches(draftId);
-                const data: any[] = Array.isArray(res) ? res : (res.data || res || []);
+                const data: any[] = Array.isArray(res) ? res : res.data || res || [];
                 if (Array.isArray(data) && data.length > 0) {
-                    setBatches(data.map((b: any) => ({
-                        apiId: b.id,
-                        key: nextKey++,
-                        name: b.name || '',
-                        startDate: b.start_date || '',
-                        endDate: b.end_date || '',
-                        startTime: toUiTime(b.start_time),
-                        endTime: toUiTime(b.end_time),
-                        fee: b.fee != null ? String(b.fee) : '',
-                        totalSeats: b.total_seats != null ? String(b.total_seats) : '',
-                        daysOfWeek: Array.isArray(b.days_of_week) ? b.days_of_week : [],
-                        isActive: b.is_active !== false,
-                        isDirty: false,
-                    })));
+                    setBatches(
+                        data.map((b: any) => ({
+                            apiId: b.id,
+                            key: nextKey++,
+                            name: b.name || '',
+                            startDate: b.start_date || '',
+                            endDate: b.end_date || '',
+                            startTime: toUiTime(b.start_time),
+                            endTime: toUiTime(b.end_time),
+                            fee: b.fee != null ? String(b.fee) : '',
+                            totalSeats: b.total_seats != null ? String(b.total_seats) : '',
+                            daysOfWeek: Array.isArray(b.days_of_week) ? b.days_of_week : [],
+                            isActive: b.is_active !== false,
+                            isDirty: false,
+                        }))
+                    );
                 }
             } catch (e) {
                 console.error('Failed to load program batches', e);
@@ -98,21 +103,19 @@ export const CreateProgramBatch: React.FC<Props> = ({ onNavigate }) => {
     }, []);
 
     const update = (key: number, patch: Partial<LocalBatch>) =>
-        setBatches(prev => prev.map(b => b.key === key ? { ...b, ...patch, isDirty: true } : b));
+        setBatches((prev) => prev.map((b) => (b.key === key ? { ...b, ...patch, isDirty: true } : b)));
 
     const toggleDay = (key: number, day: string) => {
-        const batch = batches.find(b => b.key === key);
+        const batch = batches.find((b) => b.key === key);
         if (!batch) return;
-        const days = batch.daysOfWeek.includes(day)
-            ? batch.daysOfWeek.filter(d => d !== day)
-            : [...batch.daysOfWeek, day];
+        const days = batch.daysOfWeek.includes(day) ? batch.daysOfWeek.filter((d) => d !== day) : [...batch.daysOfWeek, day];
         update(key, { daysOfWeek: days });
     };
 
     const removeBatch = (key: number) => {
-        const batch = batches.find(b => b.key === key);
+        const batch = batches.find((b) => b.key === key);
         if (batch?.apiId) deletedIds.current.push(batch.apiId);
-        setBatches(prev => prev.filter(b => b.key !== key));
+        setBatches((prev) => prev.filter((b) => b.key !== key));
     };
 
     // Shared by "Next" and "Save as draft" — applies deletions and pushes dirty
@@ -163,7 +166,16 @@ export const CreateProgramBatch: React.FC<Props> = ({ onNavigate }) => {
     const handleNext = async () => {
         if (saving) return;
         const draftId = getCurrentProgramDraftId();
-        if (!draftId) { onNavigate('CREATE_PROGRAM_MEDIA'); return; }
+        if (!draftId) {
+            onNavigate('CREATE_PROGRAM_MEDIA');
+            return;
+        }
+        // Submission needs at least one batch — flag it here, not at Preview.
+        const usable = batches.some((b) => b.apiId || (b.startDate && b.endDate && b.startTime && b.endTime && b.fee && b.totalSeats));
+        if (!usable) {
+            toast.warning('Add at least one batch — dates, timings, fee and seats — before continuing.');
+            return;
+        }
         try {
             setSaving(true);
             const ok = await persistBatches({ strict: true });
@@ -193,7 +205,14 @@ export const CreateProgramBatch: React.FC<Props> = ({ onNavigate }) => {
     };
 
     return (
-        <WizardShell title="New program" entityType="Programs" step={2} totalSteps={5} stepLabel="Batches" onBack={() => onNavigate('CREATE_PROGRAM_IDENTITY')}>
+        <WizardShell
+            title="New program"
+            entityType="Programs"
+            step={2}
+            totalSteps={5}
+            stepLabel="Batches"
+            onBack={() => onNavigate('CREATE_PROGRAM_IDENTITY')}
+        >
             <div className="pt-card p-5 sm:p-6 flex flex-col gap-5">
                 <div>
                     <h2 className="pt-h-sec">Batch &amp; schedule</h2>
@@ -211,7 +230,12 @@ export const CreateProgramBatch: React.FC<Props> = ({ onNavigate }) => {
                                 <div className="flex items-center justify-between">
                                     <p className="pt-eyebrow">Batch {idx + 1}</p>
                                     {batches.length > 1 && (
-                                        <button type="button" onClick={() => removeBatch(batch.key)} className="text-tlb-red hover:text-tlb-red-deep p-1" aria-label="Remove batch">
+                                        <button
+                                            type="button"
+                                            onClick={() => removeBatch(batch.key)}
+                                            className="text-tlb-red hover:text-tlb-red-deep p-1"
+                                            aria-label="Remove batch"
+                                        >
                                             <Trash2 size={15} />
                                         </button>
                                     )}
@@ -307,7 +331,11 @@ export const CreateProgramBatch: React.FC<Props> = ({ onNavigate }) => {
                             </div>
                         ))}
 
-                        <button type="button" onClick={() => setBatches(prev => [...prev, blankBatch()])} className="pt-btn pt-btn-o w-full justify-center border-dashed">
+                        <button
+                            type="button"
+                            onClick={() => setBatches((prev) => [...prev, blankBatch()])}
+                            className="pt-btn pt-btn-o w-full justify-center border-dashed"
+                        >
                             <Plus size={14} strokeWidth={2.75} /> Add new batch
                         </button>
                     </>

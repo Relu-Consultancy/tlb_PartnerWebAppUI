@@ -3,31 +3,28 @@ import { ArrowRight, Plus, Trash2, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
 import { SkeletonList, toast } from '../../components/ui';
 import { WizardShell, WizardNav, WizardField } from '../../components/portal/wizard';
-import {
-    getCurrentClassDraftId,
-    getClassBatches,
-    createClassBatch,
-    updateClassBatch,
-    deleteClassBatch,
-} from '../../api/listings';
+import { getCurrentClassDraftId, getClassBatches, createClassBatch, updateClassBatch, deleteClassBatch } from '../../api/listings';
 
-interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
+interface Props {
+    onNavigate: (screen: Screen) => void;
+    onOpenSidebar: () => void;
+}
 
 // UI labels ↔ API 3-letter abbreviations (aligned by index)
 const DAY_LABELS = ['M', 'T', 'W', 'Th', 'F', 'S', 'Su'];
-const DAY_API    = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+const DAY_API = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 
 const toApiDay = (label: string) => DAY_API[DAY_LABELS.indexOf(label)] ?? label;
-const toUiDay  = (api: string)   => DAY_LABELS[DAY_API.indexOf(api)]   ?? api;
+const toUiDay = (api: string) => DAY_LABELS[DAY_API.indexOf(api)] ?? api;
 
-const toApiTime = (t: string) => t.length === 5 ? `${t}:00` : t;
-const toUiTime  = (t: string) => (t || '').slice(0, 5);
+const toApiTime = (t: string) => (t.length === 5 ? `${t}:00` : t);
+const toUiTime = (t: string) => (t || '').slice(0, 5);
 
 interface LocalBatch {
     apiId?: number;
     key: number;
     name: string;
-    days: string[];      // UI labels
+    days: string[]; // UI labels
     startTime: string;
     endTime: string;
     capacity: string;
@@ -61,16 +58,18 @@ export const CreateClassBatch: React.FC<Props> = ({ onNavigate }) => {
                 const res = await getClassBatches(draftId);
                 const data: any[] = res.data || res || [];
                 if (Array.isArray(data) && data.length > 0) {
-                    setBatches(data.map((b: any) => ({
-                        apiId: b.id,
-                        key: nextKey++,
-                        name: b.name || '',
-                        days: (b.days || []).map(toUiDay),
-                        startTime: toUiTime(b.start_time),
-                        endTime: toUiTime(b.end_time),
-                        capacity: b.capacity != null ? String(b.capacity) : '',
-                        isDirty: false,
-                    })));
+                    setBatches(
+                        data.map((b: any) => ({
+                            apiId: b.id,
+                            key: nextKey++,
+                            name: b.name || '',
+                            days: (b.days || []).map(toUiDay),
+                            startTime: toUiTime(b.start_time),
+                            endTime: toUiTime(b.end_time),
+                            capacity: b.capacity != null ? String(b.capacity) : '',
+                            isDirty: false,
+                        }))
+                    );
                 }
             } catch (e) {
                 console.error('Failed to load batches', e);
@@ -81,21 +80,19 @@ export const CreateClassBatch: React.FC<Props> = ({ onNavigate }) => {
     }, []);
 
     const update = (key: number, patch: Partial<LocalBatch>) =>
-        setBatches(prev => prev.map(b => b.key === key ? { ...b, ...patch, isDirty: true } : b));
+        setBatches((prev) => prev.map((b) => (b.key === key ? { ...b, ...patch, isDirty: true } : b)));
 
     const toggleDay = (key: number, day: string) => {
-        const batch = batches.find(b => b.key === key);
+        const batch = batches.find((b) => b.key === key);
         if (!batch) return;
-        const days = batch.days.includes(day)
-            ? batch.days.filter(d => d !== day)
-            : [...batch.days, day];
+        const days = batch.days.includes(day) ? batch.days.filter((d) => d !== day) : [...batch.days, day];
         update(key, { days });
     };
 
     const removeBatch = (key: number) => {
-        const batch = batches.find(b => b.key === key);
+        const batch = batches.find((b) => b.key === key);
         if (batch?.apiId) deletedIds.current.push(batch.apiId);
-        setBatches(prev => prev.filter(b => b.key !== key));
+        setBatches((prev) => prev.filter((b) => b.key !== key));
     };
 
     // Shared by "Next" and "Save as draft" — flushes deletions then any
@@ -124,10 +121,27 @@ export const CreateClassBatch: React.FC<Props> = ({ onNavigate }) => {
         }
     };
 
+    // A batch counts once it's saved, or once the fields the API needs are filled.
+    const isUsable = (b: LocalBatch) =>
+        !!b.apiId || (!!b.name.trim() && b.days.length > 0 && !!b.startTime && !!b.endTime && !!b.capacity.trim());
+
     const handleNext = async () => {
         if (saving) return;
         const draftId = getCurrentClassDraftId();
-        if (!draftId) { onNavigate('CREATE_CLASS_MEDIA'); return; }
+        if (!draftId) {
+            onNavigate('CREATE_CLASS_MEDIA');
+            return;
+        }
+        // Submission needs at least one batch, so say it here rather than at Preview.
+        if (!batches.some(isUsable)) {
+            toast.warning('Add at least one batch — name, days, timings and capacity — before continuing.');
+            return;
+        }
+        const incomplete = batches.find((b) => b.isDirty && !isUsable(b));
+        if (incomplete) {
+            toast.warning(`Batch "${incomplete.name.trim() || 'Unnamed'}" is missing its days, timings or capacity.`);
+            return;
+        }
         try {
             setSaving(true);
             await persistBatches(draftId);
@@ -142,7 +156,10 @@ export const CreateClassBatch: React.FC<Props> = ({ onNavigate }) => {
     const handleSaveDraft = async () => {
         if (savingDraft) return;
         const draftId = getCurrentClassDraftId();
-        if (!draftId) { onNavigate('SERVICE_LISTINGS'); return; }
+        if (!draftId) {
+            onNavigate('SERVICE_LISTINGS');
+            return;
+        }
         setSavingDraft(true);
         try {
             await persistBatches(draftId);
@@ -157,7 +174,14 @@ export const CreateClassBatch: React.FC<Props> = ({ onNavigate }) => {
     };
 
     return (
-        <WizardShell title="New class" entityType="Classes" step={2} totalSteps={5} stepLabel="Batches" onBack={() => onNavigate('CREATE_CLASS_IDENTITY')}>
+        <WizardShell
+            title="New class"
+            entityType="Classes"
+            step={2}
+            totalSteps={5}
+            stepLabel="Batches"
+            onBack={() => onNavigate('CREATE_CLASS_IDENTITY')}
+        >
             <div className="pt-card p-5 sm:p-6 flex flex-col gap-5">
                 <div>
                     <h2 className="pt-h-sec">Batch &amp; schedule</h2>
@@ -175,7 +199,12 @@ export const CreateClassBatch: React.FC<Props> = ({ onNavigate }) => {
                                         <div className="flex items-center justify-between">
                                             <p className="pt-eyebrow">Batch {idx + 1}</p>
                                             {batches.length > 1 && (
-                                                <button type="button" onClick={() => removeBatch(batch.key)} className="text-tlb-red hover:text-tlb-red-deep p-1" aria-label="Remove batch">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeBatch(batch.key)}
+                                                    className="text-tlb-red hover:text-tlb-red-deep p-1"
+                                                    aria-label="Remove batch"
+                                                >
                                                     <Trash2 size={15} />
                                                 </button>
                                             )}
@@ -239,7 +268,7 @@ export const CreateClassBatch: React.FC<Props> = ({ onNavigate }) => {
 
                                 <button
                                     type="button"
-                                    onClick={() => setBatches(prev => [...prev, blankBatch()])}
+                                    onClick={() => setBatches((prev) => [...prev, blankBatch()])}
                                     className="pt-btn pt-btn-o w-full justify-center border-dashed"
                                 >
                                     <Plus size={14} strokeWidth={2.75} /> Add batch

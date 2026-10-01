@@ -4,7 +4,7 @@ import { Screen } from '../types';
 import { loadCurrentPartner, PARTNER_UPDATED_EVENT } from '../api/portalSummary';
 // Re-exported so screens can keep importing the notice and its trigger together.
 export { isApprovalError } from '../api/client';
-import { verificationOf, VerificationState } from './portal';
+import { isApprovedPartner } from './portal';
 import { Skeleton } from './ui';
 
 // ---------------------------------------------------------------------------
@@ -16,14 +16,19 @@ import { Skeleton } from './ui';
 // ---------------------------------------------------------------------------
 
 /**
- * Verification state for gating. `null` means "unknown" — the read failed, so
- * we fail open rather than lock an approved partner out over a transient error.
+ * Approval state for gating, read straight off the partner's status — the same
+ * field the backend gates on. `approved: null` means "unknown": the read failed
+ * even after a retry, so we fail open rather than lock an approved partner out
+ * over a transient error. `inReview` only picks the notice's wording, and is
+ * deliberately not `verificationOf`, which counts the separate is_verified flag
+ * as verified and would otherwise mislabel a partner mid-review.
  */
 const RETRY_DELAY_MS = 800;
 
-const usePartnerApproval = (): { loading: boolean; state: VerificationState | null } => {
+const usePartnerApproval = (): { loading: boolean; approved: boolean | null; inReview: boolean } => {
     const [loading, setLoading] = useState(true);
-    const [state, setState] = useState<VerificationState | null>(null);
+    const [approved, setApproved] = useState<boolean | null>(null);
+    const [inReview, setInReview] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -33,7 +38,10 @@ const usePartnerApproval = (): { loading: boolean; state: VerificationState | nu
             loadCurrentPartner()
                 .then((partner) => {
                     if (!cancelled) {
-                        setState(verificationOf(partner));
+                        // Approval is the backend's rule (status === 'approved'),
+                        // not the separate is_verified flag.
+                        setApproved(isApprovedPartner(partner));
+                        setInReview(String(partner?.status ?? '') === 'under_review');
                         setLoading(false);
                     }
                 })
@@ -46,7 +54,8 @@ const usePartnerApproval = (): { loading: boolean; state: VerificationState | nu
                         return;
                     }
                     console.error('Approval gate: partner status load failed', err);
-                    setState(null);
+                    setApproved(null);
+                    setInReview(false);
                     setLoading(false);
                 });
         };
@@ -60,7 +69,7 @@ const usePartnerApproval = (): { loading: boolean; state: VerificationState | nu
         };
     }, []);
 
-    return { loading, state };
+    return { loading, approved, inReview };
 };
 
 const REQUIREMENTS: { icon: React.ElementType; label: string; detail: string }[] = [
@@ -144,11 +153,11 @@ interface ApprovalGateProps {
 }
 
 export const ApprovalGate: React.FC<ApprovalGateProps> = ({ feature, onNavigate, children }) => {
-    const { loading, state } = usePartnerApproval();
+    const { loading, approved, inReview } = usePartnerApproval();
 
     if (loading) return <GateSkeleton />;
     // Unknown status → fail open; the screen surfaces its own error if the API refuses.
-    if (state === 'verified' || state === null) return <>{children}</>;
+    if (approved !== false) return <>{children}</>;
 
-    return <ApprovalRequiredNotice feature={feature} inReview={state === 'in_review'} onNavigate={onNavigate} />;
+    return <ApprovalRequiredNotice feature={feature} inReview={inReview} onNavigate={onNavigate} />;
 };

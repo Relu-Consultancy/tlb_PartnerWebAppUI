@@ -33,6 +33,15 @@ export const VERIFICATION_TONE: Record<VerificationState, Tone> = {
     pending: 'amber',
 };
 
+/**
+ * The backend's own gate for coupons and stats/* is `status === 'approved'`
+ * (IsApprovedPartner). `is_verified` is a separate admin flag that is routinely
+ * ticked on partners still sitting at `activated_limited`, so it must never
+ * stand in for approval — `verificationOf` below keeps treating it as a
+ * display signal, but access decisions use this.
+ */
+export const isApprovedPartner = (partner: any): boolean => String(partner?.status ?? '') === 'approved';
+
 export const verificationOf = (partner: any): VerificationState => {
     const status = partner?.status || '';
     if (partner?.is_verified === true || status === 'approved') return 'verified';
@@ -68,8 +77,6 @@ export const ENTITY_TONE: Record<EntityType, Tone> = {
 /** Services customers book and pay for on TLB; the others are enquiry-led. */
 export const isTicketed = (entity: EntityType): boolean => entity === 'Events' || entity === 'Venues';
 
-export const orderEntities = (entities: EntityType[]): EntityType[] =>
-    ENTITY_ORDER.filter(e => entities.includes(e));
+export const orderEntities = (entities: EntityType[]): EntityType[] => ENTITY_ORDER.filter((e) => entities.includes(e));
 
-export const serviceMixLabel = (entities: EntityType[]): string | null =>
-    entities.length > 1 ? 'Multi-service' : entities[0] ?? null;
+export const serviceMixLabel = (entities: EntityType[]): string | null => (entities.length > 1 ? 'Multi-service' : (entities[0] ?? null));

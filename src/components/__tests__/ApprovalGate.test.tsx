@@ -34,6 +34,25 @@ describe('ApprovalGate', () => {
         await waitFor(() => expect(screen.getByText('Coupons screen')).toBeInTheDocument());
     });
 
+    it('blocks a partner flagged is_verified who is still only activated_limited', async () => {
+        // The live case: an admin ticks "Is verified" while the partner sits at
+        // activated_limited. The backend still refuses coupons/stats, so the
+        // notice must show — gating on is_verified let these partners straight
+        // through to an empty screen.
+        partnerIs({ id: 1, status: 'activated_limited', is_verified: true });
+        renderGate();
+
+        await waitFor(() => expect(screen.getByText(/Coupons unlock once TLB approves your profile/i)).toBeInTheDocument());
+        expect(screen.queryByText('Coupons screen')).not.toBeInTheDocument();
+    });
+
+    it('still blocks an under-review partner even when is_verified is set', async () => {
+        partnerIs({ id: 1, status: 'under_review', is_verified: true });
+        renderGate('Analytics');
+
+        await waitFor(() => expect(screen.getByText(/Your documents are with the TLB team/i)).toBeInTheDocument());
+    });
+
     it('blocks a pending partner and points them at the documents they still owe', async () => {
         partnerIs({ id: 1, status: 'activated_limited', is_verified: false });
         renderGate();

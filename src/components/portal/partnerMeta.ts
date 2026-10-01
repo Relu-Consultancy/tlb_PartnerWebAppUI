@@ -43,8 +43,13 @@ export const VERIFICATION_TONE: Record<VerificationState, Tone> = {
 export const isApprovedPartner = (partner: any): boolean => String(partner?.status ?? '') === 'approved';
 
 export const verificationOf = (partner: any): VerificationState => {
-    const status = partner?.status || '';
-    if (partner?.is_verified === true || status === 'approved') return 'verified';
+    const status = String(partner?.status ?? '');
+    // Status is the authority. `is_verified` is only consulted when a payload
+    // omits status entirely, because admins tick it on partners still sitting
+    // at `activated_limited` — reading it first made the portal claim "Verified
+    // Partner" on accounts TLB hadn't approved.
+    if (!status) return partner?.is_verified === true ? 'verified' : 'pending';
+    if (status === 'approved') return 'verified';
     if (status === 'under_review') return 'in_review';
     return 'pending';
 };

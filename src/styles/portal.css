@@ -100,7 +100,9 @@
         text-align: left;
         color: var(--color-tlb-body);
         cursor: pointer;
-        transition: background-color 0.15s, color 0.15s;
+        transition:
+            background-color 0.15s,
+            color 0.15s;
     }
     .pt-nav-item:hover:not(:disabled) {
         background-color: var(--color-tlb-hover);
@@ -122,7 +124,7 @@
         height: 6px;
         flex: none;
         border-radius: 999px;
-        background-color: #D6D2C8;
+        background-color: #d6d2c8;
     }
     .pt-nav-item.is-active .pt-dot {
         background-color: var(--color-tlb-amber);
@@ -145,7 +147,9 @@
         white-space: nowrap;
         color: var(--color-tlb-body);
         cursor: pointer;
-        transition: background-color 0.15s, color 0.15s;
+        transition:
+            background-color 0.15s,
+            color 0.15s;
     }
     .pt-tab:hover {
         background-color: var(--color-tlb-hover);
@@ -217,7 +221,10 @@
         font-weight: 700;
         white-space: nowrap;
         cursor: pointer;
-        transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+        transition:
+            background-color 0.15s,
+            border-color 0.15s,
+            color 0.15s;
     }
     .pt-btn:disabled {
         opacity: 0.5;
@@ -296,7 +303,9 @@
         border: 1px solid var(--color-tlb-line);
         border-radius: 14px;
         cursor: pointer;
-        transition: background-color 0.15s, border-color 0.15s;
+        transition:
+            background-color 0.15s,
+            border-color 0.15s;
     }
     .pt-action:hover {
         border-color: var(--color-tlb-amber);
@@ -347,7 +356,9 @@
         line-height: 1.5;
         color: var(--color-tlb-ink);
         outline: none;
-        transition: border-color 0.15s, box-shadow 0.15s;
+        transition:
+            border-color 0.15s,
+            box-shadow 0.15s;
     }
     .pt-input:focus {
         border-color: var(--color-tlb-amber);
@@ -370,7 +381,7 @@
         transition: background-color 0.15s;
     }
     .pt-switch::after {
-        content: "";
+        content: '';
         position: absolute;
         top: 3px;
         left: 3px;
@@ -380,10 +391,10 @@
         background-color: #fff;
         transition: transform 0.15s;
     }
-    .pt-switch[aria-checked="true"] {
+    .pt-switch[aria-checked='true'] {
         background-color: var(--color-tlb-amber);
     }
-    .pt-switch[aria-checked="true"]::after {
+    .pt-switch[aria-checked='true']::after {
         transform: translateX(16px);
     }
     .pt-switch:disabled,
@@ -402,7 +413,7 @@
         color: var(--color-tlb-ink);
         cursor: pointer;
     }
-    .pt-check[aria-checked="true"] {
+    .pt-check[aria-checked='true'] {
         background-color: var(--color-tlb-amber);
     }
 
@@ -420,7 +431,9 @@
         color: var(--color-tlb-sub);
         white-space: nowrap;
         cursor: pointer;
-        transition: color 0.15s, border-color 0.15s;
+        transition:
+            color 0.15s,
+            border-color 0.15s;
     }
     .pt-vtab:hover {
         color: var(--color-tlb-ink);
@@ -460,6 +473,27 @@
         border: 1px solid var(--color-tlb-line);
         flex-wrap: wrap;
     }
+    /* Phones: one scrollable row beats a ragged two-row wrap, and the bar
+       stretches to the content width so the scroll affordance is obvious. */
+    @media (max-width: 639px) {
+        .pt-segbar {
+            display: flex;
+            align-self: stretch;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            scrollbar-width: none;
+            -webkit-overflow-scrolling: touch;
+        }
+        .pt-segbar::-webkit-scrollbar {
+            display: none;
+        }
+        .pt-seg {
+            flex: none;
+            padding: 9px 13px;
+            font-size: 13px;
+        }
+    }
+
     .pt-seg {
         display: flex;
         align-items: center;
@@ -473,7 +507,9 @@
         color: var(--color-tlb-body);
         white-space: nowrap;
         cursor: pointer;
-        transition: background-color 0.15s, color 0.15s;
+        transition:
+            background-color 0.15s,
+            color 0.15s;
     }
     .pt-seg:hover {
         background-color: var(--color-tlb-wash);
@@ -511,7 +547,10 @@
         font-weight: 600;
         white-space: nowrap;
         cursor: pointer;
-        transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+        transition:
+            background-color 0.15s,
+            border-color 0.15s,
+            color 0.15s;
     }
     .pt-scope:hover {
         border-color: var(--color-tlb-edge);
@@ -559,7 +598,7 @@
         color: var(--color-tlb-muted);
         transition: transform 0.15s;
     }
-    .pt-group-head[aria-expanded="true"] .pt-group-caret {
+    .pt-group-head[aria-expanded='true'] .pt-group-caret {
         transform: rotate(90deg);
     }
 
@@ -633,7 +672,10 @@
         font-weight: 700;
         color: var(--color-tlb-body);
         cursor: pointer;
-        transition: border-color 0.15s, background-color 0.15s, color 0.15s;
+        transition:
+            border-color 0.15s,
+            background-color 0.15s,
+            color 0.15s;
     }
     .pt-tile:hover {
         border-color: var(--color-tlb-edge);

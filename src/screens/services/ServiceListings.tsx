@@ -2,19 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { EntityType, Screen } from '../../types';
 import { ListingState } from '../../api/portalSummary';
 import { getStatsRevenue } from '../../api/stats';
-import {
-    setCurrentDraftId,
-    clearCurrentDraftId,
-    setCurrentVenueDraftId,
-    clearCurrentVenueDraftId,
-    setCurrentClassDraftId,
-    clearCurrentClassDraftId,
-    setCurrentProgramDraftId,
-    clearCurrentProgramDraftId,
-} from '../../api/listings';
+import { setCurrentDraftId, setCurrentVenueDraftId, setCurrentClassDraftId, setCurrentProgramDraftId } from '../../api/listings';
 import { usePartner } from '../../context/PartnerContext';
 import { getDateRangeOption } from '../../constants/dateRange';
-import { EntityPickerSheet, createListingScreen } from '../../components/EntityPickerSheet';
+import { EntityPickerSheet, startNewListing } from '../../components/EntityPickerSheet';
 import { requestProfileSection } from '../../constants/profileSections';
 import { ListingStatusFilter, SearchField, SegBar } from '../../components/portal';
 import { Skeleton } from '../../components/ui';
@@ -46,13 +37,6 @@ const setDraftId: Record<EntityType, (id: string) => void> = {
     Venues: setCurrentVenueDraftId,
     Classes: setCurrentClassDraftId,
     Programs: setCurrentProgramDraftId,
-};
-
-const clearAllDraftIds = () => {
-    clearCurrentDraftId();
-    clearCurrentVenueDraftId();
-    clearCurrentClassDraftId();
-    clearCurrentProgramDraftId();
 };
 
 const SkeletonBody: React.FC = () => (
@@ -106,8 +90,7 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate }) => {
     const computeDemand = (row: ListingRow) => demandOf(row, enquiries.entries, bookings.entries, dateRange, now);
 
     const handleAddListing = () => {
-        clearAllDraftIds();
-        if (allowedEntities.length === 1) onNavigate(createListingScreen(allowedEntities[0]));
+        if (allowedEntities.length === 1) onNavigate(startNewListing(allowedEntities[0]));
         else if (allowedEntities.length > 1) setShowEntityPicker(true);
         else {
             requestProfileSection('services');

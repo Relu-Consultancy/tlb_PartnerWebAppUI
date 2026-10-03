@@ -2,6 +2,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, CalendarDays, BarChart3, Users, MapPin, ChevronRight } from 'lucide-react';
 import { EntityType, Screen } from '../types';
+import { clearAllListingDraftIds } from '../api/listings';
 
 interface Props {
     isOpen: boolean;
@@ -44,11 +45,16 @@ const entityConfig: Record<EntityType, { icon: any; subtitle: string; color: str
 /** First wizard screen for creating a listing of the given service type. */
 export const createListingScreen = (entity: EntityType): Screen => entityConfig[entity].screen;
 
+/** Every "create a listing" entry point goes through this, so none can resume a stale draft. */
+export const startNewListing = (entity: EntityType): Screen => {
+    clearAllListingDraftIds();
+    return createListingScreen(entity);
+};
+
 export const EntityPickerSheet: React.FC<Props> = ({ isOpen, onClose, allowedEntities, onNavigate }) => {
     const handleSelect = (entity: EntityType) => {
-        const config = entityConfig[entity];
         onClose();
-        onNavigate(config.screen);
+        onNavigate(startNewListing(entity));
     };
 
     return (
@@ -98,7 +104,9 @@ export const EntityPickerSheet: React.FC<Props> = ({ isOpen, onClose, allowedEnt
                                         onClick={() => handleSelect(entity)}
                                         className="w-full flex items-center gap-4 p-4 rounded-2xl border border-gray-100 bg-white hover:border-tlb-yellow/40 hover:shadow-md transition-all group"
                                     >
-                                        <div className={`w-12 h-12 rounded-2xl ${config.bg} ${config.color} flex items-center justify-center`}>
+                                        <div
+                                            className={`w-12 h-12 rounded-2xl ${config.bg} ${config.color} flex items-center justify-center`}
+                                        >
                                             <Icon size={24} />
                                         </div>
                                         <div className="flex-1 text-left">

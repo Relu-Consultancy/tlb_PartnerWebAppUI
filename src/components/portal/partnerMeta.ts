@@ -69,6 +69,38 @@ export const describePartner = (partner: any): PartnerIdentity => {
     };
 };
 
+const ENTITY_BY_KEY: Record<string, EntityType> = {
+    event: 'Events',
+    events: 'Events',
+    class: 'Classes',
+    classes: 'Classes',
+    program: 'Programs',
+    programs: 'Programs',
+    venue: 'Venues',
+    venues: 'Venues',
+};
+
+/**
+ * The service types a partner offers, from `partner.categories`. Names are
+ * matched case- and plural-insensitively and anything unrecognised is dropped:
+ * a raw name that isn't exactly an EntityType silently fails every route
+ * guard and hides the service from the sidebar.
+ */
+export const entitiesFromPartner = (partner: any): EntityType[] => {
+    const raw: unknown[] = Array.isArray(partner?.categories) ? partner.categories : [];
+    const found = raw
+        .map(
+            (c: any) =>
+                ENTITY_BY_KEY[
+                    String(c?.name ?? c ?? '')
+                        .trim()
+                        .toLowerCase()
+                ]
+        )
+        .filter((e): e is EntityType => !!e);
+    return ENTITY_ORDER.filter((e) => found.includes(e));
+};
+
 /** Display order for service types (matches the mocks). */
 export const ENTITY_ORDER: EntityType[] = ['Events', 'Venues', 'Classes', 'Programs'];
 

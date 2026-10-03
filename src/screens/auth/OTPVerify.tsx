@@ -5,16 +5,13 @@ import { verifyOtp, requestOtp, AuthApiError } from '../../api/auth';
 import { setAuthToken, setRefreshToken, clearTokens } from '../../api/client';
 import { getCurrentPartner } from '../../api/onboarding';
 import { ToastContainer, useToasts } from '../../components/ui';
+import { usePartner } from '../../context/PartnerContext';
+import { entitiesFromPartner } from '../../components/portal';
 
 // Partner statuses that indicate a fully-onboarded account (allowed to log in).
 // Anything earlier means the email exists in the backend but no profile has been
 // completed — Login rejects those so the user must go through Onboarding instead.
-const LOGIN_ALLOWED_STATUSES = new Set([
-    'profile_created',
-    'activated_limited',
-    'under_review',
-    'approved',
-]);
+const LOGIN_ALLOWED_STATUSES = new Set(['profile_created', 'activated_limited', 'under_review', 'approved']);
 
 interface AuthProps {
     onNavigate: (screen: Screen) => void;
@@ -28,10 +25,11 @@ export const OTPVerify: React.FC<AuthProps> = ({ onNavigate, authData }) => {
     const [countdown, setCountdown] = useState(30);
     const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
     const { toasts, showToast, dismissToast } = useToasts();
+    const { setAllowedEntities } = usePartner();
 
     useEffect(() => {
         if (countdown <= 0) return;
-        const timer = setTimeout(() => setCountdown(c => c - 1), 1000);
+        const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
         return () => clearTimeout(timer);
     }, [countdown]);
 
@@ -72,9 +70,10 @@ export const OTPVerify: React.FC<AuthProps> = ({ onNavigate, authData }) => {
             // the user in — if the account exists but onboarding isn't finished, reject the
             // session and steer them to the Onboarding flow.
             let status = '';
+            let partner: any = null;
             try {
                 const meRes = await getCurrentPartner();
-                const partner = meRes.data || meRes;
+                partner = meRes.data || meRes;
                 status = partner?.status || '';
             } catch {
                 // If /partners/me/ fails for an unknown reason, treat as unregistered to be safe.
@@ -84,15 +83,15 @@ export const OTPVerify: React.FC<AuthProps> = ({ onNavigate, authData }) => {
                 clearTokens();
                 sessionStorage.clear();
                 setOtp(['', '', '', '', '', '']);
-                showToast(
-                    'This email is not registered as a partner. Please sign up via onboarding first.',
-                    'warning',
-                    6000,
-                );
+                showToast('This email is not registered as a partner. Please sign up via onboarding first.', 'warning', 6000);
                 setTimeout(() => onNavigate('LANDING'), 2000);
                 return;
             }
 
+            // Session restore only runs on a page load, so a login in an already
+            // open tab must set the partner's services itself — otherwise create
+            // flows and route guards see none (or the previous account's).
+            setAllowedEntities(entitiesFromPartner(partner));
             onNavigate('HOME');
         } catch (error) {
             console.error('Failed to verify OTP', error);
@@ -105,9 +104,9 @@ export const OTPVerify: React.FC<AuthProps> = ({ onNavigate, authData }) => {
                 sessionStorage.clear();
                 setOtp(['', '', '', '', '', '']);
                 showToast(
-                    'This email is registered as a Customer account and can\'t be used to log in to the Partner Portal.',
+                    "This email is registered as a Customer account and can't be used to log in to the Partner Portal.",
                     'error',
-                    6000,
+                    6000
                 );
                 return;
             }
@@ -139,7 +138,9 @@ export const OTPVerify: React.FC<AuthProps> = ({ onNavigate, authData }) => {
         const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
         if (pasted) {
             const newOtp = [...otp];
-            pasted.split('').forEach((char, i) => { newOtp[i] = char; });
+            pasted.split('').forEach((char, i) => {
+                newOtp[i] = char;
+            });
             setOtp(newOtp);
             const focusIndex = Math.min(pasted.length, 5);
             inputRefs.current[focusIndex]?.focus();
@@ -150,7 +151,9 @@ export const OTPVerify: React.FC<AuthProps> = ({ onNavigate, authData }) => {
         <div className="min-h-screen bg-white flex flex-col items-center p-6">
             <ToastContainer toasts={toasts} onDismiss={dismissToast} />
             <div className="w-full flex items-center justify-between mb-12">
-                <button onClick={() => onNavigate('LOGIN')} className="p-2"><ArrowRight size={24} className="rotate-180" /></button>
+                <button onClick={() => onNavigate('LOGIN')} className="p-2">
+                    <ArrowRight size={24} className="rotate-180" />
+                </button>
                 <h2 className="font-black text-lg uppercase tracking-widest">Verify</h2>
                 <div className="w-10"></div>
             </div>
@@ -165,14 +168,18 @@ export const OTPVerify: React.FC<AuthProps> = ({ onNavigate, authData }) => {
 
                 <h1 className="text-4xl font-black text-center mb-4">Secure Verification</h1>
                 <p className="text-center text-gray-500 leading-relaxed mb-10">
-                    We've sent a 6-digit code to your {authData?.type === 'email' ? 'email address' : 'registered mobile number'} <span className="font-bold text-tlb-dark">{authData?.value}</span> for the <span className="font-bold text-tlb-dark">TLB Partner Portal</span>.
+                    We've sent a 6-digit code to your {authData?.type === 'email' ? 'email address' : 'registered mobile number'}{' '}
+                    <span className="font-bold text-tlb-dark">{authData?.value}</span> for the{' '}
+                    <span className="font-bold text-tlb-dark">TLB Partner Portal</span>.
                 </p>
 
                 <div className="flex justify-between gap-2 mb-8">
                     {otp.map((digit, i) => (
                         <input
                             key={i}
-                            ref={(el) => { inputRefs.current[i] = el; }}
+                            ref={(el) => {
+                                inputRefs.current[i] = el;
+                            }}
                             type="text"
                             inputMode="numeric"
                             maxLength={1}
@@ -188,9 +195,7 @@ export const OTPVerify: React.FC<AuthProps> = ({ onNavigate, authData }) => {
                 <p className="text-center text-gray-600 font-medium mb-12">
                     Didn't receive the code?{' '}
                     {countdown > 0 ? (
-                        <span className="text-gray-800 font-bold">
-                            Resend in 00:{String(countdown).padStart(2, '0')}
-                        </span>
+                        <span className="text-gray-800 font-bold">Resend in 00:{String(countdown).padStart(2, '0')}</span>
                     ) : (
                         <button
                             onClick={handleResend}
@@ -201,19 +206,22 @@ export const OTPVerify: React.FC<AuthProps> = ({ onNavigate, authData }) => {
                         </button>
                     )}
                     <br />
-                    <button onClick={() => onNavigate('LOGIN')} className="text-xs text-gray-500 underline mt-2">Change Number/Email?</button>
+                    <button onClick={() => onNavigate('LOGIN')} className="text-xs text-gray-500 underline mt-2">
+                        Change Number/Email?
+                    </button>
                 </p>
 
                 <button
                     onClick={handleVerify}
                     disabled={otp.join('').length !== 6 || loading || !authData}
-                    className={`tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20 ${(otp.join('').length !== 6 || loading || !authData) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className={`tlb-button w-full py-4 shadow-lg shadow-tlb-yellow/20 ${otp.join('').length !== 6 || loading || !authData ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                     {loading ? 'Verifying...' : 'Verify Identity'} <ChevronRight size={20} />
                 </button>
 
                 <p className="mt-8 text-center text-gray-300 text-[10px]">
-                    © 2026 The Little Broadway. All rights reserved.<br />
+                    © 2026 The Little Broadway. All rights reserved.
+                    <br />
                     The Little Broadway — Partner Portal V3.0
                 </p>
             </div>

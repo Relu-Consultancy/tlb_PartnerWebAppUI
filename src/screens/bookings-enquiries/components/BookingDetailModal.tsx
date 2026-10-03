@@ -37,7 +37,9 @@ interface BookingDetailModalProps {
 const fmtDateTime = (iso: string | null): string => {
     if (!iso) return '—';
     const d = new Date(iso);
-    return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+    return Number.isNaN(d.getTime())
+        ? '—'
+        : d.toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 };
 
 // The API rejects a cancel outside these two conditions anyway (BOOKING_NOT_REFUNDABLE) — checking
@@ -62,7 +64,10 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({ entry, n
     const [cancelError, setCancelError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (!entry) { setDetail(null); return; }
+        if (!entry) {
+            setDetail(null);
+            return;
+        }
         let cancelled = false;
         setLoading(true);
         Promise.allSettled([getBookingDetail(entry.id), getBookingPaymentDetail(entry.id)]).then(([d, p]) => {
@@ -72,7 +77,9 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({ entry, n
             setDetail({ ...base, ...payment });
             setLoading(false);
         });
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+        };
     }, [entry?.id]);
 
     // Reset the cancel-flow UI whenever a different booking is opened.
@@ -82,7 +89,12 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({ entry, n
         setCancelError(null);
     }, [entry?.id]);
 
-    if (!entry) return <PortalModal open={false} onClose={onClose} title=""><div /></PortalModal>;
+    if (!entry)
+        return (
+            <PortalModal open={false} onClose={onClose} title="">
+                <div />
+            </PortalModal>
+        );
 
     const isCancelled = entry.status === 'cancelled';
     const refund = detail?.refund ?? null;
@@ -99,7 +111,10 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({ entry, n
     };
 
     const handleConfirmCancel = async () => {
-        if (!cancelReason.trim()) { setCancelError('Please add a short reason — the customer sees this.'); return; }
+        if (!cancelReason.trim()) {
+            setCancelError('Please add a short reason — the customer sees this.');
+            return;
+        }
         setCancelling(true);
         setCancelError(null);
         const result = await onCancelBooking(entry.id, cancelReason.trim());
@@ -107,7 +122,7 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({ entry, n
         if (result.success) {
             setShowCancelForm(false);
             // Refresh so the real `refund` object (now "processing") shows immediately.
-            getBookingDetail(entry.id).then(d => setDetail(prev => ({ ...prev, ...(d?.data ?? d) })));
+            getBookingDetail(entry.id).then((d) => setDetail((prev) => ({ ...prev, ...(d?.data ?? d) })));
         } else {
             setCancelError(CANCEL_ERROR_COPY[result.code] || result.message);
         }
@@ -125,9 +140,11 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({ entry, n
                 <span>{entry.listingTitle}</span>
             </div>
 
-            {isCancelled && (
-                refundMeta ? (
-                    <div className={`pt-note mb-4 ${refund?.status === 'settled' ? 'bg-tlb-green-soft text-tlb-green' : refund?.status === 'failed' ? 'bg-tlb-red-soft text-tlb-red-deep' : 'bg-tlb-amber-soft text-tlb-gold'}`}>
+            {isCancelled &&
+                (refundMeta ? (
+                    <div
+                        className={`pt-note mb-4 ${refund?.status === 'settled' ? 'bg-tlb-green-soft text-tlb-green' : refund?.status === 'failed' ? 'bg-tlb-red-soft text-tlb-red-deep' : 'bg-tlb-amber-soft text-tlb-gold'}`}
+                    >
                         <AlertCircle size={14} strokeWidth={2.75} className="flex-none mt-0.5" aria-hidden="true" />
                         <span>
                             <strong className="font-bold">{refundMeta.label}</strong> — {formatRupees(refund!.amount)}
@@ -141,10 +158,9 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({ entry, n
                         <AlertCircle size={14} strokeWidth={2.75} className="flex-none" aria-hidden="true" />
                         This booking was cancelled. No refund was initiated for it.
                     </div>
-                )
-            )}
+                ))}
 
-            <div className="grid grid-cols-3 gap-3.5 pb-4 border-b border-tlb-divider">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 pb-4 border-b border-tlb-divider">
                 <div>
                     <p className="pt-eyebrow mb-1">Slot</p>
                     <p className="text-[13px] font-semibold text-tlb-ink">{slotLabelOf(entry.listingStartsAt, now)}</p>
@@ -155,7 +171,11 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({ entry, n
                 </div>
                 <div>
                     <p className="pt-eyebrow mb-1">Booked</p>
-                    <p className="text-[13px] font-semibold text-tlb-ink">{entry.createdAt ? new Date(entry.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</p>
+                    <p className="text-[13px] font-semibold text-tlb-ink">
+                        {entry.createdAt
+                            ? new Date(entry.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                            : '—'}
+                    </p>
                 </div>
             </div>
 
@@ -169,9 +189,14 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({ entry, n
                         <div className="mt-4">
                             <p className="pt-eyebrow mb-2">What was booked</p>
                             <div className="rounded-xl border border-tlb-divider overflow-hidden">
-                                {detail.line_items.map(item => (
-                                    <div key={item.id} className="flex items-center justify-between px-3.5 py-2.5 border-b border-tlb-divider last:border-b-0 text-[13px]">
-                                        <span className="text-tlb-ink font-medium">{item.ticket_name || item.package_name || item.batch_name || item.item_type}</span>
+                                {detail.line_items.map((item) => (
+                                    <div
+                                        key={item.id}
+                                        className="flex items-center justify-between px-3.5 py-2.5 border-b border-tlb-divider last:border-b-0 text-[13px]"
+                                    >
+                                        <span className="text-tlb-ink font-medium">
+                                            {item.ticket_name || item.package_name || item.batch_name || item.item_type}
+                                        </span>
                                         <span className="text-tlb-muted font-semibold">Qty {item.quantity}</span>
                                     </div>
                                 ))}
@@ -221,16 +246,32 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({ entry, n
                                 className="pt-input min-h-[70px]"
                                 placeholder="e.g. Event rescheduled, customer opted out"
                                 value={cancelReason}
-                                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => { setCancelReason(e.target.value); setCancelError(null); }}
+                                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                                    setCancelReason(e.target.value);
+                                    setCancelError(null);
+                                }}
                                 maxLength={300}
                                 disabled={cancelling}
                             />
                             {cancelError && <p className="text-[11.5px] font-semibold text-tlb-red-deep mt-1.5">{cancelError}</p>}
                             <div className="flex items-center gap-2 mt-2.5">
-                                <button type="button" onClick={() => { setShowCancelForm(false); setCancelError(null); }} disabled={cancelling} className="pt-btn pt-btn-o">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowCancelForm(false);
+                                        setCancelError(null);
+                                    }}
+                                    disabled={cancelling}
+                                    className="pt-btn pt-btn-o"
+                                >
                                     Back
                                 </button>
-                                <button type="button" onClick={handleConfirmCancel} disabled={cancelling} className="pt-btn bg-tlb-red text-white">
+                                <button
+                                    type="button"
+                                    onClick={handleConfirmCancel}
+                                    disabled={cancelling}
+                                    className="pt-btn bg-tlb-red text-white"
+                                >
                                     {cancelling ? <Loader2 size={14} className="animate-spin" /> : <Ban size={14} />}
                                     Confirm cancellation
                                 </button>

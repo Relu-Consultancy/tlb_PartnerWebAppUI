@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { getStatsRevenue, StatsRevenue } from '../../api/stats';
 import { getBankDetails, updateBankDetails, BankDetails, UpdateBankPayload } from '../../api/banking';
 import { DateRangeKey } from '../../constants/dateRange';
+import { useLatestRequest } from '../../hooks/useLatestRequest';
 
 /**
  * `none` — the backend confirmed no account is on file (404).
@@ -21,16 +22,20 @@ interface State {
 export const useRevenueData = (range: DateRangeKey) => {
     const [state, setState] = useState<State>({ loading: true, revenue: null, bank: null, bankStatus: 'none' });
 
+    const begin = useLatestRequest();
+
     const load = useCallback(async () => {
+        const isCurrent = begin();
         setState((s) => ({ ...s, loading: true }));
         const [revenue, bank] = await Promise.allSettled([getStatsRevenue(range), getBankDetails()]);
+        if (!isCurrent()) return; // a newer period was picked meanwhile
         setState({
             loading: false,
             revenue: revenue.status === 'fulfilled' ? revenue.value : null,
             bank: bank.status === 'fulfilled' ? bank.value : null,
             bankStatus: bank.status === 'rejected' ? 'error' : bank.value ? 'linked' : 'none',
         });
-    }, [range]);
+    }, [range, begin]);
 
     useEffect(() => {
         load();

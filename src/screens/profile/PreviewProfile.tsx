@@ -124,7 +124,7 @@ export const PreviewProfile: React.FC<ProfileProps> = ({ onNavigate, previousScr
 
     return (
         <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4 sm:p-8">
-            <div className="relative w-[360px] shrink-0 rounded-[2.5rem] border-[10px] border-gray-900 bg-white shadow-2xl flex flex-col h-[780px] max-h-[90vh] overflow-hidden">
+            <div className="relative w-full max-w-[360px] shrink-0 rounded-[2.5rem] border-[10px] border-gray-900 bg-white shadow-2xl flex flex-col h-[780px] max-h-[90vh] overflow-hidden">
                 {/* iPhone notch */}
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-5 bg-gray-900 rounded-b-2xl z-30" />
 

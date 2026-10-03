@@ -133,11 +133,7 @@ export const getVenueAmenities = async (listingId: string): Promise<VenueAmeniti
     return (json?.data ?? json) as VenueAmenities;
 };
 
-export const updateVenueAmenities = async (
-    listingId: string,
-    amenityIds: number[],
-    customAmenities: string[],
-): Promise<VenueAmenities> => {
+export const updateVenueAmenities = async (listingId: string, amenityIds: number[], customAmenities: string[]): Promise<VenueAmenities> => {
     const response = await apiClient(`/api/v1/partner/listings/venues/${listingId}/amenities/`, {
         method: 'PUT',
         body: JSON.stringify({ amenity_ids: amenityIds, custom_amenities: customAmenities }),
@@ -150,9 +146,7 @@ export const updateVenueAmenities = async (
 // ─── Event Listings ────────────────────────────────────────────────────────
 
 export const getEventListings = async (status?: string) => {
-    const url = status
-        ? `/api/v1/partner/listings/events/?status=${encodeURIComponent(status)}`
-        : '/api/v1/partner/listings/events/';
+    const url = status ? `/api/v1/partner/listings/events/?status=${encodeURIComponent(status)}` : '/api/v1/partner/listings/events/';
     const response = await apiClient(url);
     if (!response.ok) await handleError(response, 'Failed to load listings');
     return response.json();
@@ -198,11 +192,7 @@ export const getListingMedia = async (listingId: string) => {
     return response.json();
 };
 
-export const uploadListingMedia = async (
-    listingId: string,
-    file: File,
-    mediaType: 'cover' | 'gallery' | 'video'
-) => {
+export const uploadListingMedia = async (listingId: string, file: File, mediaType: 'cover' | 'gallery' | 'video') => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('media_type', mediaType);
@@ -243,11 +233,7 @@ export const createTicket = async (
     return response.json();
 };
 
-export const updateTicket = async (
-    listingId: string,
-    ticketId: number,
-    data: Record<string, any>
-) => {
+export const updateTicket = async (listingId: string, ticketId: number, data: Record<string, any>) => {
     const response = await apiClient(`/api/v1/partner/listings/events/${listingId}/tickets/${ticketId}/`, {
         method: 'PUT',
         body: JSON.stringify(data),
@@ -268,9 +254,7 @@ export const deleteTicket = async (listingId: string, ticketId: number) => {
 // ─── Venue Listings ────────────────────────────────────────────────────────
 
 export const getVenueListings = async (status?: string) => {
-    const url = status
-        ? `/api/v1/partner/listings/venues/?status=${encodeURIComponent(status)}`
-        : '/api/v1/partner/listings/venues/';
+    const url = status ? `/api/v1/partner/listings/venues/?status=${encodeURIComponent(status)}` : '/api/v1/partner/listings/venues/';
     const response = await apiClient(url);
     if (!response.ok) await handleError(response, 'Failed to load venue listings');
     return response.json();
@@ -325,11 +309,7 @@ export const getVenueListingMedia = async (listingId: string) => {
     return response.json();
 };
 
-export const uploadVenueListingMedia = async (
-    listingId: string,
-    file: File,
-    mediaType: 'cover' | 'gallery' | 'video'
-) => {
+export const uploadVenueListingMedia = async (listingId: string, file: File, mediaType: 'cover' | 'gallery' | 'video') => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('media_type', mediaType);
@@ -358,10 +338,7 @@ export const getVenuePackages = async (listingId: string) => {
     return response.json();
 };
 
-export const createVenuePackage = async (
-    listingId: string,
-    data: Record<string, any>
-) => {
+export const createVenuePackage = async (listingId: string, data: Record<string, any>) => {
     const response = await apiClient(`/api/v1/partner/listings/venues/${listingId}/packages/`, {
         method: 'POST',
         body: JSON.stringify(data),
@@ -490,12 +467,22 @@ export const getCurrentProgramDraftId = (): string | null => sessionStorage.getI
 export const setCurrentProgramDraftId = (id: string) => sessionStorage.setItem(PROGRAM_DRAFT_KEY, id);
 export const clearCurrentProgramDraftId = () => sessionStorage.removeItem(PROGRAM_DRAFT_KEY);
 
+/**
+ * Forgets every wizard's in-progress listing. Each wizard resumes whatever id
+ * is parked here, so any "create a new listing" entry point that skips this
+ * reopens the last listing edited — and its saves overwrite that listing.
+ */
+export const clearAllListingDraftIds = () => {
+    clearCurrentDraftId();
+    clearCurrentVenueDraftId();
+    clearCurrentClassDraftId();
+    clearCurrentProgramDraftId();
+};
+
 // ─── Class Listings ────────────────────────────────────────────────────────
 
 export const getClassListings = async (status?: string) => {
-    const url = status
-        ? `/api/v1/partner/listings/classes/?status=${encodeURIComponent(status)}`
-        : '/api/v1/partner/listings/classes/';
+    const url = status ? `/api/v1/partner/listings/classes/?status=${encodeURIComponent(status)}` : '/api/v1/partner/listings/classes/';
     const response = await apiClient(url);
     if (!response.ok) await handleError(response, 'Failed to load class listings');
     return response.json();
@@ -585,11 +572,7 @@ export const getClassMedia = async (listingId: string) => {
     return response.json();
 };
 
-export const uploadClassMedia = async (
-    listingId: string,
-    file: File,
-    mediaType: 'cover' | 'gallery' | 'video'
-) => {
+export const uploadClassMedia = async (listingId: string, file: File, mediaType: 'cover' | 'gallery' | 'video') => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('media_type', mediaType);
@@ -703,9 +686,7 @@ export const getProgramMetaTags = async () => {
 // ─── Program Listings ──────────────────────────────────────────────────────
 
 export const getProgramListings = async (status?: string) => {
-    const url = status
-        ? `/api/v1/partner/listings/programs/?status=${encodeURIComponent(status)}`
-        : '/api/v1/partner/listings/programs/';
+    const url = status ? `/api/v1/partner/listings/programs/?status=${encodeURIComponent(status)}` : '/api/v1/partner/listings/programs/';
     const response = await apiClient(url);
     if (!response.ok) await handleError(response, 'Failed to load program listings');
     return response.json();
@@ -717,7 +698,12 @@ export const getProgramListingDetail = async (listingId: string) => {
     return response.json();
 };
 
-export const createProgramDraft = async (data: { title: string; short_description?: string; description?: string; booking_type?: string }) => {
+export const createProgramDraft = async (data: {
+    title: string;
+    short_description?: string;
+    description?: string;
+    booking_type?: string;
+}) => {
     const response = await apiClient('/api/v1/partner/listings/programs/', {
         method: 'POST',
         body: JSON.stringify(data),
@@ -811,15 +797,11 @@ export const getProgramEnquiries = async (listingId: string) => {
     return response.json();
 };
 
-export const updateProgramEnquiry = async (
-    listingId: string,
-    enquiryId: number,
-    data: { status?: string; partner_note?: string }
-) => {
-    const response = await apiClient(
-        `/api/v1/partner/listings/programs/${listingId}/enquiries/${enquiryId}/`,
-        { method: 'PATCH', body: JSON.stringify(data) }
-    );
+export const updateProgramEnquiry = async (listingId: string, enquiryId: number, data: { status?: string; partner_note?: string }) => {
+    const response = await apiClient(`/api/v1/partner/listings/programs/${listingId}/enquiries/${enquiryId}/`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+    });
     if (!response.ok) await handleError(response, 'Failed to update program enquiry');
     return response.json();
 };
@@ -832,10 +814,7 @@ export const getProgramFaqs = async (listingId: string) => {
     return response.json();
 };
 
-export const createProgramFaq = async (
-    listingId: string,
-    data: { question: string; answer: string; sort_order?: number }
-) => {
+export const createProgramFaq = async (listingId: string, data: { question: string; answer: string; sort_order?: number }) => {
     const response = await apiClient(`/api/v1/partner/listings/programs/${listingId}/faqs/`, {
         method: 'POST',
         body: JSON.stringify(data),
@@ -878,7 +857,10 @@ export const createEventFaq = async (listingId: string, data: { question: string
     return response.json();
 };
 export const updateEventFaq = async (listingId: string, faqId: number, data: { question: string; answer: string; sort_order?: number }) => {
-    const response = await apiClient(`/api/v1/partner/listings/events/${listingId}/faqs/${faqId}/`, { method: 'PUT', body: JSON.stringify(data) });
+    const response = await apiClient(`/api/v1/partner/listings/events/${listingId}/faqs/${faqId}/`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    });
     if (!response.ok) await handleError(response, 'Failed to update event FAQ');
     return response.json();
 };
@@ -900,7 +882,10 @@ export const createVenueFaq = async (listingId: string, data: { question: string
     return response.json();
 };
 export const updateVenueFaq = async (listingId: string, faqId: number, data: { question: string; answer: string; sort_order?: number }) => {
-    const response = await apiClient(`/api/v1/partner/listings/venues/${listingId}/faqs/${faqId}/`, { method: 'PUT', body: JSON.stringify(data) });
+    const response = await apiClient(`/api/v1/partner/listings/venues/${listingId}/faqs/${faqId}/`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    });
     if (!response.ok) await handleError(response, 'Failed to update venue FAQ');
     return response.json();
 };
@@ -922,7 +907,10 @@ export const createClassFaq = async (listingId: string, data: { question: string
     return response.json();
 };
 export const updateClassFaq = async (listingId: string, faqId: number, data: { question: string; answer: string; sort_order?: number }) => {
-    const response = await apiClient(`/api/v1/partner/listings/classes/${listingId}/faqs/${faqId}/`, { method: 'PUT', body: JSON.stringify(data) });
+    const response = await apiClient(`/api/v1/partner/listings/classes/${listingId}/faqs/${faqId}/`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    });
     if (!response.ok) await handleError(response, 'Failed to update class FAQ');
     return response.json();
 };
@@ -1006,7 +994,7 @@ export const uploadFaqDocument = async (
     entity: FaqDocumentEntity,
     listingId: string,
     faqId: number,
-    data: { file: File; title?: string; sort_order?: number },
+    data: { file: File; title?: string; sort_order?: number }
 ): Promise<FaqDocument> => {
     const fd = new FormData();
     fd.append('file', data.file);
@@ -1018,12 +1006,7 @@ export const uploadFaqDocument = async (
     return json?.data ?? json;
 };
 
-export const deleteFaqDocument = async (
-    entity: FaqDocumentEntity,
-    listingId: string,
-    faqId: number,
-    documentId: number,
-): Promise<void> => {
+export const deleteFaqDocument = async (entity: FaqDocumentEntity, listingId: string, faqId: number, documentId: number): Promise<void> => {
     const response = await apiClient(`${faqDocumentsUrl(entity, listingId, faqId)}${documentId}/`, { method: 'DELETE' });
     if (!response.ok) await handleError(response, 'Failed to delete FAQ document');
 };
@@ -1038,7 +1021,7 @@ export const deleteFaqDocument = async (
 export const bulkSaveFaqs = async (
     entity: FaqDocumentEntity,
     listingId: string,
-    faqs: { question: string; answer: string; sort_order?: number }[],
+    faqs: { question: string; answer: string; sort_order?: number }[]
 ): Promise<any> => {
     const response = await apiClient(`/api/v1/partner/listings/${entity}/${listingId}/faqs/bulk/`, {
         method: 'PUT',
@@ -1056,11 +1039,7 @@ export const getProgramMedia = async (listingId: string) => {
     return response.json();
 };
 
-export const uploadProgramMedia = async (
-    listingId: string,
-    file: File,
-    mediaType: 'cover' | 'gallery' | 'video'
-) => {
+export const uploadProgramMedia = async (listingId: string, file: File, mediaType: 'cover' | 'gallery' | 'video') => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('media_type', mediaType);
@@ -1073,10 +1052,7 @@ export const uploadProgramMedia = async (
 };
 
 export const deleteProgramMedia = async (listingId: string, mediaId: number) => {
-    const response = await apiClient(
-        `/api/v1/partner/listings/programs/${listingId}/media/${mediaId}/`,
-        { method: 'DELETE' }
-    );
+    const response = await apiClient(`/api/v1/partner/listings/programs/${listingId}/media/${mediaId}/`, { method: 'DELETE' });
     if (!response.ok) await handleError(response, 'Failed to delete program media');
     if (response.status === 204) return {};
     return response.json().catch(() => ({}));
@@ -1097,10 +1073,7 @@ export const getBookings = async (params?: { status?: string; listing_id?: strin
 };
 
 /** Follows `getBookings` pagination for one filter set (bounded to `maxPages`). */
-const fetchAllBookingPages = async (
-    params: { status?: string; listing_id?: string },
-    maxPages: number,
-): Promise<any[]> => {
+const fetchAllBookingPages = async (params: { status?: string; listing_id?: string }, maxPages: number): Promise<any[]> => {
     const all: any[] = [];
     for (let page = 1; page <= maxPages; page++) {
         const json = await getBookings({ ...params, page });
@@ -1117,8 +1090,7 @@ export const getAllListingBookings = async (listingId: string, maxPages = 20): P
     fetchAllBookingPages({ listing_id: listingId }, maxPages);
 
 /** Every booking across the partner's listings, following pagination (bounded to `maxPages`). */
-export const getAllBookings = async (maxPages = 30): Promise<any[]> =>
-    fetchAllBookingPages({}, maxPages);
+export const getAllBookings = async (maxPages = 30): Promise<any[]> => fetchAllBookingPages({}, maxPages);
 
 export const getBookingDetail = async (bookingId: string) => {
     const response = await apiClient(`/api/v1/partner/bookings/${bookingId}/`);
@@ -1190,4 +1162,3 @@ export const unarchiveListing = async (listingId: string) => {
     if (!response.ok) await handleError(response, 'Failed to unarchive listing');
     return response.json();
 };
-

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Menu, Plus } from 'lucide-react';
 import { Screen } from '../types';
 import { NotificationCenter } from './NotificationCenter';
-import { EntityPickerSheet, createListingScreen } from './EntityPickerSheet';
+import { EntityPickerSheet, startNewListing } from './EntityPickerSheet';
 import { AccountMenu, DateRangePicker } from './portal';
 import { usePartner } from '../context/PartnerContext';
 import { getBusinessProfile, getExtendedProfile } from '../api/onboarding';
@@ -50,7 +50,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ onOpenSidebar, onNavigate 
 
     const createListing = () => {
         if (allowedEntities.length === 1) {
-            onNavigate(createListingScreen(allowedEntities[0]));
+            onNavigate(startNewListing(allowedEntities[0]));
         } else if (allowedEntities.length > 1) {
             setPickerOpen(true);
         } else {

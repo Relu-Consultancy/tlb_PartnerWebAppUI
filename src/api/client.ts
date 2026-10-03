@@ -12,38 +12,67 @@ export const clearTokens = () => {
 // Single source of truth for the refresh-token exchange — used by apiClient's own
 // 401-retry below, and by App.tsx's session-restore-on-load effect. Never re-implement
 // this fetch elsewhere; both callers must share this exact logic.
-export const refreshAccessToken = async (): Promise<string | null> => {
+/** Fired once a refresh has definitively failed and the session is gone. */
+export const SESSION_EXPIRED_EVENT = 'tlb:session-expired';
+
+const endSession = () => {
+    clearTokens();
+    window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+};
+
+// Screens fire many requests at once (the dashboard alone sends ~10); when the
+// access token lapses they all 401 together. Without this, each one spent the
+// same refresh token in parallel — with refresh-token rotation the first won
+// and the rest failed, logging the partner out despite a successful refresh.
+let refreshInFlight: Promise<string | null> | null = null;
+
+const doRefresh = async (): Promise<string | null> => {
     const refresh_token = getRefreshToken();
     if (!refresh_token) {
-        clearTokens();
+        endSession();
         return null;
     }
+    let refreshResponse: Response;
     try {
-        const refreshResponse = await fetch(`${BASE_URL}/api/v1/auth/refresh-token/`, {
+        refreshResponse = await fetch(`${BASE_URL}/api/v1/auth/refresh-token/`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ refresh_token }),
         });
-        if (!refreshResponse.ok) {
-            // A 429 here is a transient rate limit, not an invalid/expired refresh
-            // token — keep the session tokens intact so the caller can retry shortly
-            // instead of the user being logged out mid-burst.
-            if (refreshResponse.status !== 429) clearTokens();
-            return null;
-        }
-        const res = await refreshResponse.json();
-        const payload = res.data || res;
-        const access = payload.access_token || payload.access;
-        if (!access) {
-            clearTokens();
-            return null;
-        }
-        setAuthToken(access);
-        return access;
     } catch {
-        clearTokens();
+        // Network blip — the tokens may be perfectly valid. Keep them; the
+        // caller just sees this request fail and the next one can try again.
         return null;
     }
+    if (!refreshResponse.ok) {
+        // A 429 here is a transient rate limit, not an invalid/expired refresh
+        // token — keep the session tokens intact so the caller can retry shortly
+        // instead of the user being logged out mid-burst.
+        if (refreshResponse.status !== 429) endSession();
+        return null;
+    }
+    const res = await refreshResponse.json().catch(() => null);
+    const payload = res?.data || res || {};
+    const access = payload.access_token || payload.access;
+    if (!access) {
+        endSession();
+        return null;
+    }
+    setAuthToken(access);
+    // Rotation: the server issues a fresh refresh token alongside the access
+    // token. Dropping it left a dead token behind for the next expiry.
+    const rotated = payload.refresh_token || payload.refresh;
+    if (rotated) setRefreshToken(rotated);
+    return access;
+};
+
+export const refreshAccessToken = (): Promise<string | null> => {
+    if (!refreshInFlight) {
+        refreshInFlight = doRefresh().finally(() => {
+            refreshInFlight = null;
+        });
+    }
+    return refreshInFlight;
 };
 
 export const apiClient = async (endpoint: string, options: RequestInit = {}) => {

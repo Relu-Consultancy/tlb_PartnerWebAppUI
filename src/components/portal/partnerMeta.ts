@@ -43,8 +43,13 @@ export const VERIFICATION_TONE: Record<VerificationState, Tone> = {
 export const isApprovedPartner = (partner: any): boolean => String(partner?.status ?? '') === 'approved';
 
 export const verificationOf = (partner: any): VerificationState => {
-    const status = partner?.status || '';
-    if (partner?.is_verified === true || status === 'approved') return 'verified';
+    const status = String(partner?.status ?? '');
+    // Status is the authority. `is_verified` is only consulted when a payload
+    // omits status entirely, because admins tick it on partners still sitting
+    // at `activated_limited` — reading it first made the portal claim "Verified
+    // Partner" on accounts TLB hadn't approved.
+    if (!status) return partner?.is_verified === true ? 'verified' : 'pending';
+    if (status === 'approved') return 'verified';
     if (status === 'under_review') return 'in_review';
     return 'pending';
 };
@@ -62,6 +67,38 @@ export const describePartner = (partner: any): PartnerIdentity => {
         memberSince: joined ? joined.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }) : null,
         city: partner?.base_city || partner?.business_profile?.base_city || partner?.city || null,
     };
+};
+
+const ENTITY_BY_KEY: Record<string, EntityType> = {
+    event: 'Events',
+    events: 'Events',
+    class: 'Classes',
+    classes: 'Classes',
+    program: 'Programs',
+    programs: 'Programs',
+    venue: 'Venues',
+    venues: 'Venues',
+};
+
+/**
+ * The service types a partner offers, from `partner.categories`. Names are
+ * matched case- and plural-insensitively and anything unrecognised is dropped:
+ * a raw name that isn't exactly an EntityType silently fails every route
+ * guard and hides the service from the sidebar.
+ */
+export const entitiesFromPartner = (partner: any): EntityType[] => {
+    const raw: unknown[] = Array.isArray(partner?.categories) ? partner.categories : [];
+    const found = raw
+        .map(
+            (c: any) =>
+                ENTITY_BY_KEY[
+                    String(c?.name ?? c ?? '')
+                        .trim()
+                        .toLowerCase()
+                ]
+        )
+        .filter((e): e is EntityType => !!e);
+    return ENTITY_ORDER.filter((e) => found.includes(e));
 };
 
 /** Display order for service types (matches the mocks). */

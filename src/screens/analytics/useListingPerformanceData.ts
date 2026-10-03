@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useLatestRequest } from '../../hooks/useLatestRequest';
 import { getStatsListingPerformance, ListingPerformanceRow, ListingPerformanceTab, RevenuePeriod } from '../../api/stats';
 
 const PAGE_SIZE = 10;
@@ -14,12 +15,15 @@ interface State {
 export const useListingPerformanceData = (period: RevenuePeriod, tab: ListingPerformanceTab) => {
     const [state, setState] = useState<State>({ loading: true, rows: [], total: 0, error: null });
     const [page, setPage] = useState(1);
+    const begin = useLatestRequest();
 
     const load = useCallback(
         async (targetPage: number) => {
+            const isCurrent = begin();
             setState((s) => ({ ...s, loading: true, error: null, rows: targetPage === 1 ? [] : s.rows }));
             try {
                 const res = await getStatsListingPerformance({ period, tab, page: targetPage, page_size: PAGE_SIZE });
+                if (!isCurrent()) return;
                 setState((s) => ({
                     loading: false,
                     error: null,
@@ -27,10 +31,11 @@ export const useListingPerformanceData = (period: RevenuePeriod, tab: ListingPer
                     rows: targetPage === 1 ? res.results : [...s.rows, ...res.results],
                 }));
             } catch (e: any) {
+                if (!isCurrent()) return;
                 setState({ loading: false, rows: [], total: 0, error: e?.message || 'Failed to load listing performance' });
             }
         },
-        [period, tab]
+        [period, tab, begin]
     );
 
     useEffect(() => {

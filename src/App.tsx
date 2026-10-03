@@ -8,7 +8,8 @@ import type { ErrorInfo, ReactNode } from 'react';
 import { motion } from 'motion/react';
 import { Screen, EntityType } from './types';
 import { PartnerProvider, usePartner } from './context/PartnerContext';
-import { SkeletonPage, Toaster, NoInternetState } from './components/ui';
+import { SkeletonPage, Toaster, NoInternetState, toast } from './components/ui';
+import { entitiesFromPartner } from './components/portal';
 
 // ---------------------------------------------------------------------------
 // Error boundary — stops a single screen crash from blanking the whole app.
@@ -180,7 +181,7 @@ const prefetchScreens = () => {
 import { Sidebar } from './components/Navigation';
 import { TopHeader } from './components/TopHeader';
 import { ApprovalGate } from './components/ApprovalGate';
-import { getAuthToken, getRefreshToken, clearTokens, refreshAccessToken } from './api/client';
+import { getAuthToken, getRefreshToken, clearTokens, refreshAccessToken, SESSION_EXPIRED_EVENT } from './api/client';
 import { invalidatePortalSummary } from './api/portalSummary';
 import { getCurrentPartner } from './api/onboarding';
 
@@ -358,10 +359,8 @@ function AppInner() {
                 const status = partner.status || '';
 
                 // Sync categories into context
-                if (partner.categories?.length > 0) {
-                    const cats = partner.categories.map((c: any) => c.name || c);
-                    setAllowedEntities(cats);
-                }
+                const entities = entitiesFromPartner(partner);
+                if (entities.length > 0) setAllowedEntities(entities);
 
                 // Route based on partner status
                 switch (status) {
@@ -395,6 +394,29 @@ function AppInner() {
         restoreSession();
     }, []);
 
+    // A refresh that definitively failed means the session is gone. Without this
+    // the partner was left on a screen whose every request errored out, with no
+    // way back except a manual reload. Only signed-in screens redirect — the
+    // restore-on-load path already lands on LANDING by itself.
+    useEffect(() => {
+        const onExpired = () => {
+            const current = currentScreenRef.current;
+            const signedIn = routes[current]?.hasSidebar || current.startsWith('CREATE_');
+            if (!signedIn) return;
+            try {
+                sessionStorage.clear();
+            } catch {
+                /* storage unavailable */
+            }
+            invalidatePortalSummary();
+            setAllowedEntities([]);
+            toast.warning('Your session has expired. Please sign in again.');
+            setCurrentScreen('LOGIN');
+        };
+        window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
+        return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
+    }, [setAllowedEntities]);
+
     // Route guard: redirect restricted screens to HOME
     const guardedNavigate = useCallback(
         (screen: Screen) => {
@@ -412,12 +434,15 @@ function AppInner() {
             if (screen === 'LANDING') {
                 clearTokens();
                 sessionStorage.clear();
+                // In-memory too: logging into another account in this tab must not
+                // inherit the previous partner's services.
+                setAllowedEntities([]);
                 // Memoised partner data must never leak into the next account's session.
                 invalidatePortalSummary();
             }
             setCurrentScreen(screen);
         },
-        [allowedEntities]
+        [allowedEntities, setAllowedEntities]
     );
 
     // Show loading spinner while restoring session

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useLatestRequest } from '../../hooks/useLatestRequest';
 import {
     getStatsOverview,
     getStatsEvents,
@@ -68,7 +69,10 @@ export const useAnalyticsData = (range: DateRangeKey) => {
         approvalRefused: false,
     });
 
+    const begin = useLatestRequest();
+
     const load = useCallback(async () => {
+        const isCurrent = begin();
         setState((s) => ({ ...s, loading: true }));
         const results = await Promise.allSettled([
             getStatsOverview(),
@@ -81,6 +85,7 @@ export const useAnalyticsData = (range: DateRangeKey) => {
             getStatsOverviewAll(range),
         ]);
         const [oRes, eRes, vRes, enqRes, revRes, rwRes, trRes, oaRes] = results;
+        if (!isCurrent()) return; // a newer period was picked meanwhile
         setState({
             loading: false,
             overview: settled(oRes),
@@ -95,7 +100,7 @@ export const useAnalyticsData = (range: DateRangeKey) => {
             errorMessage: (results.find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined)?.reason?.message ?? null,
             approvalRefused: results.some((r) => r.status === 'rejected' && isApprovalError(r.reason)),
         });
-    }, [range]);
+    }, [range, begin]);
 
     useEffect(() => {
         load();

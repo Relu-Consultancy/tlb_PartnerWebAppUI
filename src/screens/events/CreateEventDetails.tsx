@@ -476,7 +476,7 @@ export const CreateEventDetails: React.FC<Props> = ({ onNavigate }) => {
                 )}
 
                 <WizardField label="Mode">
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         {MODE_META.map((m) => (
                             <button
                                 key={m.value}

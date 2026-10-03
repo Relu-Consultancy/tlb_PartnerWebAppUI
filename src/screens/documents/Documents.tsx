@@ -18,7 +18,9 @@ import {
 import { Screen } from '../../types';
 import { toast } from '../../components/ui';
 import { requestProfileSection } from '../../constants/profileSections';
+import { verificationOf } from '../../components/portal';
 import { getCurrentPartner, getPartnerMedia, uploadPartnerMedia, deletePartnerMedia, submitVerification } from '../../api/onboarding';
+import { notifyPartnerUpdated } from '../../api/portalSummary';
 
 interface Props {
     onNavigate: (s: Screen) => void;
@@ -33,6 +35,33 @@ const resolveUrl = (url?: string) => {
 };
 
 const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+const ACCOUNT_DIGITS = 12;
+// Keep in step with ACCOUNT_DIGITS — a template literal would eat the \d.
+const ACCOUNT_REGEX = /^\d{12}$/;
+
+/** Field labels for the backend's validation errors, keyed by its own field names. */
+const FIELD_LABEL: Record<string, string> = {
+    pan_number: 'PAN number',
+    gst_number: 'GST number',
+    account_holder_name: 'Account holder name',
+    account_number: 'Account number',
+    ifsc_code: 'IFSC code',
+};
+
+/**
+ * Turns a DRF validation payload into something a partner can read. The API
+ * hands back the serializer's own repr —
+ * `{'account_number': [ErrorDetail(string='This field may not be blank.', …)]}`
+ * — which must never reach a toast as-is.
+ */
+export const humanizeFieldErrors = (raw: string): string | null => {
+    const fields = [...raw.matchAll(/['"]([a-z_]+)['"]\s*:/g)].map((m) => m[1]).filter((f) => f in FIELD_LABEL);
+    if (fields.length === 0) return null;
+    const unique = [...new Set(fields)].map((f) => FIELD_LABEL[f]);
+    return /blank|required/i.test(raw)
+        ? `Please fill ${unique.join(', ')} before saving.`
+        : `Please check ${unique.join(', ')} and try again.`;
+};
 const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 
 const Documents: React.FC<Props> = ({ onNavigate }) => {
@@ -83,35 +112,54 @@ const Documents: React.FC<Props> = ({ onNavigate }) => {
     }, []);
 
     const status = partner?.status || '';
-    const isVerified = partner?.is_verified === true || status === 'approved';
+    const isVerified = verificationOf(partner) === 'verified';
     const inReview = ['under_review', 'approved'].includes(status);
 
     const panValid = !pan || PAN_REGEX.test(pan.toUpperCase());
     const ifscValid = !ifsc || IFSC_REGEX.test(ifsc.toUpperCase());
 
+    const accountValid = !account || ACCOUNT_REGEX.test(account);
+
+    // The API rejects a blank bank field outright, so the three must be filled
+    // together — half a bank account is never submittable.
+    const bankTouched = !!holder || !!account || !!ifsc;
     const hasBank = !!holder && !!account && !!ifsc;
     const hasPan = !!pan;
-    const canSaveKyc = (hasPan || hasBank) && panValid && ifscValid && !savingKyc;
+    const bankReady = !bankTouched || hasBank;
+    const canSaveKyc = (hasPan || hasBank) && bankReady && panValid && ifscValid && accountValid && !savingKyc;
 
     const saveKyc = async () => {
         if (!canSaveKyc) {
-            toast.warning('Please fill valid PAN or bank details.');
+            if (bankTouched && !hasBank) {
+                toast.warning('Bank details go together — fill the holder name, account number and IFSC code.');
+            } else if (!accountValid) {
+                toast.warning(`Account number must be ${ACCOUNT_DIGITS} digits.`);
+            } else {
+                toast.warning('Please fill a valid PAN, or complete bank details.');
+            }
             return;
         }
         setSavingKyc(true);
         try {
-            await submitVerification({
-                pan_number: pan.toUpperCase(),
-                gst_number: gst.toUpperCase(),
-                account_holder_name: holder,
-                account_number: account,
-                ifsc_code: ifsc.toUpperCase(),
-                agreement_accepted: true,
-            });
+            // Only what's actually filled — the API rejects a blank string on
+            // any of these, which is what produced the raw serializer error.
+            const payload: Record<string, unknown> = { agreement_accepted: true };
+            if (pan) payload.pan_number = pan.toUpperCase();
+            if (gst) payload.gst_number = gst.toUpperCase();
+            if (hasBank) {
+                payload.account_holder_name = holder;
+                payload.account_number = account;
+                payload.ifsc_code = ifsc.toUpperCase();
+            }
+            await submitVerification(payload);
             toast.success('Documents submitted. Your details are under review.');
+            // Status just changed: drop the memoised partner read so the header
+            // chip and the approval gate pick it up without a reload.
+            notifyPartnerUpdated();
             loadAll();
         } catch (e: any) {
-            toast.error(e?.message || 'Failed to update documents.');
+            const raw = String(e?.message || '');
+            toast.error(humanizeFieldErrors(raw) || raw || 'Failed to update documents.');
         } finally {
             setSavingKyc(false);
         }
@@ -253,7 +301,7 @@ const Documents: React.FC<Props> = ({ onNavigate }) => {
                                 </div>
                             </div>
                             <div className="flex items-center justify-end pt-1">
-                                <button onClick={saveKyc} disabled={!canSaveKyc} className="tlb-button px-6 py-3 disabled:opacity-50">
+                                <button onClick={saveKyc} disabled={savingKyc} className="tlb-button px-6 py-3 disabled:opacity-50">
                                     {savingKyc ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
                                     Save Documents
                                 </button>
@@ -285,10 +333,17 @@ const Documents: React.FC<Props> = ({ onNavigate }) => {
                                     <label className="tlb-label">Account Number</label>
                                     <input
                                         value={account}
-                                        onChange={(e) => setAccount(e.target.value.replace(/\D/g, ''))}
-                                        placeholder="Account number"
+                                        onChange={(e) => setAccount(e.target.value.replace(/\D/g, '').slice(0, ACCOUNT_DIGITS))}
+                                        maxLength={ACCOUNT_DIGITS}
+                                        inputMode="numeric"
+                                        placeholder={`${ACCOUNT_DIGITS}-digit account number`}
                                         className="tlb-input w-full"
                                     />
+                                    {!accountValid && (
+                                        <p className="text-[11px] text-red-500 font-bold mt-1">
+                                            Account number must be {ACCOUNT_DIGITS} digits
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
                                     <label className="tlb-label">IFSC Code</label>
@@ -303,7 +358,7 @@ const Documents: React.FC<Props> = ({ onNavigate }) => {
                                 </div>
                             </div>
                             <div className="flex items-center justify-end pt-1">
-                                <button onClick={saveKyc} disabled={!canSaveKyc} className="tlb-button px-6 py-3 disabled:opacity-50">
+                                <button onClick={saveKyc} disabled={savingKyc} className="tlb-button px-6 py-3 disabled:opacity-50">
                                     {savingKyc ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
                                     Save Documents
                                 </button>

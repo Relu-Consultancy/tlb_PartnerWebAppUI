@@ -266,7 +266,11 @@ export const Enquiries: React.FC<Props> = () => {
                         </div>
                         <div className="relative">
                             <button
+                                type="button"
                                 onClick={() => setShowFilter(!showFilter)}
+                                aria-label="Filter by status"
+                                aria-haspopup="menu"
+                                aria-expanded={showFilter}
                                 className={`bg-white border p-3 rounded-2xl shadow-sm transition-colors ${statusFilter ? 'border-tlb-yellow text-tlb-yellow' : 'border-gray-100 text-gray-400 hover:text-gray-600'}`}
                             >
                                 <Filter size={18} />

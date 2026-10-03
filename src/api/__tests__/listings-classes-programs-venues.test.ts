@@ -116,9 +116,20 @@ import {
     ApiError,
 } from '../listings';
 
+/**
+ * Reads one field out of a raw multipart body. MSW's request.formData() runs
+ * Node's undici parser, which rejects jsdom's File (a cross-realm object that
+ * fails its WebIDL brand check) — a test-environment quirk, not a product bug,
+ * and it kept these upload tests permanently red. The raw body is the same
+ * bytes the server receives.
+ */
+const multipartField = (body: string, name: string): string | null => {
+    const match = body.match(new RegExp(`name="${name}"\r?\n\r?\n([^\r\n]*)`));
+    return match ? match[1] : null;
+};
+
 const BASE = 'https://tlb-api.reluconsultancy.in';
-const makeFile = (name = 'photo.jpg', type = 'image/jpeg', size = 1024) =>
-    new File([new ArrayBuffer(size)], name, { type });
+const makeFile = (name = 'photo.jpg', type = 'image/jpeg', size = 1024) => new File([new ArrayBuffer(size)], name, { type });
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CLASSES
@@ -167,8 +178,11 @@ describe('getClassMetaCategories', () => {
     });
 
     it('throws ApiError on server failure', async () => {
-        server.use(http.get(`${BASE}/api/v1/listings/classes/metadata/categories/`, () =>
-            HttpResponse.json({ error: { code: 'SERVER_ERROR', message: 'Internal error' } }, { status: 500 })));
+        server.use(
+            http.get(`${BASE}/api/v1/listings/classes/metadata/categories/`, () =>
+                HttpResponse.json({ error: { code: 'SERVER_ERROR', message: 'Internal error' } }, { status: 500 })
+            )
+        );
         await expect(getClassMetaCategories()).rejects.toBeInstanceOf(ApiError);
     });
 });
@@ -193,17 +207,22 @@ describe('getClassListings', () => {
 
     it('appends status query param', async () => {
         let capturedUrl = '';
-        server.use(http.get(`${BASE}/api/v1/partner/listings/classes/`, ({ request }) => {
-            capturedUrl = request.url;
-            return HttpResponse.json({ success: true, data: [] });
-        }));
+        server.use(
+            http.get(`${BASE}/api/v1/partner/listings/classes/`, ({ request }) => {
+                capturedUrl = request.url;
+                return HttpResponse.json({ success: true, data: [] });
+            })
+        );
         await getClassListings('published');
         expect(capturedUrl).toContain('status=published');
     });
 
     it('throws ApiError on 401', async () => {
-        server.use(http.get(`${BASE}/api/v1/partner/listings/classes/`, () =>
-            HttpResponse.json({ error: { code: 'UNAUTHORIZED', message: 'Auth required' } }, { status: 401 })));
+        server.use(
+            http.get(`${BASE}/api/v1/partner/listings/classes/`, () =>
+                HttpResponse.json({ error: { code: 'UNAUTHORIZED', message: 'Auth required' } }, { status: 401 })
+            )
+        );
         await expect(getClassListings()).rejects.toBeInstanceOf(ApiError);
     });
 });
@@ -218,9 +237,12 @@ describe('getClassListingDetail', () => {
     });
 
     it('throws ApiError with NOT_FOUND on missing id', async () => {
-        server.use(http.get(`${BASE}/api/v1/partner/listings/classes/bad-id/`, () =>
-            HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Class not found' } }, { status: 404 })));
-        const err = await getClassListingDetail('bad-id').catch(e => e);
+        server.use(
+            http.get(`${BASE}/api/v1/partner/listings/classes/bad-id/`, () =>
+                HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Class not found' } }, { status: 404 })
+            )
+        );
+        const err = await getClassListingDetail('bad-id').catch((e) => e);
         expect(err).toBeInstanceOf(ApiError);
         expect(err.code).toBe('NOT_FOUND');
     });
@@ -236,19 +258,24 @@ describe('createClassDraft', () => {
 
     it('sends payload in request body', async () => {
         let captured: any = null;
-        server.use(http.post(`${BASE}/api/v1/partner/listings/classes/`, async ({ request }) => {
-            captured = await request.json();
-            return HttpResponse.json({ success: true, data: mockClassDraft }, { status: 201 });
-        }));
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/classes/`, async ({ request }) => {
+                captured = await request.json();
+                return HttpResponse.json({ success: true, data: mockClassDraft }, { status: 201 });
+            })
+        );
         await createClassDraft({ title: 'Yoga Flow', category_id: 3 });
         expect(captured.title).toBe('Yoga Flow');
         expect(captured.category_id).toBe(3);
     });
 
     it('throws ApiError with INVALID_PARTNER_STATE on 403', async () => {
-        server.use(http.post(`${BASE}/api/v1/partner/listings/classes/`, () =>
-            HttpResponse.json({ error: { code: 'INVALID_PARTNER_STATE', message: 'Partner not active' } }, { status: 403 })));
-        const err = await createClassDraft({}).catch(e => e);
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/classes/`, () =>
+                HttpResponse.json({ error: { code: 'INVALID_PARTNER_STATE', message: 'Partner not active' } }, { status: 403 })
+            )
+        );
+        const err = await createClassDraft({}).catch((e) => e);
         expect(err).toBeInstanceOf(ApiError);
         expect(err.code).toBe('INVALID_PARTNER_STATE');
     });
@@ -257,10 +284,12 @@ describe('createClassDraft', () => {
 describe('updateClassListing', () => {
     it('sends patch payload and returns updated draft', async () => {
         let captured: any = null;
-        server.use(http.patch(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/`, async ({ request }) => {
-            captured = await request.json();
-            return HttpResponse.json({ success: true, data: { ...mockClassDraft, title: 'Updated Class' } });
-        }));
+        server.use(
+            http.patch(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/`, async ({ request }) => {
+                captured = await request.json();
+                return HttpResponse.json({ success: true, data: { ...mockClassDraft, title: 'Updated Class' } });
+            })
+        );
         const res = await updateClassListing(CLASS_DRAFT_ID, { title: 'Updated Class', format: 'camp' });
         expect(captured.title).toBe('Updated Class');
         expect(captured.format).toBe('camp');
@@ -268,9 +297,12 @@ describe('updateClassListing', () => {
     });
 
     it('throws ApiError with LISTING_LOCKED on 400', async () => {
-        server.use(http.patch(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/`, () =>
-            HttpResponse.json({ error: { code: 'LISTING_LOCKED', message: 'Not editable' } }, { status: 400 })));
-        const err = await updateClassListing(CLASS_DRAFT_ID, { title: 'x' }).catch(e => e);
+        server.use(
+            http.patch(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/`, () =>
+                HttpResponse.json({ error: { code: 'LISTING_LOCKED', message: 'Not editable' } }, { status: 400 })
+            )
+        );
+        const err = await updateClassListing(CLASS_DRAFT_ID, { title: 'x' }).catch((e) => e);
         expect(err.code).toBe('LISTING_LOCKED');
     });
 });
@@ -278,10 +310,12 @@ describe('updateClassListing', () => {
 describe('setClassListingLive', () => {
     it('sends is_live: true', async () => {
         let captured: any = null;
-        server.use(http.post(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/live/`, async ({ request }) => {
-            captured = await request.json();
-            return HttpResponse.json({ success: true, data: { ...mockClassDraft, is_live: true } });
-        }));
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/live/`, async ({ request }) => {
+                captured = await request.json();
+                return HttpResponse.json({ success: true, data: { ...mockClassDraft, is_live: true } });
+            })
+        );
         const res = await setClassListingLive(CLASS_DRAFT_ID, true);
         expect(captured.is_live).toBe(true);
         expect((res.data || res).is_live).toBe(true);
@@ -289,18 +323,23 @@ describe('setClassListingLive', () => {
 
     it('sends is_live: false to pause', async () => {
         let captured: any = null;
-        server.use(http.post(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/live/`, async ({ request }) => {
-            captured = await request.json();
-            return HttpResponse.json({ success: true, data: { ...mockClassDraft, is_live: false } });
-        }));
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/live/`, async ({ request }) => {
+                captured = await request.json();
+                return HttpResponse.json({ success: true, data: { ...mockClassDraft, is_live: false } });
+            })
+        );
         await setClassListingLive(CLASS_DRAFT_ID, false);
         expect(captured.is_live).toBe(false);
     });
 
     it('throws ApiError on failure', async () => {
-        server.use(http.post(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/live/`, () =>
-            HttpResponse.json({ error: { code: 'LISTING_LOCKED', message: 'Cannot set live' } }, { status: 400 })));
-        const err = await setClassListingLive(CLASS_DRAFT_ID, true).catch(e => e);
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/live/`, () =>
+                HttpResponse.json({ error: { code: 'LISTING_LOCKED', message: 'Cannot set live' } }, { status: 400 })
+            )
+        );
+        const err = await setClassListingLive(CLASS_DRAFT_ID, true).catch((e) => e);
         expect(err).toBeInstanceOf(ApiError);
         expect(err.code).toBe('LISTING_LOCKED');
     });
@@ -313,16 +352,22 @@ describe('submitClassListing', () => {
     });
 
     it('throws ApiError with PARTNER_UNDER_REVIEW on 403', async () => {
-        server.use(http.post(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/submit/`, () =>
-            HttpResponse.json({ error: { code: 'PARTNER_UNDER_REVIEW', message: 'Under review' } }, { status: 403 })));
-        const err = await submitClassListing(CLASS_DRAFT_ID).catch(e => e);
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/submit/`, () =>
+                HttpResponse.json({ error: { code: 'PARTNER_UNDER_REVIEW', message: 'Under review' } }, { status: 403 })
+            )
+        );
+        const err = await submitClassListing(CLASS_DRAFT_ID).catch((e) => e);
         expect(err.code).toBe('PARTNER_UNDER_REVIEW');
     });
 
     it('throws ApiError with INCOMPLETE_CLASS on 400', async () => {
-        server.use(http.post(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/submit/`, () =>
-            HttpResponse.json({ error: { code: 'INCOMPLETE_CLASS', message: 'Missing cover image' } }, { status: 400 })));
-        const err = await submitClassListing(CLASS_DRAFT_ID).catch(e => e);
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/submit/`, () =>
+                HttpResponse.json({ error: { code: 'INCOMPLETE_CLASS', message: 'Missing cover image' } }, { status: 400 })
+            )
+        );
+        const err = await submitClassListing(CLASS_DRAFT_ID).catch((e) => e);
         expect(err.code).toBe('INCOMPLETE_CLASS');
     });
 });
@@ -342,10 +387,12 @@ describe('getClassBatches', () => {
 describe('createClassBatch', () => {
     it('sends batch payload and returns created batch', async () => {
         let captured: any = null;
-        server.use(http.post(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/batches/`, async ({ request }) => {
-            captured = await request.json();
-            return HttpResponse.json({ success: true, data: mockClassBatches[0] }, { status: 201 });
-        }));
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/batches/`, async ({ request }) => {
+                captured = await request.json();
+                return HttpResponse.json({ success: true, data: mockClassBatches[0] }, { status: 201 });
+            })
+        );
         await createClassBatch(CLASS_DRAFT_ID, {
             name: 'Batch B',
             start_date: '2026-09-01',
@@ -361,9 +408,12 @@ describe('createClassBatch', () => {
     });
 
     it('throws ApiError with VALIDATION_ERROR on bad dates', async () => {
-        server.use(http.post(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/batches/`, () =>
-            HttpResponse.json({ error: { code: 'VALIDATION_ERROR', message: 'end_date must be after start_date' } }, { status: 400 })));
-        const err = await createClassBatch(CLASS_DRAFT_ID, { start_date: '2026-12-01', end_date: '2026-01-01' }).catch(e => e);
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/batches/`, () =>
+                HttpResponse.json({ error: { code: 'VALIDATION_ERROR', message: 'end_date must be after start_date' } }, { status: 400 })
+            )
+        );
+        const err = await createClassBatch(CLASS_DRAFT_ID, { start_date: '2026-12-01', end_date: '2026-01-01' }).catch((e) => e);
         expect(err.code).toBe('VALIDATION_ERROR');
     });
 });
@@ -371,10 +421,12 @@ describe('createClassBatch', () => {
 describe('updateClassBatch', () => {
     it('sends updated batch data', async () => {
         let captured: any = null;
-        server.use(http.put(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/batches/:batchId`, async ({ request }) => {
-            captured = await request.json();
-            return HttpResponse.json({ success: true, data: mockClassBatches[0] });
-        }));
+        server.use(
+            http.put(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/batches/:batchId`, async ({ request }) => {
+                captured = await request.json();
+                return HttpResponse.json({ success: true, data: mockClassBatches[0] });
+            })
+        );
         await updateClassBatch(CLASS_DRAFT_ID, 1, { fee: '750', total_seats: 30 });
         expect(captured.fee).toBe('750');
         expect(captured.total_seats).toBe(30);
@@ -388,9 +440,12 @@ describe('deleteClassBatch', () => {
     });
 
     it('throws ApiError on 404', async () => {
-        server.use(http.delete(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/batches/:batchId`, () =>
-            HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Batch not found' } }, { status: 404 })));
-        const err = await deleteClassBatch(CLASS_DRAFT_ID, 999).catch(e => e);
+        server.use(
+            http.delete(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/batches/:batchId`, () =>
+                HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Batch not found' } }, { status: 404 })
+            )
+        );
+        const err = await deleteClassBatch(CLASS_DRAFT_ID, 999).catch((e) => e);
         expect(err.code).toBe('NOT_FOUND');
     });
 });
@@ -408,34 +463,50 @@ describe('getClassMedia', () => {
 describe('uploadClassMedia', () => {
     it('uploads cover and returns media item', async () => {
         let capturedType = '';
-        server.use(http.post(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/media/`, async ({ request }) => {
-            const form = await request.formData();
-            capturedType = form.get('media_type') as string;
-            return HttpResponse.json({ success: true, data: { id: 10, media_type: 'cover', file_url: 'https://example.com/class-cover.jpg', created_at: '' } }, { status: 201 });
-        }));
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/media/`, async ({ request }) => {
+                capturedType = multipartField(await request.text(), 'media_type') ?? '';
+                return HttpResponse.json(
+                    {
+                        success: true,
+                        data: { id: 10, media_type: 'cover', file_url: 'https://example.com/class-cover.jpg', created_at: '' },
+                    },
+                    { status: 201 }
+                );
+            })
+        );
         const res = await uploadClassMedia(CLASS_DRAFT_ID, makeFile(), 'cover');
         expect(capturedType).toBe('cover');
         expect((res.data || res).media_type).toBe('cover');
     });
 
     it('throws ApiError with COVER_ALREADY_EXISTS', async () => {
-        server.use(http.post(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/media/`, () =>
-            HttpResponse.json({ error: { code: 'COVER_ALREADY_EXISTS', message: 'Delete existing cover first' } }, { status: 400 })));
-        const err = await uploadClassMedia(CLASS_DRAFT_ID, makeFile(), 'cover').catch(e => e);
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/media/`, () =>
+                HttpResponse.json({ error: { code: 'COVER_ALREADY_EXISTS', message: 'Delete existing cover first' } }, { status: 400 })
+            )
+        );
+        const err = await uploadClassMedia(CLASS_DRAFT_ID, makeFile(), 'cover').catch((e) => e);
         expect(err.code).toBe('COVER_ALREADY_EXISTS');
     });
 
     it('throws ApiError with GALLERY_LIMIT_EXCEEDED', async () => {
-        server.use(http.post(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/media/`, () =>
-            HttpResponse.json({ error: { code: 'GALLERY_LIMIT_EXCEEDED', message: 'Max 10 gallery images' } }, { status: 400 })));
-        const err = await uploadClassMedia(CLASS_DRAFT_ID, makeFile(), 'gallery').catch(e => e);
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/media/`, () =>
+                HttpResponse.json({ error: { code: 'GALLERY_LIMIT_EXCEEDED', message: 'Max 10 gallery images' } }, { status: 400 })
+            )
+        );
+        const err = await uploadClassMedia(CLASS_DRAFT_ID, makeFile(), 'gallery').catch((e) => e);
         expect(err.code).toBe('GALLERY_LIMIT_EXCEEDED');
     });
 
     it('throws ApiError with INVALID_FILE_FORMAT', async () => {
-        server.use(http.post(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/media/`, () =>
-            HttpResponse.json({ error: { code: 'INVALID_FILE_FORMAT', message: 'Only JPG/PNG allowed' } }, { status: 400 })));
-        const err = await uploadClassMedia(CLASS_DRAFT_ID, makeFile('doc.pdf', 'application/pdf'), 'gallery').catch(e => e);
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/media/`, () =>
+                HttpResponse.json({ error: { code: 'INVALID_FILE_FORMAT', message: 'Only JPG/PNG allowed' } }, { status: 400 })
+            )
+        );
+        const err = await uploadClassMedia(CLASS_DRAFT_ID, makeFile('doc.pdf', 'application/pdf'), 'gallery').catch((e) => e);
         expect(err.code).toBe('INVALID_FILE_FORMAT');
     });
 });
@@ -447,9 +518,12 @@ describe('deleteClassMedia', () => {
     });
 
     it('throws ApiError with NOT_FOUND on bad id', async () => {
-        server.use(http.delete(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/media/:mediaId`, () =>
-            HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Media not found' } }, { status: 404 })));
-        const err = await deleteClassMedia(CLASS_DRAFT_ID, 999).catch(e => e);
+        server.use(
+            http.delete(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/media/:mediaId`, () =>
+                HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Media not found' } }, { status: 404 })
+            )
+        );
+        const err = await deleteClassMedia(CLASS_DRAFT_ID, 999).catch((e) => e);
         expect(err.code).toBe('NOT_FOUND');
     });
 });
@@ -467,10 +541,12 @@ describe('getClassEnquiries', () => {
 
     it('appends status query param', async () => {
         let capturedUrl = '';
-        server.use(http.get(`${BASE}/api/v1/partner/listings/classes/enquiries/`, ({ request }) => {
-            capturedUrl = request.url;
-            return HttpResponse.json({ success: true, data: [] });
-        }));
+        server.use(
+            http.get(`${BASE}/api/v1/partner/listings/classes/enquiries/`, ({ request }) => {
+                capturedUrl = request.url;
+                return HttpResponse.json({ success: true, data: [] });
+            })
+        );
         await getClassEnquiries('contacted');
         expect(capturedUrl).toContain('status=contacted');
     });
@@ -488,10 +564,12 @@ describe('getClassEnquiryDetail', () => {
 describe('updateClassEnquiry', () => {
     it('sends update payload and returns updated enquiry', async () => {
         let captured: any = null;
-        server.use(http.put(`${BASE}/api/v1/partner/listings/classes/enquiries/:enquiryId`, async ({ request }) => {
-            captured = await request.json();
-            return HttpResponse.json({ success: true, data: { ...mockClassEnquiry, status: 'contacted' } });
-        }));
+        server.use(
+            http.put(`${BASE}/api/v1/partner/listings/classes/enquiries/:enquiryId`, async ({ request }) => {
+                captured = await request.json();
+                return HttpResponse.json({ success: true, data: { ...mockClassEnquiry, status: 'contacted' } });
+            })
+        );
         const res = await updateClassEnquiry('enq-001', { status: 'contacted' });
         expect(captured.status).toBe('contacted');
         expect((res.data || res).status).toBe('contacted');
@@ -506,9 +584,12 @@ describe('unlockClassEnquiry', () => {
     });
 
     it('throws ApiError on 403 (insufficient credits)', async () => {
-        server.use(http.post(`${BASE}/api/v1/partner/listings/classes/enquiries/:enquiryId/unlock/`, () =>
-            HttpResponse.json({ error: { code: 'INSUFFICIENT_CREDITS', message: 'Not enough credits' } }, { status: 403 })));
-        const err = await unlockClassEnquiry('enq-001').catch(e => e);
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/classes/enquiries/:enquiryId/unlock/`, () =>
+                HttpResponse.json({ error: { code: 'INSUFFICIENT_CREDITS', message: 'Not enough credits' } }, { status: 403 })
+            )
+        );
+        const err = await unlockClassEnquiry('enq-001').catch((e) => e);
         expect(err).toBeInstanceOf(ApiError);
         expect(err.code).toBe('INSUFFICIENT_CREDITS');
     });
@@ -554,8 +635,11 @@ describe('getProgramMetaCategories', () => {
     });
 
     it('throws ApiError on server failure', async () => {
-        server.use(http.get(`${BASE}/api/v1/listings/programs/metadata/categories/`, () =>
-            HttpResponse.json({ error: { code: 'SERVER_ERROR', message: 'Internal error' } }, { status: 500 })));
+        server.use(
+            http.get(`${BASE}/api/v1/listings/programs/metadata/categories/`, () =>
+                HttpResponse.json({ error: { code: 'SERVER_ERROR', message: 'Internal error' } }, { status: 500 })
+            )
+        );
         await expect(getProgramMetaCategories()).rejects.toBeInstanceOf(ApiError);
     });
 });
@@ -578,8 +662,11 @@ describe('getProgramMetaTags', () => {
     });
 
     it('throws ApiError on server failure', async () => {
-        server.use(http.get(`${BASE}/api/v1/listings/programs/metadata/tags/`, () =>
-            HttpResponse.json({ error: { code: 'SERVER_ERROR', message: 'Internal error' } }, { status: 500 })));
+        server.use(
+            http.get(`${BASE}/api/v1/listings/programs/metadata/tags/`, () =>
+                HttpResponse.json({ error: { code: 'SERVER_ERROR', message: 'Internal error' } }, { status: 500 })
+            )
+        );
         await expect(getProgramMetaTags()).rejects.toBeInstanceOf(ApiError);
     });
 });
@@ -596,10 +683,12 @@ describe('getProgramListings', () => {
 
     it('appends status query param', async () => {
         let capturedUrl = '';
-        server.use(http.get(`${BASE}/api/v1/partner/listings/programs/`, ({ request }) => {
-            capturedUrl = request.url;
-            return HttpResponse.json({ success: true, data: [] });
-        }));
+        server.use(
+            http.get(`${BASE}/api/v1/partner/listings/programs/`, ({ request }) => {
+                capturedUrl = request.url;
+                return HttpResponse.json({ success: true, data: [] });
+            })
+        );
         await getProgramListings('archived');
         expect(capturedUrl).toContain('status=archived');
     });
@@ -615,9 +704,12 @@ describe('getProgramListingDetail', () => {
     });
 
     it('throws ApiError with NOT_FOUND on missing id', async () => {
-        server.use(http.get(`${BASE}/api/v1/partner/listings/programs/bad-id/`, () =>
-            HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Program not found' } }, { status: 404 })));
-        const err = await getProgramListingDetail('bad-id').catch(e => e);
+        server.use(
+            http.get(`${BASE}/api/v1/partner/listings/programs/bad-id/`, () =>
+                HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Program not found' } }, { status: 404 })
+            )
+        );
+        const err = await getProgramListingDetail('bad-id').catch((e) => e);
         expect(err.code).toBe('NOT_FOUND');
     });
 });
@@ -632,10 +724,12 @@ describe('createProgramDraft', () => {
 
     it('sends all optional fields in payload', async () => {
         let captured: any = null;
-        server.use(http.post(`${BASE}/api/v1/partner/listings/programs/`, async ({ request }) => {
-            captured = await request.json();
-            return HttpResponse.json({ success: true, data: mockProgramDraft }, { status: 201 });
-        }));
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/programs/`, async ({ request }) => {
+                captured = await request.json();
+                return HttpResponse.json({ success: true, data: mockProgramDraft }, { status: 201 });
+            })
+        );
         await createProgramDraft({ title: 'Art Camp', short_description: 'Short desc', description: 'Full desc' });
         expect(captured.title).toBe('Art Camp');
         expect(captured.short_description).toBe('Short desc');
@@ -643,9 +737,12 @@ describe('createProgramDraft', () => {
     });
 
     it('throws ApiError with INVALID_PARTNER_STATE on 403', async () => {
-        server.use(http.post(`${BASE}/api/v1/partner/listings/programs/`, () =>
-            HttpResponse.json({ error: { code: 'INVALID_PARTNER_STATE', message: 'Partner not active' } }, { status: 403 })));
-        const err = await createProgramDraft({ title: 'Test' }).catch(e => e);
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/programs/`, () =>
+                HttpResponse.json({ error: { code: 'INVALID_PARTNER_STATE', message: 'Partner not active' } }, { status: 403 })
+            )
+        );
+        const err = await createProgramDraft({ title: 'Test' }).catch((e) => e);
         expect(err.code).toBe('INVALID_PARTNER_STATE');
     });
 });
@@ -653,10 +750,12 @@ describe('createProgramDraft', () => {
 describe('updateProgramListing', () => {
     it('sends patch payload and returns updated listing', async () => {
         let captured: any = null;
-        server.use(http.patch(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/`, async ({ request }) => {
-            captured = await request.json();
-            return HttpResponse.json({ success: true, data: { ...mockProgramDraft, title: 'Updated' } });
-        }));
+        server.use(
+            http.patch(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/`, async ({ request }) => {
+                captured = await request.json();
+                return HttpResponse.json({ success: true, data: { ...mockProgramDraft, title: 'Updated' } });
+            })
+        );
         await updateProgramListing(PROGRAM_DRAFT_ID, {
             title: 'Updated',
             min_age: 6,
@@ -669,9 +768,12 @@ describe('updateProgramListing', () => {
     });
 
     it('throws ApiError with LISTING_LOCKED on 400', async () => {
-        server.use(http.patch(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/`, () =>
-            HttpResponse.json({ error: { code: 'LISTING_LOCKED', message: 'Not editable' } }, { status: 400 })));
-        const err = await updateProgramListing(PROGRAM_DRAFT_ID, { title: 'x' }).catch(e => e);
+        server.use(
+            http.patch(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/`, () =>
+                HttpResponse.json({ error: { code: 'LISTING_LOCKED', message: 'Not editable' } }, { status: 400 })
+            )
+        );
+        const err = await updateProgramListing(PROGRAM_DRAFT_ID, { title: 'x' }).catch((e) => e);
         expect(err.code).toBe('LISTING_LOCKED');
     });
 });
@@ -683,9 +785,12 @@ describe('deleteProgramListing', () => {
     });
 
     it('throws ApiError on 404', async () => {
-        server.use(http.delete(`${BASE}/api/v1/partner/listings/programs/bad-id/`, () =>
-            HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Not found' } }, { status: 404 })));
-        const err = await deleteProgramListing('bad-id').catch(e => e);
+        server.use(
+            http.delete(`${BASE}/api/v1/partner/listings/programs/bad-id/`, () =>
+                HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Not found' } }, { status: 404 })
+            )
+        );
+        const err = await deleteProgramListing('bad-id').catch((e) => e);
         expect(err.code).toBe('NOT_FOUND');
     });
 });
@@ -697,9 +802,12 @@ describe('submitProgramListing', () => {
     });
 
     it('throws ApiError with INCOMPLETE_PROGRAM on missing fields', async () => {
-        server.use(http.post(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/submit/`, () =>
-            HttpResponse.json({ error: { code: 'INCOMPLETE_PROGRAM', message: 'Missing cover image' } }, { status: 400 })));
-        const err = await submitProgramListing(PROGRAM_DRAFT_ID).catch(e => e);
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/submit/`, () =>
+                HttpResponse.json({ error: { code: 'INCOMPLETE_PROGRAM', message: 'Missing cover image' } }, { status: 400 })
+            )
+        );
+        const err = await submitProgramListing(PROGRAM_DRAFT_ID).catch((e) => e);
         expect(err.code).toBe('INCOMPLETE_PROGRAM');
     });
 });
@@ -711,9 +819,12 @@ describe('archiveProgramListing', () => {
     });
 
     it('throws ApiError on 400 if not archivable', async () => {
-        server.use(http.post(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/archive/`, () =>
-            HttpResponse.json({ error: { code: 'INVALID_STATUS_TRANSITION', message: 'Cannot archive draft' } }, { status: 400 })));
-        const err = await archiveProgramListing(PROGRAM_DRAFT_ID).catch(e => e);
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/archive/`, () =>
+                HttpResponse.json({ error: { code: 'INVALID_STATUS_TRANSITION', message: 'Cannot archive draft' } }, { status: 400 })
+            )
+        );
+        const err = await archiveProgramListing(PROGRAM_DRAFT_ID).catch((e) => e);
         expect(err).toBeInstanceOf(ApiError);
         expect(err.code).toBe('INVALID_STATUS_TRANSITION');
     });
@@ -726,9 +837,12 @@ describe('unarchiveProgramListing', () => {
     });
 
     it('throws ApiError on 400 if not unarchivable', async () => {
-        server.use(http.post(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/unarchive/`, () =>
-            HttpResponse.json({ error: { code: 'INVALID_STATUS_TRANSITION', message: 'Not archived' } }, { status: 400 })));
-        const err = await unarchiveProgramListing(PROGRAM_DRAFT_ID).catch(e => e);
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/unarchive/`, () =>
+                HttpResponse.json({ error: { code: 'INVALID_STATUS_TRANSITION', message: 'Not archived' } }, { status: 400 })
+            )
+        );
+        const err = await unarchiveProgramListing(PROGRAM_DRAFT_ID).catch((e) => e);
         expect(err.code).toBe('INVALID_STATUS_TRANSITION');
     });
 });
@@ -748,10 +862,12 @@ describe('getProgramBatches', () => {
 describe('createProgramBatch', () => {
     it('sends batch payload and returns created batch', async () => {
         let captured: any = null;
-        server.use(http.post(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/batches/`, async ({ request }) => {
-            captured = await request.json();
-            return HttpResponse.json({ success: true, data: mockProgramBatches[0] }, { status: 201 });
-        }));
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/batches/`, async ({ request }) => {
+                captured = await request.json();
+                return HttpResponse.json({ success: true, data: mockProgramBatches[0] }, { status: 201 });
+            })
+        );
         await createProgramBatch(PROGRAM_DRAFT_ID, {
             name: 'Cohort 2',
             start_date: '2026-10-01',
@@ -768,10 +884,12 @@ describe('createProgramBatch', () => {
 describe('updateProgramBatch', () => {
     it('sends updated batch data', async () => {
         let captured: any = null;
-        server.use(http.put(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/batches/:batchId`, async ({ request }) => {
-            captured = await request.json();
-            return HttpResponse.json({ success: true, data: mockProgramBatches[0] });
-        }));
+        server.use(
+            http.put(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/batches/:batchId`, async ({ request }) => {
+                captured = await request.json();
+                return HttpResponse.json({ success: true, data: mockProgramBatches[0] });
+            })
+        );
         await updateProgramBatch(PROGRAM_DRAFT_ID, 1, { fee: '3000', total_seats: 25 });
         expect(captured.fee).toBe('3000');
         expect(captured.total_seats).toBe(25);
@@ -785,9 +903,12 @@ describe('deleteProgramBatch', () => {
     });
 
     it('throws ApiError on 404', async () => {
-        server.use(http.delete(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/batches/:batchId`, () =>
-            HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Batch not found' } }, { status: 404 })));
-        const err = await deleteProgramBatch(PROGRAM_DRAFT_ID, 999).catch(e => e);
+        server.use(
+            http.delete(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/batches/:batchId`, () =>
+                HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Batch not found' } }, { status: 404 })
+            )
+        );
+        const err = await deleteProgramBatch(PROGRAM_DRAFT_ID, 999).catch((e) => e);
         expect(err.code).toBe('NOT_FOUND');
     });
 });
@@ -806,10 +927,15 @@ describe('getProgramEnquiries', () => {
 describe('updateProgramEnquiry', () => {
     it('sends status and partner_note update', async () => {
         let captured: any = null;
-        server.use(http.patch(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/enquiries/:enquiryId`, async ({ request }) => {
-            captured = await request.json();
-            return HttpResponse.json({ success: true, data: { ...mockProgramEnquiry, status: 'contacted', partner_note: 'Called on Monday' } });
-        }));
+        server.use(
+            http.patch(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/enquiries/:enquiryId`, async ({ request }) => {
+                captured = await request.json();
+                return HttpResponse.json({
+                    success: true,
+                    data: { ...mockProgramEnquiry, status: 'contacted', partner_note: 'Called on Monday' },
+                });
+            })
+        );
         const res = await updateProgramEnquiry(PROGRAM_DRAFT_ID, 1, { status: 'contacted', partner_note: 'Called on Monday' });
         expect(captured.status).toBe('contacted');
         expect(captured.partner_note).toBe('Called on Monday');
@@ -817,9 +943,12 @@ describe('updateProgramEnquiry', () => {
     });
 
     it('throws ApiError on 404 for unknown enquiry', async () => {
-        server.use(http.patch(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/enquiries/:enquiryId`, () =>
-            HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Enquiry not found' } }, { status: 404 })));
-        const err = await updateProgramEnquiry(PROGRAM_DRAFT_ID, 999, { status: 'contacted' }).catch(e => e);
+        server.use(
+            http.patch(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/enquiries/:enquiryId`, () =>
+                HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Enquiry not found' } }, { status: 404 })
+            )
+        );
+        const err = await updateProgramEnquiry(PROGRAM_DRAFT_ID, 999, { status: 'contacted' }).catch((e) => e);
         expect(err.code).toBe('NOT_FOUND');
     });
 });
@@ -840,10 +969,12 @@ describe('getProgramFaqs', () => {
 describe('createProgramFaq', () => {
     it('sends FAQ payload and returns created FAQ', async () => {
         let captured: any = null;
-        server.use(http.post(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/faqs/`, async ({ request }) => {
-            captured = await request.json();
-            return HttpResponse.json({ success: true, data: mockProgramFaqs[0] }, { status: 201 });
-        }));
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/faqs/`, async ({ request }) => {
+                captured = await request.json();
+                return HttpResponse.json({ success: true, data: mockProgramFaqs[0] }, { status: 201 });
+            })
+        );
         await createProgramFaq(PROGRAM_DRAFT_ID, { question: 'New Q?', answer: 'New A', sort_order: 3 });
         expect(captured.question).toBe('New Q?');
         expect(captured.answer).toBe('New A');
@@ -854,10 +985,12 @@ describe('createProgramFaq', () => {
 describe('updateProgramFaq', () => {
     it('sends updated FAQ data', async () => {
         let captured: any = null;
-        server.use(http.put(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/faqs/:faqId`, async ({ request }) => {
-            captured = await request.json();
-            return HttpResponse.json({ success: true, data: mockProgramFaqs[0] });
-        }));
+        server.use(
+            http.put(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/faqs/:faqId`, async ({ request }) => {
+                captured = await request.json();
+                return HttpResponse.json({ success: true, data: mockProgramFaqs[0] });
+            })
+        );
         await updateProgramFaq(PROGRAM_DRAFT_ID, 1, { question: 'Updated Q?', answer: 'Updated A' });
         expect(captured.question).toBe('Updated Q?');
     });
@@ -870,9 +1003,12 @@ describe('deleteProgramFaq', () => {
     });
 
     it('throws ApiError on 404', async () => {
-        server.use(http.delete(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/faqs/:faqId`, () =>
-            HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'FAQ not found' } }, { status: 404 })));
-        const err = await deleteProgramFaq(PROGRAM_DRAFT_ID, 999).catch(e => e);
+        server.use(
+            http.delete(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/faqs/:faqId`, () =>
+                HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'FAQ not found' } }, { status: 404 })
+            )
+        );
+        const err = await deleteProgramFaq(PROGRAM_DRAFT_ID, 999).catch((e) => e);
         expect(err.code).toBe('NOT_FOUND');
     });
 });
@@ -880,16 +1016,24 @@ describe('deleteProgramFaq', () => {
 describe('bulkSaveFaqs', () => {
     it('PUTs the full FAQ array to the bulk endpoint and returns the new list', async () => {
         let captured: any = null;
-        server.use(http.put(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/faqs/bulk/`, async ({ request }) => {
-            captured = await request.json();
-            return HttpResponse.json({
-                success: true,
-                data: [
-                    { id: 41, question: 'Is parking available?', answer: 'Yes, free parking for 50 cars.', sort_order: 0, documents: [] },
-                    { id: 42, question: 'Can I reschedule?', answer: 'Yes, up to 48 hours before.', sort_order: 1, documents: [] },
-                ],
-            });
-        }));
+        server.use(
+            http.put(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/faqs/bulk/`, async ({ request }) => {
+                captured = await request.json();
+                return HttpResponse.json({
+                    success: true,
+                    data: [
+                        {
+                            id: 41,
+                            question: 'Is parking available?',
+                            answer: 'Yes, free parking for 50 cars.',
+                            sort_order: 0,
+                            documents: [],
+                        },
+                        { id: 42, question: 'Can I reschedule?', answer: 'Yes, up to 48 hours before.', sort_order: 1, documents: [] },
+                    ],
+                });
+            })
+        );
         const res = await bulkSaveFaqs('programs', PROGRAM_DRAFT_ID, [
             { question: 'Is parking available?', answer: 'Yes, free parking for 50 cars.', sort_order: 0 },
             { question: 'Can I reschedule?', answer: 'Yes, up to 48 hours before.', sort_order: 1 },
@@ -903,19 +1047,24 @@ describe('bulkSaveFaqs', () => {
 
     it('sending an empty array is a valid request (deletes all FAQs)', async () => {
         let captured: any = null;
-        server.use(http.put(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/faqs/bulk/`, async ({ request }) => {
-            captured = await request.json();
-            return HttpResponse.json({ success: true, data: [] });
-        }));
+        server.use(
+            http.put(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/faqs/bulk/`, async ({ request }) => {
+                captured = await request.json();
+                return HttpResponse.json({ success: true, data: [] });
+            })
+        );
         const res = await bulkSaveFaqs('programs', PROGRAM_DRAFT_ID, []);
         expect(captured.faqs).toEqual([]);
         expect(res.data || res).toEqual([]);
     });
 
     it('rejects the whole batch on a validation error, throwing ApiError', async () => {
-        server.use(http.put(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/faqs/bulk/`, () =>
-            HttpResponse.json({ error: { code: 'VALIDATION_ERROR', message: 'answer is required' } }, { status: 400 })));
-        const err = await bulkSaveFaqs('programs', PROGRAM_DRAFT_ID, [{ question: 'Q?', answer: '' }]).catch(e => e);
+        server.use(
+            http.put(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/faqs/bulk/`, () =>
+                HttpResponse.json({ error: { code: 'VALIDATION_ERROR', message: 'answer is required' } }, { status: 400 })
+            )
+        );
+        const err = await bulkSaveFaqs('programs', PROGRAM_DRAFT_ID, [{ question: 'Q?', answer: '' }]).catch((e) => e);
         expect(err.code).toBe('VALIDATION_ERROR');
     });
 });
@@ -925,20 +1074,30 @@ describe('bulkSaveFaqs', () => {
 describe('uploadProgramMedia', () => {
     it('uploads cover with correct form fields', async () => {
         let capturedType = '';
-        server.use(http.post(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/media/`, async ({ request }) => {
-            const form = await request.formData();
-            capturedType = form.get('media_type') as string;
-            return HttpResponse.json({ success: true, data: { id: 20, media_type: 'cover', file_url: 'https://example.com/prog-cover.jpg', created_at: '' } }, { status: 201 });
-        }));
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/media/`, async ({ request }) => {
+                capturedType = multipartField(await request.text(), 'media_type') ?? '';
+                return HttpResponse.json(
+                    {
+                        success: true,
+                        data: { id: 20, media_type: 'cover', file_url: 'https://example.com/prog-cover.jpg', created_at: '' },
+                    },
+                    { status: 201 }
+                );
+            })
+        );
         const res = await uploadProgramMedia(PROGRAM_DRAFT_ID, makeFile(), 'cover');
         expect(capturedType).toBe('cover');
         expect((res.data || res).media_type).toBe('cover');
     });
 
     it('throws ApiError with COVER_ALREADY_EXISTS', async () => {
-        server.use(http.post(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/media/`, () =>
-            HttpResponse.json({ error: { code: 'COVER_ALREADY_EXISTS', message: 'Delete existing cover first' } }, { status: 400 })));
-        const err = await uploadProgramMedia(PROGRAM_DRAFT_ID, makeFile(), 'cover').catch(e => e);
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/media/`, () =>
+                HttpResponse.json({ error: { code: 'COVER_ALREADY_EXISTS', message: 'Delete existing cover first' } }, { status: 400 })
+            )
+        );
+        const err = await uploadProgramMedia(PROGRAM_DRAFT_ID, makeFile(), 'cover').catch((e) => e);
         expect(err.code).toBe('COVER_ALREADY_EXISTS');
     });
 });
@@ -950,9 +1109,12 @@ describe('deleteProgramMedia', () => {
     });
 
     it('throws ApiError on 404', async () => {
-        server.use(http.delete(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/media/:mediaId`, () =>
-            HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Media not found' } }, { status: 404 })));
-        const err = await deleteProgramMedia(PROGRAM_DRAFT_ID, 999).catch(e => e);
+        server.use(
+            http.delete(`${BASE}/api/v1/partner/listings/programs/${PROGRAM_DRAFT_ID}/media/:mediaId`, () =>
+                HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Media not found' } }, { status: 404 })
+            )
+        );
+        const err = await deleteProgramMedia(PROGRAM_DRAFT_ID, 999).catch((e) => e);
         expect(err.code).toBe('NOT_FOUND');
     });
 });
@@ -996,8 +1158,11 @@ describe('getVenueMetaCategories', () => {
     });
 
     it('throws ApiError on server failure', async () => {
-        server.use(http.get(`${BASE}/api/v1/listings/venues/metadata/categories/`, () =>
-            HttpResponse.json({ error: { code: 'SERVER_ERROR', message: 'Internal error' } }, { status: 500 })));
+        server.use(
+            http.get(`${BASE}/api/v1/listings/venues/metadata/categories/`, () =>
+                HttpResponse.json({ error: { code: 'SERVER_ERROR', message: 'Internal error' } }, { status: 500 })
+            )
+        );
         await expect(getVenueMetaCategories()).rejects.toBeInstanceOf(ApiError);
     });
 });
@@ -1029,10 +1194,12 @@ describe('getVenueListings', () => {
 
     it('appends status query param', async () => {
         let capturedUrl = '';
-        server.use(http.get(`${BASE}/api/v1/partner/listings/venues/`, ({ request }) => {
-            capturedUrl = request.url;
-            return HttpResponse.json({ success: true, data: [] });
-        }));
+        server.use(
+            http.get(`${BASE}/api/v1/partner/listings/venues/`, ({ request }) => {
+                capturedUrl = request.url;
+                return HttpResponse.json({ success: true, data: [] });
+            })
+        );
         await getVenueListings('published');
         expect(capturedUrl).toContain('status=published');
     });
@@ -1058,10 +1225,12 @@ describe('createVenueDraft', () => {
 
     it('sends payload in request body', async () => {
         let captured: any = null;
-        server.use(http.post(`${BASE}/api/v1/partner/listings/venues/`, async ({ request }) => {
-            captured = await request.json();
-            return HttpResponse.json({ success: true, data: mockVenueDraft }, { status: 201 });
-        }));
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/venues/`, async ({ request }) => {
+                captured = await request.json();
+                return HttpResponse.json({ success: true, data: mockVenueDraft }, { status: 201 });
+            })
+        );
         await createVenueDraft({ title: 'Garden Hall', description: 'Outdoor space' });
         expect(captured.title).toBe('Garden Hall');
         expect(captured.description).toBe('Outdoor space');
@@ -1071,10 +1240,12 @@ describe('createVenueDraft', () => {
 describe('updateVenueListing', () => {
     it('sends patch payload and returns updated listing', async () => {
         let captured: any = null;
-        server.use(http.patch(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/`, async ({ request }) => {
-            captured = await request.json();
-            return HttpResponse.json({ success: true, data: { ...mockVenueDraft, title: 'Updated Venue' } });
-        }));
+        server.use(
+            http.patch(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/`, async ({ request }) => {
+                captured = await request.json();
+                return HttpResponse.json({ success: true, data: { ...mockVenueDraft, title: 'Updated Venue' } });
+            })
+        );
         await updateVenueListing(VENUE_DRAFT_ID, {
             title: 'Updated Venue',
             location_type: 'outdoor',
@@ -1088,9 +1259,12 @@ describe('updateVenueListing', () => {
     });
 
     it('throws ApiError with LISTING_LOCKED on 400', async () => {
-        server.use(http.patch(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/`, () =>
-            HttpResponse.json({ error: { code: 'LISTING_LOCKED', message: 'Not editable' } }, { status: 400 })));
-        const err = await updateVenueListing(VENUE_DRAFT_ID, { title: 'x' }).catch(e => e);
+        server.use(
+            http.patch(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/`, () =>
+                HttpResponse.json({ error: { code: 'LISTING_LOCKED', message: 'Not editable' } }, { status: 400 })
+            )
+        );
+        const err = await updateVenueListing(VENUE_DRAFT_ID, { title: 'x' }).catch((e) => e);
         expect(err.code).toBe('LISTING_LOCKED');
     });
 });
@@ -1102,9 +1276,12 @@ describe('deleteVenueListing', () => {
     });
 
     it('throws ApiError on 404', async () => {
-        server.use(http.delete(`${BASE}/api/v1/partner/listings/venues/bad-id/`, () =>
-            HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Not found' } }, { status: 404 })));
-        const err = await deleteVenueListing('bad-id').catch(e => e);
+        server.use(
+            http.delete(`${BASE}/api/v1/partner/listings/venues/bad-id/`, () =>
+                HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Not found' } }, { status: 404 })
+            )
+        );
+        const err = await deleteVenueListing('bad-id').catch((e) => e);
         expect(err.code).toBe('NOT_FOUND');
     });
 });
@@ -1116,9 +1293,12 @@ describe('submitVenueListing', () => {
     });
 
     it('throws ApiError with INCOMPLETE_VENUE on missing fields', async () => {
-        server.use(http.post(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/submit/`, () =>
-            HttpResponse.json({ error: { code: 'INCOMPLETE_VENUE', message: 'Missing cover image' } }, { status: 400 })));
-        const err = await submitVenueListing(VENUE_DRAFT_ID).catch(e => e);
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/submit/`, () =>
+                HttpResponse.json({ error: { code: 'INCOMPLETE_VENUE', message: 'Missing cover image' } }, { status: 400 })
+            )
+        );
+        const err = await submitVenueListing(VENUE_DRAFT_ID).catch((e) => e);
         expect(err.code).toBe('INCOMPLETE_VENUE');
     });
 });
@@ -1136,27 +1316,40 @@ describe('getVenueListingMedia', () => {
 describe('uploadVenueListingMedia', () => {
     it('uploads cover with correct form fields', async () => {
         let capturedType = '';
-        server.use(http.post(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/media/`, async ({ request }) => {
-            const form = await request.formData();
-            capturedType = form.get('media_type') as string;
-            return HttpResponse.json({ success: true, data: { id: 30, media_type: 'cover', file_url: 'https://example.com/venue-cover.jpg', created_at: '' } }, { status: 201 });
-        }));
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/media/`, async ({ request }) => {
+                capturedType = multipartField(await request.text(), 'media_type') ?? '';
+                return HttpResponse.json(
+                    {
+                        success: true,
+                        data: { id: 30, media_type: 'cover', file_url: 'https://example.com/venue-cover.jpg', created_at: '' },
+                    },
+                    { status: 201 }
+                );
+            })
+        );
         const res = await uploadVenueListingMedia(VENUE_DRAFT_ID, makeFile(), 'cover');
         expect(capturedType).toBe('cover');
         expect((res.data || res).media_type).toBe('cover');
     });
 
     it('throws ApiError with COVER_ALREADY_EXISTS', async () => {
-        server.use(http.post(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/media/`, () =>
-            HttpResponse.json({ error: { code: 'COVER_ALREADY_EXISTS', message: 'Delete existing cover first' } }, { status: 400 })));
-        const err = await uploadVenueListingMedia(VENUE_DRAFT_ID, makeFile(), 'cover').catch(e => e);
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/media/`, () =>
+                HttpResponse.json({ error: { code: 'COVER_ALREADY_EXISTS', message: 'Delete existing cover first' } }, { status: 400 })
+            )
+        );
+        const err = await uploadVenueListingMedia(VENUE_DRAFT_ID, makeFile(), 'cover').catch((e) => e);
         expect(err.code).toBe('COVER_ALREADY_EXISTS');
     });
 
     it('throws ApiError with GALLERY_LIMIT_EXCEEDED for gallery', async () => {
-        server.use(http.post(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/media/`, () =>
-            HttpResponse.json({ error: { code: 'GALLERY_LIMIT_EXCEEDED', message: 'Max 10 gallery images' } }, { status: 400 })));
-        const err = await uploadVenueListingMedia(VENUE_DRAFT_ID, makeFile(), 'gallery').catch(e => e);
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/media/`, () =>
+                HttpResponse.json({ error: { code: 'GALLERY_LIMIT_EXCEEDED', message: 'Max 10 gallery images' } }, { status: 400 })
+            )
+        );
+        const err = await uploadVenueListingMedia(VENUE_DRAFT_ID, makeFile(), 'gallery').catch((e) => e);
         expect(err.code).toBe('GALLERY_LIMIT_EXCEEDED');
     });
 });
@@ -1168,9 +1361,12 @@ describe('deleteVenueListingMedia', () => {
     });
 
     it('throws ApiError on 404', async () => {
-        server.use(http.delete(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/media/:mediaId`, () =>
-            HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Media not found' } }, { status: 404 })));
-        const err = await deleteVenueListingMedia(VENUE_DRAFT_ID, 999).catch(e => e);
+        server.use(
+            http.delete(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/media/:mediaId`, () =>
+                HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Media not found' } }, { status: 404 })
+            )
+        );
+        const err = await deleteVenueListingMedia(VENUE_DRAFT_ID, 999).catch((e) => e);
         expect(err.code).toBe('NOT_FOUND');
     });
 });
@@ -1190,10 +1386,12 @@ describe('getVenuePackages', () => {
 describe('createVenuePackage', () => {
     it('sends package payload and returns created package', async () => {
         let captured: any = null;
-        server.use(http.post(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/packages/`, async ({ request }) => {
-            captured = await request.json();
-            return HttpResponse.json({ success: true, data: mockVenuePackages[0] }, { status: 201 });
-        }));
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/packages/`, async ({ request }) => {
+                captured = await request.json();
+                return HttpResponse.json({ success: true, data: mockVenuePackages[0] }, { status: 201 });
+            })
+        );
         await createVenuePackage(VENUE_DRAFT_ID, {
             name: 'Premium Package',
             price: 10000,
@@ -1207,9 +1405,14 @@ describe('createVenuePackage', () => {
     });
 
     it('throws ApiError with VALIDATION_ERROR on invalid data', async () => {
-        server.use(http.post(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/packages/`, () =>
-            HttpResponse.json({ error: { code: 'VALIDATION_ERROR', message: 'duration_minutes must be positive' } }, { status: 400 })));
-        const err = await createVenuePackage(VENUE_DRAFT_ID, { name: 'Bad', price: 0, duration_minutes: -1, max_guests: 10 }).catch(e => e);
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/packages/`, () =>
+                HttpResponse.json({ error: { code: 'VALIDATION_ERROR', message: 'duration_minutes must be positive' } }, { status: 400 })
+            )
+        );
+        const err = await createVenuePackage(VENUE_DRAFT_ID, { name: 'Bad', price: 0, duration_minutes: -1, max_guests: 10 }).catch(
+            (e) => e
+        );
         expect(err.code).toBe('VALIDATION_ERROR');
     });
 });
@@ -1217,10 +1420,12 @@ describe('createVenuePackage', () => {
 describe('updateVenuePackage', () => {
     it('sends updated package data', async () => {
         let captured: any = null;
-        server.use(http.put(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/packages/:pkgId`, async ({ request }) => {
-            captured = await request.json();
-            return HttpResponse.json({ success: true, data: mockVenuePackages[0] });
-        }));
+        server.use(
+            http.put(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/packages/:pkgId`, async ({ request }) => {
+                captured = await request.json();
+                return HttpResponse.json({ success: true, data: mockVenuePackages[0] });
+            })
+        );
         await updateVenuePackage(VENUE_DRAFT_ID, 1, { price: 6000, max_guests: 75 });
         expect(captured.price).toBe(6000);
         expect(captured.max_guests).toBe(75);
@@ -1234,9 +1439,12 @@ describe('deleteVenuePackage', () => {
     });
 
     it('throws ApiError on 404', async () => {
-        server.use(http.delete(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/packages/:pkgId`, () =>
-            HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Package not found' } }, { status: 404 })));
-        const err = await deleteVenuePackage(VENUE_DRAFT_ID, 999).catch(e => e);
+        server.use(
+            http.delete(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/packages/:pkgId`, () =>
+                HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Package not found' } }, { status: 404 })
+            )
+        );
+        const err = await deleteVenuePackage(VENUE_DRAFT_ID, 999).catch((e) => e);
         expect(err.code).toBe('NOT_FOUND');
     });
 });
@@ -1256,10 +1464,12 @@ describe('getVenueAvailability', () => {
 describe('createVenueAvailabilitySlot', () => {
     it('sends slot payload and returns created slot', async () => {
         let captured: any = null;
-        server.use(http.post(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/availability/`, async ({ request }) => {
-            captured = await request.json();
-            return HttpResponse.json({ success: true, data: mockVenueSlots[0] }, { status: 201 });
-        }));
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/availability/`, async ({ request }) => {
+                captured = await request.json();
+                return HttpResponse.json({ success: true, data: mockVenueSlots[0] }, { status: 201 });
+            })
+        );
         await createVenueAvailabilitySlot(VENUE_DRAFT_ID, {
             date: '2026-08-01',
             start_time: '10:00:00',
@@ -1271,9 +1481,16 @@ describe('createVenueAvailabilitySlot', () => {
     });
 
     it('throws ApiError with VALIDATION_ERROR when end_time before start_time', async () => {
-        server.use(http.post(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/availability/`, () =>
-            HttpResponse.json({ error: { code: 'VALIDATION_ERROR', message: 'end_time must be after start_time' } }, { status: 400 })));
-        const err = await createVenueAvailabilitySlot(VENUE_DRAFT_ID, { date: '2026-08-01', start_time: '14:00:00', end_time: '10:00:00' }).catch(e => e);
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/availability/`, () =>
+                HttpResponse.json({ error: { code: 'VALIDATION_ERROR', message: 'end_time must be after start_time' } }, { status: 400 })
+            )
+        );
+        const err = await createVenueAvailabilitySlot(VENUE_DRAFT_ID, {
+            date: '2026-08-01',
+            start_time: '14:00:00',
+            end_time: '10:00:00',
+        }).catch((e) => e);
         expect(err.code).toBe('VALIDATION_ERROR');
     });
 });
@@ -1281,10 +1498,12 @@ describe('createVenueAvailabilitySlot', () => {
 describe('updateVenueAvailabilitySlot', () => {
     it('sends updated slot data', async () => {
         let captured: any = null;
-        server.use(http.put(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/availability/:slotId`, async ({ request }) => {
-            captured = await request.json();
-            return HttpResponse.json({ success: true, data: mockVenueSlots[0] });
-        }));
+        server.use(
+            http.put(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/availability/:slotId`, async ({ request }) => {
+                captured = await request.json();
+                return HttpResponse.json({ success: true, data: mockVenueSlots[0] });
+            })
+        );
         await updateVenueAvailabilitySlot(VENUE_DRAFT_ID, 1, { date: '2026-07-20', start_time: '11:00:00', end_time: '15:00:00' });
         expect(captured.date).toBe('2026-07-20');
         expect(captured.start_time).toBe('11:00:00');
@@ -1298,9 +1517,12 @@ describe('deleteVenueAvailabilitySlot', () => {
     });
 
     it('throws ApiError on 404', async () => {
-        server.use(http.delete(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/availability/:slotId`, () =>
-            HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Slot not found' } }, { status: 404 })));
-        const err = await deleteVenueAvailabilitySlot(VENUE_DRAFT_ID, 999).catch(e => e);
+        server.use(
+            http.delete(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/availability/:slotId`, () =>
+                HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Slot not found' } }, { status: 404 })
+            )
+        );
+        const err = await deleteVenueAvailabilitySlot(VENUE_DRAFT_ID, 999).catch((e) => e);
         expect(err.code).toBe('NOT_FOUND');
     });
 });
@@ -1319,10 +1541,12 @@ describe('getVenueAttendeeFields', () => {
 describe('updateVenueAttendeeFields', () => {
     it('sends fields array and returns updated fields', async () => {
         let captured: any = null;
-        server.use(http.put(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/attendee-fields/`, async ({ request }) => {
-            captured = await request.json();
-            return HttpResponse.json({ success: true, data: { fields: ['child_name', 'contact_number', 'email'] } });
-        }));
+        server.use(
+            http.put(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/attendee-fields/`, async ({ request }) => {
+                captured = await request.json();
+                return HttpResponse.json({ success: true, data: { fields: ['child_name', 'contact_number', 'email'] } });
+            })
+        );
         const res = await updateVenueAttendeeFields(VENUE_DRAFT_ID, ['child_name', 'contact_number', 'email']);
         expect(captured.fields).toEqual(['child_name', 'contact_number', 'email']);
         expect((res.data || res).fields).toHaveLength(3);
@@ -1330,10 +1554,12 @@ describe('updateVenueAttendeeFields', () => {
 
     it('accepts empty fields array', async () => {
         let captured: any = null;
-        server.use(http.put(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/attendee-fields/`, async ({ request }) => {
-            captured = await request.json();
-            return HttpResponse.json({ success: true, data: { fields: [] } });
-        }));
+        server.use(
+            http.put(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/attendee-fields/`, async ({ request }) => {
+                captured = await request.json();
+                return HttpResponse.json({ success: true, data: { fields: [] } });
+            })
+        );
         await updateVenueAttendeeFields(VENUE_DRAFT_ID, []);
         expect(captured.fields).toEqual([]);
     });
@@ -1354,10 +1580,15 @@ describe('getVenueDiscovery', () => {
 describe('updateVenueDiscovery', () => {
     it('sends all three discovery arrays', async () => {
         let captured: any = null;
-        server.use(http.put(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/discovery/`, async ({ request }) => {
-            captured = await request.json();
-            return HttpResponse.json({ success: true, data: { outing_types: ['outdoor'], activity_types: ['sports'], format_types: ['group'] } });
-        }));
+        server.use(
+            http.put(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/discovery/`, async ({ request }) => {
+                captured = await request.json();
+                return HttpResponse.json({
+                    success: true,
+                    data: { outing_types: ['outdoor'], activity_types: ['sports'], format_types: ['group'] },
+                });
+            })
+        );
         const res = await updateVenueDiscovery(VENUE_DRAFT_ID, {
             outing_types: ['outdoor'],
             activity_types: ['sports'],
@@ -1370,18 +1601,23 @@ describe('updateVenueDiscovery', () => {
 
     it('accepts partial update with only some arrays', async () => {
         let captured: any = null;
-        server.use(http.put(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/discovery/`, async ({ request }) => {
-            captured = await request.json();
-            return HttpResponse.json({ success: true, data: {} });
-        }));
+        server.use(
+            http.put(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/discovery/`, async ({ request }) => {
+                captured = await request.json();
+                return HttpResponse.json({ success: true, data: {} });
+            })
+        );
         await updateVenueDiscovery(VENUE_DRAFT_ID, { outing_types: ['indoor'] });
         expect(captured.outing_types).toEqual(['indoor']);
         expect(captured.activity_types).toBeUndefined();
     });
 
     it('throws ApiError on server failure', async () => {
-        server.use(http.put(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/discovery/`, () =>
-            HttpResponse.json({ error: { code: 'SERVER_ERROR', message: 'Internal error' } }, { status: 500 })));
+        server.use(
+            http.put(`${BASE}/api/v1/partner/listings/venues/${VENUE_DRAFT_ID}/discovery/`, () =>
+                HttpResponse.json({ error: { code: 'SERVER_ERROR', message: 'Internal error' } }, { status: 500 })
+            )
+        );
         await expect(updateVenueDiscovery(VENUE_DRAFT_ID, {})).rejects.toBeInstanceOf(ApiError);
     });
 });

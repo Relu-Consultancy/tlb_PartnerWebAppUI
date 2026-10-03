@@ -25,26 +25,19 @@ describe('Enquiries — loading & display', () => {
     });
 
     it('shows empty state when no enquiries', async () => {
-        server.use(http.get(`${BASE}/api/v1/partner/listings/classes/enquiries/`, () =>
-            HttpResponse.json({ success: true, data: [] })));
+        server.use(http.get(`${BASE}/api/v1/partner/listings/classes/enquiries/`, () => HttpResponse.json({ success: true, data: [] })));
         renderComponent();
-        await waitFor(() =>
-            expect(screen.getByText(/no enquiries yet|inbox/i)).toBeInTheDocument(), { timeout: 3000 }
-        );
+        await waitFor(() => expect(screen.getByText(/no class enquiries/i)).toBeInTheDocument(), { timeout: 3000 });
     });
 
     it('shows enquiry rows after loading', async () => {
         renderComponent();
-        await waitFor(() =>
-            expect(screen.getByText(/dance workshop/i)).toBeInTheDocument(), { timeout: 3000 }
-        );
+        await waitFor(() => expect(screen.getByText(/dance workshop/i)).toBeInTheDocument(), { timeout: 3000 });
     });
 
     it('renders search input', async () => {
         renderComponent();
-        await waitFor(() =>
-            expect(screen.getByPlaceholderText(/search/i)).toBeInTheDocument()
-        );
+        await waitFor(() => expect(screen.getByPlaceholderText(/search/i)).toBeInTheDocument());
     });
 
     it('renders filter button', async () => {
@@ -61,29 +54,26 @@ describe('Enquiries — status filter', () => {
         renderComponent();
         const user = userEvent.setup();
         await waitFor(() => screen.getByText(/dance workshop/i));
-        // Filter button is at index 1 (after Menu button)
-        const buttons = screen.getAllByRole('button');
-        const filterBtn = buttons[1];
-        await user.click(filterBtn);
+        await user.click(screen.getByRole('button', { name: /filter by status/i }));
         // Filter dropdown should appear with "All Statuses" option (unique to the dropdown)
-        await waitFor(() =>
-            expect(screen.queryByText('All Statuses')).toBeInTheDocument()
-        );
+        await waitFor(() => expect(screen.queryByText('All Statuses')).toBeInTheDocument());
     });
 });
 
 describe('Enquiries — unlock enquiry', () => {
     it('calls unlock API when Unlock button is clicked', async () => {
         let unlockCalled = false;
-        server.use(http.post(`${BASE}/api/v1/partner/listings/classes/enquiries/:id/unlock/`, () => {
-            unlockCalled = true;
-            return HttpResponse.json({ success: true, data: { ...mockClassEnquiry, is_locked: false } });
-        }));
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/classes/enquiries/:id/unlock/`, () => {
+                unlockCalled = true;
+                return HttpResponse.json({ success: true, data: { ...mockClassEnquiry, is_locked: false } });
+            })
+        );
         renderComponent();
         const user = userEvent.setup();
         await waitFor(() => screen.getByText(/dance workshop/i));
         // Click on an enquiry row to expand/select it
-        const rows = screen.getAllByRole('row').filter(r => r.textContent?.includes('Dance Workshop'));
+        const rows = screen.getAllByRole('row').filter((r) => r.textContent?.includes('Dance Workshop'));
         if (rows.length > 0) {
             await user.click(rows[0]);
             const unlockBtns = await screen.findAllByRole('button', { name: /unlock/i });
@@ -98,15 +88,17 @@ describe('Enquiries — unlock enquiry', () => {
 describe('Enquiries — status update', () => {
     it('calls update API when status changes', async () => {
         let updateCalled = false;
-        server.use(http.put(`${BASE}/api/v1/partner/listings/classes/enquiries/:id`, async () => {
-            updateCalled = true;
-            return HttpResponse.json({ success: true, data: { ...mockClassEnquiry, status: 'contacted' } });
-        }));
+        server.use(
+            http.put(`${BASE}/api/v1/partner/listings/classes/enquiries/:id`, async () => {
+                updateCalled = true;
+                return HttpResponse.json({ success: true, data: { ...mockClassEnquiry, status: 'contacted' } });
+            })
+        );
         renderComponent();
         const user = userEvent.setup();
         await waitFor(() => screen.getByText(/dance workshop/i));
         // Click on an enquiry row
-        const rows = screen.getAllByRole('row').filter(r => r.textContent?.includes('Dance Workshop'));
+        const rows = screen.getAllByRole('row').filter((r) => r.textContent?.includes('Dance Workshop'));
         if (rows.length > 0) {
             await user.click(rows[0]);
             const statusSelects = screen.queryAllByRole('combobox');
@@ -120,14 +112,17 @@ describe('Enquiries — status update', () => {
 
 describe('Enquiries — search', () => {
     it('filters enquiries by search text', async () => {
-        server.use(http.get(`${BASE}/api/v1/partner/listings/classes/enquiries/`, () =>
-            HttpResponse.json({
-                success: true,
-                data: [
-                    { ...mockClassEnquiry, id: 'enq-001', class_title: 'Dance Workshop', parent_name: 'Alice' },
-                    { ...mockClassEnquiry, id: 'enq-002', class_title: 'Yoga Class', parent_name: 'Bob', student_name: 'Bob Jr' },
-                ],
-            })));
+        server.use(
+            http.get(`${BASE}/api/v1/partner/listings/classes/enquiries/`, () =>
+                HttpResponse.json({
+                    success: true,
+                    data: [
+                        { ...mockClassEnquiry, id: 'enq-001', class_title: 'Dance Workshop', parent_name: 'Alice' },
+                        { ...mockClassEnquiry, id: 'enq-002', class_title: 'Yoga Class', parent_name: 'Bob', student_name: 'Bob Jr' },
+                    ],
+                })
+            )
+        );
         renderComponent();
         const user = userEvent.setup();
         await waitFor(() => screen.getByText(/dance workshop/i));

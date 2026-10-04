@@ -125,3 +125,20 @@ describe('ApprovalGate — transient read failures', () => {
         expect(calls).toBeGreaterThan(1);
     });
 });
+
+describe('ApprovalGate — every partner status (Django admin choices)', () => {
+    const blocked = ['initiated', 'otp_verified', 'category_selected', 'profile_created', 'activated_limited', 'under_review', 'rejected'];
+
+    it.each(blocked)('shows the verification notice for %s, whatever is_verified says', async (status) => {
+        partnerIs({ id: 1, status, is_verified: true });
+        renderGate('Analytics');
+        await waitFor(() => expect(screen.getByText(/Analytics unlock once TLB approves your profile/i)).toBeInTheDocument());
+        expect(screen.queryByText('Coupons screen')).not.toBeInTheDocument();
+    });
+
+    it('renders the real screen only for approved', async () => {
+        partnerIs({ id: 1, status: 'approved', is_verified: false });
+        renderGate();
+        await waitFor(() => expect(screen.getByText('Coupons screen')).toBeInTheDocument());
+    });
+});

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Screen } from '../../types';
 import { TrafficGroupBy } from '../../api/stats';
 import { Skeleton } from '../../components/ui';
+import { ApprovalRequiredNotice } from '../../components/ApprovalGate';
 import { formatCount } from '../../utils/format';
 import { sourceSlices, trendBars } from './model';
 import { DEFAULT_TRAFFIC_PERIOD } from './presentation';
@@ -29,8 +30,12 @@ export const TrafficAnalytics: React.FC<Props> = ({ onNavigate }) => {
     const [period, setPeriod] = useState<TrafficPeriodState>({ key: DEFAULT_TRAFFIC_PERIOD, dateFrom: '', dateTo: '' });
     const [groupBy, setGroupBy] = useState<TrafficGroupBy>('day');
 
-    const { loading, traffic, error, ready } = useTrafficData(period);
+    const { loading, traffic, error, ready, approvalRefused } = useTrafficData(period);
     const detail = useTrafficDetail(period, groupBy);
+
+    // Same backstop as Analytics/Coupons: if the gate lets a partner through and
+    // the API still refuses, explain why instead of printing the raw refusal.
+    if (approvalRefused) return <ApprovalRequiredNotice feature="Analytics" onNavigate={onNavigate} />;
 
     const bars = trendBars(traffic?.daily_trend || []);
     const slices = sourceSlices(traffic?.by_source || []);
@@ -40,9 +45,21 @@ export const TrafficAnalytics: React.FC<Props> = ({ onNavigate }) => {
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                 <div>
                     <nav aria-label="Breadcrumb" className="text-xs text-tlb-muted mb-[5px]">
-                        <button type="button" onClick={() => onNavigate('HOME')} className="text-tlb-link hover:text-tlb-gold transition-colors">Dashboard</button>
+                        <button
+                            type="button"
+                            onClick={() => onNavigate('HOME')}
+                            className="text-tlb-link hover:text-tlb-gold transition-colors"
+                        >
+                            Dashboard
+                        </button>
                         {' · '}
-                        <button type="button" onClick={() => onNavigate('ANALYTICS')} className="text-tlb-link hover:text-tlb-gold transition-colors">Analytics</button>
+                        <button
+                            type="button"
+                            onClick={() => onNavigate('ANALYTICS')}
+                            className="text-tlb-link hover:text-tlb-gold transition-colors"
+                        >
+                            Analytics
+                        </button>
                         {' · '}Traffic
                     </nav>
                     <h1 className="pt-h1 text-[24px]">Traffic analytics</h1>
@@ -62,9 +79,18 @@ export const TrafficAnalytics: React.FC<Props> = ({ onNavigate }) => {
             ) : (
                 <>
                     <div className="pt-card grid grid-cols-1 sm:grid-cols-3 overflow-hidden">
-                        <div className="pt-stat"><p className="pt-eyebrow">Views</p><p className="pt-stat-n">{formatCount(traffic?.totals.views ?? 0)}</p></div>
-                        <div className="pt-stat"><p className="pt-eyebrow">Unique viewers</p><p className="pt-stat-n">{formatCount(traffic?.totals.unique_viewers ?? 0)}</p></div>
-                        <div className="pt-stat"><p className="pt-eyebrow">Enquiries</p><p className="pt-stat-n">{formatCount(traffic?.totals.enquiries ?? 0)}</p></div>
+                        <div className="pt-stat">
+                            <p className="pt-eyebrow">Views</p>
+                            <p className="pt-stat-n">{formatCount(traffic?.totals.views ?? 0)}</p>
+                        </div>
+                        <div className="pt-stat">
+                            <p className="pt-eyebrow">Unique viewers</p>
+                            <p className="pt-stat-n">{formatCount(traffic?.totals.unique_viewers ?? 0)}</p>
+                        </div>
+                        <div className="pt-stat">
+                            <p className="pt-eyebrow">Enquiries</p>
+                            <p className="pt-stat-n">{formatCount(traffic?.totals.enquiries ?? 0)}</p>
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-[1.85fr_1fr] gap-[18px] items-stretch">
@@ -75,7 +101,9 @@ export const TrafficAnalytics: React.FC<Props> = ({ onNavigate }) => {
                         </div>
                         <div className="pt-card p-5">
                             <p className="pt-h-sec mb-1">Where views come from</p>
-                            <p className="text-[12.5px] text-tlb-muted mb-4">Source data only exists from when this shipped — older days show as organic/direct.</p>
+                            <p className="text-[12.5px] text-tlb-muted mb-4">
+                                Source data only exists from when this shipped — older days show as organic/direct.
+                            </p>
                             <SourceBreakdown slices={slices} />
                         </div>
                     </div>

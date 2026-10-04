@@ -11,7 +11,9 @@ const mockNavigate = vi.fn();
 
 const renderScreen = () => render(<TrafficAnalytics onNavigate={mockNavigate} />);
 
-beforeEach(() => { mockNavigate.mockClear(); });
+beforeEach(() => {
+    mockNavigate.mockClear();
+});
 
 describe('TrafficAnalytics', () => {
     it('shows the real headline totals and source breakdown', async () => {
@@ -51,5 +53,18 @@ describe('TrafficAnalytics', () => {
         await user.click(screen.getByRole('button', { name: /traffic period/i }));
         await user.click(screen.getByRole('option', { name: 'Custom range' }));
         expect(screen.getByText(/pick both a start and end date/i)).toBeInTheDocument();
+    });
+});
+
+describe('TrafficAnalytics — approval refusal', () => {
+    it('shows the verification notice instead of the raw refusal', async () => {
+        server.use(
+            http.get('https://tlb-api.reluconsultancy.in/api/v1/partner/stats/traffic/', () =>
+                HttpResponse.json({ detail: 'You do not have permission to perform this action.' }, { status: 403 })
+            )
+        );
+        renderScreen();
+        await waitFor(() => expect(screen.getByText(/Analytics unlock once TLB approves your profile/i)).toBeInTheDocument());
+        expect(screen.queryByText(/do not have permission/i)).not.toBeInTheDocument();
     });
 });

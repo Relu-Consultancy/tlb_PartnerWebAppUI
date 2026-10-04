@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-    Coupon, CreateCouponInput, getCoupon, getCouponUsages, getCoupons, updateCoupon, createCoupon,
-} from '../../api/coupons';
+import { Coupon, CreateCouponInput, getCoupon, getCouponUsages, getCoupons, updateCoupon, createCoupon } from '../../api/coupons';
 import { toast } from '../../components/ui';
+import { invalidatePortalSummary } from '../../api/portalSummary';
 import { statusOf } from './model';
 import { CouponRow } from './types';
 
@@ -21,7 +20,7 @@ const toRow = (c: Coupon, now: Date): CouponRow => ({
     min_order_value: c.min_order_value ?? null,
     per_user_limit: c.per_user_limit ?? 1,
     starts_at: c.starts_at ?? null,
-    target_listing_ids: (c.target_listings || []).map(l => l.id),
+    target_listing_ids: (c.target_listings || []).map((l) => l.id),
     target_listing_types: c.target_listing_types || [],
     target_genders: c.target_genders || [],
     target_min_age: c.target_min_age ?? null,
@@ -43,29 +42,35 @@ export const useCouponsData = () => {
         const now = new Date();
         try {
             const list = await getCoupons();
-            if (list.length === 0) { setState({ loading: false, rows: [], discountGiven: 0, error: null }); return; }
+            if (list.length === 0) {
+                setState({ loading: false, rows: [], discountGiven: 0, error: null });
+                return;
+            }
 
-            const details = await Promise.allSettled(list.map(c => getCoupon(c.id)));
+            const details = await Promise.allSettled(list.map((c) => getCoupon(c.id)));
             const rows: CouponRow[] = details.map((r, i) =>
-                r.status === 'fulfilled' ? toRow(r.value, now) : toRow(list[i] as unknown as Coupon, now));
+                r.status === 'fulfilled' ? toRow(r.value, now) : toRow(list[i] as unknown as Coupon, now)
+            );
             setState({ loading: false, rows, discountGiven: 0, error: null });
 
-            const usages = await Promise.allSettled(rows.map(r => getCouponUsages(r.id)));
+            const usages = await Promise.allSettled(rows.map((r) => getCouponUsages(r.id)));
             const discountGiven = usages.reduce((sum, r) => {
                 if (r.status !== 'fulfilled') return sum;
                 return sum + r.value.reduce((s, u) => s + (Number(u.discount_applied) || 0), 0);
             }, 0);
-            setState(s => ({ ...s, discountGiven }));
+            setState((s) => ({ ...s, discountGiven }));
         } catch (err: any) {
             console.error('Coupons load failed', err);
             setState({ loading: false, rows: [], discountGiven: 0, error: err?.message || 'Failed to load coupons.' });
         }
     }, []);
 
-    useEffect(() => { load(); }, [load]);
+    useEffect(() => {
+        load();
+    }, [load]);
 
     const patch = (id: string, changes: Partial<CouponRow>) =>
-        setState(s => ({ ...s, rows: s.rows.map(r => r.id === id ? { ...r, ...changes } : r) }));
+        setState((s) => ({ ...s, rows: s.rows.map((r) => (r.id === id ? { ...r, ...changes } : r)) }));
 
     const togglePause = async (row: CouponRow) => {
         const wasActive = row.is_active;
@@ -82,6 +87,8 @@ export const useCouponsData = () => {
         try {
             if (editingId) await updateCoupon(editingId, input);
             else await createCoupon(input);
+            // The sidebar badge reads a memoised count — drop it so it updates now.
+            invalidatePortalSummary('coupons');
             await load();
             return true;
         } catch (err: any) {
@@ -90,5 +97,13 @@ export const useCouponsData = () => {
         }
     };
 
-    return { loading: state.loading, rows: state.rows, discountGiven: state.discountGiven, error: state.error, reload: load, togglePause, save };
+    return {
+        loading: state.loading,
+        rows: state.rows,
+        discountGiven: state.discountGiven,
+        error: state.error,
+        reload: load,
+        togglePause,
+        save,
+    };
 };

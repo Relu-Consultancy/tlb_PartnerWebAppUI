@@ -1,10 +1,16 @@
 import { EntityType } from '../types';
 import { getCurrentPartner } from './onboarding';
 import {
-    getEventListings, getClassListings, getProgramListings, getVenueListings,
-    getClassEnquiries, getVenueEnquiries, getProgramEnquiries,
+    getEventListings,
+    getClassListings,
+    getProgramListings,
+    getVenueListings,
+    getClassEnquiries,
+    getVenueEnquiries,
+    getProgramEnquiries,
 } from './listings';
 import { getCoupons } from './coupons';
+import { isApprovalError } from './client';
 
 // ---------------------------------------------------------------------------
 // Portal summary — the partner-wide reads that the shell (sidebar badges, top
@@ -15,7 +21,10 @@ import { getCoupons } from './coupons';
 
 const DEFAULT_MAX_AGE_MS = 60_000;
 
-interface CacheEntry { at: number; promise: Promise<unknown> }
+interface CacheEntry {
+    at: number;
+    promise: Promise<unknown>;
+}
 const cache = new Map<string, CacheEntry>();
 
 const memo = <T>(key: string, load: () => Promise<T>, maxAgeMs = DEFAULT_MAX_AGE_MS): Promise<T> => {
@@ -24,13 +33,18 @@ const memo = <T>(key: string, load: () => Promise<T>, maxAgeMs = DEFAULT_MAX_AGE
     const promise = load();
     cache.set(key, { at: Date.now(), promise });
     // Never memoise a failure — the next caller retries.
-    promise.catch(() => { if (cache.get(key)?.promise === promise) cache.delete(key); });
+    promise.catch(() => {
+        if (cache.get(key)?.promise === promise) cache.delete(key);
+    });
     return promise;
 };
 
 /** Drops memoised reads — all of them, or those whose key starts with `prefix`. */
 export const invalidatePortalSummary = (prefix?: string): void => {
-    if (!prefix) { cache.clear(); return; }
+    if (!prefix) {
+        cache.clear();
+        return;
+    }
     for (const key of [...cache.keys()]) if (key.startsWith(prefix)) cache.delete(key);
 };
 
@@ -51,7 +65,7 @@ const asList = (json: any): any[] => {
 const ALL_ENTITIES: EntityType[] = ['Events', 'Classes', 'Programs', 'Venues'];
 // No selected categories yet (fresh session) → fall back to every type, as before.
 const scopeOf = (entities: EntityType[]): EntityType[] =>
-    entities.length ? ALL_ENTITIES.filter(e => entities.includes(e)) : ALL_ENTITIES;
+    entities.length ? ALL_ENTITIES.filter((e) => entities.includes(e)) : ALL_ENTITIES;
 
 // ── Partner ─────────────────────────────────────────────────────────────────
 
@@ -79,27 +93,43 @@ export type ListingCounts = Record<ListingState, number> & { total: number };
 
 /** Buckets listings by state — optionally for a single service type. */
 export const countListings = (listings: PartnerListing[], entity?: EntityType): ListingCounts =>
-    listings.reduce<ListingCounts>((counts, listing) => {
-        if (entity && listing.entityType !== entity) return counts;
-        counts.total += 1;
-        counts[listing.state] += 1;
-        return counts;
-    }, { total: 0, live: 0, paused: 0, pending: 0, draft: 0, rejected: 0, archived: 0 });
+    listings.reduce<ListingCounts>(
+        (counts, listing) => {
+            if (entity && listing.entityType !== entity) return counts;
+            counts.total += 1;
+            counts[listing.state] += 1;
+            return counts;
+        },
+        { total: 0, live: 0, paused: 0, pending: 0, draft: 0, rejected: 0, archived: 0 }
+    );
 
 export const reviewMessageOf = (it: any): string =>
-    it?.review_message || it?.review_note || it?.review_comment || it?.admin_message ||
-    it?.admin_note || it?.admin_remarks || it?.rejection_reason || it?.status_reason ||
-    it?.status_message || it?.moderation_note || it?.moderation_reason ||
-    it?.remarks || it?.feedback || '';
+    it?.review_message ||
+    it?.review_note ||
+    it?.review_comment ||
+    it?.admin_message ||
+    it?.admin_note ||
+    it?.admin_remarks ||
+    it?.rejection_reason ||
+    it?.status_reason ||
+    it?.status_message ||
+    it?.moderation_note ||
+    it?.moderation_reason ||
+    it?.remarks ||
+    it?.feedback ||
+    '';
 
 export const listingStateOf = (it: any, type: EntityType): ListingState => {
     const status = it?.status || 'draft';
     if (status === 'published') {
         // Classes carry an admin-editable `is_live` alongside `is_paused`, so both
         // must agree there; other types derive live-ness from `is_paused`.
-        const isLive = type === 'Classes'
-            ? it?.is_live !== false && it?.is_paused !== true
-            : (it?.is_paused != null ? !it.is_paused : it?.is_live !== false);
+        const isLive =
+            type === 'Classes'
+                ? it?.is_live !== false && it?.is_paused !== true
+                : it?.is_paused != null
+                  ? !it.is_paused
+                  : it?.is_live !== false;
         return isLive ? 'live' : 'paused';
     }
     if (status === 'pending' || status === 'rejected' || status === 'archived') return status;
@@ -126,11 +156,14 @@ const LISTING_LOADERS: Record<EntityType, () => Promise<any>> = {
 
 export const loadPartnerListings = (entities: EntityType[], maxAgeMs?: number): Promise<PartnerListing[]> => {
     const scope = scopeOf(entities);
-    return memo(`listings:${scope.join(',')}`, async () => {
-        const results = await Promise.allSettled(scope.map(type => LISTING_LOADERS[type]()));
-        return results.flatMap((r, i) =>
-            r.status === 'fulfilled' ? asList(r.value).map(it => normalizeListing(it, scope[i])) : []);
-    }, maxAgeMs);
+    return memo(
+        `listings:${scope.join(',')}`,
+        async () => {
+            const results = await Promise.allSettled(scope.map((type) => LISTING_LOADERS[type]()));
+            return results.flatMap((r, i) => (r.status === 'fulfilled' ? asList(r.value).map((it) => normalizeListing(it, scope[i])) : []));
+        },
+        maxAgeMs
+    );
 };
 
 // ── Enquiries ───────────────────────────────────────────────────────────────
@@ -149,33 +182,69 @@ export const loadPartnerEnquiries = (entities: EntityType[], maxAgeMs?: number):
     // Program enquiries are only exposed per listing, so the partner-wide
     // rollup covers the two flat CRM endpoints (Classes, Venues) plus a bounded
     // fan-out over Program listings — Programs has no flat enquiries endpoint.
-    const scope = scopeOf(entities).filter(e => e === 'Classes' || e === 'Venues' || e === 'Programs');
-    return memo(`enquiries:${scope.join(',')}`, async () => {
-        const jobs: Promise<PartnerEnquiry[]>[] = [];
-        const normalize = (entityType: EntityType) => (it: any): PartnerEnquiry => ({
-            id: String(it?.id ?? ''),
-            entityType,
-            status: String(it?.status || 'new').toLowerCase(),
-            createdAt: it?.created_at || it?.created || it?.date_time || null,
-        });
-        if (scope.includes('Classes')) {
-            jobs.push(getClassEnquiries().then(res => asList(res).map(normalize('Classes'))).catch(() => []));
-        }
-        if (scope.includes('Venues')) {
-            jobs.push(getVenueEnquiries().then(res => asList(res).map(normalize('Venues'))).catch(() => []));
-        }
-        if (scope.includes('Programs')) {
-            const programJobs = loadPartnerListings(['Programs'], maxAgeMs).then(listings =>
-                Promise.all(listings.map(l =>
-                    getProgramEnquiries(l.id).then(res => asList(res).map(normalize('Programs'))).catch(() => []))));
-            jobs.push(programJobs.then(lists => lists.flat()).catch(() => []));
-        }
-        const results = await Promise.all(jobs);
-        return results.flat();
-    }, maxAgeMs);
+    const scope = scopeOf(entities).filter((e) => e === 'Classes' || e === 'Venues' || e === 'Programs');
+    return memo(
+        `enquiries:${scope.join(',')}`,
+        async () => {
+            const jobs: Promise<PartnerEnquiry[]>[] = [];
+            const normalize =
+                (entityType: EntityType) =>
+                (it: any): PartnerEnquiry => ({
+                    id: String(it?.id ?? ''),
+                    entityType,
+                    status: String(it?.status || 'new').toLowerCase(),
+                    createdAt: it?.created_at || it?.created || it?.date_time || null,
+                });
+            if (scope.includes('Classes')) {
+                jobs.push(
+                    getClassEnquiries()
+                        .then((res) => asList(res).map(normalize('Classes')))
+                        .catch(() => [])
+                );
+            }
+            if (scope.includes('Venues')) {
+                jobs.push(
+                    getVenueEnquiries()
+                        .then((res) => asList(res).map(normalize('Venues')))
+                        .catch(() => [])
+                );
+            }
+            if (scope.includes('Programs')) {
+                const programJobs = loadPartnerListings(['Programs'], maxAgeMs).then((listings) =>
+                    Promise.all(
+                        listings.map((l) =>
+                            getProgramEnquiries(l.id)
+                                .then((res) => asList(res).map(normalize('Programs')))
+                                .catch(() => [])
+                        )
+                    )
+                );
+                jobs.push(programJobs.then((lists) => lists.flat()).catch(() => []));
+            }
+            const results = await Promise.all(jobs);
+            return results.flat();
+        },
+        maxAgeMs
+    );
 };
 
 // ── Coupons ─────────────────────────────────────────────────────────────────
 
-export const loadCouponCount = (maxAgeMs?: number): Promise<number> =>
-    memo('coupons', async () => (await getCoupons()).length, maxAgeMs);
+/**
+ * Coupon total for the sidebar badge, or null when the partner isn't approved
+ * yet. A refusal is a stable answer, so it's cached like a success — otherwise
+ * every navigation re-sent a request the backend was always going to 403.
+ */
+export const loadCouponCount = (maxAgeMs?: number): Promise<number | null> =>
+    memo(
+        'coupons',
+        async () => {
+            try {
+                return (await getCoupons()).length;
+            } catch (err) {
+                if (isApprovalError(err)) return null;
+                throw err;
+            }
+        },
+        maxAgeMs
+    );

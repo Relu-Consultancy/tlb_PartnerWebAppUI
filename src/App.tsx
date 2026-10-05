@@ -475,18 +475,23 @@ function AppInner() {
             )}
             <div className={`flex flex-col min-h-screen ${route.hasSidebar ? 'lg:ml-[220px] bg-tlb-canvas' : ''}`}>
                 {route.hasSidebar && <TopHeader onOpenSidebar={() => setIsSidebarOpen(true)} onNavigate={guardedNavigate} />}
-                <Suspense fallback={<SkeletonPage />}>
-                    {/* Enter-only fade — no `mode="wait"` exit gap, so the new screen mounts
-              immediately instead of leaving a blank window while the old one exits. */}
-                    <motion.div
-                        key={currentScreen}
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.2, ease: 'easeOut' }}
-                    >
-                        <ScreenErrorBoundary>
+                {/* Enter-only fade — no `mode="wait"` exit gap, so the new screen mounts
+                    immediately instead of leaving a blank window while the old one exits.
+                    Suspense sits INSIDE the animated wrapper on purpose: when it sat outside,
+                    a screen whose chunk was still downloading (first visit in production)
+                    suspended after the fade had started, React hid the wrapper and tore the
+                    animation down mid-way, and it never resumed — the screen rendered stuck
+                    at opacity 0 until the partner navigated away and back. */}
+                <motion.div
+                    key={currentScreen}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2, ease: 'easeOut' }}
+                >
+                    <ScreenErrorBoundary>
+                        <Suspense fallback={<SkeletonPage withHeader={!route.hasSidebar} />}>
                             {/* The lazy screen only loads once it actually mounts, so a gated
-                  screen fires none of its approved-partner-only calls. */}
+                                screen fires none of its approved-partner-only calls. */}
                             {route.requiresApproval ? (
                                 <ApprovalGate feature={route.requiresApproval} onNavigate={guardedNavigate}>
                                     {screenElement}
@@ -494,9 +499,9 @@ function AppInner() {
                             ) : (
                                 screenElement
                             )}
-                        </ScreenErrorBoundary>
-                    </motion.div>
-                </Suspense>
+                        </Suspense>
+                    </ScreenErrorBoundary>
+                </motion.div>
             </div>
         </div>
     );

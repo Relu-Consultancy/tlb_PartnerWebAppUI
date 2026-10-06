@@ -42,9 +42,11 @@ export const PortalModal: React.FC<PortalModalProps> = ({ open, onClose, title, 
                         aria-modal="true"
                         aria-labelledby={titleId}
                         className={`pt-card w-full ${widthClass} max-h-[calc(100vh-2rem)] overflow-y-auto overscroll-contain px-6 py-[22px]`}
-                        initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                        // Fade only. The old scale-and-slide made every dialog open visibly
+                        // small and then grow (QA: the bank form "resized" as it opened).
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
                         transition={{ duration: 0.16 }}
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}
                     >

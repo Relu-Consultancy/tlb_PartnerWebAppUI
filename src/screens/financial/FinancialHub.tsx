@@ -12,7 +12,7 @@ import { LedgerPanel } from './components/LedgerPanel';
 import { PayoutHistoryPanel } from './components/PayoutHistoryPanel';
 import { PayoutAccountCard } from './components/PayoutAccountCard';
 import { BankDetailsModal } from './components/BankDetailsModal';
-import { UpdateBankPayload } from '../../api/banking';
+import { BankDetails, UpdateBankPayload } from '../../api/banking';
 
 interface Props {
     onNavigate: (screen: Screen) => void;
@@ -29,6 +29,10 @@ const SkeletonBody: React.FC = () => (
 const FinancialHub: React.FC<Props> = ({ onNavigate }) => {
     const { dateRange } = usePartner();
     const [modalOpen, setModalOpen] = useState(false);
+    // The bank record the dialog opened with. Saving flips the screen from the
+    // "connect your bank" layout to the full page; holding this steady stops the
+    // open dialog from switching to "Update bank account" mid-save.
+    const [modalBank, setModalBank] = useState<BankDetails | null>(null);
     const data = useRevenueData(dateRange);
 
     if (data.loading) return <SkeletonBody />;
@@ -36,12 +40,23 @@ const FinancialHub: React.FC<Props> = ({ onNavigate }) => {
     const verticals = verticalAmounts(data.revenue?.revenue_by_type || []);
     const periodPhrase = getDateRangeOption(dateRange).phrase;
 
+    const openBankModal = () => {
+        setModalBank(data.bankStatus === 'linked' ? data.bank : null);
+        setModalOpen(true);
+    };
+
     const handleSave = async (payload: UpdateBankPayload, cheque?: File) => {
         const ok = await data.saveBank(payload, cheque);
         if (ok) toast.success('Bank details saved. Verification is pending.');
         else toast.error('Couldn’t save bank details. Please try again.');
         return ok;
     };
+
+    // One dialog for both layouts, rendered at the same position in the tree.
+    // When each layout had its own copy, saving swapped layouts while the dialog
+    // was open: the first copy unmounted and a fresh one mounted and replayed its
+    // open animation — the "blink" after submitting the form.
+    const bankModal = <BankDetailsModal open={modalOpen} bank={modalBank} onClose={() => setModalOpen(false)} onSave={handleSave} />;
 
     const header = (
         <div>
@@ -62,72 +77,75 @@ const FinancialHub: React.FC<Props> = ({ onNavigate }) => {
     if (data.bankStatus !== 'linked') {
         const loadFailed = data.bankStatus === 'error';
         return (
-            <div className="px-4 sm:px-[26px] pt-5 pb-9 flex flex-col gap-4">
-                {header}
-                <section
-                    role="alert"
-                    aria-live="polite"
-                    className="pt-card max-w-[620px] w-full mx-auto px-5 py-7 sm:px-9 sm:py-9 flex flex-col items-center text-center"
-                >
-                    <span
-                        className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
-                            loadFailed ? 'bg-tlb-red-soft text-tlb-red-deep' : 'bg-tlb-amber-soft text-tlb-gold'
-                        }`}
-                        aria-hidden="true"
+            <>
+                <div className="px-4 sm:px-[26px] pt-5 pb-9 flex flex-col gap-4">
+                    {header}
+                    <section
+                        role="alert"
+                        aria-live="polite"
+                        className="pt-card max-w-[620px] w-full mx-auto px-5 py-7 sm:px-9 sm:py-9 flex flex-col items-center text-center"
                     >
-                        {loadFailed ? <AlertCircle size={26} strokeWidth={2.25} /> : <Landmark size={26} strokeWidth={2.25} />}
-                    </span>
-                    <h2 className="pt-h1 text-[20px] sm:text-[22px] mt-4 sm:mt-5">
-                        {loadFailed ? 'Couldn’t load your payout account' : 'Connect your bank account'}
-                    </h2>
-                    <p className="text-[13.5px] text-tlb-sub mt-2.5 max-w-[46ch]">
-                        {loadFailed
-                            ? 'We need to check your bank details before showing revenue and payouts. Please try again.'
-                            : 'Add the account your payouts should settle into. Your revenue, ledger and payout history open up as soon as it’s saved.'}
-                    </p>
-                    {loadFailed ? (
-                        <button
-                            type="button"
-                            onClick={data.reload}
-                            className="pt-btn pt-btn-y justify-center w-full sm:w-auto py-3 sm:py-2 mt-6 sm:mt-7"
+                        <span
+                            className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
+                                loadFailed ? 'bg-tlb-red-soft text-tlb-red-deep' : 'bg-tlb-amber-soft text-tlb-gold'
+                            }`}
+                            aria-hidden="true"
                         >
-                            <RotateCw size={15} strokeWidth={2.5} /> Try again
-                        </button>
-                    ) : (
-                        <button
-                            type="button"
-                            onClick={() => setModalOpen(true)}
-                            className="pt-btn pt-btn-y justify-center w-full sm:w-auto py-3 sm:py-2 mt-6 sm:mt-7"
-                        >
-                            Add bank account <ArrowRight size={15} strokeWidth={2.5} />
-                        </button>
-                    )}
-                </section>
-                <BankDetailsModal open={modalOpen} bank={null} onClose={() => setModalOpen(false)} onSave={handleSave} />
-            </div>
+                            {loadFailed ? <AlertCircle size={26} strokeWidth={2.25} /> : <Landmark size={26} strokeWidth={2.25} />}
+                        </span>
+                        <h2 className="pt-h1 text-[20px] sm:text-[22px] mt-4 sm:mt-5">
+                            {loadFailed ? 'Couldn’t load your payout account' : 'Connect your bank account'}
+                        </h2>
+                        <p className="text-[13.5px] text-tlb-sub mt-2.5 max-w-[46ch]">
+                            {loadFailed
+                                ? 'We need to check your bank details before showing revenue and payouts. Please try again.'
+                                : 'Add the account your payouts should settle into. Your revenue, ledger and payout history open up as soon as it’s saved.'}
+                        </p>
+                        {loadFailed ? (
+                            <button
+                                type="button"
+                                onClick={data.reload}
+                                className="pt-btn pt-btn-y justify-center w-full sm:w-auto py-3 sm:py-2 mt-6 sm:mt-7"
+                            >
+                                <RotateCw size={15} strokeWidth={2.5} /> Try again
+                            </button>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={openBankModal}
+                                className="pt-btn pt-btn-y justify-center w-full sm:w-auto py-3 sm:py-2 mt-6 sm:mt-7"
+                            >
+                                Add bank account <ArrowRight size={15} strokeWidth={2.5} />
+                            </button>
+                        )}
+                    </section>
+                </div>
+                {bankModal}
+            </>
         );
     }
 
     return (
-        <div className="px-4 sm:px-[26px] pt-5 pb-9 flex flex-col gap-4">
-            {header}
+        <>
+            <div className="px-4 sm:px-[26px] pt-5 pb-9 flex flex-col gap-4">
+                {header}
 
-            <StatsStrip revenue={data.revenue} periodPhrase={periodPhrase} />
+                <StatsStrip revenue={data.revenue} periodPhrase={periodPhrase} />
 
-            <div className="pt-card p-[16px_20px]">
-                <p className="pt-h-sec mb-2.5">Revenue by vertical</p>
-                <RevenueByVertical verticals={verticals} />
+                <div className="pt-card p-[16px_20px]">
+                    <p className="pt-h-sec mb-2.5">Revenue by vertical</p>
+                    <RevenueByVertical verticals={verticals} />
+                </div>
+
+                <LedgerPanel />
+
+                <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-3.5">
+                    <PayoutHistoryPanel />
+                    <PayoutAccountCard bank={data.bank} onManage={openBankModal} />
+                </div>
             </div>
-
-            <LedgerPanel />
-
-            <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-3.5">
-                <PayoutHistoryPanel />
-                <PayoutAccountCard bank={data.bank} onManage={() => setModalOpen(true)} />
-            </div>
-
-            <BankDetailsModal open={modalOpen} bank={data.bank} onClose={() => setModalOpen(false)} onSave={handleSave} />
-        </div>
+            {bankModal}
+        </>
     );
 };
 

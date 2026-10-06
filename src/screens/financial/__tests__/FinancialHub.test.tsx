@@ -100,9 +100,11 @@ describe('FinancialHub — bank account gate', () => {
         await user.type(screen.getByPlaceholderText('Confirm account number'), '123456789012');
         await user.type(screen.getByPlaceholderText('e.g. HDFC0001234'), 'HDFC0001234');
         await user.click(screen.getByRole('checkbox'));
+
         await user.click(screen.getByRole('button', { name: 'Save bank details' }));
 
         await waitFor(() => expect(screen.getByText('Rs 1,05,910')).toBeInTheDocument());
+        await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
         expect(screen.queryByRole('heading', { name: 'Connect your bank account' })).not.toBeInTheDocument();
         expect(screen.getByText('Payout account')).toBeInTheDocument();
     });
@@ -120,5 +122,18 @@ describe('FinancialHub — bank account gate', () => {
         server.resetHandlers();
         await userEvent.setup().click(screen.getByRole('button', { name: /try again/i }));
         await waitFor(() => expect(screen.getByText(/HDFC Bank ••4412/)).toBeInTheDocument());
+    });
+});
+
+describe('FinancialHub — bank dialog opens at its final size (QA: it appeared small, then grew)', () => {
+    it('Add bank account opens without any scale/slide transform', async () => {
+        server.use(http.get(`${BASE}/api/v1/partner/bank-details/`, () => new HttpResponse(null, { status: 404 })));
+        renderScreen();
+        const user = userEvent.setup();
+        await user.click(await screen.findByRole('button', { name: /add bank account/i }));
+
+        const dialog = await screen.findByRole('dialog');
+        // The old animation started every dialog at scale(0.98) + translateY(8px).
+        expect(dialog.style.transform).not.toMatch(/scale|translate/);
     });
 });

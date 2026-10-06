@@ -30,6 +30,11 @@ describe('humanizeFieldErrors', () => {
 });
 
 describe('Documents — bank details', () => {
+    // A partner who hasn't linked a bank account anywhere yet.
+    beforeEach(() => {
+        server.use(http.get(`${BASE}/api/v1/partner/bank-details/`, () => new HttpResponse(null, { status: 404 })));
+    });
+
     const fillAll = async (user: ReturnType<typeof userEvent.setup>, opts: { bank?: boolean } = { bank: true }) => {
         await waitFor(() => expect(screen.getByPlaceholderText('ABCDE1234F')).toBeInTheDocument());
         await user.type(screen.getByPlaceholderText('ABCDE1234F'), 'ABCDE1234F');
@@ -137,5 +142,86 @@ describe('Documents — verification banner', () => {
         renderScreen();
 
         await waitFor(() => expect(screen.getByText(/Verified Partner/i)).toBeInTheDocument());
+    });
+});
+
+describe('Documents — after submitting (QA: every field went blank and Save asked for the PAN again)', () => {
+    beforeEach(() => {
+        server.use(http.get(`${BASE}/api/v1/partner/bank-details/`, () => new HttpResponse(null, { status: 404 })));
+    });
+
+    it('keeps what was entered and shows it as submitted — nothing to re-enter', async () => {
+        let posts = 0;
+        server.use(
+            http.post(`${BASE}/api/v1/partner/verification/`, () => {
+                posts += 1;
+                return HttpResponse.json({ success: true, data: { status: 'under_review' } });
+            }),
+            // As live: the partner record never sends PAN or bank fields back.
+            http.get(`${BASE}/api/v1/partner/me/`, () =>
+                HttpResponse.json({ success: true, data: { id: 1, status: posts ? 'under_review' : 'activated_limited' } })
+            )
+        );
+        const user = userEvent.setup();
+        renderScreen();
+        await waitFor(() => expect(screen.getByPlaceholderText('ABCDE1234F')).toBeInTheDocument());
+        await user.type(screen.getByPlaceholderText('ABCDE1234F'), 'ABCDE1234F');
+        await user.type(screen.getByPlaceholderText('As per bank records'), 'Asha Rao');
+        await user.type(screen.getByPlaceholderText(/12-digit account number/i), '123456789012');
+        await user.type(screen.getByPlaceholderText('HDFC0001234'), 'HDFC0001234');
+        await user.click(screen.getAllByRole('button', { name: /save documents/i })[0]);
+
+        const summary = await screen.findByRole('region', { name: 'Submitted documents' });
+        expect(summary).toHaveTextContent('ABCDE••••F');
+        expect(summary).toHaveTextContent('Asha Rao');
+        expect(summary).toHaveTextContent('••9012');
+        expect(summary).toHaveTextContent('HDFC0001234');
+        expect(screen.queryByText('Enter your PAN number')).not.toBeInTheDocument();
+
+        // Reopening the form brings the same values back, not an empty form.
+        await user.click(screen.getByRole('button', { name: 'Update details' }));
+        expect(screen.getByPlaceholderText('ABCDE1234F')).toHaveValue('ABCDE1234F');
+        expect(screen.getByPlaceholderText('As per bank records')).toHaveValue('Asha Rao');
+        expect(screen.getByPlaceholderText(/12-digit account number/i)).toHaveValue('123456789012');
+        expect(posts).toBe(1);
+    });
+
+    it('a partner already under review sees the submitted summary, not an empty form demanding the PAN', async () => {
+        server.use(
+            http.get(`${BASE}/api/v1/partner/me/`, () => HttpResponse.json({ success: true, data: { id: 1, status: 'under_review' } })),
+            http.get(`${BASE}/api/v1/partner/bank-details/`, () =>
+                HttpResponse.json({
+                    success: true,
+                    data: {
+                        account_holder_name: 'Asha Rao',
+                        account_number_masked: '••4412',
+                        ifsc_code: 'HDFC0001234',
+                        bank_name: 'HDFC Bank',
+                    },
+                })
+            )
+        );
+        renderScreen();
+
+        const summary = await screen.findByRole('region', { name: 'Submitted documents' });
+        expect(summary).toHaveTextContent('Asha Rao');
+        expect(summary).toHaveTextContent('••4412');
+        expect(screen.queryByPlaceholderText('ABCDE1234F')).not.toBeInTheDocument();
+    });
+
+    it('pre-fills the holder name and IFSC from a saved bank account, never the masked number', async () => {
+        server.use(
+            http.get(`${BASE}/api/v1/partner/bank-details/`, () =>
+                HttpResponse.json({
+                    success: true,
+                    data: { account_holder_name: 'Asha Rao', account_number_masked: '••4412', ifsc_code: 'HDFC0001234' },
+                })
+            )
+        );
+        renderScreen();
+
+        await waitFor(() => expect(screen.getByPlaceholderText('As per bank records')).toHaveValue('Asha Rao'));
+        expect(screen.getByPlaceholderText('HDFC0001234')).toHaveValue('HDFC0001234');
+        expect(screen.getByPlaceholderText(/12-digit account number/i)).toHaveValue('');
     });
 });

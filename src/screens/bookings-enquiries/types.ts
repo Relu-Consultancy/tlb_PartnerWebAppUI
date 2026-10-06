@@ -69,6 +69,9 @@ export interface BookingEntry {
     createdAt: string | null;
     /** The listing's next/only occurrence, when known — drives the "when" bucket and slot label. */
     listingStartsAt: string | null;
+    /** When and why it was cancelled, as the backend recorded it — null while it isn't. */
+    cancelledAt: string | null;
+    cancellationReason: string | null;
 }
 
 /** Bucketed by response state for the Stage filter. */

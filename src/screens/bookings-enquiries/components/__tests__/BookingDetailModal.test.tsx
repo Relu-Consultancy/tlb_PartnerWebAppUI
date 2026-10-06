@@ -10,9 +10,20 @@ import { BookingEntry } from '../../types';
 const BASE = 'https://tlb-api.reluconsultancy.in';
 
 const entry = (overrides: Partial<BookingEntry> = {}): BookingEntry => ({
-    id: 'b1', entity: 'Events', listingId: 'l1', listingTitle: 'Summer Fest',
-    bookingReference: 'BKG-1', customerName: 'Asha Rao', amount: 1100, currency: 'INR',
-    status: 'confirmed', paymentStatus: 'paid', createdAt: '2026-08-10T00:00:00Z', listingStartsAt: null,
+    id: 'b1',
+    entity: 'Events',
+    listingId: 'l1',
+    listingTitle: 'Summer Fest',
+    bookingReference: 'BKG-1',
+    customerName: 'Asha Rao',
+    amount: 1100,
+    currency: 'INR',
+    status: 'confirmed',
+    paymentStatus: 'paid',
+    createdAt: '2026-08-10T00:00:00Z',
+    listingStartsAt: null,
+    cancelledAt: null,
+    cancellationReason: null,
     ...overrides,
 });
 
@@ -20,9 +31,16 @@ const mockOnMarkAttended = vi.fn().mockResolvedValue(true);
 const mockOnCancelBooking = vi.fn();
 const mockOnClose = vi.fn();
 
-const renderModal = (e: BookingEntry) => render(
-    <BookingDetailModal entry={e} now={new Date('2026-09-01')} onClose={mockOnClose} onMarkAttended={mockOnMarkAttended} onCancelBooking={mockOnCancelBooking} />
-);
+const renderModal = (e: BookingEntry) =>
+    render(
+        <BookingDetailModal
+            entry={e}
+            now={new Date('2026-09-01')}
+            onClose={mockOnClose}
+            onMarkAttended={mockOnMarkAttended}
+            onCancelBooking={mockOnCancelBooking}
+        />
+    );
 
 // A single, always-installed handler that reads a mutable fixture per test — avoids relying on
 // MSW runtime-handler override ordering between `beforeEach` and a per-test `server.use()` for
@@ -34,15 +52,24 @@ beforeEach(() => {
     bookingDetailData = { customer_phone: '9876543210', customer_email: 'asha@example.com' };
     server.use(
         http.get(`${BASE}/api/v1/partner/bookings/:id/`, () => HttpResponse.json({ success: true, data: bookingDetailData })),
-        http.get(`${BASE}/api/v1/partner/bookings/:id/payment-detail/`, () => HttpResponse.json({ success: true, data: {} })),
+        http.get(`${BASE}/api/v1/partner/bookings/:id/payment-detail/`, () => HttpResponse.json({ success: true, data: {} }))
     );
 });
 
 describe('BookingDetailModal — refund tracking', () => {
     it('shows a real "Refund in progress" state, not "Refunded", while a refund is processing', async () => {
         bookingDetailData = {
-            customer_phone: '9876543210', customer_email: 'asha@example.com',
-            refund: { id: 'r1', status: 'processing', amount: 1100, currency: 'INR', requested_at: '2026-08-20T10:00:00Z', settled_at: null, failed_at: null },
+            customer_phone: '9876543210',
+            customer_email: 'asha@example.com',
+            refund: {
+                id: 'r1',
+                status: 'processing',
+                amount: 1100,
+                currency: 'INR',
+                requested_at: '2026-08-20T10:00:00Z',
+                settled_at: null,
+                failed_at: null,
+            },
         };
         renderModal(entry({ status: 'cancelled', paymentStatus: 'refunded' }));
         // Shown twice by design: the header badge and the detail note both reflect the real,
@@ -54,7 +81,15 @@ describe('BookingDetailModal — refund tracking', () => {
 
     it('shows "Refunded" only once the refund has actually settled', async () => {
         bookingDetailData = {
-            refund: { id: 'r1', status: 'settled', amount: 1100, currency: 'INR', requested_at: '2026-08-20T10:00:00Z', settled_at: '2026-08-22T10:00:00Z', failed_at: null },
+            refund: {
+                id: 'r1',
+                status: 'settled',
+                amount: 1100,
+                currency: 'INR',
+                requested_at: '2026-08-20T10:00:00Z',
+                settled_at: '2026-08-22T10:00:00Z',
+                failed_at: null,
+            },
         };
         renderModal(entry({ status: 'cancelled', paymentStatus: 'refunded' }));
         await waitFor(() => expect(screen.getAllByText('Refunded').length).toBeGreaterThanOrEqual(2));
@@ -96,7 +131,11 @@ describe('BookingDetailModal — cancel & refund action', () => {
     });
 
     it('shows the exact plain-language copy for CANCELLATION_DEADLINE_PASSED instead of a raw error', async () => {
-        mockOnCancelBooking.mockResolvedValue({ success: false, code: 'CANCELLATION_DEADLINE_PASSED', message: 'Cancellation deadline passed.' });
+        mockOnCancelBooking.mockResolvedValue({
+            success: false,
+            code: 'CANCELLATION_DEADLINE_PASSED',
+            message: 'Cancellation deadline passed.',
+        });
         renderModal(entry());
         const user = userEvent.setup();
         await waitFor(() => screen.getByRole('button', { name: /cancel & refund/i }));

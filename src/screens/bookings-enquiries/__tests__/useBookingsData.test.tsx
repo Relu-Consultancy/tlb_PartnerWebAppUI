@@ -71,3 +71,41 @@ describe('useBookingsData — which bookings reach the inbox', () => {
         expect(result.current.entries[0].entity).toBe('Events');
     });
 });
+
+describe('useBookingsData — every backend status lands in the right bucket', () => {
+    it('files a failed payment under Cancelled, with a reason, instead of Upcoming', async () => {
+        serveBookings([booking({ id: 'bk-f', status: 'payment_failed', payment_status: 'pending' })]);
+        const { result } = renderHook(() => useBookingsData(['Events']));
+        await waitFor(() => expect(result.current.entries).toHaveLength(1));
+        expect(result.current.entries[0]).toMatchObject({ status: 'cancelled', cancellationReason: 'The customer’s payment failed' });
+    });
+
+    it('treats a refunded booking as cancelled with its money returned', async () => {
+        serveBookings([booking({ id: 'bk-r', status: 'refunded', payment_status: 'refunded' })]);
+        const { result } = renderHook(() => useBookingsData(['Events']));
+        await waitFor(() => expect(result.current.entries).toHaveLength(1));
+        expect(result.current.entries[0]).toMatchObject({ status: 'cancelled', paymentStatus: 'refunded' });
+    });
+
+    it('treats a payment hold as awaiting payment', async () => {
+        serveBookings([booking({ id: 'bk-h', status: 'hold', payment_status: 'pending' })]);
+        const { result } = renderHook(() => useBookingsData(['Events']));
+        await waitFor(() => expect(result.current.entries).toHaveLength(1));
+        expect(result.current.entries[0].status).toBe('awaiting_payment');
+    });
+
+    it('keeps when and why a booking was cancelled', async () => {
+        serveBookings([
+            booking({
+                id: 'bk-c',
+                status: 'cancelled',
+                payment_status: 'pending',
+                cancelled_at: '2026-10-06T09:30:00Z',
+                cancellation_reason: 'hold_expired',
+            }),
+        ]);
+        const { result } = renderHook(() => useBookingsData(['Events']));
+        await waitFor(() => expect(result.current.entries).toHaveLength(1));
+        expect(result.current.entries[0]).toMatchObject({ cancelledAt: '2026-10-06T09:30:00Z', cancellationReason: 'hold_expired' });
+    });
+});

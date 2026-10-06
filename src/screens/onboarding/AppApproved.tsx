@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { ArrowRight, CheckCircle2, HelpCircle, LayoutGrid, Sparkles } from 'lucide-react';
+import { ArrowRight, CheckCircle2, LayoutGrid, Sparkles } from 'lucide-react';
 import { Screen } from '../../types';
 import { OnboardingShell, PageHeader } from '../../components/ui';
 
@@ -84,9 +84,7 @@ export const AppApproved: React.FC<OnboardingProps> = ({ onNavigate }) => {
                             </div>
                             <div className="flex-1 pt-1">
                                 <h4 className="font-black text-tlb-dark">{step.label}</h4>
-                                <p className="text-[10px] font-black uppercase tracking-widest mt-0.5 text-tlb-yellow">
-                                    {step.time}
-                                </p>
+                                <p className="text-[10px] font-black uppercase tracking-widest mt-0.5 text-tlb-yellow">{step.time}</p>
                             </div>
                         </motion.div>
                     ))}
@@ -108,10 +106,6 @@ export const AppApproved: React.FC<OnboardingProps> = ({ onNavigate }) => {
                 className="mt-4 w-full flex items-center justify-center gap-2 text-gray-500 font-bold text-sm hover:text-tlb-dark transition-colors"
             >
                 <LayoutGrid size={16} /> Back to Dashboard
-            </button>
-
-            <button className="mt-3 w-full flex items-center justify-center gap-2 text-tlb-dark font-bold text-sm hover:text-tlb-yellow transition-colors">
-                <HelpCircle size={16} /> Contact Support
             </button>
         </OnboardingShell>
     );

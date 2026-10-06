@@ -1,7 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import {
-    bookingStats, bookingWhenOf, enquiryStageOf, enquiryStats,
-    filterBookings, filterEnquiries, groupByListing, slotLabelOf, soonBookings, startsWithinADay,
+    bookingStats,
+    bookingWhenOf,
+    enquiryStageOf,
+    enquiryStats,
+    filterBookings,
+    filterEnquiries,
+    groupByListing,
+    slotLabelOf,
+    soonBookings,
+    startsWithinADay,
 } from '../model';
 import { BookingEntry, EnquiryEntry } from '../types';
 
@@ -36,6 +44,8 @@ const booking = (overrides: Partial<BookingEntry> = {}): BookingEntry => ({
     paymentStatus: 'paid',
     createdAt: NOW.toISOString(),
     listingStartsAt: null,
+    cancelledAt: null,
+    cancellationReason: null,
     ...overrides,
 });
 
@@ -80,15 +90,15 @@ describe('slotLabelOf', () => {
 });
 
 describe('groupByListing', () => {
-    it('groups in first-seen order and preserves each group\'s entity', () => {
+    it("groups in first-seen order and preserves each group's entity", () => {
         const rows = [
             enquiry({ id: 'a', listingId: 'l1', listingTitle: 'Pottery' }),
             enquiry({ id: 'b', listingId: 'l2', listingTitle: 'Creative Studio', entity: 'Venues' }),
             enquiry({ id: 'c', listingId: 'l1', listingTitle: 'Pottery' }),
         ];
         const groups = groupByListing(rows);
-        expect(groups.map(g => g.listingId)).toEqual(['l1', 'l2']);
-        expect(groups[0].rows.map(r => r.id)).toEqual(['a', 'c']);
+        expect(groups.map((g) => g.listingId)).toEqual(['l1', 'l2']);
+        expect(groups[0].rows.map((r) => r.id)).toEqual(['a', 'c']);
         expect(groups[1].entity).toBe('Venues');
     });
 });
@@ -100,11 +110,11 @@ describe('filterEnquiries', () => {
         enquiry({ id: 'c', status: 'new', entity: 'Venues', name: 'Divya Suresh' }),
     ];
     it('filters by stage and scope', () => {
-        expect(filterEnquiries(rows, { stage: 'new', scope: 'all', search: '' }).map(r => r.id)).toEqual(['a', 'c']);
-        expect(filterEnquiries(rows, { stage: 'new', scope: 'Venues', search: '' }).map(r => r.id)).toEqual(['c']);
+        expect(filterEnquiries(rows, { stage: 'new', scope: 'all', search: '' }).map((r) => r.id)).toEqual(['a', 'c']);
+        expect(filterEnquiries(rows, { stage: 'new', scope: 'Venues', search: '' }).map((r) => r.id)).toEqual(['c']);
     });
     it('searches name, listing title and contact, case-insensitively', () => {
-        expect(filterEnquiries(rows, { stage: 'new', scope: 'all', search: 'neha' }).map(r => r.id)).toEqual(['a']);
+        expect(filterEnquiries(rows, { stage: 'new', scope: 'all', search: 'neha' }).map((r) => r.id)).toEqual(['a']);
         expect(filterEnquiries(rows, { stage: 'responded', scope: 'all', search: 'nobody' })).toEqual([]);
     });
 });
@@ -127,12 +137,12 @@ describe('filterBookings', () => {
         booking({ id: 'c', entity: 'Events', customerName: 'Aditya Rao', status: 'cancelled' }),
     ];
     it('filters by when and scope', () => {
-        expect(filterBookings(rows, { when: 'today', scope: 'all', search: '' }, NOW).map(r => r.id)).toEqual(['a', 'b']);
-        expect(filterBookings(rows, { when: 'today', scope: 'Venues', search: '' }, NOW).map(r => r.id)).toEqual(['b']);
-        expect(filterBookings(rows, { when: 'cancelled', scope: 'all', search: '' }, NOW).map(r => r.id)).toEqual(['c']);
+        expect(filterBookings(rows, { when: 'today', scope: 'all', search: '' }, NOW).map((r) => r.id)).toEqual(['a', 'b']);
+        expect(filterBookings(rows, { when: 'today', scope: 'Venues', search: '' }, NOW).map((r) => r.id)).toEqual(['b']);
+        expect(filterBookings(rows, { when: 'cancelled', scope: 'all', search: '' }, NOW).map((r) => r.id)).toEqual(['c']);
     });
     it('searches customer, listing and booking reference', () => {
-        expect(filterBookings(rows, { when: 'today', scope: 'all', search: 'meera' }, NOW).map(r => r.id)).toEqual(['a']);
+        expect(filterBookings(rows, { when: 'today', scope: 'all', search: 'meera' }, NOW).map((r) => r.id)).toEqual(['a']);
     });
 });
 
@@ -162,14 +172,17 @@ describe('bookingStats', () => {
 
 describe('soonBookings', () => {
     it('counts today vs tomorrow and excludes cancelled bookings', () => {
-        const summary = soonBookings([
-            booking({ id: 'a', listingStartsAt: new Date(2026, 8, 15, 18, 0).toISOString() }),
-            booking({ id: 'b', listingStartsAt: new Date(2026, 8, 16, 7, 0).toISOString() }),
-            booking({ id: 'c', listingStartsAt: new Date(2026, 8, 15, 12, 0).toISOString(), status: 'cancelled' }),
-            booking({ id: 'd', listingStartsAt: '2026-09-25' }),
-        ], NOW);
+        const summary = soonBookings(
+            [
+                booking({ id: 'a', listingStartsAt: new Date(2026, 8, 15, 18, 0).toISOString() }),
+                booking({ id: 'b', listingStartsAt: new Date(2026, 8, 16, 7, 0).toISOString() }),
+                booking({ id: 'c', listingStartsAt: new Date(2026, 8, 15, 12, 0).toISOString(), status: 'cancelled' }),
+                booking({ id: 'd', listingStartsAt: '2026-09-25' }),
+            ],
+            NOW
+        );
         expect(summary.todayCount).toBe(1);
         expect(summary.tomorrowCount).toBe(1);
-        expect(summary.rows.map(r => r.id)).toEqual(['a', 'b']);
+        expect(summary.rows.map((r) => r.id)).toEqual(['a', 'b']);
     });
 });

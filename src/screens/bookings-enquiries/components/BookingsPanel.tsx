@@ -4,7 +4,7 @@ import { LoadMoreRow, Pill, ScopePills, SearchField, SegBar } from '../../../com
 import { formatRupees } from '../../../utils/format';
 import { BookingEntity, BookingEntry, BookingWhen } from '../types';
 import { bookingStats, filterBookings, groupByListing, slotLabelOf } from '../model';
-import { BOOKING_ENTITY_LABEL, BOOKING_ENTITY_TONE, bookingStatusMeta } from '../presentation';
+import { BOOKING_ENTITY_LABEL, BOOKING_ENTITY_TONE, bookingStatusMeta, cancellationReasonText, cancelledOnLabel } from '../presentation';
 import { GroupedList } from './GroupedList';
 
 const PAGE_SIZE = 20;
@@ -130,6 +130,19 @@ export const BookingsPanel: React.FC<BookingsPanelProps> = ({ entries, available
                         <p className="text-xs text-tlb-muted max-w-[260px]">
                             {search ? 'Try a different search.' : 'Nothing in this window right now.'}
                         </p>
+                        {/* A cancelled booking leaves Upcoming — point at it, so it never looks deleted. */}
+                        {!search && when !== 'cancelled' && whenCount('cancelled') > 0 && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setWhen('cancelled');
+                                    resetPaging();
+                                }}
+                                className="pt-btn pt-btn-o mt-2"
+                            >
+                                See {whenCount('cancelled')} cancelled booking{whenCount('cancelled') === 1 ? '' : 's'}
+                            </button>
+                        )}
                     </div>
                 ) : (
                     <GroupedList<BookingEntry>
@@ -150,6 +163,15 @@ export const BookingsPanel: React.FC<BookingsPanelProps> = ({ entries, available
                         }
                         renderRow={(row) => {
                             const meta = bookingStatusMeta(row);
+                            const cancelNote =
+                                row.status === 'cancelled'
+                                    ? [
+                                          cancelledOnLabel(row.cancelledAt) && `Cancelled ${cancelledOnLabel(row.cancelledAt)}`,
+                                          cancellationReasonText(row.cancellationReason),
+                                      ]
+                                          .filter(Boolean)
+                                          .join(' · ')
+                                    : '';
                             return (
                                 <button
                                     key={row.id}
@@ -165,6 +187,9 @@ export const BookingsPanel: React.FC<BookingsPanelProps> = ({ entries, available
                                         <span className="block text-[11px] text-tlb-muted mt-px">
                                             {slotLabelOf(row.listingStartsAt, now)}
                                         </span>
+                                        {cancelNote && (
+                                            <span className="block text-[11px] text-tlb-red-deep mt-px truncate">{cancelNote}</span>
+                                        )}
                                     </span>
                                     <span className="pt-num text-tlb-ink">{formatRupees(row.amount)}</span>
                                     <span className="flex justify-end">

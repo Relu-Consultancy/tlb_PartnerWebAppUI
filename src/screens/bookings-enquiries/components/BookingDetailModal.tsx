@@ -4,7 +4,7 @@ import { getBookingDetail, getBookingPaymentDetail } from '../../../api/listings
 import { Pill, PortalModal } from '../../../components/portal';
 import { formatRupees } from '../../../utils/format';
 import { BookingEntity, BookingEntry, Refund } from '../types';
-import { BOOKING_ENTITY_LABEL, BOOKING_ENTITY_TONE, REFUND_STATUS_META, bookingStatusMeta } from '../presentation';
+import { BOOKING_ENTITY_LABEL, BOOKING_ENTITY_TONE, REFUND_STATUS_META, bookingStatusMeta, cancellationReasonText } from '../presentation';
 import { slotLabelOf } from '../model';
 
 interface LineItem {
@@ -22,6 +22,8 @@ interface Detail {
     line_items?: LineItem[];
     refund_amount?: number | null;
     refund?: Refund | null;
+    cancelled_at?: string | null;
+    cancellation_reason?: string | null;
 }
 
 type CancelResult = { success: true } | { success: false; code: string; message: string };
@@ -103,6 +105,15 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({ entry, n
     // paymentStatus-based badge (which can't distinguish "processing" from "settled") so the header
     // Pill never contradicts the detail note just below it.
     const meta = isCancelled && refundMeta ? { label: refundMeta.label, tone: refundMeta.tone } : bookingStatusMeta(entry);
+    // When and why — the detail call is authoritative, the list row is the fallback.
+    const cancelledAt = detail?.cancelled_at ?? entry.cancelledAt;
+    const cancelReasonText = cancellationReasonText(detail?.cancellation_reason ?? entry.cancellationReason);
+    const cancelWhy = isCancelled ? (
+        <span className="block mt-1">
+            {cancelledAt ? `Cancelled ${fmtDateTime(cancelledAt)}. ` : ''}
+            Reason: {cancelReasonText || (loading ? '…' : 'none recorded')}
+        </span>
+    ) : null;
 
     const handleMarkAttended = async () => {
         setMarking(true);
@@ -151,12 +162,16 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({ entry, n
                             {refundMeta.sub ? `. ${refundMeta.sub}.` : '.'}
                             {refund?.status === 'settled' && refund.settled_at && ` Settled ${fmtDateTime(refund.settled_at)}.`}
                             {refund?.status === 'failed' && refund.failed_at && ` Failed ${fmtDateTime(refund.failed_at)}.`}
+                            {cancelWhy}
                         </span>
                     </div>
                 ) : (
                     <div className="pt-note mb-4 bg-tlb-red-soft text-tlb-red-deep">
-                        <AlertCircle size={14} strokeWidth={2.75} className="flex-none" aria-hidden="true" />
-                        This booking was cancelled. No refund was initiated for it.
+                        <AlertCircle size={14} strokeWidth={2.75} className="flex-none mt-0.5" aria-hidden="true" />
+                        <span>
+                            This booking was cancelled. No refund was initiated for it.
+                            {cancelWhy}
+                        </span>
                     </div>
                 ))}
 

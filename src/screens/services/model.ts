@@ -224,3 +224,11 @@ export const listingStateCounts = (rows: ListingRow[]): ListingStateCounts => {
     }
     return counts;
 };
+
+/**
+ * Customers holding a live booking on this listing — confirmed, or mid-payment.
+ * QA: archiving a listing and editing it left its booking cancelled, so these
+ * are the people an archive (or the move back to draft for editing) affects.
+ */
+export const activeBookingCount = (listingId: string, bookings: Pick<BookingEntry, 'listingId' | 'status'>[]): number =>
+    bookings.filter((b) => b.listingId === listingId && (b.status === 'confirmed' || b.status === 'awaiting_payment')).length;

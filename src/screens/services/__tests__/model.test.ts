@@ -1,7 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-    demandOf, enrichFromDetail, filterListings, listingStateCounts, modelOf, synthListingCode,
-} from '../model';
+import { activeBookingCount, demandOf, enrichFromDetail, filterListings, listingStateCounts, modelOf, synthListingCode } from '../model';
 import { BookingEntry, EnquiryEntry } from '../../bookings-enquiries/types';
 import { ListingRow } from '../types';
 
@@ -45,10 +43,18 @@ describe('enrichFromDetail — Events', () => {
     });
 
     it('shows the lowest ticket price, "From" when there are multiple tiers', () => {
-        const r = enrichFromDetail('Events', {
-            price_type: 'paid',
-            tickets: [{ price: 500, total_quantity: 20 }, { price: 900, total_quantity: 10 }],
-        }, null, NOW);
+        const r = enrichFromDetail(
+            'Events',
+            {
+                price_type: 'paid',
+                tickets: [
+                    { price: 500, total_quantity: 20 },
+                    { price: 900, total_quantity: 10 },
+                ],
+            },
+            null,
+            NOW
+        );
         expect(r.priceLabel).toBe('From Rs 500');
         expect(r.capacityLabel).toBe('30 seats');
     });
@@ -75,9 +81,14 @@ describe('enrichFromDetail — Venues', () => {
     });
 
     it('picks the earliest upcoming availability slot over the fallback date', () => {
-        const r = enrichFromDetail('Venues', {
-            availability: [{ date: '2026-09-01' }, { date: '2026-09-20' }],
-        }, '2099-01-01T00:00:00Z', NOW);
+        const r = enrichFromDetail(
+            'Venues',
+            {
+                availability: [{ date: '2026-09-01' }, { date: '2026-09-20' }],
+            },
+            '2099-01-01T00:00:00Z',
+            NOW
+        );
         expect(r.startsAt).toBe(new Date('2026-09-20').toISOString());
     });
 });
@@ -96,7 +107,9 @@ describe('enrichFromDetail — Classes and Programs', () => {
 
     it('uses max_capacity for Programs, falling back to the batch size', () => {
         expect(enrichFromDetail('Programs', { max_capacity: 30, batches: [] }, null, NOW).capacityLabel).toBe('30 places');
-        expect(enrichFromDetail('Programs', { batches: [{ total_seats: 15, is_active: true }] }, null, NOW).capacityLabel).toBe('15 places');
+        expect(enrichFromDetail('Programs', { batches: [{ total_seats: 15, is_active: true }] }, null, NOW).capacityLabel).toBe(
+            '15 places'
+        );
     });
 
     it('reads price/city from a nested `service` object when present', () => {
@@ -124,10 +137,25 @@ describe('enrichFromDetail — is_refundable', () => {
 
 describe('filterListings', () => {
     const row = (overrides: Partial<ListingRow> = {}): ListingRow => ({
-        id: '1', title: 'Pottery Term', entityType: 'Classes', code: 'LST-100000', state: 'live',
-        coverUrl: null, createdAt: null, reviewMessage: '', startsAt: null, enriched: true,
-        model: 'enquiry', priceLabel: '—', capacityLabel: '—', location: '—', category: '',
-        description: '', galleryUrls: [], isRefundable: true, ...overrides,
+        id: '1',
+        title: 'Pottery Term',
+        entityType: 'Classes',
+        code: 'LST-100000',
+        state: 'live',
+        coverUrl: null,
+        createdAt: null,
+        reviewMessage: '',
+        startsAt: null,
+        enriched: true,
+        model: 'enquiry',
+        priceLabel: '—',
+        capacityLabel: '—',
+        location: '—',
+        category: '',
+        description: '',
+        galleryUrls: [],
+        isRefundable: true,
+        ...overrides,
     });
     const rows = [
         row({ id: 'a', title: 'Pottery Term', entityType: 'Classes', state: 'live' }),
@@ -136,25 +164,52 @@ describe('filterListings', () => {
     ];
 
     it('filters by scope, status and text search over title/code', () => {
-        expect(filterListings(rows, { scope: 'Classes', status: 'any', search: '' }).map(r => r.id)).toEqual(['a']);
-        expect(filterListings(rows, { scope: 'all', status: 'pending', search: '' }).map(r => r.id)).toEqual(['b']);
-        expect(filterListings(rows, { scope: 'all', status: 'any', search: 'studio' }).map(r => r.id)).toEqual(['c']);
+        expect(filterListings(rows, { scope: 'Classes', status: 'any', search: '' }).map((r) => r.id)).toEqual(['a']);
+        expect(filterListings(rows, { scope: 'all', status: 'pending', search: '' }).map((r) => r.id)).toEqual(['b']);
+        expect(filterListings(rows, { scope: 'all', status: 'any', search: 'studio' }).map((r) => r.id)).toEqual(['c']);
     });
 });
 
 describe('demandOf', () => {
     const enquiry = (overrides: Partial<EnquiryEntry> = {}): EnquiryEntry => ({
-        id: '1', entity: 'Classes', listingId: 'l1', listingTitle: '', name: '', detail: '', contact: '',
-        isUnlocked: false, status: 'new', message: '', notes: '', createdAt: NOW.toISOString(), ...overrides,
+        id: '1',
+        entity: 'Classes',
+        listingId: 'l1',
+        listingTitle: '',
+        name: '',
+        detail: '',
+        contact: '',
+        isUnlocked: false,
+        status: 'new',
+        message: '',
+        notes: '',
+        createdAt: NOW.toISOString(),
+        ...overrides,
     });
     const booking = (overrides: Partial<BookingEntry> = {}): BookingEntry => ({
-        id: '1', entity: 'Events', listingId: 'l1', listingTitle: '', bookingReference: '', customerName: '',
-        amount: 0, currency: 'INR', status: 'confirmed', paymentStatus: 'paid', createdAt: NOW.toISOString(),
-        listingStartsAt: null, ...overrides,
+        id: '1',
+        entity: 'Events',
+        listingId: 'l1',
+        listingTitle: '',
+        bookingReference: '',
+        customerName: '',
+        amount: 0,
+        currency: 'INR',
+        status: 'confirmed',
+        paymentStatus: 'paid',
+        createdAt: NOW.toISOString(),
+        listingStartsAt: null,
+        cancelledAt: null,
+        cancellationReason: null,
+        ...overrides,
     });
 
     it('counts enquiries in range for an enquiry-model listing', () => {
-        const enquiries = [enquiry({ id: 'a', listingId: 'l1' }), enquiry({ id: 'b', listingId: 'l1' }), enquiry({ id: 'c', listingId: 'l2' })];
+        const enquiries = [
+            enquiry({ id: 'a', listingId: 'l1' }),
+            enquiry({ id: 'b', listingId: 'l1' }),
+            enquiry({ id: 'c', listingId: 'l2' }),
+        ];
         const d = demandOf({ id: 'l1', model: 'enquiry' }, enquiries, [], '30d', NOW);
         expect(d.count).toBe(2);
         expect(d.label).toBe('2 enquiries');
@@ -175,8 +230,23 @@ describe('demandOf', () => {
 
 describe('listingStateCounts', () => {
     it('tallies each state plus a total', () => {
-        const rows = ['live', 'live', 'pending', 'paused'].map((state, i) => ({ id: String(i), state } as ListingRow));
+        const rows = ['live', 'live', 'pending', 'paused'].map((state, i) => ({ id: String(i), state }) as ListingRow);
         const counts = listingStateCounts(rows);
         expect(counts).toMatchObject({ live: 2, pending: 1, paused: 1, draft: 0, rejected: 0, archived: 0, total: 4 });
+    });
+});
+
+describe('activeBookingCount', () => {
+    it('counts confirmed and mid-payment bookings on that listing only', () => {
+        const b = (listingId: string, status: string) => ({ listingId, status }) as any;
+        const bookings = [
+            b('l1', 'confirmed'),
+            b('l1', 'awaiting_payment'),
+            b('l1', 'cancelled'),
+            b('l1', 'attended'),
+            b('l2', 'confirmed'),
+        ];
+        expect(activeBookingCount('l1', bookings)).toBe(2);
+        expect(activeBookingCount('l3', bookings)).toBe(0);
     });
 });

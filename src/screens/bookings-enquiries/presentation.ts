@@ -63,9 +63,35 @@ const bookingStatusMeta = (entry: Pick<BookingEntry, 'status' | 'paymentStatus'>
         awaiting_payment: { label: 'Awaiting payment', tone: 'amber' },
         attended: { label: 'Attended', tone: 'neutral' },
     };
-    return META[entry.status];
+    // Never undefined — a status nobody mapped used to crash the whole row.
+    return (
+        META[entry.status as Exclude<BookingStatus, 'cancelled'>] ?? {
+            label: humanizeCode(String(entry.status || 'Unknown')),
+            tone: 'neutral',
+        }
+    );
 };
 export { bookingStatusMeta };
+
+const humanizeCode = (code: string): string => {
+    const words = code.replace(/[_-]+/g, ' ').trim();
+    return words.charAt(0).toUpperCase() + words.slice(1);
+};
+
+/** The backend's cancellation reason, readable: free text as written, a code like "hold_expired" as words. */
+export const cancellationReasonText = (reason: string | null | undefined): string | null => {
+    const r = (reason ?? '').trim();
+    if (!r) return null;
+    return /^[a-z0-9]+(?:[_-][a-z0-9]+)+$/i.test(r) ? humanizeCode(r.toLowerCase()) : r;
+};
+
+/** "6 Oct, 2:15 pm" — when a booking was cancelled. */
+export const cancelledOnLabel = (iso: string | null | undefined): string | null => {
+    if (!iso) return null;
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+};
 
 // A refund is asynchronous (Razorpay can take hours to days) — "processing" is a normal resting
 // state, not a stuck request, and must never read as "Refunded" (only "settled" means the money

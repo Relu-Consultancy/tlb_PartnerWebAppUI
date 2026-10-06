@@ -3,15 +3,35 @@ import { buildBookingEntriesCsv, buildEnquiriesCsv } from '../csv';
 import { BookingEntry, EnquiryEntry } from '../types';
 
 const enquiry: EnquiryEntry = {
-    id: '1', entity: 'Venues', listingId: 'l1', listingTitle: 'Creative Studio — Weekend hire',
-    name: 'Neha Rao', detail: '30 people', contact: '+91 98450 22114', isUnlocked: true,
-    status: 'new', message: 'Is the studio free on 23 Aug?', notes: '', createdAt: '2026-08-21T10:00:00Z',
+    id: '1',
+    entity: 'Venues',
+    listingId: 'l1',
+    listingTitle: 'Creative Studio — Weekend hire',
+    name: 'Neha Rao',
+    detail: '30 people',
+    contact: '+91 98450 22114',
+    isUnlocked: true,
+    status: 'new',
+    message: 'Is the studio free on 23 Aug?',
+    notes: '',
+    createdAt: '2026-08-21T10:00:00Z',
 };
 
 const booking: BookingEntry = {
-    id: '1', entity: 'Events', listingId: 'l2', listingTitle: 'Indigo Dyeing Evening',
-    bookingReference: 'BKG-4492', customerName: 'Divya Suresh', amount: 2200, currency: 'INR',
-    status: 'confirmed', paymentStatus: 'paid', createdAt: '2026-09-15T09:00:00Z', listingStartsAt: null,
+    id: '1',
+    entity: 'Events',
+    listingId: 'l2',
+    listingTitle: 'Indigo Dyeing Evening',
+    bookingReference: 'BKG-4492',
+    customerName: 'Divya Suresh',
+    amount: 2200,
+    currency: 'INR',
+    status: 'confirmed',
+    paymentStatus: 'paid',
+    createdAt: '2026-09-15T09:00:00Z',
+    listingStartsAt: null,
+    cancelledAt: null,
+    cancellationReason: null,
 };
 
 describe('buildEnquiriesCsv', () => {

@@ -23,6 +23,41 @@ const BOOKING_TYPE_TO_ENTITY: Record<string, BookingEntity | undefined> = {
 };
 const UNLINKED = '__unlinked__';
 
+/**
+ * The backend's booking statuses, mapped onto the four this screen buckets by
+ * (the customer app's own grouping): a payment hold is awaiting payment, a
+ * failed payment is a cancellation, and a refunded booking is a cancelled one
+ * whose money went back. Unmapped, a `payment_failed` booking was filed under
+ * Upcoming, and any status outside the four crashed the row.
+ */
+export const normalizeBookingStatus = (
+    rawStatus: unknown,
+    rawPayment: unknown
+): { status: BookingStatus; paymentStatus: PaymentStatus; reasonFallback: string | null } => {
+    const status = String(rawStatus || 'confirmed').toLowerCase();
+    const payment = String(rawPayment || 'paid').toLowerCase() as PaymentStatus;
+    switch (status) {
+        case 'confirmed':
+        case 'awaiting_payment':
+        case 'attended':
+        case 'cancelled':
+            return { status, paymentStatus: payment, reasonFallback: null };
+        case 'hold':
+            return { status: 'awaiting_payment', paymentStatus: payment, reasonFallback: null };
+        case 'payment_failed':
+            return {
+                status: 'cancelled',
+                paymentStatus: payment === 'paid' ? 'pending' : payment,
+                reasonFallback: 'The customer’s payment failed',
+            };
+        case 'refunded':
+            return { status: 'cancelled', paymentStatus: 'refunded', reasonFallback: null };
+        default:
+            // Unknown: shown under its own name (neutral pill), never claimed as confirmed.
+            return { status: status as BookingStatus, paymentStatus: payment, reasonFallback: null };
+    }
+};
+
 interface State {
     loading: boolean;
     entries: BookingEntry[];
@@ -51,6 +86,7 @@ export const useBookingsData = (allowedEntities: EntityType[]) => {
                     // vanish just because booking_type was missing or unfamiliar.
                     const entity = BOOKING_TYPE_TO_ENTITY[b?.booking_type] ?? entityById.get(listingId);
                     if (!entity || !scope.includes(entity)) return null;
+                    const { status, paymentStatus, reasonFallback } = normalizeBookingStatus(b?.status, b?.payment_status);
                     return {
                         id: String(b?.id ?? ''),
                         entity,
@@ -60,10 +96,12 @@ export const useBookingsData = (allowedEntities: EntityType[]) => {
                         customerName: b?.customer_name || 'Unknown',
                         amount: toNumber(b?.total_amount),
                         currency: b?.currency || 'INR',
-                        status: (b?.status || 'confirmed') as BookingStatus,
-                        paymentStatus: (b?.payment_status || 'paid') as PaymentStatus,
+                        status,
+                        paymentStatus,
                         createdAt: b?.created_at || null,
                         listingStartsAt: startsById.get(listingId) ?? null,
+                        cancelledAt: b?.cancelled_at || null,
+                        cancellationReason: b?.cancellation_reason || reasonFallback,
                     };
                 })
                 .filter((e): e is BookingEntry => e !== null);

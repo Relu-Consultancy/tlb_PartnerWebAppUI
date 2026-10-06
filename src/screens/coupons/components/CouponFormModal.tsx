@@ -120,8 +120,14 @@ export const CouponFormModal: React.FC<CouponFormModalProps> = ({
                             placeholder="e.g. MONSOON20"
                             value={form.code}
                             disabled={!!editing}
+                            aria-describedby={editing ? 'coupon-code-locked' : undefined}
                             onChange={(e: React.ChangeEvent<HTMLInputElement>) => set('code', e.target.value.toUpperCase())}
                         />
+                        {editing && (
+                            <p id="coupon-code-locked" className="text-[11px] text-tlb-muted mt-1">
+                                Codes can’t be changed once published — customers already have this one.
+                            </p>
+                        )}
                     </div>
                     <div className="pt-field">
                         <label className="pt-field-k">Internal note (optional)</label>

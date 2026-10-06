@@ -12,8 +12,9 @@ import { CouponRow } from './types';
 // over usage history powers the "discount given" stat.
 // ---------------------------------------------------------------------------
 
-const toRow = (c: Coupon, now: Date): CouponRow => ({
+const toRow = (c: Coupon, now: Date, detailLoaded = true): CouponRow => ({
     ...c,
+    detailLoaded,
     status: statusOf(c, now),
     description: c.description || '',
     max_discount: c.max_discount ?? null,
@@ -49,7 +50,8 @@ export const useCouponsData = () => {
 
             const details = await Promise.allSettled(list.map((c) => getCoupon(c.id)));
             const rows: CouponRow[] = details.map((r, i) =>
-                r.status === 'fulfilled' ? toRow(r.value, now) : toRow(list[i] as unknown as Coupon, now)
+                // A failed detail leaves only the summary — flagged, so Edit fetches it first.
+                r.status === 'fulfilled' ? toRow(r.value, now) : toRow(list[i] as unknown as Coupon, now, false)
             );
             setState({ loading: false, rows, discountGiven: 0, error: null });
 
@@ -83,6 +85,21 @@ export const useCouponsData = () => {
         }
     };
 
+    /**
+     * The coupon's full detail, for a row that only has its list summary.
+     * Editing from the summary would have saved its blank targeting, limits
+     * and note over the real ones. Null when it still can't be read.
+     */
+    const loadDetail = async (row: CouponRow): Promise<CouponRow | null> => {
+        try {
+            const full = toRow(await getCoupon(row.id), new Date());
+            patch(row.id, full);
+            return full;
+        } catch {
+            return null;
+        }
+    };
+
     const save = async (input: CreateCouponInput, editingId: string | null): Promise<boolean> => {
         try {
             if (editingId) await updateCoupon(editingId, input);
@@ -105,5 +122,6 @@ export const useCouponsData = () => {
         reload: load,
         togglePause,
         save,
+        loadDetail,
     };
 };

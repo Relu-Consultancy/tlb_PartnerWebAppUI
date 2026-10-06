@@ -23,6 +23,8 @@ export interface CouponRow extends CouponListItem {
     target_genders: CouponGender[];
     target_min_age: number | null;
     target_max_age: number | null;
+    /** false = only the list summary loaded (no targeting, dates or note) — never edit from it. */
+    detailLoaded?: boolean;
 }
 
 export interface CouponFormValues {

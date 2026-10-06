@@ -7,6 +7,7 @@ import {
     couponToForm,
     discountLabel,
     filterCoupons,
+    formToUpdateInput,
     limitErrors,
     localDateKey,
     formToInput,
@@ -257,5 +258,27 @@ describe('limitErrors — optional, but what is filled must make a usable coupon
 
     it('lets an already-ended coupon be edited without moving its end date', () => {
         expect(limitErrors({ ...blank, expiresAt: '2026-10-01' }, { today, originalExpiresAt: '2026-10-01' })).toEqual({});
+    });
+});
+
+describe('formToUpdateInput — what an edit sends', () => {
+    const saved = row({ description: 'Women weekday push', target_genders: ['female'] });
+
+    it('sends an emptied gender list and note as explicit clears', () => {
+        const input = formToUpdateInput({ ...couponToForm(saved), genders: [], description: '' }, saved);
+        expect(input.target_genders).toEqual([]);
+        expect(input.description).toBe('');
+    });
+
+    it('adds nothing when the coupon had no note or genders to clear', () => {
+        const blank = row();
+        const input = formToUpdateInput(couponToForm(blank), blank);
+        expect(input).toEqual(formToInput(couponToForm(blank)));
+        expect(input).not.toHaveProperty('target_genders', []);
+    });
+
+    it('is otherwise exactly what a create sends', () => {
+        const form = { ...couponToForm(saved), discountValue: '40' };
+        expect(formToUpdateInput(form, saved)).toEqual(formToInput(form));
     });
 });

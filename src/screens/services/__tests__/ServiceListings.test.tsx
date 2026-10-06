@@ -228,6 +228,7 @@ describe('ServiceListings — edit and create navigation', () => {
     });
 
     it('swaps Archive for Edit once the live listing is archived', async () => {
+        let bookingsServed = false;
         server.use(
             http.get(`${BASE}/api/v1/partner/listings/events/`, () =>
                 HttpResponse.json({
@@ -235,14 +236,23 @@ describe('ServiceListings — edit and create navigation', () => {
                     data: [{ id: DRAFT_ID, title: 'Live Event', status: 'published', is_paused: false, listing_type: 'event' }],
                 })
             ),
+            http.get(`${BASE}/api/v1/partner/bookings/`, () => {
+                bookingsServed = true;
+                return HttpResponse.json({ success: true, data: [], next: null });
+            }),
             http.post(`${BASE}/api/v1/partner/listings/${DRAFT_ID}/archive/`, () =>
                 HttpResponse.json({ success: true, data: { status: 'archived' } })
             )
         );
         renderWithPartner();
         const user = userEvent.setup();
-        await user.click(await screen.findByRole('button', { name: 'Archive' }));
+        const archive = await screen.findByRole('button', { name: 'Archive' });
+        // No bookings on it — once that's known, archiving needs no warning.
+        await waitFor(() => expect(bookingsServed).toBe(true));
+        await new Promise((r) => setTimeout(r, 50));
+        await user.click(archive);
         await waitFor(() => expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument());
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
 
     it('navigates straight to the wizard when only one service type is allowed', async () => {
@@ -250,6 +260,99 @@ describe('ServiceListings — edit and create navigation', () => {
         const user = userEvent.setup();
         await waitFor(() => screen.getByText('Test Event'));
         await user.click(screen.getByRole('button', { name: '+ New listing' }));
+        expect(mockNavigate).toHaveBeenCalledWith('CREATE_EVENT_DETAILS');
+    });
+});
+
+describe('ServiceListings — warns before taking a listing with bookings off sale (QA: archive + edit cancelled a booking)', () => {
+    const liveEvent = { id: DRAFT_ID, title: 'Live Event', status: 'published', is_paused: false, listing_type: 'event' };
+    const archivedEvent = { id: DRAFT_ID, title: 'Archived Event', status: 'archived', listing_type: 'event' };
+    const booking = (overrides: Record<string, unknown> = {}) => ({
+        id: 'bk-1',
+        booking_type: 'event',
+        listing_id: DRAFT_ID,
+        listing_title: 'Live Event',
+        booking_reference: 'BKG-1',
+        customer_name: 'Asha Rao',
+        total_amount: '500',
+        status: 'confirmed',
+        payment_status: 'paid',
+        created_at: '2026-10-01T10:00:00Z',
+        ...overrides,
+    });
+
+    const serve = (listing: object, bookings: object[]) => {
+        const calls = { archive: 0, unarchive: 0, bookingsServed: false };
+        server.use(
+            http.get(`${BASE}/api/v1/partner/listings/events/`, () => HttpResponse.json({ success: true, data: [listing] })),
+            http.get(`${BASE}/api/v1/partner/bookings/`, () => {
+                calls.bookingsServed = true;
+                return HttpResponse.json({ success: true, data: bookings, next: null });
+            }),
+            http.post(`${BASE}/api/v1/partner/listings/${DRAFT_ID}/archive/`, () => {
+                calls.archive += 1;
+                return HttpResponse.json({ success: true, data: { status: 'archived' } });
+            }),
+            http.post(`${BASE}/api/v1/partner/listings/${DRAFT_ID}/unarchive/`, () => {
+                calls.unarchive += 1;
+                return HttpResponse.json({ success: true, data: { id: DRAFT_ID, status: 'draft' } });
+            })
+        );
+        return calls;
+    };
+
+    const ready = async (calls: { bookingsServed: boolean }, buttonName: string) => {
+        const button = await screen.findByRole('button', { name: buttonName });
+        await waitFor(() => expect(calls.bookingsServed).toBe(true));
+        await new Promise((r) => setTimeout(r, 50));
+        return button;
+    };
+
+    it('asks before archiving, says how many customers, and archives nothing until confirmed', async () => {
+        const calls = serve(liveEvent, [booking()]);
+        renderWithPartner();
+        const user = userEvent.setup();
+        await user.click(await ready(calls, 'Archive'));
+
+        const dialog = await screen.findByRole('dialog', { name: 'Archive this listing?' });
+        expect(dialog).toHaveTextContent('1 customer has an active booking on Live Event');
+        expect(dialog).toHaveTextContent('can cancel those bookings');
+        expect(calls.archive).toBe(0);
+
+        await user.click(screen.getByRole('button', { name: 'Keep it live' }));
+        await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+        expect(calls.archive).toBe(0);
+
+        await user.click(screen.getByRole('button', { name: 'Archive' }));
+        await user.click(await screen.findByRole('button', { name: 'Archive anyway' }));
+        await waitFor(() => expect(calls.archive).toBe(1));
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument());
+    });
+
+    it('counts only live bookings on this listing — cancelled ones and other listings do not trigger it', async () => {
+        const calls = serve(liveEvent, [booking({ status: 'cancelled' }), booking({ id: 'bk-2', listing_id: 'other-listing' })]);
+        renderWithPartner();
+        const user = userEvent.setup();
+        await user.click(await ready(calls, 'Archive'));
+
+        await waitFor(() => expect(calls.archive).toBe(1));
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('asks before Edit moves an archived listing that still has bookings back to draft', async () => {
+        const calls = serve(archivedEvent, [
+            booking({ listing_title: 'Archived Event', status: 'awaiting_payment', payment_status: 'pending' }),
+        ]);
+        renderWithPartner();
+        const user = userEvent.setup();
+        await user.click(await ready(calls, 'Edit'));
+
+        const dialog = await screen.findByRole('dialog', { name: 'Edit this listing?' });
+        expect(dialog).toHaveTextContent('1 customer has an active booking');
+        expect(calls.unarchive).toBe(0);
+
+        await user.click(screen.getByRole('button', { name: 'Edit anyway' }));
+        await waitFor(() => expect(calls.unarchive).toBe(1));
         expect(mockNavigate).toHaveBeenCalledWith('CREATE_EVENT_DETAILS');
     });
 });

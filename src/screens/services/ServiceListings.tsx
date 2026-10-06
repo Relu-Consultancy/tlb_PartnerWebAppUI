@@ -7,13 +7,13 @@ import { usePartner } from '../../context/PartnerContext';
 import { getDateRangeOption } from '../../constants/dateRange';
 import { EntityPickerSheet, startNewListing } from '../../components/EntityPickerSheet';
 import { requestProfileSection } from '../../constants/profileSections';
-import { ListingStatusFilter, SearchField, SegBar } from '../../components/portal';
+import { ListingStatusFilter, PortalModal, SearchField, SegBar } from '../../components/portal';
 import { Skeleton } from '../../components/ui';
 import { formatCount } from '../../utils/format';
 import { useEnquiriesData } from '../bookings-enquiries/useEnquiriesData';
 import { useBookingsData } from '../bookings-enquiries/useBookingsData';
 import { useListingsData } from './useListingsData';
-import { demandOf, filterListings, listingStateCounts } from './model';
+import { activeBookingCount, demandOf, filterListings, listingStateCounts } from './model';
 import { ListingRow } from './types';
 import { SCOPE_HINT, SERVICE_LABEL } from './presentation';
 import { PendingBanner } from './components/PendingBanner';
@@ -55,6 +55,10 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate }) => {
     const [selectedRow, setSelectedRow] = useState<ListingRow | null>(null);
     const [showEntityPicker, setShowEntityPicker] = useState(false);
     const [settled, setSettled] = useState<number | null>(null);
+    // An archive or edit waiting on the partner's go-ahead because customers hold bookings.
+    const [bookingWarning, setBookingWarning] = useState<{ row: ListingRow; action: 'archive' | 'edit'; count: number | null } | null>(
+        null
+    );
     const now = new Date();
 
     const listings = useListingsData(allowedEntities);
@@ -98,13 +102,42 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate }) => {
         }
     };
 
-    const handleEdit = async (row: ListingRow) => {
+    const openEditor = async (row: ListingRow) => {
         // An archived listing is locked server-side — every save in the wizard
         // would 400 — so lift the archive first and only then open it.
         if (row.state === 'archived' && !(await listings.unarchiveForEdit(row))) return;
         setDraftId[row.entityType](row.id);
         onNavigate(EDIT_SCREEN[row.entityType]);
         setSelectedRow(null);
+    };
+
+    // QA: archiving a listing and then editing it left its customer's booking
+    // cancelled. Both steps take the listing off sale, so before either one,
+    // a partner whose listing has live bookings is told how many and asked.
+    // Bookings still loading count as unknown — asked too, never skipped.
+    const bookingsAt = (row: ListingRow): number | null => (bookings.loading ? null : activeBookingCount(row.id, bookings.entries));
+
+    const handleEdit = async (row: ListingRow) => {
+        const count = row.state === 'archived' ? bookingsAt(row) : 0;
+        if (count !== 0) setBookingWarning({ row, action: 'edit', count });
+        else await openEditor(row);
+    };
+
+    const handleToggleArchive = async (row: ListingRow): Promise<boolean> => {
+        const count = row.state === 'archived' ? 0 : bookingsAt(row);
+        if (count !== 0) {
+            setBookingWarning({ row, action: 'archive', count });
+            return false;
+        }
+        return listings.toggleArchive(row);
+    };
+
+    const confirmBookingWarning = async () => {
+        if (!bookingWarning) return;
+        const { row, action } = bookingWarning;
+        setBookingWarning(null);
+        if (action === 'archive') await listings.toggleArchive(row);
+        else await openEditor(row);
     };
 
     const scopeOptions = [
@@ -177,7 +210,7 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate }) => {
                     onOpen={setSelectedRow}
                     onEdit={handleEdit}
                     onTogglePause={listings.togglePause}
-                    onToggleArchive={listings.toggleArchive}
+                    onToggleArchive={handleToggleArchive}
                 />
             ) : (
                 <div className="pt-card flex flex-col items-center justify-center text-center py-16 px-6">
@@ -204,8 +237,38 @@ export const ServiceListings: React.FC<Props> = ({ onNavigate }) => {
                 onNavigate={onNavigate}
                 onEdit={handleEdit}
                 onTogglePause={listings.togglePause}
-                onToggleArchive={listings.toggleArchive}
+                onToggleArchive={handleToggleArchive}
             />
+
+            <PortalModal
+                open={!!bookingWarning}
+                onClose={() => setBookingWarning(null)}
+                title={bookingWarning?.action === 'edit' ? 'Edit this listing?' : 'Archive this listing?'}
+            >
+                {bookingWarning && (
+                    <>
+                        <p className="text-[13px] text-tlb-ink mt-1">
+                            {bookingWarning.count == null
+                                ? 'Customers may hold bookings on '
+                                : `${bookingWarning.count} customer${bookingWarning.count === 1 ? ' has an active booking' : 's have active bookings'} on `}
+                            <strong>{bookingWarning.row.title}</strong>.
+                        </p>
+                        <p className="pt-note mt-3 bg-tlb-red-soft text-tlb-red-deep">
+                            {bookingWarning.action === 'edit'
+                                ? 'Editing moves it back to a draft, off sale — which can cancel those bookings.'
+                                : 'Archiving takes it off sale, including to edit it — which can cancel those bookings.'}
+                        </p>
+                        <div className="flex flex-wrap justify-end gap-2.5 mt-5">
+                            <button type="button" onClick={() => setBookingWarning(null)} className="pt-btn pt-btn-o">
+                                {bookingWarning.action === 'edit' ? 'Don’t edit' : 'Keep it live'}
+                            </button>
+                            <button type="button" onClick={confirmBookingWarning} className="pt-btn pt-btn-y">
+                                {bookingWarning.action === 'edit' ? 'Edit anyway' : 'Archive anyway'}
+                            </button>
+                        </div>
+                    </>
+                )}
+            </PortalModal>
 
             <EntityPickerSheet
                 isOpen={showEntityPicker}

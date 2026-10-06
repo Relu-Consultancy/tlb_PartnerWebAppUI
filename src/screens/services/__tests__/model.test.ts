@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { demandOf, enrichFromDetail, filterListings, listingStateCounts, modelOf, synthListingCode } from '../model';
+import { activeBookingCount, demandOf, enrichFromDetail, filterListings, listingStateCounts, modelOf, synthListingCode } from '../model';
 import { BookingEntry, EnquiryEntry } from '../../bookings-enquiries/types';
 import { ListingRow } from '../types';
 
@@ -233,5 +233,20 @@ describe('listingStateCounts', () => {
         const rows = ['live', 'live', 'pending', 'paused'].map((state, i) => ({ id: String(i), state }) as ListingRow);
         const counts = listingStateCounts(rows);
         expect(counts).toMatchObject({ live: 2, pending: 1, paused: 1, draft: 0, rejected: 0, archived: 0, total: 4 });
+    });
+});
+
+describe('activeBookingCount', () => {
+    it('counts confirmed and mid-payment bookings on that listing only', () => {
+        const b = (listingId: string, status: string) => ({ listingId, status }) as any;
+        const bookings = [
+            b('l1', 'confirmed'),
+            b('l1', 'awaiting_payment'),
+            b('l1', 'cancelled'),
+            b('l1', 'attended'),
+            b('l2', 'confirmed'),
+        ];
+        expect(activeBookingCount('l1', bookings)).toBe(2);
+        expect(activeBookingCount('l3', bookings)).toBe(0);
     });
 });

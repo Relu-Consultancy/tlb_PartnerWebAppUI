@@ -34,8 +34,11 @@ function renderComponent() {
 beforeEach(() => {
     mockNavigate.mockClear();
     sessionStorage.clear();
-    server.use(http.get(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/`, () =>
-        HttpResponse.json({ success: true, data: completeDraft })));
+    server.use(
+        http.get(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/`, () =>
+            HttpResponse.json({ success: true, data: completeDraft })
+        )
+    );
 });
 
 describe('CreateClassPreview — loading & display', () => {
@@ -54,21 +57,23 @@ describe('CreateClassPreview — loading & display', () => {
 
 describe('CreateClassPreview — readiness check', () => {
     it('shows missing fields list when draft is incomplete', async () => {
-        server.use(http.get(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/`, () =>
-            HttpResponse.json({ success: true, data: { ...mockClassDraft, title: '', format: '', description: '' } })));
-        renderComponent();
-        await waitFor(() =>
-            expect(screen.getByText(/missing|incomplete|required/i)).toBeInTheDocument(), { timeout: 3000 }
+        server.use(
+            http.get(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/`, () =>
+                HttpResponse.json({ success: true, data: { ...mockClassDraft, title: '', format: '', description: '' } })
+            )
         );
+        renderComponent();
+        await waitFor(() => expect(screen.getByText(/missing|incomplete|required/i)).toBeInTheDocument(), { timeout: 3000 });
     });
 
     it('blocks submit button when required fields are missing', async () => {
-        server.use(http.get(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/`, () =>
-            HttpResponse.json({ success: true, data: { ...mockClassDraft, title: '', description: '' } })));
-        renderComponent();
-        await waitFor(() =>
-            expect(screen.getByText(/missing for submission/i)).toBeInTheDocument(), { timeout: 3000 }
+        server.use(
+            http.get(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/`, () =>
+                HttpResponse.json({ success: true, data: { ...mockClassDraft, title: '', description: '' } })
+            )
         );
+        renderComponent();
+        await waitFor(() => expect(screen.getByText(/missing for submission/i)).toBeInTheDocument(), { timeout: 3000 });
         // When missing fields exist, submit button shows "Back to Listings" not "Submit for Review"
         expect(screen.queryByRole('button', { name: /submit for review/i })).not.toBeInTheDocument();
     });
@@ -82,24 +87,23 @@ describe('CreateClassPreview — submit', () => {
         const submitBtn = screen.getByRole('button', { name: /publish|submit/i });
         if (!submitBtn.hasAttribute('disabled')) {
             await user.click(submitBtn);
-            await waitFor(() =>
-                expect(screen.getByText(/class under review|under review/i)).toBeInTheDocument()
-            );
+            await waitFor(() => expect(screen.getByText(/class under review|under review/i)).toBeInTheDocument());
         }
     });
 
     it('shows under_review modal when partner is under review', async () => {
-        server.use(http.post(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/submit/`, () =>
-            HttpResponse.json({ error: { code: 'PARTNER_UNDER_REVIEW', message: 'Profile under review' } }, { status: 403 })));
+        server.use(
+            http.post(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/submit/`, () =>
+                HttpResponse.json({ error: { code: 'PARTNER_UNDER_REVIEW', message: 'Profile under review' } }, { status: 403 })
+            )
+        );
         renderComponent();
         const user = userEvent.setup();
         await waitFor(() => screen.getByText('Test Class'));
         const submitBtn = screen.getByRole('button', { name: /publish|submit/i });
         if (!submitBtn.hasAttribute('disabled')) {
             await user.click(submitBtn);
-            await waitFor(() =>
-                expect(screen.getByText(/profile under review/i)).toBeInTheDocument()
-            );
+            await waitFor(() => expect(screen.getByText(/profile under review/i)).toBeInTheDocument());
         }
     });
 
@@ -123,10 +127,35 @@ describe('CreateClassPreview — navigation', () => {
     it('navigates back to CREATE_CLASS_POLICIES on back', async () => {
         renderComponent();
         await waitFor(() => screen.getByText('Test Class'));
-        const backBtn = screen.getAllByRole('button').find(b => b.closest('header'));
+        const backBtn = screen.getAllByRole('button').find((b) => b.closest('header'));
         if (backBtn) {
             await userEvent.setup().click(backBtn);
             expect(mockNavigate).toHaveBeenCalledWith('CREATE_CLASS_POLICIES');
         }
+    });
+});
+
+describe('CreateClassPreview — an in-person class without a location', () => {
+    it('lists Location as missing and keeps Submit off, instead of failing on Submit', async () => {
+        server.use(
+            http.get(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/`, () =>
+                HttpResponse.json({ success: true, data: { ...completeDraft, address: '' } })
+            )
+        );
+        renderComponent();
+        await waitFor(() => expect(screen.getByText(/missing for submission/i)).toBeInTheDocument(), { timeout: 3000 });
+        expect(screen.getByText(/Location/)).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /submit for review/i })).not.toBeInTheDocument();
+    });
+
+    it('does not ask an online class for one', async () => {
+        server.use(
+            http.get(`${BASE}/api/v1/partner/listings/classes/${CLASS_DRAFT_ID}/`, () =>
+                HttpResponse.json({ success: true, data: { ...completeDraft, mode: 'online', address: '' } })
+            )
+        );
+        renderComponent();
+        await waitFor(() => screen.getByText('Test Class'));
+        expect(screen.queryByText(/missing for submission/i)).not.toBeInTheDocument();
     });
 });

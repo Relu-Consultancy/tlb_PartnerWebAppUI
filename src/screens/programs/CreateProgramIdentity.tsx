@@ -68,6 +68,8 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
     // accept latitude/longitude yet, so these ride along best-effort; city and
     // address (already-supported fields) always update regardless.
     const [latitude, setLatitude] = useState<number | null>(null);
+    // Set by a Next that found no location, so the map says what's missing.
+    const [locationError, setLocationError] = useState(false);
     const [longitude, setLongitude] = useState<number | null>(null);
     const handleLocationPicked = (loc: PickedLocation) => {
         setAddress(loc.address);
@@ -172,6 +174,9 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
 
     const selectedCategory = categories.find((c) => c.id === selectedCategoryId);
     const needsAddress = deliveryMode === 'offline' || deliveryMode === 'hybrid';
+    // In person needs a place: an address, and a pin (or the city the map resolved).
+    // QA: Next let partners skip it, and the backend only refused at Submit.
+    const locationSet = !!address.trim() && (latitude != null || !!city.trim());
 
     // Shared by "Next" and "Save as draft" — creates the draft if needed and
     // persists whatever's currently filled in. Neither caller requires the step
@@ -240,6 +245,10 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
         const missing: string[] = [];
         if (!title.trim()) missing.push('Program title');
         if (!description.trim()) missing.push('Description');
+        if (needsAddress && !locationSet) {
+            missing.push('Program location (search or tap the map)');
+            setLocationError(true);
+        }
         if (missing.length > 0) {
             const message = `Please complete before continuing: ${missing.join(', ')}.`;
             setError(message);
@@ -453,7 +462,7 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                 </div>
 
                 {needsAddress && (
-                    <WizardField label="Program location" className="gap-3">
+                    <WizardField label="Program location" required missing={!locationSet} className="gap-3">
                         <LocationPicker
                             initialLatitude={latitude}
                             initialLongitude={longitude}
@@ -466,6 +475,11 @@ export const CreateProgramIdentity: React.FC<Props> = ({ onNavigate }) => {
                             value={address}
                             onChange={(e) => setAddress(e.target.value)}
                         />
+                        {locationError && !locationSet && (
+                            <p className="text-[11px] font-semibold text-tlb-red">
+                                Set the location: search for the address above, or tap the map to drop a pin.
+                            </p>
+                        )}
                     </WizardField>
                 )}
 

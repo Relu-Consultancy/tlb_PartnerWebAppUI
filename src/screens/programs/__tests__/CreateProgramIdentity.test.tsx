@@ -15,6 +15,17 @@ import { getCurrentProgramDraftId } from '../../../api/listings';
 const fillOtherRequired = async (user: ReturnType<typeof userEvent.setup>) => {
     await user.type(screen.getByPlaceholderText(/describe your program/i), 'Desc');
     await user.click(screen.getByRole('checkbox', { name: 'English' }));
+    // In person (the default mode) needs a place before Next.
+    await pickLocation(user);
+};
+
+/** Sets the location the way a partner does: search, then pick the result. */
+const pickLocation = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.type(screen.getByPlaceholderText(/search for the venue's address/i), 'Bandra');
+    await user.click(await screen.findByRole('button', { name: /Bandra West, Mumbai/ }, { timeout: 3000 }));
+    await waitFor(() =>
+        expect(screen.getByPlaceholderText(/street, building, landmark/i)).toHaveValue('Hill Road, Bandra West, Mumbai 400050')
+    );
 };
 
 const BASE = 'https://tlb-api.reluconsultancy.in';
@@ -162,5 +173,36 @@ describe('CreateProgramIdentity — booking type', () => {
         await fillOtherRequired(user);
         await user.click(screen.getByRole('button', { name: /next|continue/i }));
         await waitFor(() => expect(patchBody?.booking_type).toBe('enquiry'), { timeout: 3000 });
+    });
+});
+
+describe('CreateProgramIdentity — location is required in person (QA: skipped here, refused only at Submit)', () => {
+    const fillAllButLocation = async (user: ReturnType<typeof userEvent.setup>) => {
+        await user.type(await screen.findByPlaceholderText(/advanced robotics program/i), 'Robotics');
+        await user.type(screen.getByPlaceholderText(/describe your program/i), 'Desc');
+        await user.click(screen.getByRole('checkbox', { name: 'English' }));
+    };
+
+    it('stops Next on this screen and says the location is missing', async () => {
+        const toastWarn = vi.spyOn((await import('../../../components/ui')).toast, 'warning');
+        renderComponent();
+        const user = userEvent.setup();
+        await fillAllButLocation(user);
+        await user.click(screen.getByRole('button', { name: /next/i }));
+
+        await waitFor(() => expect(toastWarn).toHaveBeenCalledWith(expect.stringMatching(/Program location \(search or tap the map\)/)));
+        expect(screen.getByText(/Set the location: search for the address above/)).toBeInTheDocument();
+        expect(mockNavigate).not.toHaveBeenCalledWith('CREATE_PROGRAM_BATCH');
+        toastWarn.mockRestore();
+    });
+
+    it('goes on once a location is picked', async () => {
+        renderComponent();
+        const user = userEvent.setup();
+        await fillAllButLocation(user);
+        await pickLocation(user);
+        await user.click(screen.getByRole('button', { name: /next/i }));
+
+        await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('CREATE_PROGRAM_BATCH'));
     });
 });

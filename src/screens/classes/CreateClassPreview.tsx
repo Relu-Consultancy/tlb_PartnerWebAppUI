@@ -211,6 +211,8 @@ export const CreateClassPreview: React.FC<Props> = ({ onNavigate }) => {
     if (listing) {
         if (!listing.title?.trim()) missing.push('Title');
         if (!(listing.description || listing.short_description)?.trim()) missing.push('Description');
+        // The backend refuses an in-person class without an address — say so here, not on Submit.
+        if ((mode === 'offline' || mode === 'hybrid') && !(srv.address || listing.address)?.trim()) missing.push('Location');
 
         if (!cover) missing.push('Cover image');
         if (batches.length === 0) missing.push('At least one batch/schedule');

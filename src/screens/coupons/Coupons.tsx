@@ -125,7 +125,7 @@ export const Coupons: React.FC<Props> = ({ onNavigate }) => {
 
             <div className="flex items-center gap-2.5 flex-wrap">
                 <SegBar options={scopeOptions} value={status} onChange={setStatus} />
-                <div className="flex-1" />
+                <div className="hidden sm:block flex-1" />
                 <SearchField value={search} onChange={setSearch} placeholder="Search coupons" />
             </div>
 

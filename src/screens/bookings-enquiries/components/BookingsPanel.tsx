@@ -112,7 +112,7 @@ export const BookingsPanel: React.FC<BookingsPanelProps> = ({ entries, available
                         resetPaging();
                     }}
                 />
-                <div className="flex-1" />
+                <div className="hidden sm:block flex-1" />
                 <SearchField
                     value={search}
                     onChange={(v) => {

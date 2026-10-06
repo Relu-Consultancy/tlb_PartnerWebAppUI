@@ -99,59 +99,14 @@ describe('Analytics — tab switching', () => {
         expect(screen.getByText(/40 enquiries have not been contacted yet/i)).toBeInTheDocument();
     });
 
-    it('shows real traffic-source shares and links to the full traffic report', async () => {
+    it('hides "Where customers come from" until the traffic API is live — no Full report into an empty screen', async () => {
         renderScreen();
         const user = userEvent.setup();
         await waitFor(() => screen.getByText('Revenue by service'));
         await user.click(screen.getByRole('tab', { name: 'Demand funnel' }));
-        expect(screen.getByText('Instagram')).toBeInTheDocument();
-        expect(screen.getByText('Organic / direct')).toBeInTheDocument();
-        await user.click(screen.getByRole('button', { name: /full report/i }));
-        expect(mockNavigate).toHaveBeenCalledWith('TRAFFIC_ANALYTICS');
-    });
-
-    it('shows the real Top city tile with the known-location caveat, not an all-bookings percentage', async () => {
-        renderScreen();
-        const user = userEvent.setup();
-        await waitFor(() => screen.getByText('Revenue by service'));
-        await user.click(screen.getByRole('tab', { name: 'Demand funnel' }));
-        expect(screen.getByText('Top city')).toBeInTheDocument();
-        expect(screen.getByText('Bengaluru')).toBeInTheDocument();
-        expect(screen.getByText(/86% of bookings with known location/i)).toBeInTheDocument();
-    });
-
-    it('hides the Top city tile entirely when no booking has a resolved city yet', async () => {
-        server.use(
-            http.get(`${BASE}/api/v1/partner/stats/overview-all/`, ({ request }) => {
-                const listingType = new URL(request.url).searchParams.get('listing_type');
-                if (listingType) return HttpResponse.json({ success: true, data: { listing_type: listingType, top_city: null } });
-                return HttpResponse.json({
-                    success: true,
-                    data: {
-                        period: '30d',
-                        listing_type: null,
-                        gross_revenue: '0',
-                        revenue_growth_pct: 0,
-                        confirmed_bookings: 0,
-                        bookings_growth_pct: 0,
-                        avg_order_value: '0',
-                        conversion_rate: 0,
-                        repeat_customers_pct: 0,
-                        revenue_by_type: [],
-                        revenue_by_listing: null,
-                        demand_funnel: { listing_views: 0, enquiries: 0, confirmed_bookings: 0 },
-                        weekly_trend: [],
-                        top_city: null,
-                    },
-                });
-            })
-        );
-        renderScreen();
-        const user = userEvent.setup();
-        await waitFor(() => screen.getByText('Revenue by service'));
-        await user.click(screen.getByRole('tab', { name: 'Demand funnel' }));
-        await waitFor(() => expect(screen.getByText('Peak day')).toBeInTheDocument());
-        expect(screen.queryByText('Top city')).not.toBeInTheDocument();
+        expect(screen.getByText('Profile views')).toBeInTheDocument();
+        expect(screen.queryByText('Where customers come from')).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /full report/i })).not.toBeInTheDocument();
     });
 
     it('shows the listings tab with real per-listing performance rows and their price/rating states', async () => {

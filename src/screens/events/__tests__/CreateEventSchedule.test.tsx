@@ -251,3 +251,94 @@ describe('CreateEventSchedule — Next navigation', () => {
         toastSpy.mockRestore();
     });
 });
+
+describe('CreateEventSchedule — a fresh event switched to Paid (QA: "Ticket not found")', () => {
+    // As live: a new draft is free and carries the backend's automatic
+    // "Free Entry" ticket (id 1, in the default fixture). Changing the price
+    // type makes the backend clear every ticket — so ticket 1 is gone by the
+    // time the tickets are saved.
+    const backend = () => {
+        const state = { cleared: false, puts: [] as number[], posts: [] as any[], failPostNamed: '' as string };
+        server.use(
+            http.patch(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/`, async ({ request }) => {
+                const body = (await request.json()) as any;
+                if (body.price_type === 'paid') state.cleared = true;
+                return HttpResponse.json({ success: true, data: {} });
+            }),
+            http.put(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/tickets/:ticketId/`, ({ params }) => {
+                const id = Number(params.ticketId);
+                state.puts.push(id);
+                if (id === 1 && state.cleared) {
+                    return HttpResponse.json(
+                        { success: false, data: null, error: { code: 'NOT_FOUND', message: 'Ticket not found.' } },
+                        { status: 404 }
+                    );
+                }
+                return HttpResponse.json({ success: true, data: { id } });
+            }),
+            http.post(`${BASE}/api/v1/partner/listings/events/${DRAFT_ID}/tickets/`, async ({ request }) => {
+                const body = (await request.json()) as any;
+                state.posts.push(body);
+                if (state.failPostNamed && body.name === state.failPostNamed) {
+                    state.failPostNamed = '';
+                    return HttpResponse.json({ error: { code: 'SERVER_ERROR', message: 'Temporary failure' } }, { status: 500 });
+                }
+                return HttpResponse.json({ success: true, data: { id: 100 + state.posts.length, ...body } }, { status: 201 });
+            })
+        );
+        return state;
+    };
+
+    const editTier = async (user: ReturnType<typeof userEvent.setup>, index: number, name: string, price: string, qty: string) => {
+        const names = screen.getAllByPlaceholderText(/e\.g\. General Admission/i);
+        await user.clear(names[index]);
+        await user.type(names[index], name);
+        await user.clear(screen.getAllByPlaceholderText('499')[index]);
+        await user.type(screen.getAllByPlaceholderText('499')[index], price);
+        await user.clear(screen.getAllByPlaceholderText('50')[index]);
+        await user.type(screen.getAllByPlaceholderText('50')[index], qty);
+    };
+
+    it('saves the tier instead of failing with "Ticket not found"', async () => {
+        setCurrentDraftId(DRAFT_ID);
+        const state = backend();
+        const toastError = vi.spyOn(toast, 'error').mockImplementation(() => 0);
+        const user = userEvent.setup();
+        render(<CreateEventSchedule {...props} />);
+        await waitFor(() => screen.getByText('Paid event'));
+        await user.click(screen.getByText('Paid event'));
+        // The screenshot: Tier 1 is the loaded Free Entry row, typed over.
+        await editTier(user, 0, 'Entry free', '300', '23');
+        await user.click(screen.getByText(/next: media/i));
+
+        await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('CREATE_EVENT_MEDIA'));
+        expect(toastError).not.toHaveBeenCalled();
+        expect(state.puts).toEqual([1]); // tried the old id, got 404…
+        expect(state.posts).toEqual([expect.objectContaining({ name: 'Entry free', price: 300, total_quantity: 23 })]); // …so created it
+        toastError.mockRestore();
+    });
+
+    it('never creates a ticket twice when it is saved again after a failure', async () => {
+        setCurrentDraftId(DRAFT_ID);
+        const state = backend();
+        state.failPostNamed = 'VIP'; // the second tier fails once
+        const toastError = vi.spyOn(toast, 'error').mockImplementation(() => 0);
+        const user = userEvent.setup();
+        render(<CreateEventSchedule {...props} />);
+        await waitFor(() => screen.getByText('Paid event'));
+        await user.click(screen.getByText('Paid event'));
+        await editTier(user, 0, 'Entry', '300', '23');
+        await user.click(screen.getByText(/add ticket tier/i));
+        await editTier(user, 1, 'VIP', '900', '5');
+
+        await user.click(screen.getByText(/next: media/i));
+        await waitFor(() => expect(toastError).toHaveBeenCalled());
+        expect(mockNavigate).not.toHaveBeenCalledWith('CREATE_EVENT_MEDIA');
+
+        await user.click(screen.getByText(/next: media/i));
+        await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('CREATE_EVENT_MEDIA'));
+        expect(state.posts.filter((p) => p.name === 'Entry')).toHaveLength(1);
+        expect(state.posts.filter((p) => p.name === 'VIP')).toHaveLength(2); // failed once, then saved
+        toastError.mockRestore();
+    });
+});

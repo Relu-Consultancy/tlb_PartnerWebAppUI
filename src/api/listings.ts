@@ -2,11 +2,20 @@ import { apiClient } from './client';
 
 export class ApiError extends Error {
     code: string;
-    constructor(message: string, code: string) {
+    status?: number;
+    constructor(message: string, code: string, status?: number) {
         super(message);
         this.code = code;
+        this.status = status;
     }
 }
+
+/**
+ * The record a call named isn't there — e.g. an event's tickets, which the
+ * backend clears when the price type changes. Callers saving by id use this
+ * to create the record again instead of failing.
+ */
+export const isNotFoundError = (err: unknown): boolean => err instanceof ApiError && (err.code === 'NOT_FOUND' || err.status === 404);
 
 // DRF validation errors often come back as { field: ["message", ...] } rather than a
 // flat string — dig into that shape (and any nesting) for the first human-readable
@@ -41,7 +50,7 @@ const handleError = async (response: Response, fallback: string): Promise<never>
     const err = await response.json().catch(() => null);
     const code: string = err?.error?.code || err?.code || '';
     const msg = extractMessage(err?.error?.message) ?? extractMessage(err?.message) ?? extractMessage(err?.error) ?? fallback;
-    throw new ApiError(cleanErrorDetail(msg), code);
+    throw new ApiError(cleanErrorDetail(msg), code, response.status);
 };
 
 // ─── Class Metadata (public) ──────────────────────────────────────────────
@@ -246,6 +255,8 @@ export const deleteTicket = async (listingId: string, ticketId: number) => {
     const response = await apiClient(`/api/v1/partner/listings/events/${listingId}/tickets/${ticketId}/`, {
         method: 'DELETE',
     });
+    // Already gone (the backend clears tickets when the price type changes) — nothing left to delete.
+    if (response.status === 404) return {};
     if (!response.ok) await handleError(response, 'Failed to delete ticket');
     if (response.status === 204) return {};
     return response.json().catch(() => ({}));

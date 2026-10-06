@@ -28,6 +28,8 @@ import {
     getTicketCategories,
     ticketCategoryLabel,
     isBookingCategory,
+    defaultTicketCategory,
+    isBookingRequiredError,
     listSharedTickets,
     getSharedTicket,
     getSharedTicketMessages,
@@ -94,6 +96,11 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
 
     const [creating, setCreating] = useState(false);
     const [form, setForm] = useState({ subject: '', category: '', body: '', bookingId: '' });
+    // Categories the backend turned out to require a booking for — learned from
+    // its refusal, since the categories endpoint doesn't say. They get the
+    // booking picker from then on.
+    const [bookingRequired, setBookingRequired] = useState<Set<string>>(new Set());
+    const showsBookingPicker = (category: string) => isBookingCategory(category) || bookingRequired.has(category);
     const [formErrors, setFormErrors] = useState<{ subject?: string; category?: string; body?: string }>({});
     const [submitting, setSubmitting] = useState(false);
 
@@ -287,7 +294,7 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
     };
 
     const openNew = () => {
-        setForm({ subject: '', category: categories[0]?.value || '', body: '', bookingId: '' });
+        setForm({ subject: '', category: defaultTicketCategory(categories), body: '', bookingId: '' });
         setFormErrors({});
         setCreating(true);
     };
@@ -301,19 +308,34 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
         setFormErrors(errs);
         if (Object.keys(errs).length) return;
         setSubmitting(true);
+        const ticket = { subject: form.subject.trim(), category: form.category, body: form.body.trim() };
+        const bookingId = (showsBookingPicker(form.category) && form.bookingId) || undefined;
         try {
-            const t = await createTicket({
-                subject: form.subject.trim(),
-                category: form.category,
-                body: form.body.trim(),
-                booking_id: (isBookingCategory(form.category) && form.bookingId) || undefined,
-            });
+            let t;
+            try {
+                t = await createTicket({ ...ticket, booking_id: bookingId });
+            } catch (e: any) {
+                if (!bookingId || !isBookingRequiredError(e?.message)) throw e;
+                // The backend refused the booking link itself (it checks ownership
+                // against the customer, not the partner). Raise the ticket anyway
+                // and keep the reference in the description so support can find it.
+                const ref = bookingOptions.find((o) => o.value === bookingId)?.label || bookingId;
+                t = await createTicket({ ...ticket, body: `${ticket.body}\n\nRelated booking: ${ref}` });
+            }
             toast.success('Support ticket raised.');
             setCreating(false);
             await loadList();
             openTicket(t.id);
         } catch (e: any) {
-            toast.error(e?.message || 'Failed to raise ticket');
+            if (isBookingRequiredError(e?.message)) {
+                // Don't show the raw "No booking found…" — reveal the picker and say what's needed.
+                setBookingRequired((prev) => new Set(prev).add(form.category));
+                setFormErrors({
+                    category: 'This category is about a specific booking — pick it under Related booking, or choose a different category.',
+                });
+            } else {
+                toast.error(e?.message || 'Failed to raise ticket');
+            }
         } finally {
             setSubmitting(false);
         }
@@ -562,15 +584,16 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                     <label className={labelCls}>Category *</label>
                                     <Select
                                         value={form.category}
-                                        onChange={(v) =>
+                                        onChange={(v) => {
+                                            setFormErrors((e) => ({ ...e, category: undefined }));
                                             setForm((f) => ({
                                                 ...f,
                                                 category: v,
                                                 // The picker is hidden for other categories, so never
                                                 // submit a booking the partner can no longer see.
-                                                bookingId: isBookingCategory(v) ? f.bookingId : '',
-                                            }))
-                                        }
+                                                bookingId: showsBookingPicker(v) ? f.bookingId : '',
+                                            }));
+                                        }}
                                         options={categories}
                                         placeholder="Select a category"
                                         ariaLabel="Ticket category"
@@ -578,9 +601,11 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                     />
                                     {formErrors.category && <p className="text-xs text-red-500 mt-1.5">{formErrors.category}</p>}
                                 </div>
-                                {isBookingCategory(form.category) && (
+                                {showsBookingPicker(form.category) && (
                                     <div>
-                                        <label className={labelCls}>Related Booking (optional)</label>
+                                        <label className={labelCls}>
+                                            Related Booking {bookingRequired.has(form.category) ? '*' : '(optional)'}
+                                        </label>
                                         <Select
                                             value={form.bookingId}
                                             onChange={(v) => setForm((f) => ({ ...f, bookingId: v }))}

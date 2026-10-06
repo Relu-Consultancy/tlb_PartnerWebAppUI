@@ -30,29 +30,42 @@ describe('humanizeFieldErrors', () => {
 });
 
 describe('Documents — bank details', () => {
-    it('blocks a half-filled bank section instead of letting the API reject it', async () => {
+    const fillAll = async (user: ReturnType<typeof userEvent.setup>, opts: { bank?: boolean } = { bank: true }) => {
+        await waitFor(() => expect(screen.getByPlaceholderText('ABCDE1234F')).toBeInTheDocument());
+        await user.type(screen.getByPlaceholderText('ABCDE1234F'), 'ABCDE1234F');
+        if (opts.bank) {
+            await user.type(screen.getByPlaceholderText('As per bank records'), 'Asha Rao');
+            await user.type(screen.getByPlaceholderText(/12-digit account number/i), '123456789012');
+            await user.type(screen.getByPlaceholderText('HDFC0001234'), 'HDFC0001234');
+        }
+    };
+
+    it('asks for the bank account when only a PAN is filled — the API only takes them together (QA)', async () => {
         const warnSpy = vi.spyOn(toast, 'warning').mockImplementation(() => 0);
-        let posted = false;
+        let posted = 0;
         server.use(
             http.post(`${BASE}/api/v1/partner/verification/`, () => {
-                posted = true;
+                posted += 1;
                 return HttpResponse.json({ success: true, data: {} });
             })
         );
         const user = userEvent.setup();
         renderScreen();
-
-        await waitFor(() => expect(screen.getByPlaceholderText('ABCDE1234F')).toBeInTheDocument());
-        await user.type(screen.getByPlaceholderText('ABCDE1234F'), 'ABCDE1234F');
-        await user.type(screen.getByPlaceholderText('As per bank records'), 'Abusu');
+        await fillAll(user, { bank: false });
         await user.click(screen.getAllByRole('button', { name: /save documents/i })[0]);
 
         await waitFor(() => expect(warnSpy).toHaveBeenCalled());
-        expect(String(warnSpy.mock.calls[0][0])).toMatch(/bank details go together/i);
-        expect(posted).toBe(false);
+        expect(String(warnSpy.mock.calls[0][0])).toMatch(/Add your bank account below/i);
+        // The missing bank fields are marked, not just mentioned in a toast.
+        expect(screen.getByText('Enter the account holder name')).toBeInTheDocument();
+        expect(screen.getByText('Enter the account number')).toBeInTheDocument();
+        expect(screen.getByText('Enter the IFSC code')).toBeInTheDocument();
+        expect(screen.getByPlaceholderText('As per bank records')).toHaveAttribute('aria-invalid', 'true');
+        expect(posted).toBe(0);
+        warnSpy.mockRestore();
     });
 
-    it('accepts a PAN on its own and sends only the filled fields', async () => {
+    it('submits PAN and bank account together in one request', async () => {
         let body: any = null;
         server.use(
             http.post(`${BASE}/api/v1/partner/verification/`, async ({ request }) => {
@@ -62,16 +75,37 @@ describe('Documents — bank details', () => {
         );
         const user = userEvent.setup();
         renderScreen();
-
-        await waitFor(() => expect(screen.getByPlaceholderText('ABCDE1234F')).toBeInTheDocument());
-        await user.type(screen.getByPlaceholderText('ABCDE1234F'), 'ABCDE1234F');
+        await fillAll(user);
         await user.click(screen.getAllByRole('button', { name: /save documents/i })[0]);
 
         await waitFor(() => expect(body).not.toBeNull());
-        expect(body.pan_number).toBe('ABCDE1234F');
-        // Blank bank fields are what triggered "This field may not be blank".
-        expect(body).not.toHaveProperty('account_number');
-        expect(body).not.toHaveProperty('ifsc_code');
+        expect(body).toMatchObject({
+            pan_number: 'ABCDE1234F',
+            account_holder_name: 'Asha Rao',
+            account_number: '123456789012',
+            ifsc_code: 'HDFC0001234',
+        });
+        expect(body).not.toHaveProperty('gst_number');
+    });
+
+    it.each([0, 1])('Save button %i sends exactly one request, even when double-tapped', async (index) => {
+        let posted = 0;
+        server.use(
+            http.post(`${BASE}/api/v1/partner/verification/`, async () => {
+                posted += 1;
+                await new Promise((r) => setTimeout(r, 50));
+                return HttpResponse.json({ success: true, data: {} });
+            })
+        );
+        const user = userEvent.setup();
+        renderScreen();
+        await fillAll(user);
+        const button = screen.getAllByRole('button', { name: /save documents/i })[index];
+        await user.dblClick(button);
+
+        await waitFor(() => expect(posted).toBeGreaterThan(0));
+        await new Promise((r) => setTimeout(r, 150));
+        expect(posted).toBe(1);
     });
 
     it('caps the account number at 12 digits', async () => {

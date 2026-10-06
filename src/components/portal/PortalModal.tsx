@@ -1,6 +1,7 @@
 import React, { useEffect, useId } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { X } from 'lucide-react';
+import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 
 interface PortalModalProps {
     open: boolean;
@@ -13,14 +14,15 @@ interface PortalModalProps {
 }
 
 /** Centered dialog in the portal style — closes on backdrop click or Escape. */
-export const PortalModal: React.FC<PortalModalProps> = ({
-    open, onClose, title, subtitle, widthClass = 'max-w-[480px]', children,
-}) => {
+export const PortalModal: React.FC<PortalModalProps> = ({ open, onClose, title, subtitle, widthClass = 'max-w-[480px]', children }) => {
     const titleId = useId();
+    useBodyScrollLock(open);
 
     useEffect(() => {
         if (!open) return;
-        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') onClose();
+        };
         document.addEventListener('keydown', onKey);
         return () => document.removeEventListener('keydown', onKey);
     }, [open, onClose]);
@@ -39,7 +41,7 @@ export const PortalModal: React.FC<PortalModalProps> = ({
                         role="dialog"
                         aria-modal="true"
                         aria-labelledby={titleId}
-                        className={`pt-card w-full ${widthClass} max-h-[calc(100vh-2rem)] overflow-y-auto px-6 py-[22px]`}
+                        className={`pt-card w-full ${widthClass} max-h-[calc(100vh-2rem)] overflow-y-auto overscroll-contain px-6 py-[22px]`}
                         initial={{ opacity: 0, y: 8, scale: 0.98 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 8, scale: 0.98 }}
@@ -47,7 +49,9 @@ export const PortalModal: React.FC<PortalModalProps> = ({
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}
                     >
                         <div className="flex items-center justify-between gap-3 mb-1">
-                            <h2 id={titleId} className="pt-h-sec">{title}</h2>
+                            <h2 id={titleId} className="pt-h-sec">
+                                {title}
+                            </h2>
                             <button
                                 type="button"
                                 onClick={onClose}

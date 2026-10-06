@@ -5,6 +5,7 @@ import { AppListingPreview, formatLanguages, toast } from '../../components/ui';
 import type { AppListingPreviewModel, PreviewFact } from '../../components/ui';
 import { WizardShell, WizardNav, scrollToFirstMissingField } from '../../components/portal/wizard';
 import { getListingDetail, submitListing, getCurrentDraftId, clearCurrentDraftId, ApiError } from '../../api/listings';
+import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 
 interface Props {
     onNavigate: (screen: Screen) => void;
@@ -54,6 +55,8 @@ interface ResultModalProps {
 }
 
 const ResultModal: React.FC<ResultModalProps> = ({ variant, message, onClose }) => {
+    // Mounted only while shown, so the page stays put for exactly that long.
+    useBodyScrollLock(true);
     // ── success: partner isVerified=true, event submitted → under admin review ──
     if (variant === 'success') {
         return (

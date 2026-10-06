@@ -4,25 +4,31 @@ import { Screen } from '../../types';
 import { AppListingPreview, formatLanguages } from '../../components/ui';
 import type { AppListingPreviewModel, PreviewFact } from '../../components/ui';
 import { WizardShell, WizardNav } from '../../components/portal/wizard';
-import {
-    getClassListingDetail,
-    submitClassListing,
-    getCurrentClassDraftId,
-    clearCurrentClassDraftId,
-    ApiError,
-} from '../../api/listings';
+import { getClassListingDetail, submitClassListing, getCurrentClassDraftId, clearCurrentClassDraftId, ApiError } from '../../api/listings';
+import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 
-interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar: () => void; }
+interface Props {
+    onNavigate: (screen: Screen) => void;
+    onOpenSidebar: () => void;
+}
 
 type ModalVariant = 'success' | 'under_review' | 'error';
 
-interface ResultModalProps { variant: ModalVariant; message?: string; onClose: () => void; }
+interface ResultModalProps {
+    variant: ModalVariant;
+    message?: string;
+    onClose: () => void;
+}
 
 const ResultModal: React.FC<ResultModalProps> = ({ variant, message, onClose }) => {
+    // Mounted only while shown, so the page stays put for exactly that long.
+    useBodyScrollLock(true);
     if (variant === 'success') {
         return (
-            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-6"
-                style={{ backdropFilter: 'blur(6px)', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+            <div
+                className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-6"
+                style={{ backdropFilter: 'blur(6px)', backgroundColor: 'rgba(0,0,0,0.5)' }}
+            >
                 <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden border-2 border-tlb-yellow">
                     <div className="bg-tlb-yellow/10 px-6 pt-8 pb-6 flex flex-col items-center text-center gap-4">
                         <div className="relative">
@@ -44,23 +50,32 @@ const ResultModal: React.FC<ResultModalProps> = ({ variant, message, onClose }) 
                     <div className="px-6 pb-4">
                         <div className="bg-gray-50 rounded-2xl p-4 space-y-2.5">
                             {[
-                                { done: true,  label: 'Draft created & saved' },
-                                { done: true,  label: 'Submitted for admin review' },
+                                { done: true, label: 'Draft created & saved' },
+                                { done: true, label: 'Submitted for admin review' },
                                 { done: false, label: 'Admin approves → class goes live' },
                             ].map((step, i) => (
                                 <div key={i} className="flex items-center gap-3 text-xs">
-                                    <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${step.done ? 'bg-tlb-yellow' : 'bg-tlb-yellow/20 border-2 border-tlb-yellow'}`}>
-                                        {step.done
-                                            ? <CheckCircle2 size={12} className="text-tlb-dark" />
-                                            : <Clock size={9} className="text-tlb-yellow" />}
+                                    <div
+                                        className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${step.done ? 'bg-tlb-yellow' : 'bg-tlb-yellow/20 border-2 border-tlb-yellow'}`}
+                                    >
+                                        {step.done ? (
+                                            <CheckCircle2 size={12} className="text-tlb-dark" />
+                                        ) : (
+                                            <Clock size={9} className="text-tlb-yellow" />
+                                        )}
                                     </div>
-                                    <span className={step.done ? 'text-gray-700 font-semibold' : 'text-tlb-yellow font-semibold'}>{step.label}</span>
+                                    <span className={step.done ? 'text-gray-700 font-semibold' : 'text-tlb-yellow font-semibold'}>
+                                        {step.label}
+                                    </span>
                                 </div>
                             ))}
                         </div>
                     </div>
                     <div className="px-6 pb-6">
-                        <button onClick={onClose} className="w-full py-4 rounded-2xl font-black text-sm text-tlb-dark bg-tlb-yellow shadow-lg shadow-tlb-yellow/30 hover:brightness-95 active:scale-95 transition-all">
+                        <button
+                            onClick={onClose}
+                            className="w-full py-4 rounded-2xl font-black text-sm text-tlb-dark bg-tlb-yellow shadow-lg shadow-tlb-yellow/30 hover:brightness-95 active:scale-95 transition-all"
+                        >
                             Okay, Go to My Listings
                         </button>
                     </div>
@@ -71,8 +86,10 @@ const ResultModal: React.FC<ResultModalProps> = ({ variant, message, onClose }) 
 
     if (variant === 'under_review') {
         return (
-            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-6"
-                style={{ backdropFilter: 'blur(6px)', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+            <div
+                className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-6"
+                style={{ backdropFilter: 'blur(6px)', backgroundColor: 'rgba(0,0,0,0.5)' }}
+            >
                 <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden border-2 border-purple-400">
                     <div className="bg-blue-50 px-6 pt-8 pb-6 flex flex-col items-center text-center gap-4">
                         <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center border-4 border-purple-400 shadow-lg">
@@ -85,11 +102,15 @@ const ResultModal: React.FC<ResultModalProps> = ({ variant, message, onClose }) 
                     </div>
                     <div className="px-6 py-5">
                         <p className="text-sm text-gray-500 leading-relaxed text-center">
-                            {message || 'Your partner profile is currently under review. You can save drafts but cannot submit listings until the review is complete.'}
+                            {message ||
+                                'Your partner profile is currently under review. You can save drafts but cannot submit listings until the review is complete.'}
                         </p>
                     </div>
                     <div className="px-6 pb-6">
-                        <button onClick={onClose} className="w-full py-4 rounded-2xl font-black text-sm text-tlb-dark bg-tlb-yellow shadow-lg shadow-tlb-yellow/30 hover:brightness-95 active:scale-95 transition-all">
+                        <button
+                            onClick={onClose}
+                            className="w-full py-4 rounded-2xl font-black text-sm text-tlb-dark bg-tlb-yellow shadow-lg shadow-tlb-yellow/30 hover:brightness-95 active:scale-95 transition-all"
+                        >
                             Back to Listings
                         </button>
                     </div>
@@ -99,8 +120,10 @@ const ResultModal: React.FC<ResultModalProps> = ({ variant, message, onClose }) 
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-6"
-            style={{ backdropFilter: 'blur(6px)', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <div
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-6"
+            style={{ backdropFilter: 'blur(6px)', backgroundColor: 'rgba(0,0,0,0.5)' }}
+        >
             <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden border-2 border-red-400">
                 <div className="bg-red-50 px-6 pt-8 pb-6 flex flex-col items-center text-center gap-4">
                     <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center border-4 border-red-400 shadow-lg">
@@ -117,7 +140,10 @@ const ResultModal: React.FC<ResultModalProps> = ({ variant, message, onClose }) 
                     </p>
                 </div>
                 <div className="px-6 pb-6">
-                    <button onClick={onClose} className="w-full py-4 rounded-2xl font-black text-sm text-tlb-dark bg-tlb-yellow shadow-lg shadow-tlb-yellow/30 hover:brightness-95 active:scale-95 transition-all">
+                    <button
+                        onClick={onClose}
+                        className="w-full py-4 rounded-2xl font-black text-sm text-tlb-dark bg-tlb-yellow shadow-lg shadow-tlb-yellow/30 hover:brightness-95 active:scale-95 transition-all"
+                    >
                         Got it
                     </button>
                 </div>
@@ -133,11 +159,11 @@ const resolveUrl = (url?: string) => {
     return `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
 };
 
-const titleCase = (s?: string) => s ? s.charAt(0).toUpperCase() + s.slice(1) : '—';
+const titleCase = (s?: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : '—');
 
 const fmtDays = (days: string[]) => {
     const map: Record<string, string> = { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' };
-    return (days || []).map(d => map[d] || d).join(', ');
+    return (days || []).map((d) => map[d] || d).join(', ');
 };
 
 export const CreateClassPreview: React.FC<Props> = ({ onNavigate }) => {
@@ -171,8 +197,8 @@ export const CreateClassPreview: React.FC<Props> = ({ onNavigate }) => {
     const srv = listing?.service || {};
     const media: any[] = srv.media || listing?.media || [];
     const batches: any[] = srv.batches || listing?.batches || [];
-    const cover = media.find(m => m.media_type === 'cover');
-    const gallery = media.filter(m => m.media_type === 'gallery');
+    const cover = media.find((m) => m.media_type === 'cover');
+    const gallery = media.filter((m) => m.media_type === 'gallery');
     const category = srv.category || listing?.category;
     const subcategory = srv.subcategory || listing?.subcategory;
     const mode = srv.mode || listing?.mode;
@@ -196,27 +222,37 @@ export const CreateClassPreview: React.FC<Props> = ({ onNavigate }) => {
     const clsLoc = srv.location || listing?.location;
     const firstBatch = batches[0];
     const clsPrice = listing?.price ?? srv.price ?? listing?.fee ?? srv.fee;
-    const langLine = listing ? formatLanguages((listing.languages ? listing : srv).languages, (listing.languages ? listing : srv).other_language) : '';
-    const previewModel: AppListingPreviewModel | null = listing ? {
-        typeLabel: 'Class',
-        title: listing.title || '',
-        coverUrl: cover ? resolveUrl(cover.url || cover.file_url) : undefined,
-        gallery: gallery.map((g: any) => resolveUrl(g.url || g.file_url)),
-        tags: [category?.name, subcategory?.name, ...tags].filter(Boolean) as string[],
-        locationLine: mode === 'online' ? 'Online class' : ([clsArea, clsCity].filter(Boolean).join(', ') || clsLoc || undefined),
-        address: mode === 'online' ? undefined : (clsLoc || [clsArea, clsCity].filter(Boolean).join(', ') || undefined),
-        dateLine: firstBatch ? `${fmtDays(firstBatch.days || [])} · ${(firstBatch.start_time || '').slice(0, 5)}–${(firstBatch.end_time || '').slice(0, 5)}` : undefined,
-        description: listing.description || listing.short_description || '',
-        aboutTitle: 'About Class',
-        facts: [
-            langLine ? { icon: 'language', label: 'Language', value: langLine } : null,
-            (minAge != null || maxAge != null) ? { icon: 'age', label: 'Age Group', value: `${minAge ?? '?'}–${maxAge ?? '?'} yrs` } : null,
-            mode ? { icon: 'mode', label: 'Mode', value: titleCase(mode) } : null,
-            batches.length ? { icon: 'schedule', label: 'Batches', value: `${batches.length} batch${batches.length > 1 ? 'es' : ''}` } : null,
-        ].filter(Boolean) as PreviewFact[],
-        priceLabel: clsPrice != null ? (Number(clsPrice) > 0 ? `₹${Number(clsPrice).toLocaleString()}` : 'Free') : '—',
-        ctaLabel: (srv.booking_type || listing.booking_type) === 'direct_booking' ? 'Book Now' : 'Enquire Now',
-    } : null;
+    const langLine = listing
+        ? formatLanguages((listing.languages ? listing : srv).languages, (listing.languages ? listing : srv).other_language)
+        : '';
+    const previewModel: AppListingPreviewModel | null = listing
+        ? {
+              typeLabel: 'Class',
+              title: listing.title || '',
+              coverUrl: cover ? resolveUrl(cover.url || cover.file_url) : undefined,
+              gallery: gallery.map((g: any) => resolveUrl(g.url || g.file_url)),
+              tags: [category?.name, subcategory?.name, ...tags].filter(Boolean) as string[],
+              locationLine: mode === 'online' ? 'Online class' : [clsArea, clsCity].filter(Boolean).join(', ') || clsLoc || undefined,
+              address: mode === 'online' ? undefined : clsLoc || [clsArea, clsCity].filter(Boolean).join(', ') || undefined,
+              dateLine: firstBatch
+                  ? `${fmtDays(firstBatch.days || [])} · ${(firstBatch.start_time || '').slice(0, 5)}–${(firstBatch.end_time || '').slice(0, 5)}`
+                  : undefined,
+              description: listing.description || listing.short_description || '',
+              aboutTitle: 'About Class',
+              facts: [
+                  langLine ? { icon: 'language', label: 'Language', value: langLine } : null,
+                  minAge != null || maxAge != null
+                      ? { icon: 'age', label: 'Age Group', value: `${minAge ?? '?'}–${maxAge ?? '?'} yrs` }
+                      : null,
+                  mode ? { icon: 'mode', label: 'Mode', value: titleCase(mode) } : null,
+                  batches.length
+                      ? { icon: 'schedule', label: 'Batches', value: `${batches.length} batch${batches.length > 1 ? 'es' : ''}` }
+                      : null,
+              ].filter(Boolean) as PreviewFact[],
+              priceLabel: clsPrice != null ? (Number(clsPrice) > 0 ? `₹${Number(clsPrice).toLocaleString()}` : 'Free') : '—',
+              ctaLabel: (srv.booking_type || listing.booking_type) === 'direct_booking' ? 'Book Now' : 'Enquire Now',
+          }
+        : null;
 
     const handleSubmit = async () => {
         if (!draftId || !canSubmit) return;
@@ -229,7 +265,7 @@ export const CreateClassPreview: React.FC<Props> = ({ onNavigate }) => {
             const code: string = err instanceof ApiError ? err.code : '';
             setModal({
                 variant: code === 'PARTNER_UNDER_REVIEW' ? 'under_review' : 'error',
-                message: code === 'PARTNER_UNDER_REVIEW' ? undefined : (err?.message || undefined),
+                message: code === 'PARTNER_UNDER_REVIEW' ? undefined : err?.message || undefined,
             });
         } finally {
             setSubmitting(false);
@@ -244,7 +280,14 @@ export const CreateClassPreview: React.FC<Props> = ({ onNavigate }) => {
 
     if (loading) {
         return (
-            <WizardShell title="New class" entityType="Classes" step={5} totalSteps={5} stepLabel="Preview & publish" onBack={() => onNavigate('CREATE_CLASS_POLICIES')}>
+            <WizardShell
+                title="New class"
+                entityType="Classes"
+                step={5}
+                totalSteps={5}
+                stepLabel="Preview & publish"
+                onBack={() => onNavigate('CREATE_CLASS_POLICIES')}
+            >
                 <div className="pt-card p-5 sm:p-6 flex items-center justify-center gap-2 text-tlb-muted text-xs font-bold py-12">
                     <Loader2 size={16} className="animate-spin" /> Loading preview…
                 </div>
@@ -254,18 +297,34 @@ export const CreateClassPreview: React.FC<Props> = ({ onNavigate }) => {
 
     if (loadError || !listing) {
         return (
-            <WizardShell title="New class" entityType="Classes" step={5} totalSteps={5} stepLabel="Preview & publish" onBack={() => onNavigate('CREATE_CLASS_POLICIES')}>
+            <WizardShell
+                title="New class"
+                entityType="Classes"
+                step={5}
+                totalSteps={5}
+                stepLabel="Preview & publish"
+                onBack={() => onNavigate('CREATE_CLASS_POLICIES')}
+            >
                 <div className="pt-note bg-tlb-red-soft text-tlb-red-deep">{loadError || 'Could not load class.'}</div>
             </WizardShell>
         );
     }
 
     return (
-        <WizardShell title="New class" entityType="Classes" step={5} totalSteps={5} stepLabel="Preview & publish" onBack={() => onNavigate('CREATE_CLASS_POLICIES')}>
+        <WizardShell
+            title="New class"
+            entityType="Classes"
+            step={5}
+            totalSteps={5}
+            stepLabel="Preview & publish"
+            onBack={() => onNavigate('CREATE_CLASS_POLICIES')}
+        >
             <div className="pt-card p-5 sm:p-6 flex flex-col gap-5">
                 <div className="text-center">
                     <h2 className="pt-h-sec">Preview your listing</h2>
-                    <p className="text-[13px] text-tlb-sub mt-0.5">This is how parents will see your class. Review everything before publishing.</p>
+                    <p className="text-[13px] text-tlb-sub mt-0.5">
+                        This is how parents will see your class. Review everything before publishing.
+                    </p>
                 </div>
 
                 {previewModel && <AppListingPreview model={previewModel} listingId={draftId || undefined} />}
@@ -278,7 +337,9 @@ export const CreateClassPreview: React.FC<Props> = ({ onNavigate }) => {
                             <p className="pt-eyebrow !text-tlb-gold">Missing for submission</p>
                         </div>
                         <ul className="text-xs list-disc pl-5 space-y-0.5">
-                            {missing.map(m => <li key={m}>{m}</li>)}
+                            {missing.map((m) => (
+                                <li key={m}>{m}</li>
+                            ))}
                         </ul>
                     </div>
                 ) : listing.status === 'draft' ? (
@@ -295,10 +356,14 @@ export const CreateClassPreview: React.FC<Props> = ({ onNavigate }) => {
 
                 <WizardNav
                     onBack={() => onNavigate('CREATE_CLASS_POLICIES')}
-                    onNext={canSubmit && !submitting ? handleSubmit : () => {
-                        clearCurrentClassDraftId();
-                        onNavigate('SERVICE_LISTINGS');
-                    }}
+                    onNext={
+                        canSubmit && !submitting
+                            ? handleSubmit
+                            : () => {
+                                  clearCurrentClassDraftId();
+                                  onNavigate('SERVICE_LISTINGS');
+                              }
+                    }
                     nextText={submitting ? 'Submitting…' : canSubmit ? 'Submit for review' : 'Back to listings'}
                     nextIcon={submitting ? <Loader2 size={14} className="animate-spin" /> : <Rocket size={14} strokeWidth={2.75} />}
                     onSaveDraft={() => onNavigate('SERVICE_LISTINGS')}

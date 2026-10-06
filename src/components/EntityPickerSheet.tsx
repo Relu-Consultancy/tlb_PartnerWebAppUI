@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, CalendarDays, BarChart3, Users, MapPin, ChevronRight } from 'lucide-react';
 import { EntityType, Screen } from '../types';
 import { clearAllListingDraftIds } from '../api/listings';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
 interface Props {
     isOpen: boolean;
@@ -52,6 +53,7 @@ export const startNewListing = (entity: EntityType): Screen => {
 };
 
 export const EntityPickerSheet: React.FC<Props> = ({ isOpen, onClose, allowedEntities, onNavigate }) => {
+    useBodyScrollLock(isOpen);
     const handleSelect = (entity: EntityType) => {
         onClose();
         onNavigate(startNewListing(entity));

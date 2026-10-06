@@ -1,5 +1,6 @@
 import React, { useCallback, useState, useSyncExternalStore } from 'react';
 import { AlertTriangle, CheckCircle2, Info, X, XCircle } from 'lucide-react';
+import { readableErrorMessage } from '../../utils/readableError';
 
 export type ToastType = 'error' | 'success' | 'warning' | 'info';
 
@@ -36,7 +37,9 @@ const emit = () => listeners.forEach((l) => l());
 
 const subscribe = (listener: () => void) => {
     listeners.add(listener);
-    return () => { listeners.delete(listener); };
+    return () => {
+        listeners.delete(listener);
+    };
 };
 
 const getSnapshot = () => items;
@@ -47,9 +50,14 @@ const dismiss = (id: number) => {
 };
 
 const show = (type: ToastType, message: string, options: ToastOptions = {}) => {
-    const id = ++seq;
     const { title = DEFAULT_TITLES[type], duration = 5000 } = options;
-    items = [...items, { id, type, title, message }];
+    // Backend validation dumps never reach the partner as-is.
+    const text = message ? readableErrorMessage(message) : message;
+    // A repeat tap shouldn't stack a second copy of the toast already showing.
+    const same = items.find((t) => t.type === type && t.title === title && t.message === text);
+    if (same) return same.id;
+    const id = ++seq;
+    items = [...items, { id, type, title, message: text }];
     emit();
     if (duration > 0) {
         setTimeout(() => dismiss(id), duration);
@@ -73,13 +81,54 @@ export const toast = {
 // ---------------------------------------------------------------------------
 // Presentation
 // ---------------------------------------------------------------------------
-const PALETTE: Record<ToastType, {
-    bar: string; bg: string; ring: string; title: string; text: string; icon: React.ElementType; iconColor: string;
-}> = {
-    success: { bar: 'bg-emerald-500', bg: 'bg-emerald-50', ring: 'ring-emerald-100', title: 'text-emerald-800', text: 'text-emerald-700', icon: CheckCircle2, iconColor: 'text-emerald-500' },
-    error:   { bar: 'bg-red-500',     bg: 'bg-red-50',     ring: 'ring-red-100',     title: 'text-red-800',     text: 'text-red-700',     icon: XCircle,       iconColor: 'text-red-500' },
-    warning: { bar: 'bg-amber-500',   bg: 'bg-amber-50',   ring: 'ring-amber-100',   title: 'text-amber-800',   text: 'text-amber-700',   icon: AlertTriangle, iconColor: 'text-amber-500' },
-    info:    { bar: 'bg-blue-500',    bg: 'bg-blue-50',    ring: 'ring-blue-100',    title: 'text-blue-800',    text: 'text-blue-700',    icon: Info,          iconColor: 'text-blue-500' },
+const PALETTE: Record<
+    ToastType,
+    {
+        bar: string;
+        bg: string;
+        ring: string;
+        title: string;
+        text: string;
+        icon: React.ElementType;
+        iconColor: string;
+    }
+> = {
+    success: {
+        bar: 'bg-emerald-500',
+        bg: 'bg-emerald-50',
+        ring: 'ring-emerald-100',
+        title: 'text-emerald-800',
+        text: 'text-emerald-700',
+        icon: CheckCircle2,
+        iconColor: 'text-emerald-500',
+    },
+    error: {
+        bar: 'bg-red-500',
+        bg: 'bg-red-50',
+        ring: 'ring-red-100',
+        title: 'text-red-800',
+        text: 'text-red-700',
+        icon: XCircle,
+        iconColor: 'text-red-500',
+    },
+    warning: {
+        bar: 'bg-amber-500',
+        bg: 'bg-amber-50',
+        ring: 'ring-amber-100',
+        title: 'text-amber-800',
+        text: 'text-amber-700',
+        icon: AlertTriangle,
+        iconColor: 'text-amber-500',
+    },
+    info: {
+        bar: 'bg-blue-500',
+        bg: 'bg-blue-50',
+        ring: 'ring-blue-100',
+        title: 'text-blue-800',
+        text: 'text-blue-700',
+        icon: Info,
+        iconColor: 'text-blue-500',
+    },
 };
 
 const ToastCard: React.FC<{ toast: ToastItem; onDismiss: (id: number) => void }> = ({ toast, onDismiss }) => {
@@ -105,9 +154,7 @@ const ToastCard: React.FC<{ toast: ToastItem; onDismiss: (id: number) => void }>
                 </div>
                 <div className="min-w-0 flex-1">
                     <h4 className={`text-[15px] font-bold leading-tight ${p.title}`}>{toast.title}</h4>
-                    {toast.message && (
-                        <p className={`mt-0.5 text-sm leading-snug ${p.text}`}>{toast.message}</p>
-                    )}
+                    {toast.message && <p className={`mt-0.5 text-sm leading-snug ${p.text}`}>{toast.message}</p>}
                 </div>
             </div>
         </div>
@@ -156,7 +203,14 @@ export function useToasts() {
 
     const showToast = useCallback((message: string, type: ToastType = 'error', durationMs = 5000) => {
         const id = ++localSeq;
-        setToasts((prev) => [...prev, { id, type, title: DEFAULT_TITLES[type], message }]);
+        const text = message ? readableErrorMessage(message) : message;
+        const title = DEFAULT_TITLES[type];
+        // A repeat tap shouldn't stack a second copy of the toast already showing.
+        setToasts((prev) =>
+            prev.some((t) => t.type === type && t.title === title && t.message === text)
+                ? prev
+                : [...prev, { id, type, title, message: text }]
+        );
         if (durationMs > 0) {
             setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), durationMs);
         }

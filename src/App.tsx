@@ -332,6 +332,11 @@ function AppInner() {
         currentScreenRef.current = currentScreen;
     }, [currentScreen]);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    // Whatever navigated (menu item, header account menu, a button on the
+    // screen), the mobile drawer must not stay open over the new screen.
+    useEffect(() => {
+        setIsSidebarOpen(false);
+    }, [currentScreen]);
     const [confirmLogout, setConfirmLogout] = useState(false);
     const [authData, setAuthData] = useState<{ value: string; type: 'email' | 'phone' } | null>(null);
     const [initializing, setInitializing] = useState(true);

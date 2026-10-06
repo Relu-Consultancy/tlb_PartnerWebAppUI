@@ -211,6 +211,32 @@ export const getTicketCategories = async (): Promise<TicketCategory[]> => {
     }
 };
 
+// Categories that plausibly hinge on a specific booking — never a good silent default.
+const BOOKING_TIED = /review|booking|refund|payment|cancel/;
+// General-purpose categories, in order of preference, for the form's default.
+const GENERAL_DEFAULTS = ['other', 'technical', 'account', 'account_issue', 'onboarding_issue', 'listing_issue', 'listing_bug'];
+
+/**
+ * The category a new ticket starts on. It used to be whatever the server listed
+ * first — "Event Review" — so a partner who only typed a subject and description
+ * submitted under a category the backend ties to a booking, and got "No booking
+ * found or does not belong to you".
+ */
+export const defaultTicketCategory = (categories: TicketCategory[]): string => {
+    // Match on the label too — some deployments key categories by numeric id.
+    const keyed = categories.map((c) => ({ c, keys: [categoryKey(c.value), categoryKey(c.label || '')] }));
+    for (const want of GENERAL_DEFAULTS) {
+        const hit = keyed.find((k) => k.keys.includes(want));
+        if (hit) return hit.c.value;
+    }
+    const general = keyed.find((k) => !k.keys.some((key) => BOOKING_TIED.test(key)));
+    return (general ?? keyed[0])?.c.value ?? '';
+};
+
+/** The backend's refusal when a category needs a booking the ticket didn't carry. */
+export const isBookingRequiredError = (message: unknown): boolean =>
+    /no booking found|booking.{0,40}(required|does not belong)|BOOKING_(REQUIRED|NOT_FOUND)/i.test(String(message ?? ''));
+
 export const ticketCategoryLabel = (value: string) => {
     const fallback = DEFAULT_CATEGORIES.find((c) => c.value === value)?.label || humanize(value || '');
     return applyOverride(value || '', fallback);

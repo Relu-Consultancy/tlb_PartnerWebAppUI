@@ -9,7 +9,7 @@ import { motion } from 'motion/react';
 import { Screen, EntityType } from './types';
 import { PartnerProvider, usePartner } from './context/PartnerContext';
 import { SkeletonPage, Toaster, NoInternetState, toast } from './components/ui';
-import { entitiesFromPartner } from './components/portal';
+import { entitiesFromPartner, PortalModal } from './components/portal';
 
 // ---------------------------------------------------------------------------
 // Error boundary — stops a single screen crash from blanking the whole app.
@@ -281,6 +281,44 @@ const routes: Record<Screen, RouteConfig> = {
 };
 
 // ---------------------------------------------------------------------------
+// Browser history. Screens still live in React state (no router library), but
+// every signed-in navigation is mirrored into window.history so the browser's
+// Back button walks back through the app instead of leaving it. The URL never
+// changes. Layout of the stack once signed in:
+//
+//   [ ROOT sentinel ] [ HOME ] [ ANALYTICS ] [ ... ]
+//
+// Backing onto the sentinel means "about to leave the app": we stay put and
+// ask "Do you want to log out?". Auth/onboarding screens replace the current
+// entry instead of pushing, so Back can never return to OTP or the login form.
+// ---------------------------------------------------------------------------
+const HISTORY_ROOT = '__tlb_root__';
+
+const isSignedInScreen = (screen: Screen): boolean => !!routes[screen]?.hasSidebar || screen.startsWith('CREATE_');
+
+const writeHistory = (mode: 'push' | 'replace', screen: string) => {
+    try {
+        if (mode === 'push') window.history.pushState({ tlbScreen: screen }, '');
+        else window.history.replaceState({ tlbScreen: screen }, '');
+    } catch {
+        /* history unavailable (sandboxed frame) — in-app navigation still works */
+    }
+};
+
+/** Mirrors one in-app navigation into browser history. */
+const recordNavigation = (from: Screen, to: Screen) => {
+    if (to === 'LANDING' || !isSignedInScreen(to)) {
+        writeHistory('replace', to);
+    } else if (!isSignedInScreen(from)) {
+        // Entering the app: the sentinel takes the auth screen's slot.
+        writeHistory('replace', HISTORY_ROOT);
+        writeHistory('push', to);
+    } else {
+        writeHistory('push', to);
+    }
+};
+
+// ---------------------------------------------------------------------------
 // Inner App (consumes PartnerContext)
 // ---------------------------------------------------------------------------
 function AppInner() {
@@ -294,6 +332,7 @@ function AppInner() {
         currentScreenRef.current = currentScreen;
     }, [currentScreen]);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [confirmLogout, setConfirmLogout] = useState(false);
     const [authData, setAuthData] = useState<{ value: string; type: 'email' | 'phone' } | null>(null);
     const [initializing, setInitializing] = useState(true);
     const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -324,6 +363,12 @@ function AppInner() {
 
     // ── Session restore on page load / refresh ──
     useEffect(() => {
+        writeHistory('replace', 'LANDING');
+        // Every exit from restore goes through here, so history matches the screen.
+        const land = (screen: Screen) => {
+            recordNavigation('LANDING', screen);
+            setCurrentScreen(screen);
+        };
         const restoreSession = async () => {
             const token = getAuthToken();
 
@@ -365,20 +410,20 @@ function AppInner() {
                 // Route based on partner status
                 switch (status) {
                     case 'otp_verified':
-                        setCurrentScreen('PARTNER_CATEGORY');
+                        land('PARTNER_CATEGORY');
                         break;
                     case 'category_selected':
-                        setCurrentScreen('REGISTRATION');
+                        land('REGISTRATION');
                         break;
                     case 'profile_created':
                     case 'activated_limited':
                     case 'under_review':
                     case 'approved':
-                        setCurrentScreen('HOME');
+                        land('HOME');
                         break;
                     default:
                         // Unknown status but valid token — go to HOME
-                        setCurrentScreen('HOME');
+                        land('HOME');
                         break;
                 }
             } catch (err) {
@@ -411,6 +456,7 @@ function AppInner() {
             invalidatePortalSummary();
             setAllowedEntities([]);
             toast.warning('Your session has expired. Please sign in again.');
+            writeHistory('replace', 'LOGIN');
             setCurrentScreen('LOGIN');
         };
         window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
@@ -419,19 +465,15 @@ function AppInner() {
 
     // Route guard: redirect restricted screens to HOME
     const guardedNavigate = useCallback(
-        (screen: Screen) => {
-            // Remember where we came from so children can offer an accurate "back".
-            if (screen !== currentScreenRef.current) setPreviousScreen(currentScreenRef.current);
+        (screen: Screen, fromHistory = false) => {
+            const current = currentScreenRef.current;
             const targetRoute = routes[screen];
-            if (targetRoute?.requiresEntities) {
-                const hasAccess = targetRoute.requiresEntities.some((e) => allowedEntities.includes(e));
-                if (!hasAccess) {
-                    setCurrentScreen('HOME');
-                    return;
-                }
-            }
+            const allowed = !targetRoute?.requiresEntities || targetRoute.requiresEntities.some((e) => allowedEntities.includes(e));
+            const next: Screen = allowed ? screen : 'HOME';
+            // Remember where we came from so children can offer an accurate "back".
+            if (next !== current) setPreviousScreen(current);
             // If navigating to LANDING, clear tokens (logout)
-            if (screen === 'LANDING') {
+            if (next === 'LANDING') {
                 clearTokens();
                 sessionStorage.clear();
                 // In-memory too: logging into another account in this tab must not
@@ -440,10 +482,69 @@ function AppInner() {
                 // Memoised partner data must never leak into the next account's session.
                 invalidatePortalSummary();
             }
-            setCurrentScreen(screen);
+            // A Back/Forward press already moved the browser — don't write it twice.
+            if (!fromHistory && next !== current) recordNavigation(current, next);
+            setCurrentScreen(next);
         },
         [allowedEntities, setAllowedEntities]
     );
+
+    // Back/Forward. Uses a ref so the listener always sees the current guard.
+    const navigateRef = useRef(guardedNavigate);
+    useEffect(() => {
+        navigateRef.current = guardedNavigate;
+    }, [guardedNavigate]);
+
+    useEffect(() => {
+        const onPopState = (e: PopStateEvent) => {
+            const target = e.state?.tlbScreen as string | undefined;
+            const current = currentScreenRef.current;
+            const signedIn = isSignedInScreen(current) && !!getAuthToken();
+            if (!target) return;
+            // A Back press must never leave the mobile menu open over the new screen.
+            setIsSidebarOpen(false);
+
+            if (target === HISTORY_ROOT) {
+                if (signedIn) {
+                    // About to leave the app — stay on this screen and ask first.
+                    writeHistory('push', current);
+                    setConfirmLogout(true);
+                } else {
+                    // Already signed out: keep going back out of the site.
+                    window.history.back();
+                }
+                return;
+            }
+            if (!routes[target as Screen]) return;
+            const screen = target as Screen;
+
+            if (isSignedInScreen(screen) && !getAuthToken()) {
+                // A stale signed-in entry left over from before logout. Overwriting
+                // it in place made Back look dead (one press per old screen) — keep
+                // going back past them instead, out of the site.
+                window.history.back();
+                return;
+            }
+            if (screen.startsWith('CREATE_') && !current.startsWith('CREATE_')) {
+                // Stepping back INTO a wizard the partner already left (submitted,
+                // saved as draft, or exited). Its draft id is gone, so the preview
+                // showed "No active draft" and earlier steps opened blank — where
+                // Next would create a duplicate listing. Skip past the old wizard;
+                // drafts are resumed from My listings -> Edit.
+                window.history.back();
+                return;
+            }
+            if (signedIn && !isSignedInScreen(screen)) {
+                // Would step back out to an auth screen: treat as leaving.
+                writeHistory('push', current);
+                setConfirmLogout(true);
+                return;
+            }
+            navigateRef.current(screen, true);
+        };
+        window.addEventListener('popstate', onPopState);
+        return () => window.removeEventListener('popstate', onPopState);
+    }, []);
 
     // Show loading spinner while restoring session
     if (initializing) {
@@ -465,6 +566,25 @@ function AppInner() {
     return (
         <div className="font-sans text-tlb-dark">
             {isOffline && <NoInternetState />}
+            {/* Shown when the browser's Back would take a signed-in partner out of the app. */}
+            <PortalModal open={confirmLogout} onClose={() => setConfirmLogout(false)} title="Do you want to log out?">
+                <p className="text-[13px] text-tlb-sub mt-1">You’ll need to sign in again to get back to your dashboard.</p>
+                <div className="flex justify-end gap-2.5 mt-5">
+                    <button type="button" onClick={() => setConfirmLogout(false)} className="pt-btn pt-btn-o">
+                        Stay
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setConfirmLogout(false);
+                            guardedNavigate('LANDING');
+                        }}
+                        className="pt-btn pt-btn-d"
+                    >
+                        Log out
+                    </button>
+                </div>
+            </PortalModal>
             {route.hasSidebar && (
                 <Sidebar
                     isOpen={isSidebarOpen}

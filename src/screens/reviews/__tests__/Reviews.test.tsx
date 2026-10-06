@@ -71,3 +71,33 @@ describe('Reviews — tabs', () => {
         await waitFor(() => expect(screen.getByText(/reviews unavailable/i)).toBeInTheDocument());
     });
 });
+
+describe('Reviews — listing rating when the aggregate sends no average', () => {
+    it('works the rating out from the reviews instead of showing nothing', async () => {
+        // QA: listings with 3–4 reviews showed a null rating — the stats call
+        // counted the reviews but answered avg_rating: null.
+        const reviews = [5, 4, 4, 3].map((rating, i) => ({
+            id: `r${i}`,
+            listing_id: 'l1',
+            listing_title: 'Pottery basics',
+            rating,
+            comment: `Review ${i}`,
+            reviewer_name: `Guest ${i}`,
+            created_at: '2026-09-20T10:00:00Z',
+        }));
+        server.use(
+            http.get(`${BASE}/api/v1/partner/stats/reviews/`, () =>
+                HttpResponse.json({ success: true, data: { avg_rating: null, total_reviews: 4, rating_distribution: [] } })
+            ),
+            http.get(`${BASE}/api/v1/partner/reviews/`, () =>
+                HttpResponse.json({ success: true, data: { count: 4, next: null, previous: null, results: reviews } })
+            )
+        );
+        renderScreen();
+
+        await waitFor(() => expect(screen.getByText('Guest 0')).toBeInTheDocument());
+        expect(screen.getByText('4.0')).toBeInTheDocument();
+        expect(screen.getByText(/Across 4 reviews on your listings/)).toBeInTheDocument();
+        expect(screen.queryByText(/null/i)).not.toBeInTheDocument();
+    });
+});

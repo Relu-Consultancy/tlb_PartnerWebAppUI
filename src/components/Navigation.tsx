@@ -5,6 +5,7 @@ import { EntityType, Screen } from '../types';
 import { usePartner } from '../context/PartnerContext';
 import { loadPartnerListings, loadPartnerEnquiries, loadCouponCount, isUnanswered } from '../api/portalSummary';
 import { CountBadge } from './portal';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
 interface SidebarProps {
     isOpen: boolean;
@@ -57,6 +58,8 @@ const Brand: React.FC = () => (
 );
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentScreen, onNavigate }) => {
+    // The drawer only exists below lg; there it must hold the page still too.
+    useBodyScrollLock(isOpen);
     const { allowedEntities } = usePartner();
     const counts = useNavCounts(allowedEntities, currentScreen);
 

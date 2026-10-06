@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import {
-    funnelStages, overviewFunnelStages, revenueByListingSlices, revenueTypeSlices,
-    trendPoints, uncontactedLeadValue, weeklyTrendPoints,
+    funnelStages,
+    overviewFunnelStages,
+    revenueByListingSlices,
+    revenueTypeSlices,
+    trendPoints,
+    uncontactedLeadValue,
+    weeklyTrendPoints,
+    yearlyTrendPoints,
 } from '../model';
 
 describe('revenueTypeSlices', () => {
@@ -34,11 +40,11 @@ describe('funnelStages', () => {
     it('computes each stage as a percentage of profile views', () => {
         const stages = funnelStages(
             { profile_views: 1000 },
-            { conversion_funnel: { new_leads: 100, contacted: 60, converted: 40, conversion_rate: 40 } },
+            { conversion_funnel: { new_leads: 100, contacted: 60, converted: 40, conversion_rate: 40 } }
         );
         // [views, detail opens (placeholder), leads, contacted, converted]
-        expect(stages.map(s => s.pctOfFirst)).toEqual([100, 0, 10, 6, 4]);
-        expect(stages.find(s => s.key === 'detail')?.available).toBe(false);
+        expect(stages.map((s) => s.pctOfFirst)).toEqual([100, 0, 10, 6, 4]);
+        expect(stages.find((s) => s.key === 'detail')?.available).toBe(false);
     });
 
     it('labels the final stage "Enquiries closed", not a literal booking count', () => {
@@ -47,14 +53,14 @@ describe('funnelStages', () => {
         // "closed" doesn't itself guarantee a booking resulted, so this must not read as a booking count.
         const stages = funnelStages(
             { profile_views: 1000 },
-            { conversion_funnel: { new_leads: 100, contacted: 60, converted: 40, conversion_rate: 40 } },
+            { conversion_funnel: { new_leads: 100, contacted: 60, converted: 40, conversion_rate: 40 } }
         );
-        expect(stages.find(s => s.key === 'converted')?.label).toBe('Enquiries closed');
+        expect(stages.find((s) => s.key === 'converted')?.label).toBe('Enquiries closed');
     });
 
     it('never divides by zero with no profile views', () => {
         const stages = funnelStages({ profile_views: 0 }, null);
-        expect(stages.every(s => Number.isFinite(s.pctOfFirst))).toBe(true);
+        expect(stages.every((s) => Number.isFinite(s.pctOfFirst))).toBe(true);
     });
 });
 
@@ -62,7 +68,7 @@ describe('uncontactedLeadValue', () => {
     it('multiplies uncontacted leads by the average order value', () => {
         const result = uncontactedLeadValue(
             { conversion_funnel: { new_leads: 84, contacted: 51, converted: 30, conversion_rate: 0 } },
-            { avg_order_value: '2000' },
+            { avg_order_value: '2000' }
         );
         expect(result).toEqual({ uncontacted: 33, value: 66000 });
     });
@@ -70,7 +76,7 @@ describe('uncontactedLeadValue', () => {
     it('never goes negative when contacted exceeds new_leads', () => {
         const result = uncontactedLeadValue(
             { conversion_funnel: { new_leads: 10, contacted: 15, converted: 5, conversion_rate: 0 } },
-            { avg_order_value: '500' },
+            { avg_order_value: '500' }
         );
         expect(result.uncontacted).toBe(0);
     });
@@ -106,13 +112,44 @@ describe('overviewFunnelStages', () => {
     it('builds a real 3-stage funnel (no placeholder stages) as a percentage of listing views', () => {
         const stages = overviewFunnelStages({ listing_views: 1000, enquiries: 84, confirmed_bookings: 57 });
         expect(stages).toHaveLength(3);
-        expect(stages.every(s => s.available)).toBe(true);
-        expect(stages.map(s => s.pctOfFirst)).toEqual([100, 8, 6]);
+        expect(stages.every((s) => s.available)).toBe(true);
+        expect(stages.map((s) => s.pctOfFirst)).toEqual([100, 8, 6]);
     });
 
     it('never divides by zero with no listing views', () => {
         const stages = overviewFunnelStages({ listing_views: 0, enquiries: 0, confirmed_bookings: 0 });
-        expect(stages.every(s => Number.isFinite(s.pctOfFirst))).toBe(true);
+        expect(stages.every((s) => Number.isFinite(s.pctOfFirst))).toBe(true);
     });
 });
 
+describe('revenue trend granularity', () => {
+    const series = {
+        revenue_trend: [
+            { month: 'Nov 2025', year: 2025, count: 2, earnings: '1000.00' },
+            { month: 'Dec 2025', year: 2025, count: 1, earnings: '500.00' },
+            { month: 'Dec 2026', year: 2026, count: 4, earnings: '2000.00' },
+        ],
+    };
+
+    it('keeps the year on monthly labels when the series spans years', () => {
+        // "Dec" alone showed two identical points on an all-time chart.
+        expect(trendPoints(series).map((p) => p.label)).toEqual(["Nov '25", "Dec '25", "Dec '26"]);
+    });
+
+    it('keeps plain month labels within a single year', () => {
+        expect(trendPoints({ revenue_trend: series.revenue_trend.slice(0, 2) }).map((p) => p.label)).toEqual(['Nov', 'Dec']);
+    });
+
+    it('rolls monthly buckets up into years', () => {
+        expect(yearlyTrendPoints(series)).toEqual([
+            { label: '2025', revenue: 1500, bookings: 3 },
+            { label: '2026', revenue: 2000, bookings: 4 },
+        ]);
+    });
+
+    it('reads the year from the label when the API omits it', () => {
+        expect(yearlyTrendPoints({ revenue_trend: [{ month: 'Jan 2024', earnings: '10' }] })).toEqual([
+            { label: '2024', revenue: 10, bookings: 0 },
+        ]);
+    });
+});

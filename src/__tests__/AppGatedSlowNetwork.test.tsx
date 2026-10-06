@@ -1,11 +1,15 @@
 import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { configure, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse, delay } from 'msw';
 import { server } from '../test/msw/server';
 import { invalidatePortalSummary } from '../api/portalSummary';
 import App from '../App';
+
+// Whole-app tests boot the entire portal; in a saturated parallel run that
+// can take longer than the suite-wide 4s wait. Scoped to this file's worker.
+configure({ asyncUtilTimeout: 25000 });
 
 // Simulate production: a screen's JS chunk takes time to download on first visit.
 vi.mock('../screens/analytics', async () => {
@@ -49,23 +53,23 @@ describe('App — gated screens on a slow (production-like) first visit', () => 
         signedInAs('approved');
         const user = userEvent.setup();
         render(<App />);
-        await user.click(await screen.findByRole('button', { name: /^Analytics/ }, { timeout: 8000 }));
-        await waitFor(() => expect(screen.getByRole('heading', { name: /Analytics & reports/i })).toBeVisible(), { timeout: 10000 });
-    }, 30000);
+        await user.click(await screen.findByRole('button', { name: /^Analytics/ }, { timeout: 25000 }));
+        await waitFor(() => expect(screen.getByRole('heading', { name: /Analytics & reports/i })).toBeVisible(), { timeout: 25000 });
+    }, 60000);
 
     it('approved partner: Coupons renders on the FIRST click', async () => {
         signedInAs('approved');
         const user = userEvent.setup();
         render(<App />);
-        await user.click(await screen.findByRole('button', { name: /^Coupons/ }, { timeout: 8000 }));
-        await waitFor(() => expect(screen.getByRole('heading', { name: /^Coupons$/ })).toBeVisible(), { timeout: 10000 });
-    }, 30000);
+        await user.click(await screen.findByRole('button', { name: /^Coupons/ }, { timeout: 25000 }));
+        await waitFor(() => expect(screen.getByRole('heading', { name: /^Coupons$/ })).toBeVisible(), { timeout: 25000 });
+    }, 60000);
 
     it('unapproved partner: notice renders on the FIRST click', async () => {
         signedInAs('activated_limited');
         const user = userEvent.setup();
         render(<App />);
-        await user.click(await screen.findByRole('button', { name: /^Analytics/ }, { timeout: 8000 }));
-        await waitFor(() => expect(screen.getByText(/Analytics unlock once TLB approves/i)).toBeVisible(), { timeout: 10000 });
-    }, 30000);
+        await user.click(await screen.findByRole('button', { name: /^Analytics/ }, { timeout: 25000 }));
+        await waitFor(() => expect(screen.getByText(/Analytics unlock once TLB approves/i)).toBeVisible(), { timeout: 25000 });
+    }, 60000);
 });

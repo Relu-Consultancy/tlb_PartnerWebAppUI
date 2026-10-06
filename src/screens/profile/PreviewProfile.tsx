@@ -107,9 +107,12 @@ export const PreviewProfile: React.FC<ProfileProps> = ({ onNavigate, previousScr
     };
 
     const getPrimaryLabel = () => {
-        if (allowedEntities.includes('CLASS')) return 'Our Classes';
-        if (allowedEntities.includes('EVENT')) return 'Our Events';
-        if (allowedEntities.includes('PROGRAM')) return 'Our Programs';
+        // The values are EntityType ('Classes'…), not 'CLASS' — the old checks never
+        // matched, so every partner got the generic "Our Offerings".
+        if (allowedEntities.includes('Classes')) return 'Our Classes';
+        if (allowedEntities.includes('Events')) return 'Our Events';
+        if (allowedEntities.includes('Programs')) return 'Our Programs';
+        if (allowedEntities.includes('Venues')) return 'Our Venues';
         return 'Our Offerings';
     };
 
@@ -264,9 +267,9 @@ export const PreviewProfile: React.FC<ProfileProps> = ({ onNavigate, previousScr
                                                               : '—'}{' '}
                                                         ({listing.review_count || totalReviews || 0})
                                                     </div>
-                                                    <div className="flex items-center text-[10px] text-gray-500 font-medium">
-                                                        <Users size={11} className="mr-1" />
-                                                        {age}
+                                                    <div className="flex items-center min-w-0 text-[10px] text-gray-500 font-medium">
+                                                        <Users size={11} className="mr-1 shrink-0" />
+                                                        <span className="truncate">{age}</span>
                                                     </div>
                                                 </div>
 

@@ -4,20 +4,39 @@ import { Screen } from '../../types';
 import { AppListingPreview, formatLanguages } from '../../components/ui';
 import type { AppListingPreviewModel, PreviewFact } from '../../components/ui';
 import { WizardShell, WizardNav } from '../../components/portal/wizard';
-import {
-    getVenueListingDetail,
-    submitVenueListing,
-    getCurrentVenueDraftId,
-    clearCurrentVenueDraftId,
-    ApiError,
-} from '../../api/listings';
+import { getVenueListingDetail, submitVenueListing, getCurrentVenueDraftId, clearCurrentVenueDraftId, ApiError } from '../../api/listings';
+import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 
-interface Props { onNavigate: (screen: Screen) => void; onOpenSidebar?: () => void; }
+interface Props {
+    onNavigate: (screen: Screen) => void;
+    onOpenSidebar?: () => void;
+}
 
-interface MediaItem { id: number; media_type: string; url: string }
-interface AvailabilitySlot { id: number; date: string; start_time: string; end_time: string; note?: string }
-interface VenuePackage { id: number; name: string; price: string | number; description?: string; duration_minutes?: number; max_guests?: number }
-interface OccasionItem { id: number; name: string; slug: string }
+interface MediaItem {
+    id: number;
+    media_type: string;
+    url: string;
+}
+interface AvailabilitySlot {
+    id: number;
+    date: string;
+    start_time: string;
+    end_time: string;
+    note?: string;
+}
+interface VenuePackage {
+    id: number;
+    name: string;
+    price: string | number;
+    description?: string;
+    duration_minutes?: number;
+    max_guests?: number;
+}
+interface OccasionItem {
+    id: number;
+    name: string;
+    slug: string;
+}
 
 interface VenueDetail {
     id: string;
@@ -49,13 +68,21 @@ interface VenueDetail {
 
 type ModalVariant = 'success' | 'under_review' | 'error';
 
-interface ResultModalProps { variant: ModalVariant; message?: string; onClose: () => void }
+interface ResultModalProps {
+    variant: ModalVariant;
+    message?: string;
+    onClose: () => void;
+}
 
 const ResultModal: React.FC<ResultModalProps> = ({ variant, message, onClose }) => {
+    // Mounted only while shown, so the page stays put for exactly that long.
+    useBodyScrollLock(true);
     if (variant === 'success') {
         return (
-            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-6"
-                style={{ backdropFilter: 'blur(6px)', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+            <div
+                className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-6"
+                style={{ backdropFilter: 'blur(6px)', backgroundColor: 'rgba(0,0,0,0.5)' }}
+            >
                 <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden border-2 border-amber-400">
                     <div className="bg-amber-50 px-6 pt-8 pb-6 flex flex-col items-center text-center gap-4">
                         <div className="relative">
@@ -75,7 +102,10 @@ const ResultModal: React.FC<ResultModalProps> = ({ variant, message, onClose }) 
                         </p>
                     </div>
                     <div className="px-6 pb-6">
-                        <button onClick={onClose} className="w-full py-4 rounded-2xl font-black text-sm text-tlb-dark bg-tlb-yellow shadow-lg shadow-tlb-yellow/30 hover:brightness-95 active:scale-95 transition-all">
+                        <button
+                            onClick={onClose}
+                            className="w-full py-4 rounded-2xl font-black text-sm text-tlb-dark bg-tlb-yellow shadow-lg shadow-tlb-yellow/30 hover:brightness-95 active:scale-95 transition-all"
+                        >
                             Okay, Go to My Listings
                         </button>
                     </div>
@@ -86,8 +116,10 @@ const ResultModal: React.FC<ResultModalProps> = ({ variant, message, onClose }) 
 
     if (variant === 'under_review') {
         return (
-            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-6"
-                style={{ backdropFilter: 'blur(6px)', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+            <div
+                className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-6"
+                style={{ backdropFilter: 'blur(6px)', backgroundColor: 'rgba(0,0,0,0.5)' }}
+            >
                 <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden border-2 border-purple-400">
                     <div className="bg-purple-50 px-6 pt-8 pb-6 flex flex-col items-center text-center gap-4">
                         <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center border-4 border-purple-400 shadow-lg">
@@ -100,11 +132,15 @@ const ResultModal: React.FC<ResultModalProps> = ({ variant, message, onClose }) 
                     </div>
                     <div className="px-6 py-5">
                         <p className="text-sm text-gray-500 leading-relaxed text-center">
-                            {message || 'Your partner profile is currently under review. You can save drafts, but cannot submit venues until the review is complete.'}
+                            {message ||
+                                'Your partner profile is currently under review. You can save drafts, but cannot submit venues until the review is complete.'}
                         </p>
                     </div>
                     <div className="px-6 pb-6">
-                        <button onClick={onClose} className="w-full py-4 rounded-2xl font-black text-sm text-tlb-dark bg-tlb-yellow shadow-lg shadow-tlb-yellow/30 hover:brightness-95 active:scale-95 transition-all">
+                        <button
+                            onClick={onClose}
+                            className="w-full py-4 rounded-2xl font-black text-sm text-tlb-dark bg-tlb-yellow shadow-lg shadow-tlb-yellow/30 hover:brightness-95 active:scale-95 transition-all"
+                        >
                             Back to Listings
                         </button>
                     </div>
@@ -114,8 +150,10 @@ const ResultModal: React.FC<ResultModalProps> = ({ variant, message, onClose }) 
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-6"
-            style={{ backdropFilter: 'blur(6px)', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <div
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 sm:p-6"
+            style={{ backdropFilter: 'blur(6px)', backgroundColor: 'rgba(0,0,0,0.5)' }}
+        >
             <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden border-2 border-red-400">
                 <div className="bg-red-50 px-6 pt-8 pb-6 flex flex-col items-center text-center gap-4">
                     <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center border-4 border-red-400 shadow-lg">
@@ -132,7 +170,10 @@ const ResultModal: React.FC<ResultModalProps> = ({ variant, message, onClose }) 
                     </p>
                 </div>
                 <div className="px-6 pb-6">
-                    <button onClick={onClose} className="w-full py-4 rounded-2xl font-black text-sm text-tlb-dark bg-tlb-yellow shadow-lg shadow-tlb-yellow/30 hover:brightness-95 active:scale-95 transition-all">
+                    <button
+                        onClick={onClose}
+                        className="w-full py-4 rounded-2xl font-black text-sm text-tlb-dark bg-tlb-yellow shadow-lg shadow-tlb-yellow/30 hover:brightness-95 active:scale-95 transition-all"
+                    >
                         Got it
                     </button>
                 </div>
@@ -149,8 +190,11 @@ const resolveUrl = (url: string) => {
 };
 
 const fmtSlotDate = (iso: string) => {
-    try { return new Date(iso + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' }); }
-    catch { return iso; }
+    try {
+        return new Date(iso + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+    } catch {
+        return iso;
+    }
 };
 
 export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
@@ -163,7 +207,11 @@ export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
 
     useEffect(() => {
         const id = getCurrentVenueDraftId();
-        if (!id) { setLoadError('No active draft. Start from "Venue Details".'); setLoading(false); return; }
+        if (!id) {
+            setLoadError('No active draft. Start from "Venue Details".');
+            setLoading(false);
+            return;
+        }
         setDraftId(id);
 
         const load = async () => {
@@ -180,8 +228,8 @@ export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
         load();
     }, []);
 
-    const cover = venue?.media?.find(m => m.media_type === 'cover');
-    const gallery = venue?.media?.filter(m => m.media_type === 'gallery') || [];
+    const cover = venue?.media?.find((m) => m.media_type === 'cover');
+    const gallery = venue?.media?.filter((m) => m.media_type === 'gallery') || [];
     const packages = venue?.packages || [];
     const slots = venue?.availability || [];
 
@@ -200,39 +248,60 @@ export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
     }
     const canSubmit = !!venue && missing.length === 0 && venue.status === 'draft';
 
-    const minPkg = packages.length ? Math.min(...packages.map(p => Number(p.price) || 0)) : undefined;
+    const minPkg = packages.length ? Math.min(...packages.map((p) => Number(p.price) || 0)) : undefined;
     const firstSlot = slots[0];
     const langLine = venue ? formatLanguages(venue.languages, venue.other_language) : '';
-    const previewModel: AppListingPreviewModel | null = venue ? {
-        typeLabel: 'Venue',
-        title: venue.title || '',
-        coverUrl: cover ? resolveUrl(cover.url) : undefined,
-        gallery: gallery.map(g => resolveUrl(g.url)),
-        tags: [venue.category?.name, venue.subcategory?.name].filter(Boolean) as string[],
-        locationLine: [venue.area, venue.city].filter(Boolean).join(', ') || venue.address || undefined,
-        address: venue.address || [venue.area, venue.city].filter(Boolean).join(', ') || undefined,
-        dateLine: firstSlot ? `${fmtSlotDate(firstSlot.date)} · ${firstSlot.start_time}–${firstSlot.end_time}` : undefined,
-        description: venue.description || '',
-        aboutTitle: 'About Venue',
-        facts: [
-            langLine ? { icon: 'language', label: 'Language', value: langLine } : null,
-            (venue.min_capacity != null || venue.max_capacity != null) ? {
-                icon: 'capacity', label: 'Capacity',
-                value: venue.min_capacity != null && venue.max_capacity != null
-                    ? `${venue.min_capacity}–${venue.max_capacity} guests`
-                    : venue.max_capacity != null ? `Up to ${venue.max_capacity} guests` : `${venue.min_capacity}+ guests`,
-            } : null,
-            (venue.min_age != null || venue.max_age != null) ? {
-                icon: 'age', label: 'Age Group', value: `${venue.min_age ?? 0}–${venue.max_age ?? '∞'} yrs`,
-            } : null,
-            venue.occasions && venue.occasions.length ? {
-                icon: 'occasion', label: 'Best for', value: venue.occasions.slice(0, 3).map(o => o.name).join(', '),
-            } : null,
-            slots.length ? { icon: 'schedule', label: 'Availability', value: `${slots.length} slot${slots.length > 1 ? 's' : ''}` } : null,
-        ].filter(Boolean) as PreviewFact[],
-        priceLabel: minPkg != null ? `₹${minPkg.toLocaleString()}` : '—',
-        ctaLabel: venue.booking_type === 'direct_booking' ? 'Book Now' : 'Enquire Now',
-    } : null;
+    const previewModel: AppListingPreviewModel | null = venue
+        ? {
+              typeLabel: 'Venue',
+              title: venue.title || '',
+              coverUrl: cover ? resolveUrl(cover.url) : undefined,
+              gallery: gallery.map((g) => resolveUrl(g.url)),
+              tags: [venue.category?.name, venue.subcategory?.name].filter(Boolean) as string[],
+              locationLine: [venue.area, venue.city].filter(Boolean).join(', ') || venue.address || undefined,
+              address: venue.address || [venue.area, venue.city].filter(Boolean).join(', ') || undefined,
+              dateLine: firstSlot ? `${fmtSlotDate(firstSlot.date)} · ${firstSlot.start_time}–${firstSlot.end_time}` : undefined,
+              description: venue.description || '',
+              aboutTitle: 'About Venue',
+              facts: [
+                  langLine ? { icon: 'language', label: 'Language', value: langLine } : null,
+                  venue.min_capacity != null || venue.max_capacity != null
+                      ? {
+                            icon: 'capacity',
+                            label: 'Capacity',
+                            value:
+                                venue.min_capacity != null && venue.max_capacity != null
+                                    ? `${venue.min_capacity}–${venue.max_capacity} guests`
+                                    : venue.max_capacity != null
+                                      ? `Up to ${venue.max_capacity} guests`
+                                      : `${venue.min_capacity}+ guests`,
+                        }
+                      : null,
+                  venue.min_age != null || venue.max_age != null
+                      ? {
+                            icon: 'age',
+                            label: 'Age Group',
+                            value: `${venue.min_age ?? 0}–${venue.max_age ?? '∞'} yrs`,
+                        }
+                      : null,
+                  venue.occasions && venue.occasions.length
+                      ? {
+                            icon: 'occasion',
+                            label: 'Best for',
+                            value: venue.occasions
+                                .slice(0, 3)
+                                .map((o) => o.name)
+                                .join(', '),
+                        }
+                      : null,
+                  slots.length
+                      ? { icon: 'schedule', label: 'Availability', value: `${slots.length} slot${slots.length > 1 ? 's' : ''}` }
+                      : null,
+              ].filter(Boolean) as PreviewFact[],
+              priceLabel: minPkg != null ? `₹${minPkg.toLocaleString()}` : '—',
+              ctaLabel: venue.booking_type === 'direct_booking' ? 'Book Now' : 'Enquire Now',
+          }
+        : null;
 
     const handleSubmit = async () => {
         if (!draftId || !canSubmit) return;
@@ -245,7 +314,7 @@ export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
             const code = err instanceof ApiError ? err.code : '';
             setModal({
                 variant: code === 'PARTNER_UNDER_REVIEW' ? 'under_review' : 'error',
-                message: code === 'PARTNER_UNDER_REVIEW' ? undefined : (err?.message || undefined),
+                message: code === 'PARTNER_UNDER_REVIEW' ? undefined : err?.message || undefined,
             });
         } finally {
             setSubmitting(false);
@@ -260,7 +329,14 @@ export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
 
     if (loading) {
         return (
-            <WizardShell title="New venue" entityType="Venues" step={7} totalSteps={7} stepLabel="Preview & publish" onBack={() => onNavigate('CREATE_VENUE_POLICIES')}>
+            <WizardShell
+                title="New venue"
+                entityType="Venues"
+                step={7}
+                totalSteps={7}
+                stepLabel="Preview & publish"
+                onBack={() => onNavigate('CREATE_VENUE_POLICIES')}
+            >
                 <div className="pt-card p-5 sm:p-6 flex items-center justify-center gap-2 text-tlb-muted text-xs font-bold py-12">
                     <Loader2 size={16} className="animate-spin" /> Loading preview…
                 </div>
@@ -270,14 +346,28 @@ export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
 
     if (loadError || !venue) {
         return (
-            <WizardShell title="New venue" entityType="Venues" step={7} totalSteps={7} stepLabel="Preview & publish" onBack={() => onNavigate('CREATE_VENUE_POLICIES')}>
+            <WizardShell
+                title="New venue"
+                entityType="Venues"
+                step={7}
+                totalSteps={7}
+                stepLabel="Preview & publish"
+                onBack={() => onNavigate('CREATE_VENUE_POLICIES')}
+            >
                 <div className="pt-note bg-tlb-red-soft text-tlb-red-deep">{loadError || 'Could not load venue.'}</div>
             </WizardShell>
         );
     }
 
     return (
-        <WizardShell title="New venue" entityType="Venues" step={7} totalSteps={7} stepLabel="Preview & publish" onBack={() => onNavigate('CREATE_VENUE_POLICIES')}>
+        <WizardShell
+            title="New venue"
+            entityType="Venues"
+            step={7}
+            totalSteps={7}
+            stepLabel="Preview & publish"
+            onBack={() => onNavigate('CREATE_VENUE_POLICIES')}
+        >
             <div className="pt-card p-5 sm:p-6 flex flex-col gap-5">
                 <div className="text-center">
                     <h2 className="pt-h-sec">Preview your venue</h2>
@@ -294,7 +384,9 @@ export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
                             <p className="pt-eyebrow !text-tlb-gold">Missing for submission</p>
                         </div>
                         <ul className="text-xs list-disc pl-5 space-y-0.5">
-                            {missing.map(m => <li key={m}>{m}</li>)}
+                            {missing.map((m) => (
+                                <li key={m}>{m}</li>
+                            ))}
                         </ul>
                     </div>
                 ) : venue.status === 'draft' ? (
@@ -318,9 +410,7 @@ export const CreateVenuePreview: React.FC<Props> = ({ onNavigate }) => {
                 />
             </div>
 
-            {modal && (
-                <ResultModal variant={modal.variant} message={modal.message} onClose={handleModalClose} />
-            )}
+            {modal && <ResultModal variant={modal.variant} message={modal.message} onClose={handleModalClose} />}
         </WizardShell>
     );
 };

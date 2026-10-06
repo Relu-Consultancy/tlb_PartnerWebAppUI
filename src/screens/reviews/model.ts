@@ -38,6 +38,8 @@ export interface ReviewSummary {
     fromFeed: boolean;
     /** True when the average covers only the reviews loaded so far. */
     partialAverage: boolean;
+    /** Whose rating this is — the whole partner, or the one listing picked in the filter. */
+    scope: 'partner' | 'listing';
 }
 
 interface FeedInput {
@@ -45,23 +47,43 @@ interface FeedInput {
     total: number;
     /** Only an unfiltered feed can stand in for a partner-wide aggregate. */
     unfiltered: boolean;
+    /** The feed is narrowed to one listing — the tile then rates that listing. */
+    listing?: boolean;
 }
 
+/** Mean of the ratings actually present, and whether that covers every review. */
+const feedAverage = (reviews: { rating: number }[], total: number) => {
+    const rated = reviews.map((r) => r.rating).filter((r) => typeof r === 'number' && r > 0);
+    return {
+        avgRating: rated.length > 0 ? rated.reduce((sum, r) => sum + r, 0) / rated.length : null,
+        partialAverage: rated.length < total,
+    };
+};
+
 export const reviewSummary = (stats: StatsLike | null, feed: FeedInput): ReviewSummary => {
+    // One listing picked: the partner-wide aggregate is the wrong number — rate
+    // that listing from its own reviews.
+    if (feed.listing) {
+        return { ...feedAverage(feed.reviews, feed.total), totalReviews: feed.total, fromFeed: true, scope: 'listing' };
+    }
     if (stats && stats.total_reviews > 0) {
-        return { avgRating: stats.avg_rating, totalReviews: stats.total_reviews, fromFeed: false, partialAverage: false };
+        if (stats.avg_rating == null && feed.unfiltered && feed.reviews.length > 0) {
+            // The aggregate counts the reviews but sent no average (QA: a null
+            // rating beside 3–4 reviews) — work it out from the reviews themselves.
+            return {
+                ...feedAverage(feed.reviews, stats.total_reviews),
+                totalReviews: stats.total_reviews,
+                fromFeed: true,
+                scope: 'partner',
+            };
+        }
+        return { avgRating: stats.avg_rating, totalReviews: stats.total_reviews, fromFeed: false, partialAverage: false, scope: 'partner' };
     }
     if (feed.unfiltered && feed.total > 0) {
-        const rated = feed.reviews.map((r) => r.rating).filter((r) => typeof r === 'number' && r > 0);
-        return {
-            avgRating: rated.length > 0 ? rated.reduce((sum, r) => sum + r, 0) / rated.length : null,
-            totalReviews: feed.total,
-            fromFeed: true,
-            partialAverage: rated.length < feed.total,
-        };
+        return { ...feedAverage(feed.reviews, feed.total), totalReviews: feed.total, fromFeed: true, scope: 'partner' };
     }
     // A real zero (stats answered, feed agrees) vs. nothing to go on at all.
-    return { avgRating: null, totalReviews: stats ? stats.total_reviews : null, fromFeed: false, partialAverage: false };
+    return { avgRating: null, totalReviews: stats ? stats.total_reviews : null, fromFeed: false, partialAverage: false, scope: 'partner' };
 };
 
 interface StatsLike {

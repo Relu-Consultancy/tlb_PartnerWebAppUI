@@ -20,7 +20,8 @@ const Stars: React.FC<{ value: number }> = ({ value }) => (
 /** Never claims a number the data doesn't support — see `reviewSummary`. */
 const countNote = (summary: ReviewSummary): string => {
     if (summary.totalReviews == null) return 'Review totals aren’t available right now';
-    const base = `Across ${formatCount(summary.totalReviews)} review${summary.totalReviews === 1 ? '' : 's'} on your listings`;
+    const where = summary.scope === 'listing' ? 'on this listing' : 'on your listings';
+    const base = `Across ${formatCount(summary.totalReviews)} review${summary.totalReviews === 1 ? '' : 's'} ${where}`;
     return summary.partialAverage ? `${base} · rating from the reviews loaded so far` : base;
 };
 

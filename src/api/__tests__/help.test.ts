@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/msw/server';
-import { getTicketCategories, isBookingCategory, ticketCategoryLabel } from '../help';
+import { defaultTicketCategory, getTicketCategories, isBookingCategory, isBookingRequiredError, ticketCategoryLabel } from '../help';
 
 const BASE = 'https://tlb-api.reluconsultancy.in';
 const CATEGORIES_URL = `${BASE}/api/v1/help/tickets/categories/`;
@@ -74,5 +74,49 @@ describe('isBookingCategory', () => {
         expect(isBookingCategory('listing_issue')).toBe(false);
         expect(isBookingCategory('listing_bug')).toBe(false);
         expect(isBookingCategory('')).toBe(false);
+    });
+});
+
+describe('defaultTicketCategory', () => {
+    it('never defaults to the server’s first category when that one is tied to a booking', () => {
+        const categories = [
+            { value: 'event_review', label: 'Listing Review' },
+            { value: 'booking_issue', label: 'Bookings Issue' },
+            { value: 'other', label: 'Other' },
+        ];
+        expect(defaultTicketCategory(categories)).toBe('other');
+    });
+
+    it('falls back to the first general category, matching labels for id-keyed deployments', () => {
+        expect(
+            defaultTicketCategory([
+                { value: '1', label: 'Event Review' },
+                { value: '2', label: 'Refund Request' },
+                { value: '3', label: 'Profile Help' },
+            ])
+        ).toBe('3');
+        expect(
+            defaultTicketCategory([
+                { value: '9', label: 'Other' },
+                { value: '1', label: 'Booking' },
+            ])
+        ).toBe('9');
+    });
+
+    it('uses whatever exists when every category is booking-tied, and nothing when there are none', () => {
+        expect(defaultTicketCategory([{ value: 'booking_issue', label: 'Bookings Issue' }])).toBe('booking_issue');
+        expect(defaultTicketCategory([])).toBe('');
+    });
+});
+
+describe('isBookingRequiredError', () => {
+    it('recognises the backend’s booking refusal', () => {
+        expect(isBookingRequiredError('No booking found or does not belong to you.')).toBe(true);
+        expect(isBookingRequiredError('A booking is required for this category')).toBe(true);
+    });
+
+    it('leaves other failures alone', () => {
+        expect(isBookingRequiredError('Failed to raise ticket (HTTP 500)')).toBe(false);
+        expect(isBookingRequiredError(undefined)).toBe(false);
     });
 });

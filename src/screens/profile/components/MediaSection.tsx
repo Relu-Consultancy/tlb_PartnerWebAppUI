@@ -1,5 +1,6 @@
-import React from 'react';
-import { ImagePlus, Loader2, Play, Trash2, Video } from 'lucide-react';
+import React, { useState } from 'react';
+import { ExternalLink, ImagePlus, Loader2, Play, Trash2, Video } from 'lucide-react';
+import { PortalModal } from '../../../components/portal/PortalModal';
 import { SectionCard } from './fields';
 
 interface MediaSectionProps {
@@ -27,8 +28,87 @@ const DeleteButton: React.FC<{ label: string; onClick: () => void }> = ({ label,
     </button>
 );
 
+const mediaUrl = (m: any): string | null => m?.file_url || m?.url || m?.file || null;
+
+/**
+ * The gallery video and its player. The tile used to be a static box with a
+ * play icon and nothing behind it, so clicking an uploaded video did nothing.
+ */
+const VideoTile: React.FC<{ video: any; onDelete: () => void }> = ({ video, onDelete }) => {
+    const [open, setOpen] = useState(false);
+    const [failed, setFailed] = useState(false);
+    const src = mediaUrl(video);
+
+    return (
+        <div className={`${TILE} group bg-tlb-ink`}>
+            <button
+                type="button"
+                onClick={() => {
+                    setFailed(false);
+                    setOpen(true);
+                }}
+                disabled={!src}
+                aria-label="Play gallery video"
+                className="absolute inset-0 flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-tlb-amber disabled:cursor-not-allowed"
+            >
+                {src && (
+                    // First frame as the thumbnail; `#t=0.1` makes Safari paint one too.
+                    <video
+                        src={`${src}#t=0.1`}
+                        preload="metadata"
+                        muted
+                        playsInline
+                        aria-hidden="true"
+                        className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                    />
+                )}
+                <span className="relative flex items-center justify-center w-10 h-10 rounded-full bg-black/55">
+                    <Play size={18} className="text-white ml-0.5" aria-hidden="true" />
+                </span>
+            </button>
+            <DeleteButton label="Delete video" onClick={onDelete} />
+
+            <PortalModal open={open} onClose={() => setOpen(false)} title="Gallery video" widthClass="max-w-[720px]">
+                {src && !failed && (
+                    <video
+                        src={src}
+                        controls
+                        autoPlay
+                        playsInline
+                        onError={() => setFailed(true)}
+                        className="mt-3 w-full max-h-[70vh] rounded-lg bg-black"
+                    />
+                )}
+                {failed && (
+                    // A .mov (HEVC) upload is stored fine but most browsers other than Safari can't decode it.
+                    <p className="mt-3 text-sm text-tlb-sub">
+                        This video can’t be played in your browser. It’s uploaded and safe — you can open the file directly.
+                    </p>
+                )}
+                {src && (
+                    <a
+                        href={src}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-tlb-gold hover:underline"
+                    >
+                        <ExternalLink size={13} aria-hidden="true" /> Open in a new tab
+                    </a>
+                )}
+            </PortalModal>
+        </div>
+    );
+};
+
 export const MediaSection: React.FC<MediaSectionProps> = ({
-    coverUrl, onCoverSelected, images, video, uploading, onAddImages, onAddVideo, onDelete,
+    coverUrl,
+    onCoverSelected,
+    images,
+    video,
+    uploading,
+    onAddImages,
+    onAddVideo,
+    onDelete,
 }) => (
     <SectionCard title="Photos & media" subtitle="Cover photo and gallery shown on your public page">
         <label className="group relative block h-40 sm:h-48 rounded-xl overflow-hidden border border-dashed border-tlb-edge bg-tlb-wash cursor-pointer focus-within:ring-2 focus-within:ring-tlb-amber">
@@ -97,19 +177,13 @@ export const MediaSection: React.FC<MediaSectionProps> = ({
                     />
                 </label>
             )}
-            {images.map(img => (
+            {images.map((img) => (
                 <div key={img.id} className={`${TILE} group bg-tlb-wash`}>
                     <img src={img.file_url || img.file} alt="Gallery photo" className="w-full h-full object-cover" />
                     <DeleteButton label="Delete photo" onClick={() => onDelete(img.id, 'image')} />
                 </div>
             ))}
-            {video && (
-                <div className={`${TILE} group bg-tlb-ink flex items-center justify-center`}>
-                    <Play size={22} className="text-white" aria-hidden="true" />
-                    <span className="sr-only">Gallery video</span>
-                    <DeleteButton label="Delete video" onClick={() => onDelete(video.id, 'video')} />
-                </div>
-            )}
+            {video && <VideoTile video={video} onDelete={() => onDelete(video.id, 'video')} />}
         </div>
     </SectionCard>
 );

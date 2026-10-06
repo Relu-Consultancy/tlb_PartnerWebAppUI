@@ -17,6 +17,7 @@ import {
     createTicket,
     updateTicket,
     deleteTicket,
+    isNotFoundError,
     getCurrentDraftId,
     setCurrentDraftId,
     clearCurrentDraftId,
@@ -516,5 +517,39 @@ describe('deleteTicket', () => {
         );
         const err = await deleteTicket(DRAFT_ID, 1).catch((e) => e);
         expect(err.code).toBe('CANNOT_DELETE_LAST_TICKET');
+    });
+});
+
+describe('event tickets that the backend already cleared', () => {
+    const TICKETS = `${BASE}/api/v1/partner/listings/events/evt-1/tickets`;
+
+    it('deleting a ticket that is already gone counts as done', async () => {
+        server.use(
+            http.delete(`${TICKETS}/9/`, () =>
+                HttpResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Ticket not found.' } }, { status: 404 })
+            )
+        );
+        await expect(deleteTicket('evt-1', 9)).resolves.toEqual({});
+    });
+
+    it('updating one says so in a way callers can recognise', async () => {
+        server.use(
+            http.put(`${TICKETS}/9/`, () =>
+                HttpResponse.json({ success: false, error: { code: 'NOT_FOUND', message: 'Ticket not found.' } }, { status: 404 })
+            )
+        );
+        const err = await updateTicket('evt-1', 9, { name: 'x' }).catch((e) => e);
+        expect(isNotFoundError(err)).toBe(true);
+        expect(err.message).toBe('Ticket not found.');
+    });
+
+    it('other failures are not mistaken for "gone"', async () => {
+        server.use(
+            http.put(`${TICKETS}/9/`, () =>
+                HttpResponse.json({ error: { code: 'VALIDATION_ERROR', message: 'Bad price' } }, { status: 400 })
+            )
+        );
+        const err = await updateTicket('evt-1', 9, { name: 'x' }).catch((e) => e);
+        expect(isNotFoundError(err)).toBe(false);
     });
 });

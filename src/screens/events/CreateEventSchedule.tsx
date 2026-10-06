@@ -3,7 +3,15 @@ import { ArrowRight, Plus, Trash2, Loader2 } from 'lucide-react';
 import { Screen } from '../../types';
 import { toast } from '../../components/ui';
 import { WizardShell, WizardNav, WizardField, scrollToFirstMissingField } from '../../components/portal/wizard';
-import { getListingDetail, updateListing, createTicket, updateTicket, deleteTicket, getCurrentDraftId } from '../../api/listings';
+import {
+    isNotFoundError,
+    getListingDetail,
+    updateListing,
+    createTicket,
+    updateTicket,
+    deleteTicket,
+    getCurrentDraftId,
+} from '../../api/listings';
 
 interface Props {
     onNavigate: (screen: Screen) => void;
@@ -161,41 +169,62 @@ export const CreateEventSchedule: React.FC<Props> = ({ onNavigate }) => {
 
         await updateListing(draftId, payload);
 
-        // Sync tickets (only relevant for paid events)
+        // Sync tickets (only relevant for paid events).
+        //
+        // A change of price type makes the backend clear every ticket the
+        // listing had — including the automatic free ticket a new event
+        // starts with. Those ids are gone by now, so updating one 404'd with
+        // "Ticket not found" (QA: every fresh event switched to Paid). So:
+        // after a switch every row is saved, not just edited ones; a ticket
+        // the backend no longer has is created fresh; and deleting one that's
+        // already gone counts as done. Ids of tickets created here go back on
+        // their rows straight away, so a retry after a later failure updates
+        // them instead of creating them twice.
         if (priceType === 'paid') {
-            // Determine which originals were removed
-            const currentIds = new Set(tickets.map((t) => t.id).filter((x): x is number => x !== null));
-            const toDelete: number[] = [];
-            originalTicketIds.forEach((id) => {
-                if (!currentIds.has(id)) toDelete.push(id);
-            });
-
-            for (const id of toDelete) {
-                await deleteTicket(draftId, id);
-            }
-
-            for (const t of tickets) {
-                const priceNum = parseFloat(t.price);
-                const qtyNum = parseInt(t.quantity, 10);
-                if (!t.name.trim() || isNaN(priceNum) || isNaN(qtyNum)) {
-                    // Skip incomplete ticket rows
-                    continue;
+            const switched = priceType !== originalPriceType;
+            const rows = tickets.map((t) => ({ ...t }));
+            try {
+                const currentIds = new Set(rows.map((t) => t.id).filter((x): x is number => x !== null));
+                for (const id of originalTicketIds) {
+                    // A ticket that's already gone counts as deleted (see deleteTicket).
+                    if (!currentIds.has(id)) await deleteTicket(draftId, id);
                 }
-                if (t.id === null) {
-                    await createTicket(draftId, {
-                        name: t.name.trim(),
-                        price: priceNum,
-                        total_quantity: qtyNum,
-                        description: t.description || undefined,
-                    });
-                } else if (t.dirty) {
-                    await updateTicket(draftId, t.id, {
+
+                for (const t of rows) {
+                    const priceNum = parseFloat(t.price);
+                    const qtyNum = parseInt(t.quantity, 10);
+                    if (!t.name.trim() || isNaN(priceNum) || isNaN(qtyNum)) {
+                        // Skip incomplete ticket rows
+                        continue;
+                    }
+                    const data = {
                         name: t.name.trim(),
                         price: priceNum,
                         total_quantity: qtyNum,
                         description: t.description || '',
-                    });
+                    };
+                    const create = async () => {
+                        const res = await createTicket(draftId, { ...data, description: data.description || undefined });
+                        const createdId = Number((res as any)?.data?.id ?? (res as any)?.id);
+                        if (Number.isFinite(createdId)) t.id = createdId;
+                    };
+                    if (t.id === null) {
+                        await create();
+                    } else if (t.dirty || switched) {
+                        try {
+                            await updateTicket(draftId, t.id, data);
+                        } catch (err) {
+                            if (!isNotFoundError(err)) throw err;
+                            await create();
+                        }
+                    }
+                    t.dirty = false;
                 }
+            } finally {
+                // What's saved now has real ids (and is no longer dirty) — even
+                // when a later row failed, so trying again can't duplicate it.
+                setTickets(rows);
+                setOriginalTicketIds(new Set(rows.map((t) => t.id).filter((x): x is number => x !== null)));
             }
         }
         // If user switched from paid → free, backend auto-clears tickets.

@@ -148,6 +148,20 @@ describe('FinancialHub — bank dialog opens at its final size (QA: it appeared 
         expect(container.contains(dialog)).toBe(false);
         expect(dialog.parentElement?.parentElement).toBe(document.body);
     });
+
+    it('shows the dialog solid from the first frame — only the backdrop fades (QA: the screen "glitched")', async () => {
+        server.use(http.get(`${BASE}/api/v1/partner/bank-details/`, () => new HttpResponse(null, { status: 404 })));
+        renderScreen();
+        const user = userEvent.setup();
+        await user.click(await screen.findByRole('button', { name: /add bank account/i }));
+
+        const dialog = await screen.findByRole('dialog');
+        // When the card (or a parent of it) faded, the screen behind showed through
+        // it mid-animation — a double exposure on every open and close.
+        for (let el: HTMLElement | null = dialog; el && el !== document.body; el = el.parentElement) {
+            expect(el.style.opacity === '' || Number(el.style.opacity) === 1).toBe(true);
+        }
+    });
 });
 
 describe('FinancialHub — bank gate holds for every "no bank" response (QA: sections were reachable)', () => {

@@ -77,4 +77,27 @@ describe('Browser Back button (QA: back used to exit the site)', () => {
         await waitFor(() => expect(localStorage.getItem('access_token')).toBeNull());
         expect(document.querySelector('[aria-current="page"]')).toBeNull();
     }, 30000);
+
+    it('Back from outside never reopens a wizard the partner already left', async () => {
+        // After submitting (or exiting) a wizard its draft id is gone: stepping back
+        // into it showed "No active draft", and blank earlier steps could create a
+        // duplicate listing.
+        signedIn();
+        const user = userEvent.setup();
+        render(<App />);
+
+        await waitFor(() => expect(activeNav()).toMatch(/^Dashboard/), { timeout: 8000 });
+        await user.click(screen.getByRole('button', { name: /^My listings/ }));
+        await waitFor(() => expect(activeNav()).toMatch(/^My listings/));
+        await user.click(await screen.findByRole('button', { name: /\+ New listing/ }, { timeout: 8000 }));
+        await waitFor(() => expect(screen.getByText(/step 1 of/i)).toBeInTheDocument(), { timeout: 8000 });
+
+        // Leave the wizard, then press Back.
+        await user.click(screen.getByRole('button', { name: /^Reviews/ }));
+        await waitFor(() => expect(activeNav()).toMatch(/^Reviews/));
+        await pressBack();
+
+        await waitFor(() => expect(activeNav()).toMatch(/^My listings/));
+        expect(screen.queryByText(/step 1 of/i)).not.toBeInTheDocument();
+    }, 30000);
 });

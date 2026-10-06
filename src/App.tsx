@@ -501,6 +501,8 @@ function AppInner() {
             const current = currentScreenRef.current;
             const signedIn = isSignedInScreen(current) && !!getAuthToken();
             if (!target) return;
+            // A Back press must never leave the mobile menu open over the new screen.
+            setIsSidebarOpen(false);
 
             if (target === HISTORY_ROOT) {
                 if (signedIn) {
@@ -517,8 +519,19 @@ function AppInner() {
             const screen = target as Screen;
 
             if (isSignedInScreen(screen) && !getAuthToken()) {
-                // A stale signed-in entry after logout — don't reopen it.
-                writeHistory('replace', current);
+                // A stale signed-in entry left over from before logout. Overwriting
+                // it in place made Back look dead (one press per old screen) — keep
+                // going back past them instead, out of the site.
+                window.history.back();
+                return;
+            }
+            if (screen.startsWith('CREATE_') && !current.startsWith('CREATE_')) {
+                // Stepping back INTO a wizard the partner already left (submitted,
+                // saved as draft, or exited). Its draft id is gone, so the preview
+                // showed "No active draft" and earlier steps opened blank — where
+                // Next would create a duplicate listing. Skip past the old wizard;
+                // drafts are resumed from My listings -> Edit.
+                window.history.back();
                 return;
             }
             if (signedIn && !isSignedInScreen(screen)) {

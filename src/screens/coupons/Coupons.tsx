@@ -3,12 +3,12 @@ import { Screen } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
 import { loadPartnerListings, PartnerListing } from '../../api/portalSummary';
 import { SearchField, SegBar } from '../../components/portal';
-import { Skeleton } from '../../components/ui';
+import { Skeleton, toast } from '../../components/ui';
 import { isApprovalError } from '../../api/client';
 import { ApprovalRequiredNotice } from '../../components/ApprovalGate';
 import { formatCount } from '../../utils/format';
 import { useCouponsData } from './useCouponsData';
-import { couponStats, couponToForm, filterCoupons, formToInput } from './model';
+import { couponStats, couponToForm, filterCoupons, formToInput, formToUpdateInput } from './model';
 import { CouponFormValues, CouponRow } from './types';
 import { COUPON_STATUS_META, COUPON_STATUS_ORDER } from './presentation';
 import { StatsStrip } from './components/StatsStrip';
@@ -76,12 +76,21 @@ export const Coupons: React.FC<Props> = ({ onNavigate }) => {
         setEditing(null);
         setFormOpen(true);
     };
-    const openEdit = (row: CouponRow) => {
-        setEditing(row);
+    const openEdit = async (row: CouponRow) => {
+        let full: CouponRow | null = row;
+        if (row.detailLoaded === false) {
+            full = await coupons.loadDetail(row);
+            if (!full) {
+                toast.error('Couldn’t load this coupon’s details, so it can’t be edited safely yet. Please try again.');
+                return;
+            }
+        }
+        setEditing(full);
         setFormOpen(true);
     };
 
-    const handleSave = async (values: CouponFormValues) => coupons.save(formToInput(values), editing?.id ?? null);
+    const handleSave = async (values: CouponFormValues) =>
+        coupons.save(editing ? formToUpdateInput(values, editing) : formToInput(values), editing?.id ?? null);
 
     return (
         <div className="px-4 sm:px-[26px] pt-5 pb-9 flex flex-col gap-4">

@@ -360,6 +360,12 @@
             border-color 0.15s,
             box-shadow 0.15s;
     }
+    /* Every disabled field used to look editable — typing just did nothing. */
+    .pt-input:disabled {
+        background-color: var(--color-tlb-wash);
+        color: var(--color-tlb-sub);
+        cursor: not-allowed;
+    }
     .pt-input:focus {
         border-color: var(--color-tlb-amber);
         box-shadow: 0 0 0 3px rgba(245, 179, 1, 0.18);

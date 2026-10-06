@@ -137,6 +137,24 @@ export const formToInput = (form: CouponFormValues): CreateCouponInput => ({
 
 // Local day, never the UTC one: a stored "6 Oct 00:00 IST" is 5 Oct in UTC, and
 // editing would have shown — and re-saved — the day before, every time.
+/**
+ * The PATCH for an edit. `formToInput` leaves out an emptied note or gender
+ * list — right for a create, where there's nothing to say — but on an edit
+ * "left out" means "keep what's saved", so unticking every gender left a
+ * women-only coupon women-only, and a cleared note came back. Clearing what
+ * the coupon has is sent as an explicit empty value; everything else is
+ * exactly what a create would send.
+ */
+export const formToUpdateInput = (
+    form: CouponFormValues,
+    original: Pick<CouponRow, 'description' | 'target_genders'>
+): CreateCouponInput => {
+    const input = formToInput(form);
+    if (!form.description.trim() && (original.description || '').trim()) input.description = '';
+    if (form.genders.length === 0 && (original.target_genders || []).length > 0) input.target_genders = [];
+    return input;
+};
+
 const toDateInput = (iso: string | null | undefined): string => {
     if (iso && DATE_ONLY.test(iso)) return iso;
     const d = parseDate(iso);

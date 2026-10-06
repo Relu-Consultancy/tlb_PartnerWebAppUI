@@ -481,6 +481,14 @@ export const mockListingPerformance = {
     ],
 };
 
+export const mockResolvedLocation = {
+    address: 'Hill Road, Bandra West, Mumbai 400050',
+    city: 'Mumbai',
+    area: 'Bandra West',
+    latitude: 19.0596,
+    longitude: 72.8295,
+};
+
 export const mockStatsReviews = {
     avg_rating: 4.6,
     total_reviews: 46,
@@ -1054,6 +1062,13 @@ export const handlers = [
         return HttpResponse.json({ success: true, data: { id: 99, name: body.category } });
     }),
     http.delete(`${BASE}/api/v1/partner/verticals/`, () => HttpResponse.json({ success: true, data: { message: 'removed' } })),
+
+    // ─── Location picker (search, pick a result, drop a pin) ──────────────────
+    http.get(`${BASE}/api/v1/partner/location/autocomplete/`, () =>
+        HttpResponse.json({ success: true, data: [{ place_id: 'place-bandra', description: 'Bandra West, Mumbai, Maharashtra, India' }] })
+    ),
+    http.get(`${BASE}/api/v1/partner/location/place-details/`, () => HttpResponse.json({ success: true, data: mockResolvedLocation })),
+    http.get(`${BASE}/api/v1/partner/location/reverse-geocode/`, () => HttpResponse.json({ success: true, data: mockResolvedLocation })),
 
     // ─── Catch-alls for endpoints screens hit incidentally ───────────────────
     // These used to fall through to the REAL production API (158 requests per

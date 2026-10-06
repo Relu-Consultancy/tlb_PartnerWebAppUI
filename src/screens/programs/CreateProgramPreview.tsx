@@ -226,6 +226,8 @@ export const CreateProgramPreview: React.FC<Props> = ({ onNavigate }) => {
     if (program) {
         if (!program.title?.trim()) missing.push('Title');
         if (!(program.description || program.short_description)?.trim()) missing.push('Description');
+        // An in-person program needs its place set — say so here, not on Submit.
+        if ((deliveryMode === 'offline' || deliveryMode === 'hybrid') && !program.address?.trim()) missing.push('Location');
         if (!cover) missing.push('Cover image');
     }
     // API 11.5: submit allowed for draft or rejected

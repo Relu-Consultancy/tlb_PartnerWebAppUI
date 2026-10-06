@@ -13,8 +13,15 @@ const BASE = 'https://tlb-api.reluconsultancy.in';
 const mockNavigate = vi.fn();
 
 const couponListItem = (overrides: Record<string, unknown> = {}) => ({
-    id: 'coupon-1', code: 'MONSOON20', discount_type: 'percent', discount_value: 20,
-    is_active: true, usage_count: 28, usage_limit: 100, expires_at: null, ...overrides,
+    id: 'coupon-1',
+    code: 'MONSOON20',
+    discount_type: 'percent',
+    discount_value: 20,
+    is_active: true,
+    usage_count: 28,
+    usage_limit: 100,
+    expires_at: null,
+    ...overrides,
 });
 
 function renderScreen(allowedEntities: string[] = ['Events']) {
@@ -43,8 +50,11 @@ describe('Coupons — loading and empty state', () => {
     });
 
     it('shows an error message when the list fails to load', async () => {
-        server.use(http.get(`${BASE}/api/v1/partner/coupons/`, () =>
-            HttpResponse.json({ error: { message: 'Coupons unavailable' } }, { status: 500 })));
+        server.use(
+            http.get(`${BASE}/api/v1/partner/coupons/`, () =>
+                HttpResponse.json({ error: { message: 'Coupons unavailable' } }, { status: 500 })
+            )
+        );
         renderScreen();
         await waitFor(() => expect(screen.getByText(/coupons unavailable/i)).toBeInTheDocument());
     });
@@ -52,8 +62,7 @@ describe('Coupons — loading and empty state', () => {
 
 describe('Coupons — list display', () => {
     it('shows the coupon code, discount and status', async () => {
-        server.use(http.get(`${BASE}/api/v1/partner/coupons/`, () =>
-            HttpResponse.json({ success: true, data: [couponListItem()] })));
+        server.use(http.get(`${BASE}/api/v1/partner/coupons/`, () => HttpResponse.json({ success: true, data: [couponListItem()] })));
         renderScreen();
         await waitFor(() => expect(screen.getByText('MONSOON20')).toBeInTheDocument());
         expect(screen.getByText('20% off')).toBeInTheDocument();
@@ -64,7 +73,9 @@ describe('Coupons — list display', () => {
     it('shows "All active listings" when a coupon has no targeting', async () => {
         server.use(
             http.get(`${BASE}/api/v1/partner/coupons/`, () => HttpResponse.json({ success: true, data: [couponListItem()] })),
-            http.get(`${BASE}/api/v1/partner/coupons/:id/`, () => HttpResponse.json({ success: true, data: { ...mockCoupon, target_listing_types: [] } })),
+            http.get(`${BASE}/api/v1/partner/coupons/:id/`, () =>
+                HttpResponse.json({ success: true, data: { ...mockCoupon, target_listing_types: [] } })
+            )
         );
         renderScreen();
         await waitFor(() => expect(screen.getByText('All active listings')).toBeInTheDocument());
@@ -74,9 +85,11 @@ describe('Coupons — list display', () => {
         const codesById: Record<string, string> = { 'coupon-1': 'MONSOON20', 'coupon-2': 'CLAYFIRST' };
         server.use(
             http.get(`${BASE}/api/v1/partner/coupons/`, () =>
-                HttpResponse.json({ success: true, data: [couponListItem(), couponListItem({ id: 'coupon-2', code: 'CLAYFIRST' })] })),
+                HttpResponse.json({ success: true, data: [couponListItem(), couponListItem({ id: 'coupon-2', code: 'CLAYFIRST' })] })
+            ),
             http.get(`${BASE}/api/v1/partner/coupons/:id/`, ({ params }) =>
-                HttpResponse.json({ success: true, data: { ...mockCoupon, id: params.id, code: codesById[params.id as string] } })),
+                HttpResponse.json({ success: true, data: { ...mockCoupon, id: params.id, code: codesById[params.id as string] } })
+            )
         );
         renderScreen();
         const user = userEvent.setup();
@@ -95,7 +108,7 @@ describe('Coupons — create flow', () => {
             http.post(`${BASE}/api/v1/partner/coupons/`, async ({ request }) => {
                 created = await request.json();
                 return HttpResponse.json({ success: true, data: { ...mockCoupon, ...created, id: 'new-id' } }, { status: 201 });
-            }),
+            })
         );
         renderScreen();
         const user = userEvent.setup();
@@ -109,6 +122,37 @@ describe('Coupons — create flow', () => {
         await user.click(screen.getByRole('button', { name: /publish coupon/i }));
 
         await waitFor(() => expect(created).toMatchObject({ code: 'FESTIVE30', discount_value: 30, discount_type: 'percent' }));
+        // The Limits row is optional — blank sends the documented defaults.
+        expect(created).toMatchObject({ usage_limit: null, per_user_limit: 1, starts_at: null, expires_at: null });
+    });
+
+    it('explains what each blank limit means, and refuses a 0 that would make the coupon unusable', async () => {
+        let posted = false;
+        server.use(
+            http.get(`${BASE}/api/v1/partner/coupons/`, () => HttpResponse.json({ success: true, data: [] })),
+            http.post(`${BASE}/api/v1/partner/coupons/`, () => {
+                posted = true;
+                return HttpResponse.json({ success: true, data: mockCoupon }, { status: 201 });
+            })
+        );
+        renderScreen();
+        const user = userEvent.setup();
+        await waitFor(() => screen.getByText('No coupons yet'));
+        await user.click(screen.getByRole('button', { name: '+ Create coupon' }));
+        await waitFor(() => expect(screen.getByRole('heading', { name: 'Create a coupon' })).toBeInTheDocument());
+
+        expect(screen.getByText('Blank = unlimited')).toBeInTheDocument();
+        expect(screen.getByText('Blank = once each')).toBeInTheDocument();
+        expect(screen.getByText('Blank = live right away')).toBeInTheDocument();
+        expect(screen.getByText(/Blank = never expires/)).toBeInTheDocument();
+
+        await user.type(screen.getByPlaceholderText(/e\.g\. MONSOON20/i), 'ZERO');
+        await user.type(screen.getAllByRole('spinbutton')[0], '30');
+        await user.type(screen.getByPlaceholderText('Unlimited'), '0');
+
+        expect(screen.getByText('At least 1 — or leave blank for unlimited.')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /publish coupon/i })).toBeDisabled();
+        expect(posted).toBe(false);
     });
 });
 
@@ -120,7 +164,7 @@ describe('Coupons — pause/resume', () => {
             http.patch(`${BASE}/api/v1/partner/coupons/:id/`, async ({ request }) => {
                 patched = await request.json();
                 return HttpResponse.json({ success: true, data: { ...mockCoupon, ...patched } });
-            }),
+            })
         );
         renderScreen();
         const user = userEvent.setup();

@@ -1,6 +1,8 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { EntityType } from '../types';
 import { DateRangeKey, DEFAULT_DATE_RANGE, isDateRangeKey } from '../constants/dateRange';
+// Direct import, not the portal barrel — that barrel imports this context.
+import { sanitizeEntities } from '../components/portal/partnerMeta';
 
 interface PartnerContextValue {
     allowedEntities: EntityType[];
@@ -11,7 +13,6 @@ interface PartnerContextValue {
 }
 
 const DATE_RANGE_STORAGE_KEY = 'dateRange';
-const KNOWN_ENTITIES: EntityType[] = ['Events', 'Classes', 'Programs', 'Venues'];
 
 const PartnerContext = createContext<PartnerContextValue>({
     allowedEntities: [],
@@ -27,8 +28,7 @@ export const PartnerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     // sessionStorage value must degrade to "no services yet", never throw.
     const [allowedEntities, setAllowedEntitiesState] = useState<EntityType[]>(() => {
         try {
-            const parsed = JSON.parse(sessionStorage.getItem('allowedEntities') || '[]');
-            return Array.isArray(parsed) ? parsed.filter((e): e is EntityType => KNOWN_ENTITIES.includes(e)) : [];
+            return sanitizeEntities(JSON.parse(sessionStorage.getItem('allowedEntities') || '[]'));
         } catch {
             return [];
         }
@@ -44,10 +44,13 @@ export const PartnerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
 
     // Stable identities — App's route guard and several effects depend on these.
+    // The one way in, so it's where values are checked: whatever a caller
+    // passes, only real service types get stored.
     const setAllowedEntities = useCallback((entities: EntityType[]) => {
-        setAllowedEntitiesState(entities);
+        const clean = sanitizeEntities(entities);
+        setAllowedEntitiesState(clean);
         try {
-            sessionStorage.setItem('allowedEntities', JSON.stringify(entities));
+            sessionStorage.setItem('allowedEntities', JSON.stringify(clean));
         } catch {
             /* storage unavailable — state still updates */
         }

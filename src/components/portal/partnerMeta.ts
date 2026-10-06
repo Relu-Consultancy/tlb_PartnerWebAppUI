@@ -88,17 +88,31 @@ const ENTITY_BY_KEY: Record<string, EntityType> = {
  */
 export const entitiesFromPartner = (partner: any): EntityType[] => {
     const raw: unknown[] = Array.isArray(partner?.categories) ? partner.categories : [];
-    const found = raw
-        .map(
-            (c: any) =>
-                ENTITY_BY_KEY[
-                    String(c?.name ?? c ?? '')
-                        .trim()
-                        .toLowerCase()
-                ]
-        )
-        .filter((e): e is EntityType => !!e);
+    const found = raw.map((c: any) => toEntityType(c?.name ?? c)).filter((e): e is EntityType => !!e);
     return ENTITY_ORDER.filter((e) => found.includes(e));
+};
+
+/** "events", "Event", " Venues " → the EntityType it names; anything else → null. */
+export const toEntityType = (name: unknown): EntityType | null =>
+    ENTITY_BY_KEY[
+        String(name ?? '')
+            .trim()
+            .toLowerCase()
+    ] ?? null;
+
+/**
+ * Only real service types, each once. Every screen looks loaders up by these
+ * (`LIST_LOADERS[type]()`), so one stray value — a raw backend name like
+ * "events" — crashed My listings with "Ze[n] is not a function".
+ */
+export const sanitizeEntities = (list: unknown): EntityType[] => {
+    if (!Array.isArray(list)) return [];
+    const out: EntityType[] = [];
+    for (const item of list) {
+        const e = toEntityType(item);
+        if (e && !out.includes(e)) out.push(e);
+    }
+    return out;
 };
 
 /** Display order for service types (matches the mocks). */

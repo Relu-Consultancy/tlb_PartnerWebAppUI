@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { EntityType, Screen } from '../../types';
+import { Screen } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
 import { SkeletonDashboard } from '../../components/ui';
+import { entitiesFromPartner } from '../../components/portal';
 import { markNotificationRead, InAppNotification } from '../../api/notifications';
 import { PartnerListing } from '../../api/portalSummary';
 import { getDateRangeOption } from '../../constants/dateRange';
@@ -28,12 +29,14 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
     const { loading, revenueLoading, partner, notifications, model, markActivityRead } = useDashboardData(allowedEntities, dateRange);
     const [reviewListing, setReviewListing] = useState<PartnerListing | null>(null);
 
-    // The backend's categories are the source of truth for nav + route guards.
+    // The backend's categories are the source of truth for nav + route guards —
+    // mapped through entitiesFromPartner like everywhere else. Copying the raw
+    // names (e.g. "events") put values no screen knows into the list, and My
+    // listings crashed with "Ze[n] is not a function".
     useEffect(() => {
-        const categories = partner?.categories;
-        if (!Array.isArray(categories) || categories.length === 0) return;
-        const names = categories.map((c: any) => c?.name || c) as EntityType[];
-        if (names.join(',') !== allowedEntities.join(',')) setAllowedEntities(names);
+        const entities = entitiesFromPartner(partner);
+        if (entities.length === 0) return;
+        if (entities.join(',') !== allowedEntities.join(',')) setAllowedEntities(entities);
     }, [partner]);
 
     // Unfinished onboarding belongs in the onboarding flow, not the dashboard.

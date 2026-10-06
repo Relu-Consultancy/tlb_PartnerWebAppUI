@@ -1,4 +1,5 @@
 import React, { useEffect, useId } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { X } from 'lucide-react';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
@@ -27,7 +28,12 @@ export const PortalModal: React.FC<PortalModalProps> = ({ open, onClose, title, 
         return () => document.removeEventListener('keydown', onKey);
     }, [open, onClose]);
 
-    return (
+    // Rendered into <body>, not in place. Inline, the overlay sat inside the
+    // screen's animated wrapper, and a `position: fixed` element is laid out
+    // against its nearest transformed ancestor, not the window — so while that
+    // wrapper carried a transform the dialog appeared at the screen's size and
+    // then snapped to full size (QA: the bank form "opened small, then grew").
+    return createPortal(
         <AnimatePresence>
             {open && (
                 <motion.div
@@ -68,6 +74,7 @@ export const PortalModal: React.FC<PortalModalProps> = ({ open, onClose, title, 
                     </motion.div>
                 </motion.div>
             )}
-        </AnimatePresence>
+        </AnimatePresence>,
+        document.body
     );
 };

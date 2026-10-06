@@ -136,4 +136,16 @@ describe('FinancialHub — bank dialog opens at its final size (QA: it appeared 
         // The old animation started every dialog at scale(0.98) + translateY(8px).
         expect(dialog.style.transform).not.toMatch(/scale|translate/);
     });
+
+    it('renders the overlay at the top of <body>, outside the screen and its animated wrapper', async () => {
+        server.use(http.get(`${BASE}/api/v1/partner/bank-details/`, () => new HttpResponse(null, { status: 404 })));
+        const { container } = renderScreen();
+        const user = userEvent.setup();
+        await user.click(await screen.findByRole('button', { name: /add bank account/i }));
+
+        const dialog = await screen.findByRole('dialog');
+        // In place, a transformed ancestor sized the fixed overlay instead of the window.
+        expect(container.contains(dialog)).toBe(false);
+        expect(dialog.parentElement?.parentElement).toBe(document.body);
+    });
 });

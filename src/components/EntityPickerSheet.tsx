@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { createPortal } from 'react-dom';
 import { X, CalendarDays, BarChart3, Users, MapPin, ChevronRight } from 'lucide-react';
 import { EntityType, Screen } from '../types';
 import { clearAllListingDraftIds } from '../api/listings';
@@ -59,7 +60,9 @@ export const EntityPickerSheet: React.FC<Props> = ({ isOpen, onClose, allowedEnt
         onNavigate(startNewListing(entity));
     };
 
-    return (
+    // Into <body> for the same reason as PortalModal: in place, a transformed
+    // ancestor would size this fixed sheet instead of the window.
+    return createPortal(
         <AnimatePresence>
             {isOpen && (
                 <>
@@ -123,6 +126,7 @@ export const EntityPickerSheet: React.FC<Props> = ({ isOpen, onClose, allowedEnt
                     </motion.div>
                 </>
             )}
-        </AnimatePresence>
+        </AnimatePresence>,
+        document.body
     );
 };

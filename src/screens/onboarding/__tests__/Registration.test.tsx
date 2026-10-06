@@ -27,13 +27,19 @@ const serve = () => {
 async function fillAndSubmit(links: { facebook?: string; website?: string }) {
     const onNavigate = vi.fn();
     const { container } = render(<Registration onNavigate={onNavigate} />);
-    await userEvent.type(screen.getByPlaceholderText('The Grand Theater'), 'Grand Studio');
-    await userEvent.type(screen.getByPlaceholderText('Sarah Bernhardt'), 'Asha Rao');
-    await userEvent.type(screen.getByPlaceholderText('xyz@email_name.com'), 'asha@grand.example');
-    await userEvent.type(screen.getByPlaceholderText('Mumbai'), 'Pune');
-    await userEvent.type(screen.getByPlaceholderText('https://instagram.com/yourbusiness'), 'https://instagram.com/grand');
-    if (links.facebook) await userEvent.type(screen.getByPlaceholderText('https://facebook.com/yourbusiness'), links.facebook);
-    if (links.website) await userEvent.type(screen.getByPlaceholderText('https://www.yourbusiness.com'), links.website);
+    // Pasted, not typed key by key — ten fields of keystrokes timed out under
+    // the full suite's parallel load.
+    const fill = async (placeholder: string, value: string) => {
+        await userEvent.click(screen.getByPlaceholderText(placeholder));
+        await userEvent.paste(value);
+    };
+    await fill('The Grand Theater', 'Grand Studio');
+    await fill('Sarah Bernhardt', 'Asha Rao');
+    await fill('xyz@email_name.com', 'asha@grand.example');
+    await fill('Mumbai', 'Pune');
+    await fill('https://instagram.com/yourbusiness', 'https://instagram.com/grand');
+    if (links.facebook) await fill('https://facebook.com/yourbusiness', links.facebook);
+    if (links.website) await fill('https://www.yourbusiness.com', links.website);
 
     const photos = [1, 2, 3].map((i) => new File(['x'], `p${i}.jpg`, { type: 'image/jpeg' }));
     const fileInput = container.querySelector('input[type="file"][multiple]') as HTMLInputElement;

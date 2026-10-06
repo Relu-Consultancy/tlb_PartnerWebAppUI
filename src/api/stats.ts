@@ -292,9 +292,46 @@ export const getStatsRevenue = async (period: RevenuePeriod = '30d'): Promise<St
     return unwrap<StatsRevenue>(res, 'Failed to load revenue stats');
 };
 
+/** A rating as the API may send it — number, Decimal string ("4.25"), or null. */
+const toRating = (v: unknown): number | null => {
+    if (v == null || v === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : null;
+};
+
+/**
+ * Review stats with a trustworthy average. The backend has answered
+ * `avg_rating: null` while counting several reviews, and sends Decimal fields
+ * as strings — and callers do `avg_rating.toFixed(1)` — so normalise once,
+ * here. A missing average is rebuilt from the rating distribution if present.
+ */
+export const normalizeStatsReviews = (raw: any): StatsReviews => {
+    const distribution: RatingBucket[] = (Array.isArray(raw?.rating_distribution) ? raw.rating_distribution : []).map((b: any) => ({
+        rating: Number(b?.rating ?? b?.stars) || 0,
+        count: Number(b?.count) || 0,
+    }));
+    let avg = toRating(raw?.avg_rating ?? raw?.average_rating);
+    if (avg == null) {
+        const counted = distribution.filter((b) => b.rating > 0 && b.count > 0);
+        const n = counted.reduce((sum, b) => sum + b.count, 0);
+        if (n > 0) avg = counted.reduce((sum, b) => sum + b.rating * b.count, 0) / n;
+    }
+    return {
+        ...raw,
+        avg_rating: avg,
+        total_reviews: Number(raw?.total_reviews) || 0,
+        rating_distribution: distribution,
+        avg_rating_trend: (Array.isArray(raw?.avg_rating_trend) ? raw.avg_rating_trend : []).map((t: any) => ({
+            ...t,
+            avg_rating: toRating(t?.avg_rating),
+        })),
+        recent_reviews: Array.isArray(raw?.recent_reviews) ? raw.recent_reviews : [],
+    };
+};
+
 export const getStatsReviews = async (): Promise<StatsReviews> => {
     const res = await apiClient('/api/v1/partner/stats/reviews/');
-    return unwrap<StatsReviews>(res, 'Failed to load review stats');
+    return normalizeStatsReviews(await unwrap<unknown>(res, 'Failed to load review stats'));
 };
 
 // ── Traffic analytics (calendar-relative periods — distinct from RevenuePeriod) ──

@@ -43,6 +43,7 @@ export const Reviews: React.FC<Props> = ({ onNavigate }) => {
         reviews: data.reviews,
         total: data.total,
         unfiltered: listingId === 'all' && tab !== 'business' && tab !== 'unanswered',
+        listing: listingId !== 'all' && tab !== 'business' && tab !== 'unanswered',
     });
 
     return (

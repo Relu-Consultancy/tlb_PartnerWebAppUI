@@ -1,9 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/msw/server';
-import {
-    getStatsOverview, getStatsEvents, getStatsVenues, getStatsEnquiries, trackProfileView,
-} from '../stats';
+import { getStatsOverview, getStatsEvents, getStatsVenues, getStatsEnquiries, trackProfileView, normalizeStatsReviews } from '../stats';
 import { mockStatsOverview, mockStatsEnquiries } from '../../test/msw/handlers';
 
 const BASE = 'https://tlb-api.reluconsultancy.in';
@@ -24,32 +22,35 @@ describe('stats API — getStatsOverview', () => {
         localStorage.setItem('access_token', 'tok-123');
         let authHeader: string | null = null;
         let url = '';
-        server.use(http.get(`${BASE}/api/v1/partner/stats/overview/`, ({ request }) => {
-            authHeader = request.headers.get('Authorization');
-            url = request.url;
-            return HttpResponse.json({ success: true, data: mockStatsOverview });
-        }));
+        server.use(
+            http.get(`${BASE}/api/v1/partner/stats/overview/`, ({ request }) => {
+                authHeader = request.headers.get('Authorization');
+                url = request.url;
+                return HttpResponse.json({ success: true, data: mockStatsOverview });
+            })
+        );
         await getStatsOverview();
         expect(url).toContain('/api/v1/partner/stats/overview/');
         expect(authHeader).toBe('Bearer tok-123');
     });
 
     it('supports a bare (non-enveloped) JSON body', async () => {
-        server.use(http.get(`${BASE}/api/v1/partner/stats/overview/`, () =>
-            HttpResponse.json(mockStatsOverview)));
+        server.use(http.get(`${BASE}/api/v1/partner/stats/overview/`, () => HttpResponse.json(mockStatsOverview)));
         const res = await getStatsOverview();
         expect(res.active_batches).toBe(6);
     });
 
     it('throws with the API error message on failure', async () => {
-        server.use(http.get(`${BASE}/api/v1/partner/stats/overview/`, () =>
-            HttpResponse.json({ error: { message: 'Not approved' } }, { status: 403 })));
+        server.use(
+            http.get(`${BASE}/api/v1/partner/stats/overview/`, () =>
+                HttpResponse.json({ error: { message: 'Not approved' } }, { status: 403 })
+            )
+        );
         await expect(getStatsOverview()).rejects.toThrow('Not approved');
     });
 
     it('throws a fallback message when no error body is present', async () => {
-        server.use(http.get(`${BASE}/api/v1/partner/stats/overview/`, () =>
-            new HttpResponse(null, { status: 500 })));
+        server.use(http.get(`${BASE}/api/v1/partner/stats/overview/`, () => new HttpResponse(null, { status: 500 })));
         await expect(getStatsOverview()).rejects.toThrow(/Failed to load overview stats/);
     });
 });
@@ -65,8 +66,7 @@ describe('stats API — getStatsEvents', () => {
     });
 
     it('throws on failure', async () => {
-        server.use(http.get(`${BASE}/api/v1/partner/stats/events/`, () =>
-            HttpResponse.json({ message: 'boom' }, { status: 500 })));
+        server.use(http.get(`${BASE}/api/v1/partner/stats/events/`, () => HttpResponse.json({ message: 'boom' }, { status: 500 })));
         await expect(getStatsEvents()).rejects.toThrow('boom');
     });
 });
@@ -91,8 +91,11 @@ describe('stats API — getStatsEnquiries', () => {
     });
 
     it('tolerates a null avg_response_hours', async () => {
-        server.use(http.get(`${BASE}/api/v1/partner/stats/enquiries/`, () =>
-            HttpResponse.json({ success: true, data: { ...mockStatsEnquiries, avg_response_hours: null } })));
+        server.use(
+            http.get(`${BASE}/api/v1/partner/stats/enquiries/`, () =>
+                HttpResponse.json({ success: true, data: { ...mockStatsEnquiries, avg_response_hours: null } })
+            )
+        );
         const res = await getStatsEnquiries();
         expect(res.avg_response_hours).toBeNull();
     });
@@ -102,20 +105,54 @@ describe('stats API — trackProfileView', () => {
     it('POSTs to the track-view endpoint for the given partner id', async () => {
         let called = false;
         let method = '';
-        server.use(http.post(`${BASE}/api/v1/partner/:id/track-view/`, ({ request, params }) => {
-            called = true;
-            method = request.method;
-            expect(params.id).toBe('partner-xyz');
-            return HttpResponse.json({ success: true, data: { message: 'tracked' } });
-        }));
+        server.use(
+            http.post(`${BASE}/api/v1/partner/:id/track-view/`, ({ request, params }) => {
+                called = true;
+                method = request.method;
+                expect(params.id).toBe('partner-xyz');
+                return HttpResponse.json({ success: true, data: { message: 'tracked' } });
+            })
+        );
         await trackProfileView('partner-xyz');
         expect(called).toBe(true);
         expect(method).toBe('POST');
     });
 
     it('never throws even when the request fails (best-effort)', async () => {
-        server.use(http.post(`${BASE}/api/v1/partner/:id/track-view/`, () =>
-            new HttpResponse(null, { status: 500 })));
+        server.use(http.post(`${BASE}/api/v1/partner/:id/track-view/`, () => new HttpResponse(null, { status: 500 })));
         await expect(trackProfileView('partner-xyz')).resolves.toBeUndefined();
+    });
+});
+
+describe('normalizeStatsReviews', () => {
+    it('rebuilds a missing average from the rating distribution', () => {
+        const stats = normalizeStatsReviews({
+            avg_rating: null,
+            total_reviews: 4,
+            rating_distribution: [
+                { rating: 5, count: 1 },
+                { rating: 4, count: 2 },
+                { rating: 3, count: 1 },
+            ],
+        });
+        expect(stats.avg_rating).toBe(4);
+    });
+
+    it('reads Decimal strings as numbers, so callers can call toFixed', () => {
+        const stats = normalizeStatsReviews({
+            avg_rating: '4.25',
+            total_reviews: '3',
+            avg_rating_trend: [{ month: 'Sep', avg_rating: '4.5', count: 2 }],
+        });
+        expect(stats.avg_rating).toBe(4.25);
+        expect(stats.total_reviews).toBe(3);
+        expect(stats.avg_rating_trend[0].avg_rating).toBe(4.5);
+    });
+
+    it('leaves a partner with no reviews unrated', () => {
+        const stats = normalizeStatsReviews({ avg_rating: null, total_reviews: 0, rating_distribution: [] });
+        expect(stats.avg_rating).toBeNull();
+        expect(stats.rating_distribution).toEqual([]);
+        expect(stats.recent_reviews).toEqual([]);
     });
 });

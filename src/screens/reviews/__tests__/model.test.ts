@@ -23,7 +23,7 @@ describe('reviewSummary — tile vs feed', () => {
 
     it('uses the aggregate when it has reviews', () => {
         const summary = reviewSummary({ avg_rating: 4.6, total_reviews: 12 }, { reviews: [review(5)], total: 12, unfiltered: true });
-        expect(summary).toEqual({ avgRating: 4.6, totalReviews: 12, fromFeed: false, partialAverage: false });
+        expect(summary).toEqual({ avgRating: 4.6, totalReviews: 12, fromFeed: false, partialAverage: false, scope: 'partner' });
     });
 
     it('falls back to the feed when the stats call failed — never "0 reviews" above a visible review', () => {
@@ -56,5 +56,31 @@ describe('reviewSummary — tile vs feed', () => {
         const summary = reviewSummary({ avg_rating: null, total_reviews: 0 }, { reviews: [], total: 0, unfiltered: true });
         expect(summary.totalReviews).toBe(0);
         expect(summary.avgRating).toBeNull();
+    });
+});
+
+describe('reviewSummary — missing averages and one listing', () => {
+    const review = (rating: number) => ({ rating });
+
+    it('works the average out from the reviews when the aggregate counts them but sends no average', () => {
+        // QA: a listing with 3–4 reviews showed a null rating.
+        const summary = reviewSummary(
+            { avg_rating: null, total_reviews: 4 },
+            { reviews: [review(5), review(4), review(4), review(3)], total: 4, unfiltered: true }
+        );
+        expect(summary).toMatchObject({ avgRating: 4, totalReviews: 4, partialAverage: false, scope: 'partner' });
+    });
+
+    it('rates the picked listing from its own reviews, not the partner-wide aggregate', () => {
+        const summary = reviewSummary(
+            { avg_rating: 4.6, total_reviews: 46 },
+            { reviews: [review(3), review(4), review(5)], total: 3, unfiltered: false, listing: true }
+        );
+        expect(summary).toMatchObject({ avgRating: 4, totalReviews: 3, partialAverage: false, scope: 'listing' });
+    });
+
+    it('shows a picked listing with no reviews as unrated, not as the partner average', () => {
+        const summary = reviewSummary({ avg_rating: 4.6, total_reviews: 46 }, { reviews: [], total: 0, unfiltered: false, listing: true });
+        expect(summary).toMatchObject({ avgRating: null, totalReviews: 0, scope: 'listing' });
     });
 });

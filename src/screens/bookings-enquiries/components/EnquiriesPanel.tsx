@@ -34,30 +34,22 @@ export const EnquiriesPanel: React.FC<EnquiriesPanelProps> = ({ entries, listing
     const [expandedListingId, setExpandedListingId] = useState<string | null>(null);
     const [visible, setVisible] = useState(PAGE_SIZE);
 
-    const scopeOptions = (['Classes', 'Programs', 'Venues'] as EnquiryEntity[]).filter(e => availableEntities.includes(e));
+    const scopeOptions = (['Classes', 'Programs', 'Venues'] as EnquiryEntity[]).filter((e) => availableEntities.includes(e));
     const stats = useMemo(() => enquiryStats(entries), [entries]);
 
-    const staged = useMemo(
-        () => filterEnquiries(entries, { stage, scope, search: '' }),
-        [entries, stage, scope],
-    );
+    const staged = useMemo(() => filterEnquiries(entries, { stage, scope, search: '' }), [entries, stage, scope]);
     const listingFiltered = useMemo(
-        () => listingStatus === 'any' ? staged : staged.filter(e => (listingsById.get(e.listingId)?.state ?? 'draft') === listingStatus),
-        [staged, listingStatus, listingsById],
+        () =>
+            listingStatus === 'any' ? staged : staged.filter((e) => (listingsById.get(e.listingId)?.state ?? 'draft') === listingStatus),
+        [staged, listingStatus, listingsById]
     );
-    const filtered = useMemo(
-        () => filterEnquiries(listingFiltered, { stage, scope, search }),
-        [listingFiltered, stage, scope, search],
-    );
-    const sorted = useMemo(
-        () => [...filtered].sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? '')),
-        [filtered],
-    );
+    const filtered = useMemo(() => filterEnquiries(listingFiltered, { stage, scope, search }), [listingFiltered, stage, scope, search]);
+    const sorted = useMemo(() => [...filtered].sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? '')), [filtered]);
     const visibleRows = sorted.slice(0, visible);
     const groups = useMemo(() => groupByListing(visibleRows), [visibleRows]);
 
     const listingStatusCounts = (state: ListingState | 'any') =>
-        state === 'any' ? staged.length : staged.filter(e => (listingsById.get(e.listingId)?.state ?? 'draft') === state).length;
+        state === 'any' ? staged.length : staged.filter((e) => (listingsById.get(e.listingId)?.state ?? 'draft') === state).length;
 
     const resetPaging = () => setVisible(PAGE_SIZE);
 
@@ -66,10 +58,13 @@ export const EnquiriesPanel: React.FC<EnquiriesPanelProps> = ({ entries, listing
             <SegBar
                 options={[
                     { key: 'all' as const, label: 'All enquiries', count: stats.total },
-                    ...scopeOptions.map(e => ({ key: e, label: SERVICE_LABEL[e], count: stats.byEntity[e] })),
+                    ...scopeOptions.map((e) => ({ key: e, label: SERVICE_LABEL[e], count: stats.byEntity[e] })),
                 ]}
                 value={scope}
-                onChange={v => { setScope(v); resetPaging(); }}
+                onChange={(v) => {
+                    setScope(v);
+                    resetPaging();
+                }}
             />
 
             <div className="pt-note">
@@ -85,18 +80,39 @@ export const EnquiriesPanel: React.FC<EnquiriesPanelProps> = ({ entries, listing
                         { key: 'responded' as const, label: 'Responded' },
                     ]}
                     value={stage}
-                    onChange={v => { setStage(v); resetPaging(); }}
+                    onChange={(v) => {
+                        setStage(v);
+                        resetPaging();
+                    }}
                 />
                 <div className="w-px h-[22px] bg-tlb-line mx-1" aria-hidden="true" />
-                <ListingStatusFilter value={listingStatus} onChange={v => { setListingStatus(v); resetPaging(); }} countOf={listingStatusCounts} />
-                <div className="flex-1" />
-                <SearchField value={search} onChange={v => { setSearch(v); resetPaging(); }} placeholder="Search name, listing or phone" />
+                <ListingStatusFilter
+                    value={listingStatus}
+                    onChange={(v) => {
+                        setListingStatus(v);
+                        resetPaging();
+                    }}
+                    countOf={listingStatusCounts}
+                />
+                <div className="hidden sm:block flex-1" />
+                <SearchField
+                    value={search}
+                    onChange={(v) => {
+                        setSearch(v);
+                        resetPaging();
+                    }}
+                    placeholder="Search name, listing or phone"
+                />
             </div>
 
             <div className="pt-card overflow-x-auto">
                 <div className="flex items-center justify-between min-w-[640px] px-[17px] py-3 border-b border-tlb-line bg-tlb-chrome">
-                    <span className="pt-h-sec text-sm">{stage === 'new' ? 'Enquiries to respond' : 'Responded — awaiting the customer'}</span>
-                    <span className="text-[11.5px] font-semibold text-tlb-muted">{filtered.length} {filtered.length === 1 ? 'enquiry' : 'enquiries'}</span>
+                    <span className="pt-h-sec text-sm">
+                        {stage === 'new' ? 'Enquiries to respond' : 'Responded — awaiting the customer'}
+                    </span>
+                    <span className="text-[11.5px] font-semibold text-tlb-muted">
+                        {filtered.length} {filtered.length === 1 ? 'enquiry' : 'enquiries'}
+                    </span>
                 </div>
 
                 {groups.length === 0 ? (
@@ -104,19 +120,21 @@ export const EnquiriesPanel: React.FC<EnquiriesPanelProps> = ({ entries, listing
                         <IconTile tone="neutral" icon={CircleAlert} size="md" />
                         <p className="text-sm font-bold text-tlb-ink">No enquiries here</p>
                         <p className="text-xs text-tlb-muted max-w-[260px]">
-                            {search || listingStatus !== 'any' ? 'Try a different search or listing filter.' : 'Nothing in this stage right now.'}
+                            {search || listingStatus !== 'any'
+                                ? 'Try a different search or listing filter.'
+                                : 'Nothing in this stage right now.'}
                         </p>
                     </div>
                 ) : (
                     <GroupedList<EnquiryEntry>
                         groups={groups}
                         expandedId={expandedListingId}
-                        onToggle={id => setExpandedListingId(cur => cur === id ? null : id)}
-                        entityLabel={e => ENQUIRY_ENTITY_LABEL[e as EnquiryEntity]}
-                        entityTone={e => ENQUIRY_ENTITY_TONE[e as EnquiryEntity]}
-                        countLabel={n => `${n} ${n === 1 ? 'enquiry' : 'enquiries'}`}
+                        onToggle={(id) => setExpandedListingId((cur) => (cur === id ? null : id))}
+                        entityLabel={(e) => ENQUIRY_ENTITY_LABEL[e as EnquiryEntity]}
+                        entityTone={(e) => ENQUIRY_ENTITY_TONE[e as EnquiryEntity]}
+                        countLabel={(n) => `${n} ${n === 1 ? 'enquiry' : 'enquiries'}`}
                         minWidth={640}
-                        renderRow={row => (
+                        renderRow={(row) => (
                             <button
                                 key={row.id}
                                 type="button"
@@ -127,7 +145,11 @@ export const EnquiriesPanel: React.FC<EnquiriesPanelProps> = ({ entries, listing
                                     className="w-[34px] h-[34px] rounded-full flex items-center justify-center text-white text-[11.5px] font-extrabold flex-none"
                                     style={{ background: avatarColorOf(row.name) }}
                                 >
-                                    {row.name.split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase()).join('') || '?'}
+                                    {row.name
+                                        .split(/\s+/)
+                                        .slice(0, 2)
+                                        .map((w) => w[0]?.toUpperCase())
+                                        .join('') || '?'}
                                 </span>
                                 <span className="w-[190px] flex-none min-w-0">
                                     <span className="block text-[13.5px] font-bold text-tlb-ink truncate">{row.name}</span>
@@ -143,7 +165,12 @@ export const EnquiriesPanel: React.FC<EnquiriesPanelProps> = ({ entries, listing
                     />
                 )}
 
-                <LoadMoreRow shown={Math.min(visible, filtered.length)} total={filtered.length} noun="enquiries" onLoadMore={() => setVisible(v => v + PAGE_SIZE)} />
+                <LoadMoreRow
+                    shown={Math.min(visible, filtered.length)}
+                    total={filtered.length}
+                    noun="enquiries"
+                    onLoadMore={() => setVisible((v) => v + PAGE_SIZE)}
+                />
             </div>
         </div>
     );

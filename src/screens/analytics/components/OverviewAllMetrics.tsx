@@ -15,18 +15,30 @@ const DeltaPill: React.FC<{ pct: number }> = ({ pct }) => {
     return (
         <span
             className="pt-pill inline-flex items-center gap-1"
-            style={up ? { background: 'var(--color-tlb-green-soft)', color: 'var(--color-tlb-green)' } : { background: 'var(--color-tlb-red-soft)', color: 'var(--color-tlb-red-deep)' }}
+            style={
+                up
+                    ? { background: 'var(--color-tlb-green-soft)', color: 'var(--color-tlb-green)' }
+                    : { background: 'var(--color-tlb-red-soft)', color: 'var(--color-tlb-red-deep)' }
+            }
         >
             {up ? <TrendingUp size={11} /> : <TrendingDown size={11} />} {Math.abs(pct).toFixed(0)}%
         </span>
     );
 };
 
-const Tile: React.FC<{ label: string; value: string; delta?: number | null; sub: string }> = ({ label, value, delta, sub }) => (
-    <div className="pt-card p-[17px_19px] flex flex-col gap-[7px]">
+/** `wide` spans both phone columns — a rupee figure doesn't fit half of a 320px screen. */
+const Tile: React.FC<{ label: string; value: string; delta?: number | null; sub: string; wide?: boolean }> = ({
+    label,
+    value,
+    delta,
+    sub,
+    wide,
+}) => (
+    <div className={`pt-card p-[17px_19px] flex flex-col gap-[7px] min-w-0 ${wide ? 'col-span-2 sm:col-span-1' : ''}`}>
         <span className="pt-eyebrow">{label}</span>
-        <div className="flex items-baseline gap-[9px]">
-            <span className="pt-num text-[25px]">{value}</span>
+        {/* Wraps rather than overflowing: a long value pushes the pill onto the next line. */}
+        <div className="flex flex-wrap items-baseline gap-x-[9px] gap-y-1 min-w-0">
+            <span className="pt-num text-[25px] min-w-0 break-words">{value}</span>
             {delta != null && <DeltaPill pct={delta} />}
         </div>
         <div className="text-[12px] text-tlb-muted">{sub}</div>
@@ -41,6 +53,7 @@ export const OverviewAllMetrics: React.FC<OverviewAllMetricsProps> = ({ overview
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <Tile
             label="Gross revenue"
+            wide
             value={overview ? formatRupees(toNumber(overview.gross_revenue)) : '—'}
             delta={overview?.revenue_growth_pct ?? null}
             sub={overview ? `${formatCount(overview.confirmed_bookings)} bookings this period` : 'no data yet'}

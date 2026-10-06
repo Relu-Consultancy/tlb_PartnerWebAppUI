@@ -16,7 +16,8 @@ const KpiCard: React.FC<KpiCardProps> = ({ label, value, sub, valueClassName = '
         <div className={`pt-num text-[25px] leading-tight mt-[7px] transition-opacity ${busy ? 'opacity-40' : ''} ${valueClassName}`}>
             {value}
         </div>
-        <div className="text-[11px] mt-1 truncate">{sub}</div>
+        {/* Wraps on narrow phones instead of cutting the line off with "…". */}
+        <div className="text-[11px] leading-snug mt-1">{sub}</div>
     </div>
 );
 
@@ -27,22 +28,34 @@ export const KpiGrid: React.FC<{ kpis: KpiModel; revenueLoading: boolean }> = ({
             <KpiCard
                 label="Total listings"
                 value={formatCount(listings.total)}
-                sub={<span className="text-tlb-muted">{listings.live} live · {listings.pending} pending approval</span>}
+                sub={
+                    <span className="text-tlb-muted">
+                        {listings.live} live · {listings.pending} pending approval
+                    </span>
+                }
             />
             <KpiCard
                 label="Enquiries"
                 value={formatCount(enquiries.received)}
-                sub={enquiries.unanswered > 0
-                    ? <span className="font-bold text-tlb-red">{enquiries.unanswered} still unanswered</span>
-                    : <span className="text-tlb-muted">All caught up</span>}
+                sub={
+                    enquiries.unanswered > 0 ? (
+                        <span className="font-bold text-tlb-red">{enquiries.unanswered} still unanswered</span>
+                    ) : (
+                        <span className="text-tlb-muted">All caught up</span>
+                    )
+                }
             />
             <KpiCard
                 label="Bookings"
                 value={bookings.confirmed === null ? '—' : formatCount(bookings.confirmed)}
                 busy={revenueLoading}
-                sub={bookings.today
-                    ? <span className="font-bold text-tlb-green">▲ +{bookings.today} today</span>
-                    : <span className="text-tlb-muted">Confirmed bookings</span>}
+                sub={
+                    bookings.today ? (
+                        <span className="font-bold text-tlb-green">▲ +{bookings.today} today</span>
+                    ) : (
+                        <span className="text-tlb-muted">Confirmed bookings</span>
+                    )
+                }
             />
             <KpiCard
                 label="Revenue"

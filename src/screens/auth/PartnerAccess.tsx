@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { ArrowRight, Mail, Smartphone, ShieldCheck } from 'lucide-react';
 import { Screen } from '../../types';
-import { requestOtp } from '../../api/auth';
+import { PHONE_OTP_AVAILABLE, PHONE_OTP_UNAVAILABLE_MESSAGE, requestOtp } from '../../api/auth';
 import { OnboardingShell, PageHeader, ToastContainer, useToasts } from '../../components/ui';
 
 interface AuthProps {
@@ -25,8 +25,10 @@ export const PartnerAccess: React.FC<AuthProps> = ({ onNavigate, setAuthData }) 
         }
         const digits = onlyDigits(contact);
         const v = digits.length === 10;
-        return { type: 'phone' as const, identifier: v ? `+91${digits}` : contact, valid: v };
+        // A complete number still can't be used until SMS OTP ships.
+        return { type: 'phone' as const, identifier: v ? `+91${digits}` : contact, valid: v && PHONE_OTP_AVAILABLE };
     }, [contact]);
+    const phoneBlocked = !PHONE_OTP_AVAILABLE && type === 'phone' && onlyDigits(contact).length > 0;
 
     const handleContinue = async () => {
         if (!valid || loading) return;
@@ -59,7 +61,11 @@ export const PartnerAccess: React.FC<AuthProps> = ({ onNavigate, setAuthData }) 
                         Welcome to <span className="text-tlb-yellow">TLB.</span>
                     </>
                 }
-                subtitle="Enter your email or mobile number to begin. We'll send you a one-time code to verify it's really you."
+                subtitle={
+                    PHONE_OTP_AVAILABLE
+                        ? "Enter your email or mobile number to begin. We'll send you a one-time code to verify it's really you."
+                        : "Enter your email address to begin. We'll send you a one-time code to verify it's really you."
+                }
             />
 
             <motion.div
@@ -69,13 +75,13 @@ export const PartnerAccess: React.FC<AuthProps> = ({ onNavigate, setAuthData }) 
                 className="bg-white border border-gray-100 rounded-3xl p-6 sm:p-8 shadow-sm"
             >
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 block">
-                    Email or Mobile Number
+                    {PHONE_OTP_AVAILABLE ? 'Email or Mobile Number' : 'Email Address'}
                 </label>
                 <div className="relative">
                     <input
                         type="text"
                         autoFocus
-                        placeholder="partner@example.com or 98765 43210"
+                        placeholder={PHONE_OTP_AVAILABLE ? 'partner@example.com or 98765 43210' : 'partner@example.com'}
                         className="tlb-input w-full pr-12 text-base py-3.5"
                         value={contact}
                         onChange={(e) => setContact(e.target.value)}
@@ -89,9 +95,17 @@ export const PartnerAccess: React.FC<AuthProps> = ({ onNavigate, setAuthData }) 
                         {type === 'email' ? <Mail size={16} /> : <Smartphone size={16} />}
                     </div>
                 </div>
-                <p className="text-[11px] text-gray-400 mt-2 ml-1">
-                    {type === 'email' ? "We'll send a 6-digit code to this email." : 'Indian mobile numbers, +91 prefix added automatically.'}
-                </p>
+                {phoneBlocked ? (
+                    <p role="status" className="text-[12px] font-semibold text-amber-700 mt-2 ml-1">
+                        {PHONE_OTP_UNAVAILABLE_MESSAGE}
+                    </p>
+                ) : (
+                    <p className="text-[11px] text-gray-400 mt-2 ml-1">
+                        {type === 'email' || !PHONE_OTP_AVAILABLE
+                            ? "We'll send a 6-digit code to this email."
+                            : 'Indian mobile numbers, +91 prefix added automatically.'}
+                    </p>
+                )}
 
                 <motion.button
                     type="button"

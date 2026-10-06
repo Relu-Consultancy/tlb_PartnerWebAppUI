@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { ArrowRight, CheckCircle2, Clock, HelpCircle, Hourglass } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Clock, Hourglass } from 'lucide-react';
 import { Screen } from '../../types';
 import { OnboardingShell, PageHeader } from '../../components/ui';
 
@@ -84,8 +84,8 @@ export const AppSubmitted: React.FC<OnboardingProps> = ({ onNavigate }) => {
                                     step.status === 'done'
                                         ? 'bg-tlb-yellow text-tlb-dark'
                                         : step.status === 'current'
-                                        ? 'bg-white border-2 border-tlb-yellow text-tlb-yellow'
-                                        : 'bg-white border-2 border-gray-100 text-gray-300'
+                                          ? 'bg-white border-2 border-tlb-yellow text-tlb-yellow'
+                                          : 'bg-white border-2 border-gray-100 text-gray-300'
                                 }`}
                             >
                                 {step.status === 'current' && (
@@ -100,11 +100,7 @@ export const AppSubmitted: React.FC<OnboardingProps> = ({ onNavigate }) => {
                                 )}
                             </div>
                             <div className="flex-1 pt-1">
-                                <h4
-                                    className={`font-black ${
-                                        step.status === 'pending' ? 'text-gray-300' : 'text-tlb-dark'
-                                    }`}
-                                >
+                                <h4 className={`font-black ${step.status === 'pending' ? 'text-gray-300' : 'text-tlb-dark'}`}>
                                     {step.label}
                                 </h4>
                                 <p
@@ -129,10 +125,6 @@ export const AppSubmitted: React.FC<OnboardingProps> = ({ onNavigate }) => {
             >
                 Go to Dashboard <ArrowRight size={18} />
             </motion.button>
-
-            <button className="mt-4 w-full flex items-center justify-center gap-2 text-tlb-dark font-bold text-sm hover:text-tlb-yellow transition-colors">
-                <HelpCircle size={16} /> Contact Support
-            </button>
         </OnboardingShell>
     );
 };

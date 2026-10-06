@@ -82,6 +82,10 @@ const Documents: React.FC<Props> = ({ onNavigate }) => {
     const [account, setAccount] = useState('');
     const [ifsc, setIfsc] = useState('');
     const [savingKyc, setSavingKyc] = useState(false);
+    // State flips only after a re-render; a ref stops a fast double tap sending twice.
+    const savingRef = useRef(false);
+    // Set by the first failed save, so empty fields only turn red once asked for.
+    const [showMissing, setShowMissing] = useState(false);
 
     // Uploads
     const [uploadingDoc, setUploadingDoc] = useState(false);
@@ -120,37 +124,54 @@ const Documents: React.FC<Props> = ({ onNavigate }) => {
 
     const accountValid = !account || ACCOUNT_REGEX.test(account);
 
-    // The API rejects a blank bank field outright, so the three must be filled
-    // together — half a bank account is never submittable.
-    const bankTouched = !!holder || !!account || !!ifsc;
-    const hasBank = !!holder && !!account && !!ifsc;
-    const hasPan = !!pan;
-    const bankReady = !bankTouched || hasBank;
-    const canSaveKyc = (hasPan || hasBank) && bankReady && panValid && ifscValid && accountValid && !savingKyc;
+    // POST /partner/verification/ is the only way in (no partial update), and it
+    // refuses the request unless the bank account comes with it. So PAN and bank
+    // details are one submission — QA saved a PAN alone and got a bank error.
+    const missing = {
+        pan: !pan.trim(),
+        holder: !holder.trim(),
+        account: !account,
+        ifsc: !ifsc.trim(),
+    };
+    const hasBank = !missing.holder && !missing.account && !missing.ifsc;
+    const canSaveKyc = !missing.pan && hasBank && panValid && ifscValid && accountValid && !savingKyc;
+    const flag = (isMissing: boolean) => showMissing && isMissing;
+    const flagCls = (isMissing: boolean) => (flag(isMissing) ? ' !border-red-300 ring-1 ring-red-200' : '');
 
     const saveKyc = async () => {
+        if (savingRef.current) return;
         if (!canSaveKyc) {
-            if (bankTouched && !hasBank) {
-                toast.warning('Bank details go together — fill the holder name, account number and IFSC code.');
+            setShowMissing(true);
+            if (!missing.pan && panValid && !hasBank) {
+                toast.warning('Add your bank account below to submit — your PAN and bank details are verified together.');
+            } else if (missing.pan || !panValid) {
+                toast.warning(missing.pan ? 'Enter your PAN number to submit.' : 'Check your PAN number — it should look like ABCDE1234F.');
             } else if (!accountValid) {
                 toast.warning(`Account number must be ${ACCOUNT_DIGITS} digits.`);
             } else {
-                toast.warning('Please fill a valid PAN, or complete bank details.');
+                toast.warning('Check the highlighted fields and try again.');
             }
+            // Take the partner to the first thing to fix — usually off-screen on a phone.
+            requestAnimationFrame(() => {
+                const first = document.querySelector<HTMLInputElement>('[data-kyc-field][aria-invalid="true"]');
+                first?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+                first?.focus({ preventScroll: true });
+            });
             return;
         }
+        savingRef.current = true;
         setSavingKyc(true);
         try {
             // Only what's actually filled — the API rejects a blank string on
             // any of these, which is what produced the raw serializer error.
-            const payload: Record<string, unknown> = { agreement_accepted: true };
-            if (pan) payload.pan_number = pan.toUpperCase();
-            if (gst) payload.gst_number = gst.toUpperCase();
-            if (hasBank) {
-                payload.account_holder_name = holder;
-                payload.account_number = account;
-                payload.ifsc_code = ifsc.toUpperCase();
-            }
+            const payload: Record<string, unknown> = {
+                agreement_accepted: true,
+                pan_number: pan.trim().toUpperCase(),
+                account_holder_name: holder.trim(),
+                account_number: account,
+                ifsc_code: ifsc.trim().toUpperCase(),
+            };
+            if (gst.trim()) payload.gst_number = gst.trim().toUpperCase();
             await submitVerification(payload);
             toast.success('Documents submitted. Your details are under review.');
             // Status just changed: drop the memoised partner read so the header
@@ -161,6 +182,7 @@ const Documents: React.FC<Props> = ({ onNavigate }) => {
             const raw = String(e?.message || '');
             toast.error(humanizeFieldErrors(raw) || raw || 'Failed to update documents.');
         } finally {
+            savingRef.current = false;
             setSavingKyc(false);
         }
     };
@@ -272,7 +294,9 @@ const Documents: React.FC<Props> = ({ onNavigate }) => {
                                 </div>
                                 <div>
                                     <h2 className="font-black text-sm text-gray-900 leading-none">Identity &amp; Tax</h2>
-                                    <p className="text-[11px] text-gray-400 mt-1">PAN is required · GST optional</p>
+                                    <p className="text-[11px] text-gray-400 mt-1">
+                                        PAN required · GST optional · submitted with your bank account
+                                    </p>
                                 </div>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -283,9 +307,12 @@ const Documents: React.FC<Props> = ({ onNavigate }) => {
                                         onChange={(e) => setPan(e.target.value.toUpperCase())}
                                         maxLength={10}
                                         placeholder="ABCDE1234F"
-                                        className="tlb-input w-full uppercase"
+                                        className={`tlb-input w-full uppercase${flagCls(missing.pan)}`}
+                                        data-kyc-field
+                                        aria-invalid={flag(missing.pan) || !panValid}
                                     />
                                     {!panValid && <p className="text-[11px] text-red-500 font-bold mt-1">Invalid PAN format</p>}
+                                    {flag(missing.pan) && <p className="text-[11px] text-red-500 font-bold mt-1">Enter your PAN number</p>}
                                 </div>
                                 <div>
                                     <label className="tlb-label">
@@ -316,7 +343,7 @@ const Documents: React.FC<Props> = ({ onNavigate }) => {
                                 </div>
                                 <div>
                                     <h2 className="font-black text-sm text-gray-900 leading-none">Bank Account</h2>
-                                    <p className="text-[11px] text-gray-400 mt-1">Where your payouts are settled</p>
+                                    <p className="text-[11px] text-gray-400 mt-1">Where your payouts are settled · required to submit</p>
                                 </div>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -326,8 +353,13 @@ const Documents: React.FC<Props> = ({ onNavigate }) => {
                                         value={holder}
                                         onChange={(e) => setHolder(e.target.value)}
                                         placeholder="As per bank records"
-                                        className="tlb-input w-full"
+                                        className={`tlb-input w-full${flagCls(missing.holder)}`}
+                                        data-kyc-field
+                                        aria-invalid={flag(missing.holder)}
                                     />
+                                    {flag(missing.holder) && (
+                                        <p className="text-[11px] text-red-500 font-bold mt-1">Enter the account holder name</p>
+                                    )}
                                 </div>
                                 <div>
                                     <label className="tlb-label">Account Number</label>
@@ -337,8 +369,13 @@ const Documents: React.FC<Props> = ({ onNavigate }) => {
                                         maxLength={ACCOUNT_DIGITS}
                                         inputMode="numeric"
                                         placeholder={`${ACCOUNT_DIGITS}-digit account number`}
-                                        className="tlb-input w-full"
+                                        className={`tlb-input w-full${flagCls(missing.account)}`}
+                                        data-kyc-field
+                                        aria-invalid={flag(missing.account) || !accountValid}
                                     />
+                                    {flag(missing.account) && (
+                                        <p className="text-[11px] text-red-500 font-bold mt-1">Enter the account number</p>
+                                    )}
                                     {!accountValid && (
                                         <p className="text-[11px] text-red-500 font-bold mt-1">
                                             Account number must be {ACCOUNT_DIGITS} digits
@@ -352,9 +389,12 @@ const Documents: React.FC<Props> = ({ onNavigate }) => {
                                         onChange={(e) => setIfsc(e.target.value.toUpperCase())}
                                         maxLength={11}
                                         placeholder="HDFC0001234"
-                                        className="tlb-input w-full uppercase"
+                                        className={`tlb-input w-full uppercase${flagCls(missing.ifsc)}`}
+                                        data-kyc-field
+                                        aria-invalid={flag(missing.ifsc) || !ifscValid}
                                     />
                                     {!ifscValid && <p className="text-[11px] text-red-500 font-bold mt-1">Invalid IFSC format</p>}
+                                    {flag(missing.ifsc) && <p className="text-[11px] text-red-500 font-bold mt-1">Enter the IFSC code</p>}
                                 </div>
                             </div>
                             <div className="flex items-center justify-end pt-1">

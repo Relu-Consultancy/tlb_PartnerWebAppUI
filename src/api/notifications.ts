@@ -54,6 +54,21 @@ const ensureOk = async (res: Response, fallback: string) => {
     }
 };
 
+/** One notification, whatever shape the API sends it in. */
+const normalizeNotification = (n: any): InAppNotification => ({
+    ...n,
+    id: String(n?.id ?? ''),
+    notification_type: String(n?.notification_type ?? n?.type ?? ''),
+    title: n?.title ?? '',
+    body: n?.body ?? n?.message ?? '',
+    action_url: n?.action_url ?? null,
+    metadata: n?.metadata ?? null,
+    // Unread unless the API says otherwise, by flag or by a read timestamp.
+    is_read: Boolean(n?.is_read ?? n?.read ?? n?.read_at),
+    read_at: n?.read_at ?? null,
+    created_at: n?.created_at ?? '',
+});
+
 /** GET /notifications/in-app/ — paginated list (newest first). */
 export const listNotifications = async (params: ListParams = {}): Promise<NotificationPage> => {
     const qs = new URLSearchParams();
@@ -63,21 +78,43 @@ export const listNotifications = async (params: ListParams = {}): Promise<Notifi
     const query = qs.toString();
     const res = await apiClient(`/api/v1/notifications/in-app/${query ? `?${query}` : ''}`);
     await ensureOk(res, 'Failed to load notifications');
-    const d = unwrap(await res.json());
+    const json = await res.json();
+    const d = unwrap(json);
+    // Paginated ({data: {results, next}}) or flat ({data: [...], next}) — reading
+    // only `results` turned the flat form into an empty list under a non-zero badge.
+    const list: any[] = Array.isArray(d) ? d : Array.isArray(d?.results) ? d.results : [];
     return {
-        count: Number(d?.count ?? 0),
-        next: d?.next ?? null,
-        previous: d?.previous ?? null,
-        results: (d?.results ?? []) as InAppNotification[],
+        count: Number(d?.count ?? json?.count ?? list.length),
+        next: d?.next ?? json?.next ?? null,
+        previous: d?.previous ?? json?.previous ?? null,
+        results: list.map(normalizeNotification),
     };
 };
 
-/** GET /notifications/in-app/unread-count/ — drives the bell badge. */
+/** How many unread items we're willing to fetch to check the server's count. */
+const UNREAD_VERIFY_LIMIT = 50;
+
+/**
+ * GET /notifications/in-app/unread-count/ — drives the bell and Messages badges.
+ *
+ * The count endpoint and the list can disagree (QA: "1 new" over an empty
+ * Unread tab). A badge must never promise a message the partner can't open,
+ * so a small count is checked against the unread items actually listed. A
+ * count with more than a page of unread items behind it is taken as-is.
+ */
 export const getUnreadCount = async (): Promise<number> => {
     const res = await apiClient('/api/v1/notifications/in-app/unread-count/');
     await ensureOk(res, 'Failed to load unread count');
     const d = unwrap(await res.json());
-    return Number(d?.count ?? 0);
+    const reported = Number(d?.count ?? d?.unread_count ?? d?.unread ?? 0) || 0;
+    if (reported <= 0) return 0;
+    try {
+        const page = await listNotifications({ unread: true, page_size: UNREAD_VERIFY_LIMIT });
+        if (page.next) return reported;
+        return page.results.filter((n) => !n.is_read).length;
+    } catch {
+        return reported; // can't check — fall back to what the server said
+    }
 };
 
 /** POST /notifications/in-app/{id}/read/ — mark one read. */
@@ -103,9 +140,7 @@ export const getNotificationPreferences = async (): Promise<NotificationPreferen
 };
 
 /** PATCH /notifications/preferences/ */
-export const updateNotificationPreferences = async (
-    patch: Partial<NotificationPreferences>,
-): Promise<NotificationPreferences> => {
+export const updateNotificationPreferences = async (patch: Partial<NotificationPreferences>): Promise<NotificationPreferences> => {
     const res = await apiClient('/api/v1/notifications/preferences/', {
         method: 'PATCH',
         body: JSON.stringify(patch),

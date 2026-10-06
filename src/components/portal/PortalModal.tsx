@@ -37,23 +37,33 @@ export const PortalModal: React.FC<PortalModalProps> = ({ open, onClose, title, 
         <AnimatePresence>
             {open && (
                 <motion.div
-                    className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[rgba(20,19,18,0.45)]"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    onClick={onClose}
+                    key="portal-modal"
+                    className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+                    // Present for exactly as long as the backdrop fades; the card itself never fades.
+                    exit={{ transition: { duration: 0.16 } }}
                 >
+                    {/* Only the backdrop fades. When the card faded too, the screen behind
+                        showed through it mid-animation — a double exposure on every open
+                        and close (QA: the bank dialog "glitched"). It's a sibling, not the
+                        card's parent, because a fading parent takes its children with it. */}
                     <motion.div
-                        role="dialog"
-                        aria-modal="true"
-                        aria-labelledby={titleId}
-                        className={`pt-card w-full ${widthClass} max-h-[calc(100vh-2rem)] overflow-y-auto overscroll-contain px-6 py-[22px]`}
-                        // Fade only. The old scale-and-slide made every dialog open visibly
-                        // small and then grow (QA: the bank form "resized" as it opened).
+                        aria-hidden="true"
+                        className="absolute inset-0 bg-[rgba(20,19,18,0.45)]"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         transition={{ duration: 0.16 }}
+                        onClick={onClose}
+                    />
+                    <motion.div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby={titleId}
+                        className={`pt-card relative w-full ${widthClass} max-h-[calc(100vh-2rem)] overflow-y-auto overscroll-contain px-6 py-[22px]`}
+                        // Solid from the first frame and gone on close — no fade, no
+                        // scale/slide (that made dialogs open small and then grow).
+                        initial={{ opacity: 1 }}
+                        exit={{ opacity: 0, transition: { duration: 0 } }}
                         onClick={(e: React.MouseEvent) => e.stopPropagation()}
                     >
                         <div className="flex items-center justify-between gap-3 mb-1">

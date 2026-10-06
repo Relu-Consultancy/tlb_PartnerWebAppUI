@@ -1129,7 +1129,10 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                         value={sharedQuery}
                                         onChange={(e) => setSharedQuery(e.target.value)}
                                         placeholder="Search shared queries"
-                                        className="tlb-input !pl-9 !py-2.5"
+                                        // Fixed height, no vertical padding, normal line-height: every
+                                        // engine then centres the text itself. Sized by padding plus a
+                                        // 20px line-height, Safari drew the placeholder off-centre.
+                                        className="tlb-input block h-[42px] !pl-9 !py-0 ![line-height:normal]"
                                     />
                                 </div>
                             </div>

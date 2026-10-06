@@ -1,24 +1,8 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import {
-    motion,
-    AnimatePresence,
-    useMotionTemplate,
-    useMotionValue,
-} from 'motion/react';
-import {
-    ArrowLeft,
-    ArrowRight,
-    BarChart3,
-    Building2,
-    CalendarDays,
-    GraduationCap,
-    Mail,
-    Smartphone,
-    Sparkles,
-    Star,
-} from 'lucide-react';
+import { motion, AnimatePresence, useMotionTemplate, useMotionValue } from 'motion/react';
+import { ArrowLeft, ArrowRight, BarChart3, Building2, CalendarDays, GraduationCap, Mail, Smartphone, Sparkles, Star } from 'lucide-react';
 import { Screen } from '../../types';
-import { requestOtp } from '../../api/auth';
+import { PHONE_OTP_AVAILABLE, requestOtp } from '../../api/auth';
 import { ToastContainer, useToasts } from '../../components/ui';
 
 interface AuthProps {
@@ -29,7 +13,8 @@ interface AuthProps {
 type Mode = 'phone' | 'email';
 
 export const Login: React.FC<AuthProps> = ({ onNavigate, setAuthData }) => {
-    const [mode, setMode] = useState<Mode>('phone');
+    // Email first while the backend can't send SMS codes (see PHONE_OTP_AVAILABLE).
+    const [mode, setMode] = useState<Mode>(PHONE_OTP_AVAILABLE ? 'phone' : 'email');
     const [email, setEmail] = useState('');
     const [phone, setPhone] = useState('');
     const [loading, setLoading] = useState(false);
@@ -37,7 +22,7 @@ export const Login: React.FC<AuthProps> = ({ onNavigate, setAuthData }) => {
 
     const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     const isPhoneValid = phone.length === 10;
-    const isValid = mode === 'email' ? isEmailValid : isPhoneValid;
+    const isValid = mode === 'email' ? isEmailValid : PHONE_OTP_AVAILABLE && isPhoneValid;
 
     const submit = async () => {
         if (!isValid || loading) return;
@@ -150,8 +135,7 @@ export const Login: React.FC<AuthProps> = ({ onNavigate, setAuthData }) => {
                         <span className="text-tlb-yellow">back.</span>
                     </h1>
                     <p className="text-gray-400 mt-5 text-base leading-relaxed max-w-md">
-                        Pick up where you left off. Manage listings, bookings, and payouts from a single, beautifully designed
-                        dashboard.
+                        Pick up where you left off. Manage listings, bookings, and payouts from a single, beautifully designed dashboard.
                     </p>
 
                     {/* Floating entity badges */}
@@ -213,14 +197,12 @@ export const Login: React.FC<AuthProps> = ({ onNavigate, setAuthData }) => {
                             <Smartphone size={11} /> Sign In
                         </div>
                         <h2 className="text-3xl sm:text-4xl font-black leading-tight">Welcome back, partner.</h2>
-                        <p className="text-gray-500 mt-2 text-sm">
-                            Choose how you'd like to receive your secure one-time code.
-                        </p>
+                        <p className="text-gray-500 mt-2 text-sm">Choose how you'd like to receive your secure one-time code.</p>
                     </div>
 
                     {/* Mode tabs */}
                     <div className="relative bg-gray-100 rounded-2xl p-1.5 flex gap-1 mb-6">
-                        {(['phone', 'email'] as Mode[]).map((m) => {
+                        {((PHONE_OTP_AVAILABLE ? ['phone', 'email'] : ['email', 'phone']) as Mode[]).map((m) => {
                             const active = mode === m;
                             const Icon = m === 'phone' ? Smartphone : Mail;
                             return (
@@ -241,6 +223,11 @@ export const Login: React.FC<AuthProps> = ({ onNavigate, setAuthData }) => {
                                     <span className="relative flex items-center gap-2">
                                         <Icon size={15} />
                                         {m === 'phone' ? 'Mobile' : 'Email'}
+                                        {m === 'phone' && !PHONE_OTP_AVAILABLE && (
+                                            <span className="text-[9px] font-black uppercase tracking-wider bg-gray-200 text-gray-500 rounded-full px-1.5 py-0.5">
+                                                Soon
+                                            </span>
+                                        )}
                                     </span>
                                 </button>
                             );
@@ -256,7 +243,24 @@ export const Login: React.FC<AuthProps> = ({ onNavigate, setAuthData }) => {
                             exit={{ opacity: 0, x: mode === 'phone' ? 12 : -12 }}
                             transition={{ duration: 0.25, ease: 'easeOut' }}
                         >
-                            {mode === 'phone' ? (
+                            {mode === 'phone' && !PHONE_OTP_AVAILABLE ? (
+                                <div role="status" className="rounded-2xl border border-tlb-yellow/40 bg-tlb-yellow/10 p-4">
+                                    <p className="text-sm font-bold text-tlb-dark flex items-center gap-2">
+                                        <Smartphone size={15} /> Mobile OTP isn’t available yet
+                                    </p>
+                                    <p className="text-[12.5px] text-gray-600 mt-1">
+                                        We can’t send codes by SMS right now. Sign in with your email address and we’ll send your code
+                                        there.
+                                    </p>
+                                    <button
+                                        type="button"
+                                        onClick={() => setMode('email')}
+                                        className="mt-3 inline-flex items-center gap-1.5 text-sm font-black text-tlb-dark underline underline-offset-4 decoration-tlb-yellow"
+                                    >
+                                        <Mail size={14} /> Use email instead
+                                    </button>
+                                </div>
+                            ) : mode === 'phone' ? (
                                 <div>
                                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">
                                         Mobile Number
@@ -291,10 +295,7 @@ export const Login: React.FC<AuthProps> = ({ onNavigate, setAuthData }) => {
                                             onChange={(e) => setEmail(e.target.value)}
                                             autoFocus
                                         />
-                                        <Mail
-                                            size={16}
-                                            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300"
-                                        />
+                                        <Mail size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300" />
                                     </div>
                                     <p className="text-[11px] text-gray-400 mt-2 ml-1">We'll send a 6-digit code to this email.</p>
                                 </div>

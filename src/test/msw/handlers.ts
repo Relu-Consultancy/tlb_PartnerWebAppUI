@@ -1054,4 +1054,27 @@ export const handlers = [
         return HttpResponse.json({ success: true, data: { id: 99, name: body.category } });
     }),
     http.delete(`${BASE}/api/v1/partner/verticals/`, () => HttpResponse.json({ success: true, data: { message: 'removed' } })),
+
+    // ─── Catch-alls for endpoints screens hit incidentally ───────────────────
+    // These used to fall through to the REAL production API (158 requests per
+    // run), which made the suite flaky and had tests talking to prod. Specific
+    // handlers above still win — MSW uses the first match — so these only answer
+    // requests no test cared to mock. setup.ts now fails on any unmatched call.
+    http.get(`${BASE}/api/v1/partner/extended-profile/`, () => HttpResponse.json({ success: true, data: {} })),
+    http.get(`${BASE}/api/v1/partner/bookings/`, () => HttpResponse.json({ success: true, data: [], next: null })),
+    http.get(`${BASE}/api/v1/partner/media/`, () => HttpResponse.json({ success: true, data: [] })),
+    http.get(`${BASE}/api/v1/partner/categories/`, () => HttpResponse.json({ success: true, data: [] })),
+    http.get(`${BASE}/api/v1/partner/listings/:id/terms/`, () => HttpResponse.json({ success: true, data: [] })),
+    http.get(`${BASE}/api/v1/partner/listings/programs/:id/enquiries/`, () => HttpResponse.json({ success: true, data: [] })),
+    http.get(`${BASE}/api/v1/partner/listings/:type/:id/`, () =>
+        HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Not found' } }, { status: 404 })
+    ),
+    http.get(`${BASE}/api/v1/notifications/in-app/unread-count/`, () => HttpResponse.json({ success: true, data: { count: 0 } })),
+    http.get(`${BASE}/api/v1/notifications/in-app/`, () =>
+        HttpResponse.json({ success: true, data: { count: 0, next: null, results: [] } })
+    ),
+    http.get(`${BASE}/api/v1/notifications/preferences/`, () => HttpResponse.json({ success: true, data: {} })),
+    http.post(`${BASE}/api/v1/auth/refresh-token/`, () =>
+        HttpResponse.json({ success: true, data: { access_token: 'test-access-token', refresh_token: 'test-refresh-token' } })
+    ),
 ];

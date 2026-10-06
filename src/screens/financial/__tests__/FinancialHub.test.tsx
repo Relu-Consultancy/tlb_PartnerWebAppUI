@@ -149,3 +149,21 @@ describe('FinancialHub — bank dialog opens at its final size (QA: it appeared 
         expect(dialog.parentElement?.parentElement).toBe(document.body);
     });
 });
+
+describe('FinancialHub — bank gate holds for every "no bank" response (QA: sections were reachable)', () => {
+    it.each([
+        ['200 with data: null', () => HttpResponse.json({ success: true, data: null })],
+        ['200 with data: {}', () => HttpResponse.json({ success: true, data: {} })],
+        [
+            '200 with a blank record',
+            () => HttpResponse.json({ success: true, data: { account_holder_name: '', ifsc_code: '', account_number_masked: '' } }),
+        ],
+        ['404', () => new HttpResponse(null, { status: 404 })],
+    ])('shows the connect-bank prompt and hides payouts for %s', async (_label, reply) => {
+        server.use(http.get(`${BASE}/api/v1/partner/bank-details/`, reply));
+        renderScreen();
+        await waitFor(() => expect(screen.getByRole('heading', { name: 'Connect your bank account' })).toBeInTheDocument());
+        expect(screen.queryByText('Revenue by vertical')).not.toBeInTheDocument();
+        expect(screen.queryByText('Payout account')).not.toBeInTheDocument();
+    });
+});

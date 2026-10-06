@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
 import { EntityType, Screen } from '../../types';
 import { usePartner } from '../../context/PartnerContext';
-import { getDateRangeOption } from '../../constants/dateRange';
+import { DATE_RANGE_OPTIONS, DateRangeKey, getDateRangeOption } from '../../constants/dateRange';
 import { Pill, SegBar } from '../../components/portal';
 import { Skeleton, toast } from '../../components/ui';
 import { ApprovalRequiredNotice } from '../../components/ApprovalGate';
@@ -20,6 +20,9 @@ import {
     trendPoints,
     uncontactedLeadValue,
     weeklyTrendPoints,
+    yearlyTrendPoints,
+    TREND_GRANULARITY_OPTIONS,
+    TrendGranularity,
 } from './model';
 import { AnalyticsTab } from './types';
 import { OverviewAllMetrics } from './components/OverviewAllMetrics';
@@ -67,16 +70,20 @@ const SkeletonBody: React.FC = () => (
 );
 
 export const Analytics: React.FC<Props> = ({ onNavigate }) => {
-    const { allowedEntities, dateRange } = usePartner();
+    const { allowedEntities, dateRange, setDateRange } = usePartner();
     const [tab, setTab] = useState<AnalyticsTab>('overview');
     const [overviewScope, setOverviewScope] = useState<EntityType | 'all'>('all');
     const [perfTab, setPerfTab] = useState<ListingPerformanceTab>('all');
     const [exportingCsv, setExportingCsv] = useState(false);
+    const [granularity, setGranularity] = useState<TrendGranularity>('monthly');
 
     const stats = useAnalyticsData(dateRange);
     const overviewListingType = overviewScope === 'all' ? undefined : OVERVIEW_LISTING_TYPE[overviewScope];
     const overviewAll = useOverviewAllData(dateRange, overviewListingType);
     const listingPerf = useListingPerformanceData(dateRange, perfTab);
+    // Weekly revenue comes from overview-all; the Overview tab's copy may be scoped
+    // to one service, so the Revenue tab reads its own all-services series.
+    const allServicesOverview = useOverviewAllData(dateRange);
 
     if (stats.loading) return <SkeletonBody />;
 
@@ -94,7 +101,13 @@ export const Analytics: React.FC<Props> = ({ onNavigate }) => {
     }
 
     const slices = revenueTypeSlices(stats.revenue?.revenue_by_type || []);
-    const trend = trendPoints({ revenue_trend: stats.revenue?.revenue_trend || [] });
+    const revenueSeries = { revenue_trend: stats.revenue?.revenue_trend || [] };
+    const trend =
+        granularity === 'weekly'
+            ? weeklyTrendPoints(allServicesOverview.overview?.weekly_trend || [])
+            : granularity === 'yearly'
+              ? yearlyTrendPoints(revenueSeries)
+              : trendPoints(revenueSeries);
     const stages = funnelStages(stats.overview, stats.enquiries);
     const { uncontacted, value: uncontactedValue } = uncontactedLeadValue(stats.enquiries, stats.revenue);
 
@@ -233,9 +246,50 @@ export const Analytics: React.FC<Props> = ({ onNavigate }) => {
                         </div>
                     </div>
                     <div className="pt-card p-5">
-                        <p className="pt-h-sec mb-1">Revenue trend</p>
-                        <p className="text-[12.5px] text-tlb-muted mb-2">Monthly · {getDateRangeOption(dateRange).phrase}</p>
-                        <RevenueChart points={trend} />
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-2">
+                            <div>
+                                <p className="pt-h-sec mb-1">Revenue trend</p>
+                                <p className="text-[12.5px] text-tlb-muted">
+                                    {TREND_GRANULARITY_OPTIONS.find((o) => o.value === granularity)?.label} ·{' '}
+                                    {getDateRangeOption(dateRange).phrase}
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <select
+                                    value={granularity}
+                                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                                        setGranularity(e.target.value as TrendGranularity)
+                                    }
+                                    aria-label="Trend grouping"
+                                    className="pt-input py-1.5 text-[12.5px] w-auto"
+                                >
+                                    {TREND_GRANULARITY_OPTIONS.map((o) => (
+                                        <option key={o.value} value={o.value}>
+                                            {o.label}
+                                        </option>
+                                    ))}
+                                </select>
+                                {/* Same control as the top-bar picker, surfaced here so the period is
+                                    changeable from the chart itself — one shared value, never two. */}
+                                <select
+                                    value={dateRange}
+                                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setDateRange(e.target.value as DateRangeKey)}
+                                    aria-label="Trend period"
+                                    className="pt-input py-1.5 text-[12.5px] w-auto"
+                                >
+                                    {DATE_RANGE_OPTIONS.map((o) => (
+                                        <option key={o.key} value={o.key}>
+                                            {o.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+                        {granularity === 'weekly' && allServicesOverview.loading ? (
+                            <div className="h-40 animate-pulse rounded-xl bg-tlb-hover" aria-busy="true" />
+                        ) : (
+                            <RevenueChart points={trend} />
+                        )}
                     </div>
                     <div className="pt-card p-5">
                         <p className="pt-h-sec mb-1">Revenue by service</p>

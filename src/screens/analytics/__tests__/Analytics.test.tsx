@@ -222,3 +222,19 @@ describe('Analytics — approval refusals', () => {
         await waitFor(() => expect(screen.getByText(/Analytics unlock once TLB approves your profile/i)).toBeInTheDocument());
     });
 });
+
+describe('Analytics — Revenue trend controls (QA: only static text was shown)', () => {
+    it('offers grouping and period dropdowns on the trend card', async () => {
+        const user = userEvent.setup();
+        renderScreen();
+        await user.click(await screen.findByRole('tab', { name: /^Revenue/ }));
+
+        const grouping = await screen.findByRole('combobox', { name: 'Trend grouping' });
+        expect(Array.from((grouping as HTMLSelectElement).options).map((o) => o.text)).toEqual(['Weekly', 'Monthly', 'Yearly']);
+        const period = screen.getByRole('combobox', { name: 'Trend period' });
+        expect(Array.from((period as HTMLSelectElement).options).map((o) => o.text)).toContain('Till date');
+
+        await user.selectOptions(grouping, 'yearly');
+        expect(screen.getByText(/^Yearly ·/)).toBeInTheDocument();
+    });
+});

@@ -1,6 +1,11 @@
 import {
-    StatsEnquiries, StatsOverview, StatsRevenue, RevenueByType,
-    OverviewDemandFunnel, OverviewWeeklyTrendPoint, RevenueByListingRow,
+    StatsEnquiries,
+    StatsOverview,
+    StatsRevenue,
+    RevenueByType,
+    OverviewDemandFunnel,
+    OverviewWeeklyTrendPoint,
+    RevenueByListingRow,
 } from '../../api/stats';
 import { toNumber } from '../../utils/format';
 import { FunnelStage, RevenueTypeSlice, TrendPoint } from './types';
@@ -21,7 +26,7 @@ const typeMeta = (type: string): { label: string; color: string } =>
 
 /** Real "revenue by service" breakdown — the mock's own stacked bar, driven by `revenue_by_type`. */
 export const revenueTypeSlices = (types: RevenueByType[]): RevenueTypeSlice[] => {
-    const amounts = types.map(t => toNumber(t.amount));
+    const amounts = types.map((t) => toNumber(t.amount));
     const total = amounts.reduce((a, b) => a + b, 0);
     return types
         .map((t, i) => {
@@ -39,29 +44,72 @@ export const revenueTypeSlices = (types: RevenueByType[]): RevenueTypeSlice[] =>
 };
 
 /** Monthly revenue + booking-count trend — real monthly buckets, not the mock's fabricated weekly ones. */
-export const trendPoints = (revenue: Pick<StatsRevenue, 'revenue_trend'>): TrendPoint[] =>
-    (revenue.revenue_trend || []).map(r => ({
-        label: (r.month || '').split(' ')[0] || r.month,
-        revenue: toNumber(r.earnings),
-        bookings: r.count ?? 0,
-    }));
+/** Year of a monthly bucket — `year` when sent, else the trailing token of "Dec 2025". */
+const bucketYear = (r: { month: string; year?: number }): number | null => {
+    if (typeof r.year === 'number') return r.year;
+    const n = Number(
+        String(r.month || '')
+            .trim()
+            .split(/\s+/)
+            .pop()
+    );
+    return Number.isFinite(n) && n > 1900 ? n : null;
+};
+
+/**
+ * Monthly points. The label keeps the year whenever the series spans more than
+ * one — "Dec" alone made an all-time chart show two identical "Dec" points.
+ */
+export const trendPoints = (revenue: Pick<StatsRevenue, 'revenue_trend'>): TrendPoint[] => {
+    const rows = revenue.revenue_trend || [];
+    const years = new Set(rows.map(bucketYear).filter((y) => y != null));
+    return rows.map((r) => {
+        const month = (r.month || '').split(' ')[0] || r.month;
+        const year = bucketYear(r);
+        return {
+            label: years.size > 1 && year != null ? `${month} '${String(year).slice(-2)}` : month,
+            revenue: toNumber(r.earnings),
+            bookings: r.count ?? 0,
+        };
+    });
+};
+
+/** Yearly points — the monthly buckets summed per year. */
+export const yearlyTrendPoints = (revenue: Pick<StatsRevenue, 'revenue_trend'>): TrendPoint[] => {
+    const byYear = new Map<number, TrendPoint>();
+    for (const r of revenue.revenue_trend || []) {
+        const year = bucketYear(r);
+        if (year == null) continue;
+        const point = byYear.get(year) ?? { label: String(year), revenue: 0, bookings: 0 };
+        point.revenue += toNumber(r.earnings);
+        point.bookings += r.count ?? 0;
+        byYear.set(year, point);
+    }
+    return [...byYear.entries()].sort(([a], [b]) => a - b).map(([, p]) => p);
+};
+
+export type TrendGranularity = 'weekly' | 'monthly' | 'yearly';
+
+export const TREND_GRANULARITY_OPTIONS: { value: TrendGranularity; label: string }[] = [
+    { value: 'weekly', label: 'Weekly' },
+    { value: 'monthly', label: 'Monthly' },
+    { value: 'yearly', label: 'Yearly' },
+];
 
 // ── Overview tab (stats/overview-all/) — real weekly trend, this endpoint does give one ──
 
 const LISTING_PALETTE = ['#F5B301', '#1A1917', '#7C3AED', '#2E9E5B', '#3A63C9', '#B22222', '#8A6D00', '#0891B2'];
 
 export const weeklyTrendPoints = (weekly: OverviewWeeklyTrendPoint[]): TrendPoint[] =>
-    weekly.map(w => {
+    weekly.map((w) => {
         const d = new Date(w.week_start);
-        const label = Number.isNaN(d.getTime())
-            ? w.week_start
-            : d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+        const label = Number.isNaN(d.getTime()) ? w.week_start : d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
         return { label, revenue: toNumber(w.revenue), bookings: w.bookings };
     });
 
 /** "Revenue by service" on the All-services scope, or "revenue by listing" within one service — same slice shape either way. */
 export const revenueByListingSlices = (rows: RevenueByListingRow[]): RevenueTypeSlice[] => {
-    const amounts = rows.map(r => toNumber(r.amount));
+    const amounts = rows.map((r) => toNumber(r.amount));
     const total = amounts.reduce((a, b) => a + b, 0);
     return rows
         .map((r, i) => ({
@@ -84,7 +132,7 @@ export const overviewFunnelStages = (funnel: OverviewDemandFunnel): FunnelStage[
         { key: 'bookings', label: 'Bookings confirmed', count: funnel.confirmed_bookings, color: '#2E9E5B' },
     ];
     const first = stages[0].count || 1;
-    return stages.map(s => ({ ...s, available: true, pctOfFirst: Math.round((s.count / first) * 100) }));
+    return stages.map((s) => ({ ...s, available: true, pctOfFirst: Math.round((s.count / first) * 100) }));
 };
 
 // ── Demand funnel — real 4-stage funnel from profile views + the enquiry CRM funnel ──
@@ -101,7 +149,7 @@ export const overviewFunnelStages = (funnel: OverviewDemandFunnel): FunnelStage[
 // "closed" doesn't by itself guarantee the enquiry ended in a booking.
 export const funnelStages = (
     overview: Pick<StatsOverview, 'profile_views'> | null,
-    enquiries: Pick<StatsEnquiries, 'conversion_funnel'> | null,
+    enquiries: Pick<StatsEnquiries, 'conversion_funnel'> | null
 ): FunnelStage[] => {
     const views = overview?.profile_views ?? 0;
     const funnel = enquiries?.conversion_funnel;
@@ -113,17 +161,16 @@ export const funnelStages = (
         { key: 'converted', label: 'Enquiries closed', count: funnel?.converted ?? 0, color: '#2E9E5B', available: true },
     ];
     const first = stages[0].count || 1;
-    return stages.map(s => ({ ...s, pctOfFirst: s.available ? Math.round((s.count / first) * 100) : 0 }));
+    return stages.map((s) => ({ ...s, pctOfFirst: s.available ? Math.round((s.count / first) * 100) : 0 }));
 };
 
 /** Real, computed "money still on the table" — uncontacted leads × average order value. Never a fabricated figure. */
 export const uncontactedLeadValue = (
     enquiries: Pick<StatsEnquiries, 'conversion_funnel'> | null,
-    revenue: Pick<StatsRevenue, 'avg_order_value'> | null,
+    revenue: Pick<StatsRevenue, 'avg_order_value'> | null
 ): { uncontacted: number; value: number } => {
     const funnel = enquiries?.conversion_funnel;
     const uncontacted = Math.max(0, (funnel?.new_leads ?? 0) - (funnel?.contacted ?? 0));
     const aov = toNumber(revenue?.avg_order_value);
     return { uncontacted, value: uncontacted * aov };
 };
-

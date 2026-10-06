@@ -118,3 +118,19 @@ describe('Support — raising a ticket', () => {
         expect(screen.queryByText(/No booking found/i)).not.toBeInTheDocument();
     });
 });
+
+describe('Support — subject length', () => {
+    it('cannot go past the API’s 200-character limit (QA: raw max_length error)', async () => {
+        serve(() => created());
+        render(<Support onNavigate={vi.fn()} onOpenSidebar={vi.fn()} />);
+        await waitFor(() => expect(categoriesServed).toBe(true));
+        await userEvent.click((await screen.findAllByRole('button', { name: /New Ticket/i }))[0]);
+        const subject = screen.getByPlaceholderText('Brief summary of your issue') as HTMLInputElement;
+
+        await userEvent.click(subject);
+        await userEvent.paste('Brief'.repeat(60));
+
+        expect(subject.value).toHaveLength(200);
+        expect(screen.getByText('200/200')).toBeInTheDocument();
+    });
+});

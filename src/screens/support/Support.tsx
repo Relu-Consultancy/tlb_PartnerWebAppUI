@@ -43,6 +43,9 @@ import {
 } from '../../api/help';
 import { getBookings } from '../../api/listings';
 
+/** The tickets API's limit on `subject`. */
+const SUBJECT_MAX = 200;
+
 interface Props {
     onNavigate: (screen: Screen) => void;
     onOpenSidebar: () => void;
@@ -303,6 +306,7 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
         ev.preventDefault();
         const errs: typeof formErrors = {};
         if (!form.subject.trim()) errs.subject = 'Subject is required.';
+        else if (form.subject.trim().length > SUBJECT_MAX) errs.subject = `Keep the subject under ${SUBJECT_MAX} characters.`;
         if (!form.category) errs.category = 'Pick a category.';
         if (!form.body.trim()) errs.body = 'Describe your issue.';
         setFormErrors(errs);
@@ -574,9 +578,18 @@ export const Support: React.FC<Props> = ({ onNavigate, onOpenSidebar }) => {
                                     value={form.subject}
                                     onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))}
                                     placeholder="Brief summary of your issue"
+                                    // The API refuses anything longer (QA: raw max_length error).
+                                    maxLength={SUBJECT_MAX}
                                     className={`tlb-input ${formErrors.subject ? 'border-red-300 ring-1 ring-red-200' : ''}`}
                                 />
-                                {formErrors.subject && <p className="text-xs text-red-500 mt-1.5">{formErrors.subject}</p>}
+                                <div className="flex items-start justify-between gap-3 mt-1.5">
+                                    <p className="text-xs text-red-500">{formErrors.subject}</p>
+                                    <p
+                                        className={`text-[11px] shrink-0 ${form.subject.length >= SUBJECT_MAX ? 'text-red-500 font-bold' : 'text-gray-400'}`}
+                                    >
+                                        {form.subject.length}/{SUBJECT_MAX}
+                                    </p>
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

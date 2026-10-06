@@ -21,6 +21,7 @@ import { requestProfileSection } from '../../constants/profileSections';
 import { verificationOf } from '../../components/portal';
 import { getCurrentPartner, getPartnerMedia, uploadPartnerMedia, deletePartnerMedia, submitVerification } from '../../api/onboarding';
 import { notifyPartnerUpdated } from '../../api/portalSummary';
+import { BankDetails, getBankDetails } from '../../api/banking';
 
 interface Props {
     onNavigate: (s: Screen) => void;
@@ -64,6 +65,10 @@ export const humanizeFieldErrors = (raw: string): string | null => {
 };
 const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 
+/** ABCDE1234F -> ABCDE••••F — enough to recognise, not enough to copy. */
+export const maskPan = (pan: string) => (pan.length === 10 ? `${pan.slice(0, 5)}••••${pan.slice(9)}` : pan);
+const maskAccount = (acc: string) => (acc.length > 4 ? `••${acc.slice(-4)}` : acc);
+
 const Documents: React.FC<Props> = ({ onNavigate }) => {
     // Documents lives under My profile → return to its Documents & KYC section.
     const backToProfile = () => {
@@ -73,6 +78,10 @@ const Documents: React.FC<Props> = ({ onNavigate }) => {
 
     const [loading, setLoading] = useState(true);
     const [partner, setPartner] = useState<any>(null);
+    const [bank, setBank] = useState<BankDetails | null>(null);
+    // Submitted documents show as a summary; this reopens the form to change them.
+    const [editing, setEditing] = useState(false);
+    const [justSubmitted, setJustSubmitted] = useState(false);
     const [media, setMedia] = useState<any[]>([]);
 
     // KYC form
@@ -84,6 +93,8 @@ const Documents: React.FC<Props> = ({ onNavigate }) => {
     const [savingKyc, setSavingKyc] = useState(false);
     // State flips only after a re-render; a ref stops a fast double tap sending twice.
     const savingRef = useRef(false);
+    // The "what's missing" warning is stale once a save goes through.
+    const warningRef = useRef<number | null>(null);
     // Set by the first failed save, so empty fields only turn red once asked for.
     const [showMissing, setShowMissing] = useState(false);
 
@@ -94,18 +105,27 @@ const Documents: React.FC<Props> = ({ onNavigate }) => {
     const loadAll = async () => {
         setLoading(true);
         try {
-            const [pRes, mRes] = await Promise.allSettled([getCurrentPartner(), getPartnerMedia()]);
+            const [pRes, mRes, bRes] = await Promise.allSettled([getCurrentPartner(), getPartnerMedia(), getBankDetails()]);
             const p = pRes.status === 'fulfilled' ? pRes.value?.data || pRes.value : null;
             const m = mRes.status === 'fulfilled' ? mRes.value?.data || mRes.value : [];
+            const b = bRes.status === 'fulfilled' ? bRes.value : null;
             setPartner(p);
             setMedia(Array.isArray(m) ? m : []);
+            setBank(b);
 
+            // The partner record doesn't send these back (and the verification
+            // endpoint is POST-only), so a field is filled only when the server
+            // actually has a value — never blanked. QA: everything typed vanished
+            // right after a successful save, and the next save demanded the PAN.
             const v = (p?.verification || p || {}) as any;
-            setPan(v.pan_number || p?.pan_number || '');
-            setGst(v.gst_number || p?.gst_number || '');
-            setHolder(v.account_holder_name || p?.account_holder_name || '');
-            setAccount(v.account_number || p?.account_number || p?.bank_account_number || '');
-            setIfsc(v.ifsc_code || p?.ifsc_code || '');
+            const keep = (server: unknown) => (prev: string) => (typeof server === 'string' && server ? server : prev);
+            setPan(keep(v.pan_number || p?.pan_number));
+            setGst(keep(v.gst_number || p?.gst_number));
+            setHolder(keep(v.account_holder_name || p?.account_holder_name || b?.account_holder_name));
+            // A masked number ("••4412") is never a usable value for the form.
+            const fullAccount = v.account_number || p?.account_number || p?.bank_account_number;
+            setAccount(keep(typeof fullAccount === 'string' && /^\d+$/.test(fullAccount) ? fullAccount : ''));
+            setIfsc(keep(v.ifsc_code || p?.ifsc_code || b?.ifsc_code));
         } finally {
             setLoading(false);
         }
@@ -118,6 +138,9 @@ const Documents: React.FC<Props> = ({ onNavigate }) => {
     const status = partner?.status || '';
     const isVerified = verificationOf(partner) === 'verified';
     const inReview = ['under_review', 'approved'].includes(status);
+    // Once submitted, show what was sent rather than an empty form asking again.
+    const submitted = justSubmitted || inReview || isVerified;
+    const showForm = !submitted || editing;
 
     const panValid = !pan || PAN_REGEX.test(pan.toUpperCase());
     const ifscValid = !ifsc || IFSC_REGEX.test(ifsc.toUpperCase());
@@ -143,13 +166,17 @@ const Documents: React.FC<Props> = ({ onNavigate }) => {
         if (!canSaveKyc) {
             setShowMissing(true);
             if (!missing.pan && panValid && !hasBank) {
-                toast.warning('Add your bank account below to submit — your PAN and bank details are verified together.');
+                warningRef.current = toast.warning(
+                    'Add your bank account below to submit — your PAN and bank details are verified together.'
+                );
             } else if (missing.pan || !panValid) {
-                toast.warning(missing.pan ? 'Enter your PAN number to submit.' : 'Check your PAN number — it should look like ABCDE1234F.');
+                warningRef.current = toast.warning(
+                    missing.pan ? 'Enter your PAN number to submit.' : 'Check your PAN number — it should look like ABCDE1234F.'
+                );
             } else if (!accountValid) {
-                toast.warning(`Account number must be ${ACCOUNT_DIGITS} digits.`);
+                warningRef.current = toast.warning(`Account number must be ${ACCOUNT_DIGITS} digits.`);
             } else {
-                toast.warning('Check the highlighted fields and try again.');
+                warningRef.current = toast.warning('Check the highlighted fields and try again.');
             }
             // Take the partner to the first thing to fix — usually off-screen on a phone.
             requestAnimationFrame(() => {
@@ -174,6 +201,10 @@ const Documents: React.FC<Props> = ({ onNavigate }) => {
             if (gst.trim()) payload.gst_number = gst.trim().toUpperCase();
             await submitVerification(payload);
             toast.success('Documents submitted. Your details are under review.');
+            if (warningRef.current != null) toast.dismiss(warningRef.current);
+            setJustSubmitted(true);
+            setEditing(false);
+            setShowMissing(false);
             // Status just changed: drop the memoised partner read so the header
             // chip and the approval gate pick it up without a reload.
             notifyPartnerUpdated();
@@ -286,124 +317,183 @@ const Documents: React.FC<Props> = ({ onNavigate }) => {
                             </div>
                         </div>
 
-                        {/* KYC / Identity & Tax */}
-                        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6 space-y-4">
-                            <div className="flex items-center gap-2.5">
-                                <div className="w-9 h-9 rounded-xl bg-tlb-yellow/10 text-tlb-yellow flex items-center justify-center">
-                                    <FileText size={18} />
+                        {!showForm ? (
+                            <section
+                                aria-label="Submitted documents"
+                                className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6 space-y-4"
+                            >
+                                <div className="flex items-center justify-between gap-3 flex-wrap">
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                                            <CheckCircle2 size={18} />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <h2 className="font-black text-sm text-gray-900 leading-none">
+                                                Identity &amp; bank details submitted
+                                            </h2>
+                                            <p className="text-[11px] text-gray-400 mt-1">
+                                                {isVerified ? 'Verified by the TLB team' : 'With the TLB team for review'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button type="button" onClick={() => setEditing(true)} className="pt-btn pt-btn-o shrink-0">
+                                        Update details
+                                    </button>
                                 </div>
-                                <div>
-                                    <h2 className="font-black text-sm text-gray-900 leading-none">Identity &amp; Tax</h2>
-                                    <p className="text-[11px] text-gray-400 mt-1">
-                                        PAN required · GST optional · submitted with your bank account
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="tlb-label">PAN Number</label>
-                                    <input
-                                        value={pan}
-                                        onChange={(e) => setPan(e.target.value.toUpperCase())}
-                                        maxLength={10}
-                                        placeholder="ABCDE1234F"
-                                        className={`tlb-input w-full uppercase${flagCls(missing.pan)}`}
-                                        data-kyc-field
-                                        aria-invalid={flag(missing.pan) || !panValid}
-                                    />
-                                    {!panValid && <p className="text-[11px] text-red-500 font-bold mt-1">Invalid PAN format</p>}
-                                    {flag(missing.pan) && <p className="text-[11px] text-red-500 font-bold mt-1">Enter your PAN number</p>}
-                                </div>
-                                <div>
-                                    <label className="tlb-label">
-                                        GST Number <span className="text-gray-300">(optional)</span>
-                                    </label>
-                                    <input
-                                        value={gst}
-                                        onChange={(e) => setGst(e.target.value.toUpperCase())}
-                                        maxLength={15}
-                                        placeholder="22ABCDE1234F1Z5"
-                                        className="tlb-input w-full uppercase"
-                                    />
-                                </div>
-                            </div>
-                            <div className="flex items-center justify-end pt-1">
-                                <button onClick={saveKyc} disabled={savingKyc} className="tlb-button px-6 py-3 disabled:opacity-50">
-                                    {savingKyc ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
-                                    Save Documents
-                                </button>
-                            </div>
-                        </section>
+                                <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                                    {[
+                                        ['PAN', pan ? maskPan(pan.toUpperCase()) : 'Submitted'],
+                                        ['GST', gst ? gst.toUpperCase() : 'Not provided'],
+                                        ['Account holder', bank?.account_holder_name || holder || 'Submitted'],
+                                        ['Account number', bank?.account_number_masked || (account ? maskAccount(account) : 'Submitted')],
+                                        ['IFSC', bank?.ifsc_code || ifsc.toUpperCase() || 'Submitted'],
+                                    ].map(([k, val]) => (
+                                        <div key={k} className="min-w-0">
+                                            <dt className="text-[10px] font-black uppercase tracking-widest text-gray-400">{k}</dt>
+                                            <dd className="font-bold text-gray-800 mt-0.5 break-words">{val}</dd>
+                                        </div>
+                                    ))}
+                                </dl>
+                            </section>
+                        ) : (
+                            <>
+                                {submitted && (
+                                    <div className="flex items-center justify-between gap-3 rounded-2xl bg-white border border-gray-100 p-4 text-[12.5px] text-gray-600">
+                                        <span>
+                                            Updating sends your details for review again. Enter the full account number — it's only ever
+                                            shown masked.
+                                        </span>
+                                        <button type="button" onClick={() => setEditing(false)} className="pt-btn pt-btn-o shrink-0">
+                                            Cancel
+                                        </button>
+                                    </div>
+                                )}
+                                {/* KYC / Identity & Tax */}
+                                <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6 space-y-4">
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="w-9 h-9 rounded-xl bg-tlb-yellow/10 text-tlb-yellow flex items-center justify-center">
+                                            <FileText size={18} />
+                                        </div>
+                                        <div>
+                                            <h2 className="font-black text-sm text-gray-900 leading-none">Identity &amp; Tax</h2>
+                                            <p className="text-[11px] text-gray-400 mt-1">
+                                                PAN required · GST optional · submitted with your bank account
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="tlb-label">PAN Number</label>
+                                            <input
+                                                value={pan}
+                                                onChange={(e) => setPan(e.target.value.toUpperCase())}
+                                                maxLength={10}
+                                                placeholder="ABCDE1234F"
+                                                className={`tlb-input w-full uppercase${flagCls(missing.pan)}`}
+                                                data-kyc-field
+                                                aria-invalid={flag(missing.pan) || !panValid}
+                                            />
+                                            {!panValid && <p className="text-[11px] text-red-500 font-bold mt-1">Invalid PAN format</p>}
+                                            {flag(missing.pan) && (
+                                                <p className="text-[11px] text-red-500 font-bold mt-1">Enter your PAN number</p>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <label className="tlb-label">
+                                                GST Number <span className="text-gray-300">(optional)</span>
+                                            </label>
+                                            <input
+                                                value={gst}
+                                                onChange={(e) => setGst(e.target.value.toUpperCase())}
+                                                maxLength={15}
+                                                placeholder="22ABCDE1234F1Z5"
+                                                className="tlb-input w-full uppercase"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center justify-end pt-1">
+                                        <button onClick={saveKyc} disabled={savingKyc} className="tlb-button px-6 py-3 disabled:opacity-50">
+                                            {savingKyc ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
+                                            Save Documents
+                                        </button>
+                                    </div>
+                                </section>
 
-                        {/* Bank account */}
-                        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6 space-y-4">
-                            <div className="flex items-center gap-2.5">
-                                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                                    <Landmark size={18} />
-                                </div>
-                                <div>
-                                    <h2 className="font-black text-sm text-gray-900 leading-none">Bank Account</h2>
-                                    <p className="text-[11px] text-gray-400 mt-1">Where your payouts are settled · required to submit</p>
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div className="sm:col-span-2">
-                                    <label className="tlb-label">Account Holder Name</label>
-                                    <input
-                                        value={holder}
-                                        onChange={(e) => setHolder(e.target.value)}
-                                        placeholder="As per bank records"
-                                        className={`tlb-input w-full${flagCls(missing.holder)}`}
-                                        data-kyc-field
-                                        aria-invalid={flag(missing.holder)}
-                                    />
-                                    {flag(missing.holder) && (
-                                        <p className="text-[11px] text-red-500 font-bold mt-1">Enter the account holder name</p>
-                                    )}
-                                </div>
-                                <div>
-                                    <label className="tlb-label">Account Number</label>
-                                    <input
-                                        value={account}
-                                        onChange={(e) => setAccount(e.target.value.replace(/\D/g, '').slice(0, ACCOUNT_DIGITS))}
-                                        maxLength={ACCOUNT_DIGITS}
-                                        inputMode="numeric"
-                                        placeholder={`${ACCOUNT_DIGITS}-digit account number`}
-                                        className={`tlb-input w-full${flagCls(missing.account)}`}
-                                        data-kyc-field
-                                        aria-invalid={flag(missing.account) || !accountValid}
-                                    />
-                                    {flag(missing.account) && (
-                                        <p className="text-[11px] text-red-500 font-bold mt-1">Enter the account number</p>
-                                    )}
-                                    {!accountValid && (
-                                        <p className="text-[11px] text-red-500 font-bold mt-1">
-                                            Account number must be {ACCOUNT_DIGITS} digits
-                                        </p>
-                                    )}
-                                </div>
-                                <div>
-                                    <label className="tlb-label">IFSC Code</label>
-                                    <input
-                                        value={ifsc}
-                                        onChange={(e) => setIfsc(e.target.value.toUpperCase())}
-                                        maxLength={11}
-                                        placeholder="HDFC0001234"
-                                        className={`tlb-input w-full uppercase${flagCls(missing.ifsc)}`}
-                                        data-kyc-field
-                                        aria-invalid={flag(missing.ifsc) || !ifscValid}
-                                    />
-                                    {!ifscValid && <p className="text-[11px] text-red-500 font-bold mt-1">Invalid IFSC format</p>}
-                                    {flag(missing.ifsc) && <p className="text-[11px] text-red-500 font-bold mt-1">Enter the IFSC code</p>}
-                                </div>
-                            </div>
-                            <div className="flex items-center justify-end pt-1">
-                                <button onClick={saveKyc} disabled={savingKyc} className="tlb-button px-6 py-3 disabled:opacity-50">
-                                    {savingKyc ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
-                                    Save Documents
-                                </button>
-                            </div>
-                        </section>
+                                {/* Bank account */}
+                                <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6 space-y-4">
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                                            <Landmark size={18} />
+                                        </div>
+                                        <div>
+                                            <h2 className="font-black text-sm text-gray-900 leading-none">Bank Account</h2>
+                                            <p className="text-[11px] text-gray-400 mt-1">
+                                                Where your payouts are settled · required to submit
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div className="sm:col-span-2">
+                                            <label className="tlb-label">Account Holder Name</label>
+                                            <input
+                                                value={holder}
+                                                onChange={(e) => setHolder(e.target.value)}
+                                                placeholder="As per bank records"
+                                                className={`tlb-input w-full${flagCls(missing.holder)}`}
+                                                data-kyc-field
+                                                aria-invalid={flag(missing.holder)}
+                                            />
+                                            {flag(missing.holder) && (
+                                                <p className="text-[11px] text-red-500 font-bold mt-1">Enter the account holder name</p>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <label className="tlb-label">Account Number</label>
+                                            <input
+                                                value={account}
+                                                onChange={(e) => setAccount(e.target.value.replace(/\D/g, '').slice(0, ACCOUNT_DIGITS))}
+                                                maxLength={ACCOUNT_DIGITS}
+                                                inputMode="numeric"
+                                                placeholder={`${ACCOUNT_DIGITS}-digit account number`}
+                                                className={`tlb-input w-full${flagCls(missing.account)}`}
+                                                data-kyc-field
+                                                aria-invalid={flag(missing.account) || !accountValid}
+                                            />
+                                            {flag(missing.account) && (
+                                                <p className="text-[11px] text-red-500 font-bold mt-1">Enter the account number</p>
+                                            )}
+                                            {!accountValid && (
+                                                <p className="text-[11px] text-red-500 font-bold mt-1">
+                                                    Account number must be {ACCOUNT_DIGITS} digits
+                                                </p>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <label className="tlb-label">IFSC Code</label>
+                                            <input
+                                                value={ifsc}
+                                                onChange={(e) => setIfsc(e.target.value.toUpperCase())}
+                                                maxLength={11}
+                                                placeholder="HDFC0001234"
+                                                className={`tlb-input w-full uppercase${flagCls(missing.ifsc)}`}
+                                                data-kyc-field
+                                                aria-invalid={flag(missing.ifsc) || !ifscValid}
+                                            />
+                                            {!ifscValid && <p className="text-[11px] text-red-500 font-bold mt-1">Invalid IFSC format</p>}
+                                            {flag(missing.ifsc) && (
+                                                <p className="text-[11px] text-red-500 font-bold mt-1">Enter the IFSC code</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center justify-end pt-1">
+                                        <button onClick={saveKyc} disabled={savingKyc} className="tlb-button px-6 py-3 disabled:opacity-50">
+                                            {savingKyc ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
+                                            Save Documents
+                                        </button>
+                                    </div>
+                                </section>
+                            </>
+                        )}
 
                         {/* Additional uploaded documents / media */}
                         <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6 space-y-4">

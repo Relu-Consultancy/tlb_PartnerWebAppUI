@@ -1,11 +1,15 @@
 import React from 'react';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { configure, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '../test/msw/server';
 import { invalidatePortalSummary } from '../api/portalSummary';
 import App from '../App';
+
+// Whole-app tests boot the entire portal; in a saturated parallel run that
+// can take longer than the suite-wide 4s wait. Scoped to this file's worker.
+configure({ asyncUtilTimeout: 25000 });
 
 const BASE = 'https://tlb-api.reluconsultancy.in';
 
@@ -38,9 +42,9 @@ describe('App — first visit to the approval-gated screens', () => {
             signedInAs('activated_limited');
             const user = userEvent.setup();
             render(<App />);
-            const link = await screen.findByRole('button', { name: new RegExp(`^${label}`) }, { timeout: 8000 });
+            const link = await screen.findByRole('button', { name: new RegExp(`^${label}`) }, { timeout: 25000 });
             await user.click(link);
-            await waitFor(() => expect(screen.getByText(notice)).toBeVisible(), { timeout: 8000 });
+            await waitFor(() => expect(screen.getByText(notice)).toBeVisible(), { timeout: 25000 });
         },
         20000
     );

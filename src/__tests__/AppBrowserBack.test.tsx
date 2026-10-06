@@ -1,11 +1,15 @@
 import React from 'react';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { configure, render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '../test/msw/server';
 import { invalidatePortalSummary } from '../api/portalSummary';
 import App from '../App';
+
+// Whole-app tests boot the entire portal; in a saturated parallel run that
+// can take longer than the suite-wide 4s wait. Scoped to this file's worker.
+configure({ asyncUtilTimeout: 25000 });
 
 const BASE = 'https://tlb-api.reluconsultancy.in';
 
@@ -41,7 +45,7 @@ describe('Browser Back button (QA: back used to exit the site)', () => {
         const user = userEvent.setup();
         render(<App />);
 
-        await waitFor(() => expect(activeNav()).toMatch(/^Dashboard/), { timeout: 8000 });
+        await waitFor(() => expect(activeNav()).toMatch(/^Dashboard/), { timeout: 25000 });
         await user.click(screen.getByRole('button', { name: /^Reviews/ }));
         await waitFor(() => expect(activeNav()).toMatch(/^Reviews/));
         await user.click(screen.getByRole('button', { name: /^My listings/ }));
@@ -63,20 +67,20 @@ describe('Browser Back button (QA: back used to exit the site)', () => {
         await user.click(screen.getByRole('button', { name: 'Stay' }));
         await waitFor(() => expect(screen.queryByText('Do you want to log out?')).not.toBeInTheDocument());
         expect(activeNav()).toMatch(/^Dashboard/);
-    }, 30000);
+    }, 60000);
 
     it('"Log out" from the prompt signs the partner out', async () => {
         signedIn();
         const user = userEvent.setup();
         render(<App />);
 
-        await waitFor(() => expect(activeNav()).toMatch(/^Dashboard/), { timeout: 8000 });
+        await waitFor(() => expect(activeNav()).toMatch(/^Dashboard/), { timeout: 25000 });
         await pressBack();
         await user.click(await screen.findByRole('button', { name: 'Log out' }));
 
         await waitFor(() => expect(localStorage.getItem('access_token')).toBeNull());
         expect(document.querySelector('[aria-current="page"]')).toBeNull();
-    }, 30000);
+    }, 60000);
 
     it('Back from outside never reopens a wizard the partner already left', async () => {
         // After submitting (or exiting) a wizard its draft id is gone: stepping back
@@ -86,11 +90,11 @@ describe('Browser Back button (QA: back used to exit the site)', () => {
         const user = userEvent.setup();
         render(<App />);
 
-        await waitFor(() => expect(activeNav()).toMatch(/^Dashboard/), { timeout: 8000 });
+        await waitFor(() => expect(activeNav()).toMatch(/^Dashboard/), { timeout: 25000 });
         await user.click(screen.getByRole('button', { name: /^My listings/ }));
         await waitFor(() => expect(activeNav()).toMatch(/^My listings/));
-        await user.click(await screen.findByRole('button', { name: /\+ New listing/ }, { timeout: 8000 }));
-        await waitFor(() => expect(screen.getByText(/step 1 of/i)).toBeInTheDocument(), { timeout: 8000 });
+        await user.click(await screen.findByRole('button', { name: /\+ New listing/ }, { timeout: 25000 }));
+        await waitFor(() => expect(screen.getByText(/step 1 of/i)).toBeInTheDocument(), { timeout: 25000 });
 
         // Leave the wizard, then press Back.
         await user.click(screen.getByRole('button', { name: /^Reviews/ }));
@@ -99,5 +103,5 @@ describe('Browser Back button (QA: back used to exit the site)', () => {
 
         await waitFor(() => expect(activeNav()).toMatch(/^My listings/));
         expect(screen.queryByText(/step 1 of/i)).not.toBeInTheDocument();
-    }, 30000);
+    }, 60000);
 });

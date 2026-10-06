@@ -10,7 +10,24 @@
 
     /* Default heading rhythm so even unstyled headings stay consistent.
        Screen-level classes (.tlb-page-title etc.) override these. */
-    h1, h2, h3, h4, h5, h6 {
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
         line-height: 1.2;
+    }
+
+    /* A text input has a built-in width of ~20 characters, and a flex item
+       won't shrink below its built-in width — so an `<input class="flex-1">`
+       beside an icon or badge pushed past the edge of narrow phones (QA:
+       onboarding's Digital Presence badges spilled out of their boxes).
+       Letting form controls shrink fixes every such row at once; it changes
+       nothing where there's room. */
+    input,
+    select,
+    textarea {
+        min-width: 0;
     }
 }

@@ -32,7 +32,8 @@ import { DemandFunnel } from './components/DemandFunnel';
 import { ListingsPerformanceTable } from './components/ListingsPerformanceTable';
 import { CustomersPanel } from './components/CustomersPanel';
 import { ReportsPanel } from './components/ReportsPanel';
-import { TrafficSourcesCard } from './components/TrafficSourcesCard';
+// Hidden with the "Where customers come from" card below — restore together.
+// import { TrafficSourcesCard } from './components/TrafficSourcesCard';
 import { formatRupees, toNumber } from '../../utils/format';
 
 const OVERVIEW_LISTING_TYPE: Partial<Record<EntityType, OverviewAllListingType>> = {
@@ -194,7 +195,7 @@ export const Analytics: React.FC<Props> = ({ onNavigate }) => {
                                     </div>
                                     <RevenueChart points={overviewTrend} />
                                 </div>
-                                <div className="pt-card p-5">
+                                <div className="pt-card p-5 flex flex-col">
                                     <p className="pt-h-sec mb-1">
                                         {revenueByListingCard
                                             ? `Revenue by ${overviewScope === 'all' ? 'listing' : overviewScope.slice(0, -1).toLowerCase()}`
@@ -291,7 +292,7 @@ export const Analytics: React.FC<Props> = ({ onNavigate }) => {
                             <RevenueChart points={trend} />
                         )}
                     </div>
-                    <div className="pt-card p-5">
+                    <div className="pt-card p-5 flex flex-col">
                         <p className="pt-h-sec mb-1">Revenue by service</p>
                         <RevenueByService
                             slices={slices}
@@ -302,7 +303,7 @@ export const Analytics: React.FC<Props> = ({ onNavigate }) => {
             )}
 
             {tab === 'funnel' && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-[18px] items-start">
+                <>
                     <div className="pt-card p-5">
                         <p className="pt-h-sec">Demand funnel</p>
                         <p className="text-[12.5px] text-tlb-muted mb-5">
@@ -315,12 +316,18 @@ export const Analytics: React.FC<Props> = ({ onNavigate }) => {
                             avgResponseHours={stats.enquiries?.avg_response_hours ?? null}
                         />
                     </div>
+                    {/* Hidden for now — the traffic API isn't integrated yet, so "Where customers
+                        come from" showed no data and its "Full report" opened an empty Traffic
+                        analytics screen. To restore: put the funnel card back in a
+                        `grid grid-cols-1 lg:grid-cols-2 gap-[18px] items-start` beside it, and
+                        uncomment the import at the top.
                     <TrafficSourcesCard
                         traffic={stats.traffic}
                         topCity={stats.overviewAll?.top_city ?? null}
                         onViewDetail={() => onNavigate('TRAFFIC_ANALYTICS')}
                     />
-                </div>
+                    */}
+                </>
             )}
 
             {tab === 'listings' && (

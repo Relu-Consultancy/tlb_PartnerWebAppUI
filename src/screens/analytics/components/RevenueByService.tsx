@@ -15,15 +15,17 @@ export const RevenueByService: React.FC<RevenueByServiceProps> = ({ slices, gros
         return <p className="text-[12.5px] text-tlb-muted">No revenue recorded for this window yet.</p>;
     }
     return (
-        <div className="flex flex-col h-full">
+        // flex-1, not h-full: the card also holds its title, so 100% of the card
+        // overflowed it and pushed "Fastest growing" out past the bottom edge.
+        <div className="flex flex-col flex-1 min-h-0">
             <p className="text-[12.5px] text-tlb-muted mb-4">{grossLabel} gross</p>
             <div className="flex h-3 rounded-full overflow-hidden gap-[2px]">
-                {slices.map(s => (
+                {slices.map((s) => (
                     <div key={s.type} style={{ flex: Math.max(s.pct, 1), background: s.color }} />
                 ))}
             </div>
             <div className="flex flex-col gap-3.5 mt-[18px]">
-                {slices.map(s => (
+                {slices.map((s) => (
                     <div key={s.type} className="flex items-center gap-2.5">
                         <span className="w-[9px] h-[9px] rounded-[3px] flex-none" style={{ background: s.color }} />
                         <span className="flex-1 text-[13px] text-tlb-ink">{s.label}</span>
@@ -35,8 +37,8 @@ export const RevenueByService: React.FC<RevenueByServiceProps> = ({ slices, gros
             <div className="flex-1 min-h-[14px]" />
             <div className="border-t border-tlb-divider pt-3.5">
                 <p className="pt-eyebrow mb-2.5">Fastest growing</p>
-                <div className="flex items-center justify-between text-[13px]">
-                    <span className="text-tlb-muted">Month-over-month, per {footerNoun}</span>
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 text-[13px]">
+                    <span className="text-tlb-muted min-w-0">Month-over-month, per {footerNoun}</span>
                     <Pill tone="neutral">Coming soon</Pill>
                 </div>
             </div>

@@ -1,5 +1,15 @@
 import { parseDate, isSameLocalDay, toNumber, slotLabelOf, startsWithinADay } from '../../utils/format';
-import { BookingEntity, BookingEntry, BookingStatus, BookingWhen, EnquiryEntity, EnquiryEntry, EnquiryStage, ListingGroup } from './types';
+import {
+    BookingEntity,
+    BookingEntry,
+    BookingStatus,
+    BookingWhen,
+    EnquiryEntity,
+    EnquiryEntry,
+    EnquiryStage,
+    ListingGroup,
+    RefundStatus,
+} from './types';
 
 // ---------------------------------------------------------------------------
 // Pure derivations for the Bookings/Enquiries screen — grouping, filtering,
@@ -108,7 +118,8 @@ const isSettled = (status: BookingStatus): boolean => status === 'confirmed' || 
 export const bookingStats = (entries: BookingEntry[]): BookingStats => {
     const settled = entries.filter((e) => isSettled(e.status));
     const cancelled = entries.filter((e) => e.status === 'cancelled');
-    const refunded = entries.filter((e) => e.paymentStatus === 'refunded');
+    // Only a settled refund means the money is back — see refundStatusOf.
+    const refunded = entries.filter((e) => e.refundStatus === 'settled');
     const bookingValue = settled.reduce((sum, e) => sum + e.amount, 0);
     return {
         total: entries.length,
@@ -117,7 +128,7 @@ export const bookingStats = (entries: BookingEntry[]): BookingStats => {
         averageValue: settled.length > 0 ? bookingValue / settled.length : 0,
         cancelledCount: cancelled.length,
         cancelledPct: entries.length > 0 ? (cancelled.length / entries.length) * 100 : 0,
-        refundedAmount: refunded.reduce((sum, e) => sum + e.amount, 0),
+        refundedAmount: refunded.reduce((sum, e) => sum + (e.refundAmount ?? e.amount), 0),
         refundedCount: refunded.length,
         byEntity: {
             Events: entries.filter((e) => e.entity === 'Events').length,
@@ -151,3 +162,53 @@ export const soonBookings = (entries: BookingEntry[], now: Date): SoonSummary =>
 };
 
 export { toNumber };
+
+// ── Refunds ──────────────────────────────────────────────────────────────────
+
+/** The Refunds view's filter: everything, the failed ones, the ones still moving, the settled ones. */
+export type RefundFilter = 'all' | 'attention' | 'in_progress' | 'settled';
+
+const refundGroupOf = (status: RefundStatus): Exclude<RefundFilter, 'all'> =>
+    status === 'failed' ? 'attention' : status === 'settled' ? 'settled' : 'in_progress';
+
+export interface RefundSummary {
+    attention: { count: number; amount: number };
+    in_progress: { count: number; amount: number };
+    settled: { count: number; amount: number };
+    total: number;
+}
+
+/** Bookings that have a refund at all — the rest never had money to return. */
+export const refundEntries = (entries: BookingEntry[]): BookingEntry[] => entries.filter((e) => e.refundStatus != null);
+
+export const refundSummary = (entries: BookingEntry[]): RefundSummary => {
+    const out: RefundSummary = {
+        attention: { count: 0, amount: 0 },
+        in_progress: { count: 0, amount: 0 },
+        settled: { count: 0, amount: 0 },
+        total: 0,
+    };
+    for (const e of refundEntries(entries)) {
+        const bucket = out[refundGroupOf(e.refundStatus!)];
+        bucket.count += 1;
+        bucket.amount += e.refundAmount ?? e.amount;
+        out.total += 1;
+    }
+    return out;
+};
+
+const REFUND_ORDER: Record<Exclude<RefundFilter, 'all'>, number> = { attention: 0, in_progress: 1, settled: 2 };
+
+/**
+ * Refunds in the chosen view: failed first (they need the partner), then the
+ * ones still moving, then the settled — newest cancellation first within each.
+ */
+export const filterRefunds = (entries: BookingEntry[], filter: RefundFilter, search = ''): BookingEntry[] =>
+    refundEntries(entries)
+        .filter((e) => filter === 'all' || refundGroupOf(e.refundStatus!) === filter)
+        .filter((e) => matchesText([e.customerName, e.listingTitle, e.bookingReference], search))
+        .sort(
+            (a, b) =>
+                REFUND_ORDER[refundGroupOf(a.refundStatus!)] - REFUND_ORDER[refundGroupOf(b.refundStatus!)] ||
+                (b.cancelledAt ?? b.createdAt ?? '').localeCompare(a.cancelledAt ?? a.createdAt ?? '')
+        );

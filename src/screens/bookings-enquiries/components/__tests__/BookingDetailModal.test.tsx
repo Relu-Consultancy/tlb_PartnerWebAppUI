@@ -24,6 +24,8 @@ const entry = (overrides: Partial<BookingEntry> = {}): BookingEntry => ({
     listingStartsAt: null,
     cancelledAt: null,
     cancellationReason: null,
+    refundStatus: null,
+    refundAmount: null,
     ...overrides,
 });
 
@@ -75,7 +77,7 @@ describe('BookingDetailModal — refund tracking', () => {
         // Shown twice by design: the header badge and the detail note both reflect the real,
         // authoritative refund status now (previously the header badge lagged, showing "Refunded").
         await waitFor(() => expect(screen.getAllByText('Refund in progress').length).toBeGreaterThanOrEqual(2));
-        expect(screen.getByText(/usually settles in 3–7 days/i)).toBeInTheDocument();
+        expect(screen.getByText(/usually 3–7 days/i)).toBeInTheDocument();
         expect(screen.queryByText('Refunded')).not.toBeInTheDocument();
     });
 

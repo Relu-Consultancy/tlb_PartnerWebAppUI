@@ -54,9 +54,17 @@ export const ENQUIRY_STATUS_OPTIONS: Record<EnquiryEntity, EnquiryStatus[]> = {
     Venues: ['new', 'contacted', 'site_visit_scheduled', 'closed'],
 };
 
-const bookingStatusMeta = (entry: Pick<BookingEntry, 'status' | 'paymentStatus'>): { label: string; tone: Tone } => {
+const bookingStatusMeta = (
+    entry: Pick<BookingEntry, 'status' | 'paymentStatus'> & { refundStatus?: RefundStatus | null }
+): { label: string; tone: Tone } => {
+    // The refund decides the badge whenever there is one — payment_status stays
+    // "paid" through a refund, so keying off it showed a mid-refund booking as paid.
+    if (entry.refundStatus) {
+        const r = REFUND_STATUS_META[entry.refundStatus];
+        return { label: r.label, tone: r.tone };
+    }
     if (entry.status === 'cancelled') {
-        return entry.paymentStatus === 'refunded' ? { label: 'Refunded', tone: 'blue' } : { label: 'Cancelled', tone: 'red' };
+        return entry.paymentStatus === 'refunded' ? { label: 'Refunded', tone: 'green' } : { label: 'Cancelled', tone: 'red' };
     }
     const META: Record<Exclude<BookingStatus, 'cancelled'>, { label: string; tone: Tone }> = {
         confirmed: { label: 'Confirmed', tone: 'green' },
@@ -95,13 +103,12 @@ export const cancelledOnLabel = (iso: string | null | undefined): string | null 
 
 // A refund is asynchronous (Razorpay can take hours to days) — "processing" is a normal resting
 // state, not a stuck request, and must never read as "Refunded" (only "settled" means the money
-// has actually landed). "Requested" is included for completeness but is very short-lived in
-// practice — it flips to "processing" almost immediately.
+// has actually landed). Requested and processing share one label, as the API's copy rules say.
 export const REFUND_STATUS_META: Record<RefundStatus, { label: string; sub?: string; tone: Tone }> = {
-    requested: { label: 'Refund requested', tone: 'amber' },
-    processing: { label: 'Refund in progress', sub: 'Usually settles in 3–7 days', tone: 'amber' },
+    requested: { label: 'Refund in progress', sub: 'Usually 3–7 days', tone: 'amber' },
+    processing: { label: 'Refund in progress', sub: 'Usually 3–7 days', tone: 'amber' },
     settled: { label: 'Refunded', tone: 'green' },
-    failed: { label: 'Refund failed', sub: 'Needs manual follow-up', tone: 'red' },
+    failed: { label: 'Refund failed', sub: 'The customer hasn’t been paid back', tone: 'red' },
 };
 
 const AVATAR_PALETTE = ['#3A63C9', '#7C3AED', '#2E9E5B', '#B45309', '#C2410C', '#0891B2'];

@@ -32,6 +32,8 @@ const booking: BookingEntry = {
     listingStartsAt: null,
     cancelledAt: null,
     cancellationReason: null,
+    refundStatus: null,
+    refundAmount: null,
 };
 
 describe('buildEnquiriesCsv', () => {

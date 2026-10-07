@@ -5,8 +5,6 @@ import userEvent from '@testing-library/user-event';
 import { mockStatsTraffic } from '../../../../test/msw/handlers';
 import { TrafficSourcesCard } from '../TrafficSourcesCard';
 
-// The card is hidden on the Analytics screen until the traffic API is live
-// (see Analytics.tsx). These keep it working for when it comes back.
 describe('TrafficSourcesCard', () => {
     it('shows real traffic-source shares and links to the full traffic report', async () => {
         const onViewDetail = vi.fn();

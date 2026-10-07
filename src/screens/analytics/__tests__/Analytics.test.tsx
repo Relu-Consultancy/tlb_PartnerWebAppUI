@@ -99,14 +99,16 @@ describe('Analytics — tab switching', () => {
         expect(screen.getByText(/40 enquiries have not been contacted yet/i)).toBeInTheDocument();
     });
 
-    it('hides "Where customers come from" until the traffic API is live — no Full report into an empty screen', async () => {
+    it('shows "Where customers come from" beside the funnel, linking to the full traffic report', async () => {
         renderScreen();
         const user = userEvent.setup();
         await waitFor(() => screen.getByText('Revenue by service'));
         await user.click(screen.getByRole('tab', { name: 'Demand funnel' }));
         expect(screen.getByText('Profile views')).toBeInTheDocument();
-        expect(screen.queryByText('Where customers come from')).not.toBeInTheDocument();
-        expect(screen.queryByRole('button', { name: /full report/i })).not.toBeInTheDocument();
+        expect(screen.getByText('Where customers come from')).toBeInTheDocument();
+        expect(screen.getByText('Instagram')).toBeInTheDocument();
+        await user.click(screen.getByRole('button', { name: /full report/i }));
+        expect(mockNavigate).toHaveBeenCalledWith('TRAFFIC_ANALYTICS');
     });
 
     it('shows the listings tab with real per-listing performance rows and their price/rating states', async () => {

@@ -27,6 +27,8 @@ const entry = (overrides: Partial<BookingEntry> = {}): BookingEntry => ({
     listingStartsAt: '2026-10-20T18:00:00Z',
     cancelledAt: '2026-10-06T09:30:00Z',
     cancellationReason: 'listing_archived',
+    refundStatus: null,
+    refundAmount: null,
     ...overrides,
 });
 

@@ -72,6 +72,15 @@ export interface BookingEntry {
     /** When and why it was cancelled, as the backend recorded it — null while it isn't. */
     cancelledAt: string | null;
     cancellationReason: string | null;
+    /**
+     * The booking's latest refund, from the list's `refund_status`. Null = no
+     * refund was ever started (never paid, or still active). This — not
+     * `paymentStatus`, which stays "paid" until the refund settles — drives
+     * every refund badge.
+     */
+    refundStatus: RefundStatus | null;
+    /** What's being refunded, or null when there's no refund. */
+    refundAmount: number | null;
 }
 
 /** Bucketed by response state for the Stage filter. */

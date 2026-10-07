@@ -6,11 +6,14 @@ import {
     enquiryStats,
     filterBookings,
     filterEnquiries,
+    filterRefunds,
     groupByListing,
+    refundSummary,
     slotLabelOf,
     soonBookings,
     startsWithinADay,
 } from '../model';
+import { bookingStatusMeta } from '../presentation';
 import { BookingEntry, EnquiryEntry } from '../types';
 
 const NOW = new Date(2026, 8, 15, 10, 0, 0); // 15 Sep 2026, 10:00 local
@@ -46,6 +49,8 @@ const booking = (overrides: Partial<BookingEntry> = {}): BookingEntry => ({
     listingStartsAt: null,
     cancelledAt: null,
     cancellationReason: null,
+    refundStatus: null,
+    refundAmount: null,
     ...overrides,
 });
 
@@ -151,8 +156,9 @@ describe('bookingStats', () => {
         const stats = bookingStats([
             booking({ status: 'confirmed', amount: 2000 }),
             booking({ status: 'attended', amount: 1000 }),
-            booking({ status: 'cancelled', paymentStatus: 'refunded', amount: 500 }),
-            booking({ status: 'cancelled', paymentStatus: 'paid', amount: 900 }),
+            booking({ status: 'cancelled', paymentStatus: 'refunded', refundStatus: 'settled', refundAmount: 500, amount: 500 }),
+            // Mid-refund: payment_status still says "paid" — it must not count as refunded.
+            booking({ status: 'cancelled', paymentStatus: 'paid', refundStatus: 'processing', refundAmount: 900, amount: 900 }),
         ]);
         expect(stats.confirmedCount).toBe(2);
         expect(stats.bookingValue).toBe(3000);
@@ -184,5 +190,48 @@ describe('soonBookings', () => {
         expect(summary.todayCount).toBe(1);
         expect(summary.tomorrowCount).toBe(1);
         expect(summary.rows.map((r) => r.id)).toEqual(['a', 'b']);
+    });
+});
+
+describe('refunds', () => {
+    const r = (id: string, refundStatus: any, refundAmount: number | null, cancelledAt: string) =>
+        booking({ id, status: 'cancelled', paymentStatus: 'paid', refundStatus, refundAmount, cancelledAt, amount: 999 });
+    const rows = [
+        r('settled-old', 'settled', 300, '2026-10-01T10:00:00Z'),
+        r('progress', 'processing', 500, '2026-10-05T10:00:00Z'),
+        r('requested', 'requested', 200, '2026-10-06T10:00:00Z'),
+        r('failed', 'failed', 750, '2026-10-02T10:00:00Z'),
+        booking({ id: 'active', status: 'confirmed', refundStatus: null, refundAmount: null }),
+    ];
+
+    it('sums each state — requested and processing are both "in progress"', () => {
+        expect(refundSummary(rows)).toEqual({
+            attention: { count: 1, amount: 750 },
+            in_progress: { count: 2, amount: 700 },
+            settled: { count: 1, amount: 300 },
+            total: 4,
+        });
+    });
+
+    it('lists failed first, then in progress, then settled — newest first within each — and never a booking without a refund', () => {
+        expect(filterRefunds(rows, 'all').map((e) => e.id)).toEqual(['failed', 'requested', 'progress', 'settled-old']);
+        expect(filterRefunds(rows, 'attention').map((e) => e.id)).toEqual(['failed']);
+        expect(filterRefunds(rows, 'in_progress').map((e) => e.id)).toEqual(['requested', 'progress']);
+    });
+
+    it('drives the badge from the refund status, not the payment status', () => {
+        // Mid-refund the payment still says "paid" — the badge must not read as a normal booking.
+        expect(bookingStatusMeta({ status: 'cancelled', paymentStatus: 'paid', refundStatus: 'processing' }).label).toBe(
+            'Refund in progress'
+        );
+        expect(bookingStatusMeta({ status: 'cancelled', paymentStatus: 'paid', refundStatus: 'requested' }).label).toBe(
+            'Refund in progress'
+        );
+        expect(bookingStatusMeta({ status: 'cancelled', paymentStatus: 'refunded', refundStatus: 'settled' }).label).toBe('Refunded');
+        expect(bookingStatusMeta({ status: 'cancelled', paymentStatus: 'paid', refundStatus: 'failed' })).toEqual({
+            label: 'Refund failed',
+            tone: 'red',
+        });
+        expect(bookingStatusMeta({ status: 'cancelled', paymentStatus: 'paid', refundStatus: null }).label).toBe('Cancelled');
     });
 });

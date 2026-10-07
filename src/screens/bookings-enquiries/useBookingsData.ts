@@ -4,7 +4,7 @@ import { loadPartnerListings } from '../../api/portalSummary';
 import { ApiError, cancelBooking, getAllBookings, markBookingAttended } from '../../api/listings';
 import { toast } from '../../components/ui';
 import { toNumber } from '../../utils/format';
-import { BookingEntity, BookingEntry, BookingStatus, PaymentStatus } from './types';
+import { BookingEntity, BookingEntry, BookingStatus, PaymentStatus, RefundStatus } from './types';
 
 // ---------------------------------------------------------------------------
 // Loads every booking (Event tickets + ticketed Venue slots) and attaches
@@ -22,6 +22,20 @@ const BOOKING_TYPE_TO_ENTITY: Record<string, BookingEntity | undefined> = {
     program: 'Programs',
 };
 const UNLINKED = '__unlinked__';
+
+const REFUND_STATUSES: RefundStatus[] = ['requested', 'processing', 'settled', 'failed'];
+
+/**
+ * A booking's refund state from the list row. `refund_status` is additive —
+ * an older or cached response without it means "no refund". A payment the API
+ * already marks "refunded" has settled by definition (it only flips once the
+ * money is back), so that still reads as Refunded.
+ */
+export const refundStatusOf = (rawRefundStatus: unknown, paymentStatus: PaymentStatus): RefundStatus | null => {
+    const s = String(rawRefundStatus ?? '').toLowerCase() as RefundStatus;
+    if (REFUND_STATUSES.includes(s)) return s;
+    return paymentStatus === 'refunded' ? 'settled' : null;
+};
 
 /**
  * The backend's booking statuses, mapped onto the four this screen buckets by
@@ -102,6 +116,8 @@ export const useBookingsData = (allowedEntities: EntityType[]) => {
                         listingStartsAt: startsById.get(listingId) ?? null,
                         cancelledAt: b?.cancelled_at || null,
                         cancellationReason: b?.cancellation_reason || reasonFallback,
+                        refundStatus: refundStatusOf(b?.refund_status, paymentStatus),
+                        refundAmount: b?.refund_amount != null && b.refund_amount !== '' ? toNumber(b.refund_amount) : null,
                     };
                 })
                 .filter((e): e is BookingEntry => e !== null);
@@ -131,8 +147,24 @@ export const useBookingsData = (allowedEntities: EntityType[]) => {
     // code-specific inline messaging (deadline passed, not refundable, etc.), not just a toast.
     const cancel = async (id: string, reason: string): Promise<{ success: true } | { success: false; code: string; message: string }> => {
         try {
-            await cancelBooking(id, reason);
-            setState((s) => ({ ...s, entries: s.entries.map((e) => (e.id === id ? { ...e, status: 'cancelled' } : e)) }));
+            const res: any = await cancelBooking(id, reason);
+            // The response is the booking detail with its new refund (status
+            // "processing") — show that straight away rather than a bare "Cancelled".
+            const refund = (res?.data ?? res)?.refund;
+            setState((s) => ({
+                ...s,
+                entries: s.entries.map((e) =>
+                    e.id === id
+                        ? {
+                              ...e,
+                              status: 'cancelled',
+                              cancelledAt: e.cancelledAt ?? new Date().toISOString(),
+                              refundStatus: refundStatusOf(refund?.status, e.paymentStatus) ?? 'processing',
+                              refundAmount: refund?.amount != null ? toNumber(refund.amount) : e.amount,
+                          }
+                        : e
+                ),
+            }));
             return { success: true };
         } catch (err: any) {
             const code = err instanceof ApiError ? err.code : '';

@@ -6,6 +6,7 @@ import { BookingEntity, BookingEntry, BookingWhen } from '../types';
 import { bookingStats, filterBookings, groupByListing, slotLabelOf } from '../model';
 import { BOOKING_ENTITY_LABEL, BOOKING_ENTITY_TONE, bookingStatusMeta, cancellationReasonText, cancelledOnLabel } from '../presentation';
 import { GroupedList } from './GroupedList';
+import { StatCard } from './StatCard';
 
 const PAGE_SIZE = 20;
 const SERVICE_LABEL: Record<BookingEntity, string> = { Events: 'Events', Venues: 'Venues', Classes: 'Classes', Programs: 'Programs' };
@@ -24,20 +25,6 @@ const CONTEXT_NOTE: Record<'all' | BookingEntity, string> = {
     Classes: 'Class bookings — only classes set to direct booking are paid upfront; the rest arrive as enquiries.',
     Programs: 'Program bookings — only programs set to direct booking are paid upfront; the rest arrive as enquiries.',
 };
-
-interface StatCardProps {
-    label: string;
-    value: string;
-    valueClassName?: string;
-    sub?: string;
-}
-const StatCard: React.FC<StatCardProps> = ({ label, value, valueClassName = '', sub }) => (
-    <div className="pt-stat">
-        <span className="pt-eyebrow">{label}</span>
-        <div className={`pt-stat-n ${valueClassName}`}>{value}</div>
-        {sub && <div className="text-[11.5px] text-tlb-muted mt-0.5">{sub}</div>}
-    </div>
-);
 
 interface BookingsPanelProps {
     entries: BookingEntry[];

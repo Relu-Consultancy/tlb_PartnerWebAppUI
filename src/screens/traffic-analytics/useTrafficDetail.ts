@@ -53,7 +53,6 @@ export const useTrafficDetail = (period: TrafficPeriodState, groupBy: TrafficGro
                 if (!isCurrent()) return;
                 setState({ loading: false, rows: [], total: 0, error: e?.message || 'Failed to load traffic detail' });
             }
-            // eslint-disable-next-line react-hooks/exhaustive-deps
         },
         [period.key, period.dateFrom, period.dateTo, groupBy, ready, begin]
     );
@@ -69,5 +68,10 @@ export const useTrafficDetail = (period: TrafficPeriodState, groupBy: TrafficGro
         load(next);
     };
 
-    return { ...state, loadMore };
+    const reload = useCallback(() => {
+        setPage(1);
+        load(1);
+    }, [load]);
+
+    return { ...state, loadMore, reload };
 };

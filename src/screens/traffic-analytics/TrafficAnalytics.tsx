@@ -13,6 +13,7 @@ import { TrafficPeriodPicker } from './components/TrafficPeriodPicker';
 import { TrafficTrendChart } from './components/TrafficTrendChart';
 import { SourceBreakdown } from './components/SourceBreakdown';
 import { TrafficDetailTable } from './components/TrafficDetailTable';
+import { RefreshCw } from 'lucide-react';
 
 interface Props {
     onNavigate: (screen: Screen) => void;
@@ -30,7 +31,7 @@ export const TrafficAnalytics: React.FC<Props> = ({ onNavigate }) => {
     const [period, setPeriod] = useState<TrafficPeriodState>({ key: DEFAULT_TRAFFIC_PERIOD, dateFrom: '', dateTo: '' });
     const [groupBy, setGroupBy] = useState<TrafficGroupBy>('day');
 
-    const { loading, traffic, error, ready, approvalRefused } = useTrafficData(period);
+    const { loading, traffic, error, ready, approvalRefused, reload: reloadData } = useTrafficData(period);
     const detail = useTrafficDetail(period, groupBy);
 
     // Same backstop as Analytics/Coupons: if the gate lets a partner through and
@@ -67,7 +68,26 @@ export const TrafficAnalytics: React.FC<Props> = ({ onNavigate }) => {
                         {traffic ? traffic.period.label : 'Where your views come from, day by day'}
                     </p>
                 </div>
-                <TrafficPeriodPicker value={period} onChange={setPeriod} />
+                <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            reloadData();
+                            detail.reload();
+                        }}
+                        disabled={loading || detail.loading}
+                        aria-label="Refresh traffic analytics"
+                        title="Refresh data"
+                        className="inline-flex items-center justify-center bg-white border border-tlb-line rounded-[10px] w-[38px] h-[38px] text-tlb-link hover:border-tlb-edge transition-colors disabled:opacity-50"
+                    >
+                        <RefreshCw
+                            size={15}
+                            strokeWidth={2.75}
+                            className={loading || detail.loading ? 'animate-spin text-tlb-muted' : ''}
+                        />
+                    </button>
+                    <TrafficPeriodPicker value={period} onChange={setPeriod} />
+                </div>
             </div>
 
             {!ready ? (

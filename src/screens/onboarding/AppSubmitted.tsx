@@ -21,7 +21,8 @@ export const AppSubmitted: React.FC<OnboardingProps> = ({ onNavigate }) => {
         <OnboardingShell
             title="Application Status"
             eyebrow="Under Review"
-            onBack={() => onNavigate('REGISTRATION')}
+            // No back button: the application is already submitted, and going
+            // back to Registration would let a partner re-edit or re-submit it.
             rightSlot={
                 <div className="hidden sm:flex items-center gap-1.5 bg-amber-50 text-amber-700 px-2.5 py-1 rounded-lg">
                     <Hourglass size={12} />
